@@ -1,0 +1,17 @@
+{
+  "name": "ds1-triple-randomizer",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -k \"npm run dev -w @ds1tr/backend\" \"npm run dev -w @ds1tr/desktop\"",
+    "build": "npm run build -w @ds1tr/contracts && npm run build -w @ds1tr/backend && npm run build -w @ds1tr/desktop",
+    "typecheck": "npm run typecheck -w @ds1tr/contracts && npm run typecheck -w @ds1tr/backend && npm run typecheck -w @ds1tr/desktop"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
