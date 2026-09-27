@@ -4,9 +4,10 @@ DS1 Triple Randomizer is licensed under GPL-3.0-only.
 
 No Dark Souls Remastered game data is included in this repository. A
 selective, pinned vendor of `kellernz1/ds-randomizer` (the files needed to
-build `DsrDataTool.dll`) is included under `engines/combined/vendor/` — see
-`engines/combined/vendor/UPSTREAM_PIN.md` for the exact pinned commit and
-file list.
+build `DsrDataTool.dll`, plus the minimal JavaScript generation core) is
+included under `engines/combined/vendor/` — see
+`engines/combined/vendor/UPSTREAM_PIN.md` for the exact pinned commit, the
+file list, and the blob-identity verification record.
 
 | Component | Upstream | License | Distribution policy |
 | --- | --- | --- | --- |

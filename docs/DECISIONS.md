@@ -60,3 +60,51 @@ building `DsrDataTool.dll` (`docs/COMBINED_ENGINE_INTEGRATION.md`,
    a build-tool location, not a vendored or committed file, and any
    contributor/agent hitting the same failure should do the same rather
    than request the registry change.
+
+## The vendored JS core is loaded by computed dynamic `import()`, and includes `writeOutput`
+
+Date: 2026-09-28
+
+Three choices made while vendoring the upstream JavaScript generation core
+(`docs/COMBINED_ENGINE_INTEGRATION.md`, "JS core vendor proof"):
+
+1. **`writeOutput` is part of the vendored boundary, not just `generate`.**
+   `generate()` alone is the pure core, but `patch-enemies --placements`
+   consumes `seed_<safeSeed>/randomizer.json` — exactly the layout
+   `core/output.js` writes and the layout the committed workspace planner
+   already encodes. Reimplementing it would fork that layout in two places
+   with nothing gained. `core/rng.js` and `data/prototype-data.js` come
+   along only because `generator.js` statically imports them.
+   `data/catalog.js` and `game/detection.js` stay out: catalog loading and
+   staleness verification are a separate, still-open concern.
+
+2. **Loading uses a runtime-computed dynamic `import()` of a `file:` URL,
+   with types hand-written in the backend.** A static TypeScript import
+   cannot reach the vendor tree — it sits outside the backend's `rootDir`,
+   so it either drags a file outside the program root into compilation
+   (TS6059) or fails to resolve as typed (TS2307). `pathToFileURL()` is
+   mandatory rather than cosmetic: a bare Windows `C:\…` path is not a
+   valid ESM specifier (`ERR_UNSUPPORTED_ESM_URL_SCHEME`). Types live in
+   `apps/backend/src/adapters/combinedRandomizerCore.ts` instead of `.d.ts`
+   files beside the vendored code, so vendored bytes stay byte-identical to
+   the pinned commit and a pin update is a pure file replacement.
+
+3. **Vendor identity is verified by Git blob object ID, not by `diff`.**
+   `core.autocrlf` is enabled on the development machine, so vendored files
+   are checked out with CRLF while upstream stores LF — a raw byte
+   comparison against a fresh clone reports false mismatches on Windows.
+   Blob object IDs are computed on the normalized content this repository
+   actually stores and distributes, which is what the GPL "corresponding
+   source" obligation is about. The IDs are recorded in
+   `engines/combined/vendor/UPSTREAM_PIN.md` so a future pin update has a
+   fixed baseline. A `.gitattributes` override was considered and rejected:
+   the stored blobs already match upstream exactly, so it would only change
+   working-copy bytes while adding churn to another task's files.
+
+A fourth, smaller consequence: `engines/combined/vendor/package.json` is
+**repository-authored, not vendored**. The vendored `.js` files are ES
+modules and the nearest enclosing manifest is this repository's root
+`package.json`, which is not `"type": "module"`, so Node would reparse each
+file (`MODULE_TYPELESS_PACKAGE_JSON`). Upstream's own `package.json` is not
+vendored because it carries Electron/`electron-builder` configuration that
+is out of scope; only the `"type": "module"` declaration is reproduced.

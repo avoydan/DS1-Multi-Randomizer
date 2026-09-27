@@ -8,8 +8,11 @@ This does not repeat the feature-parity analysis in
 [docs/source-analysis.md](source-analysis.md).
 
 Analyzed against upstream commit `f120efe0e95b957b7e76109868c3c9966e22720c`
-(2026-08-20), cloned read-only for this analysis. No upstream files were
-copied into this repository.
+(2026-08-20), originally cloned read-only for this analysis. Upstream files
+have since been selectively vendored at that exact commit under
+`engines/combined/vendor/` — see "Vendored build proof" and "JS core vendor
+proof" below, and `engines/combined/vendor/UPSTREAM_PIN.md` for the file
+list.
 
 ## Upstream files/functions/entry points
 
@@ -62,8 +65,11 @@ synchronous.
      `generate` itself, `outputDirectory`, the boolean randomize-* flags,
      `enemyScaling`, `includeDlc`, `generateSpoilerLog`, `useExtractedData`,
      `dryRun`). Unknown keys are ignored; missing keys fall back to
-     `defaultConfig`. `config.seed` must match `/^[\w.-]{1,64}$/` or
-     `validateConfig` throws.
+     `defaultConfig`. `config.seed` must match `/^[\w.-]{1,64}$/`, or
+     `validateConfig` reports it. **Correction (2026-09-28, verified
+     against the vendored source):** `validateConfig` *returns* a
+     `string[]` of human-readable errors and never throws — callers must
+     check the returned array, not catch an exception.
    - `gameCatalog`: a JSON object with `schemaVersion === 17` and non-empty
      `enemySlots`/`enemyArchetypes` arrays, produced only by
      `DsrDataTool scan`. **If omitted or incomplete, `generate` does not
@@ -172,9 +178,10 @@ CombinedRandomizerRequest
 Every `items.*` sub-flag must be ANDed with `items.enabled` (and likewise
 `enemies.*` with `enemies.enabled`): upstream has no master on/off switch
 per capability, only the individual flags. If both engines end up fully
-disabled, `validateConfig` throws (`"Enable at least one category to
-randomize."`), which the adapter must translate to a request-validation
-error before ever touching upstream, not a generation failure.
+disabled, `validateConfig` returns `["Enable at least one category to
+randomize."]` (it returns errors, it does not throw), which the adapter must
+translate to a request-validation error before ever touching upstream, not a
+generation failure.
 
 ## Workspace strategy
 
@@ -208,8 +215,8 @@ error before ever touching upstream, not a generation failure.
   directory — no contract change needed to expose it.
 - Failure codes (none exist upstream; all are adapter-invented, mapped
   from where the pipeline stage fails):
-  - `INVALID_CONFIG` — `validateConfig` errors, or request-shape problems
-    caught before calling upstream at all.
+  - `INVALID_CONFIG` — a non-empty `validateConfig` error array, or
+    request-shape problems caught before calling upstream at all.
   - `CATALOG_UNAVAILABLE` — no catalog for `gamePath`/`workspacePath` and
     `scan` was not requested or failed.
   - `CATALOG_STALE` — `verifyCatalogSources` mismatch; caller must
@@ -561,3 +568,165 @@ verification step.
   scope for this task.
 - Blockers 1-4 and 6 from the original integration analysis remain
   untouched, as instructed.
+
+## JS core vendor proof
+
+Resolves "the JS core is still unvendored" from the previous section, and
+answers the concrete question it left open: what exactly does the backend
+import, from where, and how. Does **not** call `generate()` or
+`writeOutput()` — executing a generation run is a later task.
+
+### The callable JS-core boundary
+
+Everything this repository needs from the upstream JavaScript core is six
+exports across three modules, all now vendored under
+`engines/combined/vendor/src/`:
+
+| Vendored module | Export | Signature | Notes |
+|---|---|---|---|
+| `core/config.js` | `RANDOMIZER_VERSION` | `string` | `"0.5.66"` at the pinned commit. Record it in the run manifest as the combined engine version. |
+| `core/config.js` | `defaultConfig` | frozen object | Every key the mapping layer may set; unknown keys are dropped by `normalizeConfig`. |
+| `core/config.js` | `normalizeConfig` | `(input?) => config` | Fills defaults, coerces booleans, trims strings, clamps `enemyScaling` to `vanilla \| area \| progressive`, and substitutes a random seed when `seed` is falsy. |
+| `core/config.js` | `validateConfig` | `(config, { requireGame? }) => string[]` | **Returns** an error array; never throws. Empty array means acceptable. Call with `requireGame: false` — `generate()` does not read `gameDirectory`. |
+| `core/generator.js` | `generate` | `(config, { gameCatalog? }) => result` | Pure and synchronous: no filesystem, network, timers, or ambient randomness. Throws only on internal impossibility (e.g. `"Could not create a safe boss permutation."`). |
+| `core/output.js` | `writeOutput` | `(result, baseDirectory) => Promise<string>` | The only async, filesystem-touching export. Writes `<baseDirectory>/seed_<safeSeed(result.seed)>/…` and resolves to that directory. |
+
+The result object keys this repository depends on are `schemaVersion`,
+`randomizerVersion`, `dataStatus`, `seed`, `config`, and `placementHash`.
+`dataStatus` is the load-bearing one: it is `"extracted"` only when a usable
+catalog was supplied, and `"prototype"` otherwise (Blocker 1).
+`result.validation.valid` remains hard-coded `true` upstream and must not be
+trusted.
+
+### Minimal module set and closed import graph
+
+Five files, which is the transitive closure of `generate()` and
+`writeOutput()`:
+
+```
+core/generator.js      generate()            <- entry point
+  core/rng.js          (static import)
+  core/config.js       (static import)       <- also an entry point
+  data/prototype-data.js (static import)
+core/output.js         writeOutput()         <- entry point, imports nothing local
+```
+
+Every module specifier appearing anywhere in those five files is either a
+Node builtin (`node:crypto`, `node:fs/promises`, `node:path`) or one of the
+three relative specifiers above. There are no dynamic `import()` calls, no
+`require()` calls, and no third-party packages, so the vendored set needs no
+`node_modules` and installs nothing.
+
+`core/rng.js` and `data/prototype-data.js` are vendored **only because
+`generator.js` statically imports them**, not because either is used on an
+accepted path: the prototype data set exists to feed upstream's
+catalog-less fallback, which must be rejected via `dataStatus`.
+
+Deliberately excluded: `src/cli.js`, `src/server.js`, `src/desktop/**`
+(CLI/HTTP/Electron layers), `src/core/share.js` (share links for upstream's
+own UI), and `src/data/catalog.js` + `src/game/detection.js` (catalog
+loading and staleness verification — a separate open concern, Blocker 6).
+Rationale per file: `engines/combined/vendor/UPSTREAM_PIN.md`.
+
+### Revision verification
+
+All twelve vendored files (the seven from the previous task plus these five)
+were verified equal to pinned commit
+`f120efe0e95b957b7e76109868c3c9966e22720c` by comparing Git blob object IDs
+rather than raw bytes, because `core.autocrlf` rewrites line endings on
+checkout on Windows and makes `diff -q` unreliable. The exact object IDs and
+the verification commands are recorded in
+`engines/combined/vendor/UPSTREAM_PIN.md` ("Verification method and recorded
+blob identities").
+
+### How the backend loads it
+
+`apps/backend/src/adapters/combinedRandomizerCore.ts` is the single loading
+boundary. Three mechanics are forced by the environment rather than chosen:
+
+1. **Dynamic `import()`, not a static TypeScript import.** The vendor tree
+   lies outside the backend's `rootDir: src`, so a static import would
+   either pull a file outside the program root into compilation (TS6059) or
+   fail to resolve as typed (TS2307). The loader instead computes the path
+   at runtime.
+2. **`pathToFileURL()` around the resolved path.** A bare Windows absolute
+   path (`C:\…`) is not a valid ESM specifier and is rejected with
+   `ERR_UNSUPPORTED_ESM_URL_SCHEME`, so every specifier is a `file:` URL.
+3. **An ESM scope marker at `engines/combined/vendor/package.json`.** The
+   vendored `.js` files are ES modules, but the nearest enclosing
+   `package.json` is this repository's root manifest, which is not
+   `"type": "module"`. Without the marker Node emits
+   `MODULE_TYPELESS_PACKAGE_JSON` and reparses each file. This one file is
+   repository-authored, not vendored: upstream's own `package.json` carries
+   Electron/`electron-builder` configuration that is out of scope, so only
+   its `"type": "module"` declaration is reproduced.
+
+The vendor root is resolved from `import.meta.url` with the same four-level
+`../../../../` pattern `core/pipeline.ts` already uses, which resolves to the
+repository root identically from `src/adapters` (under `tsx`) and
+`dist/adapters` (compiled), so no build-time path rewriting is needed.
+
+Types for the upstream exports are hand-written in the loader rather than
+placed in `.d.ts` files beside the vendored code, so the vendored bytes stay
+byte-identical to the pinned commit.
+
+`loadCombinedRandomizerCore()` returns a typed result instead of throwing:
+
+- `{ ok: true, core, coreRoot }`
+- `{ ok: false, code: 'JS_CORE_MISSING', message, specifier }` — a module
+  failed to import (absent vendor tree, unreadable file).
+- `{ ok: false, code: 'JS_CORE_INCOMPLETE', message, missingExports }` — the
+  tree loaded but does not expose the six documented exports, which means it
+  no longer matches the pinned commit.
+
+Both codes are new additions to the failure-code list under
+[Result mapping](#resulterrorprogress-mapping). `coreRoot` and
+`importModule` are injectable so both failures are testable without
+disturbing the real vendor directory.
+
+### Verification performed
+
+`npm run test -w @ds1tr/backend` (35 tests, all passing), including seven new
+tests that make the claims above executable rather than read off the source:
+
+- the vendored `src/` tree contains exactly the five expected files;
+- no vendored module references any specifier outside the allowed set, and
+  every allowed specifier is actually used (so the set cannot silently drift
+  in either direction);
+- `engines/combined/vendor/package.json` declares `"type": "module"`;
+- core modules are addressed as `file:` URLs;
+- a real load succeeds and exposes all six exports, with
+  `RANDOMIZER_VERSION === "0.5.66"` pinning the vendored revision
+  behaviourally;
+- `normalizeConfig`/`validateConfig` are callable with no game directory and
+  no filesystem access, and `validateConfig` returns `[]` rather than
+  throwing;
+- an absent vendor root yields `JS_CORE_MISSING`, and a stubbed importer
+  yields `JS_CORE_INCOMPLETE` with the exact missing-export list.
+
+Backend `npm run typecheck` and `npm run build` both pass. `generate()` was
+never called, no game directory was touched, and no file outside the
+repository was read or written.
+
+### Blockers unresolved by this task
+
+- **`core/pipeline.ts` still probes the wrong path.** `ExternalAdapter` for
+  the combined engine is configured with
+  `expectedSource: 'vendor/src/cli.js'` and
+  `expectedExecutable: 'vendor/DSR-Randomizer.exe'`
+  ([apps/backend/src/core/pipeline.ts](../apps/backend/src/core/pipeline.ts)).
+  Neither exists and neither should: `src/cli.js` is deliberately excluded,
+  and there is no upstream portable `.exe` in this integration model. The
+  engine-presence probe therefore keeps reporting the combined engine as
+  missing even though the core is now vendored. Correct targets are
+  `vendor/src/core/generator.js` and the built
+  `vendor/tools/DsrDataTool/bin/Release/net8.0/DsrDataTool.dll`. Changing
+  them is pipeline wiring, explicitly out of scope here, and belongs to the
+  task that wires the execution bridge.
+- **No public fork exists** — unchanged; see the previous section and
+  `docs/LICENSING.md`. Vendoring the JS core does not change this: it is the
+  same upstream repository under the same GPL-3.0-only terms.
+- **Blockers 1, 2, 3, and 6** (silent prototype fallback, seed charset,
+  missing `generateSpoilerLog` request field, catalog/game-dir coupling) are
+  untouched by this task. Blocker 5's build half stays resolved; the
+  `DsrDataTool.dll` runtime dependency is unchanged.

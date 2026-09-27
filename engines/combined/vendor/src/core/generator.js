@@ -1,0 +1,2311 @@
+import { createHash } from "node:crypto";
+import { createStream } from "./rng.js";
+import { normalizeConfig, validateConfig } from "./config.js";
+import {
+  enemies,
+  enemySlots,
+  bosses,
+  bossSlots,
+  items,
+  itemLocations,
+} from "../data/prototype-data.js";
+
+const byId = (values) => new Map(values.map((value) => [value.id, value]));
+const dragonBodyModels = new Set([
+  "c2300", // Titanite Demon
+  "c2730", // Crossbreed Priscilla
+  "c3420", // Undead Dragon
+  "c3421", // Bounding Demon / Undead Dragon legs
+  "c3430", // Hellkite Drake
+  "c3520", // Drake
+  "c5351", // Anor Londo Gargoyle (ordinary enemy)
+  "c4510", // Black Dragon Kalameet
+  "c5260", // Gaping Dragon
+  "c5290", // Seath the Scaleless
+]);
+const linkedPartModels = new Set([
+  "c2731", // Priscilla's tail
+  "c3422", // Undead Dragon wing
+  "c3431", // Hellkite tail
+  "c3451", // Everlasting Dragon tail; its friendly parent stays protected
+  "c3472", // Sanctuary Guardian tail
+  "c3531", // Hydra heads
+  "c4511", // Kalameet tail
+  "c5201", "c5202", // Centipede Demon limbs
+  "c5261", // Gaping Dragon tail
+  "c5291", // Seath's tail
+  "c5352", "c5353", // Gargoyle tails
+  "c5400", "c5401", // Bed of Chaos linked encounter parts
+]);
+const internalHelperModels = new Set([
+  "c3510", // Asylum transport crow
+  "c3511", // Alternate transport-crow dummy
+  // Translucent Black Knight memories in the Kiln are scenery-only actors.
+  // Their NPC/AI parameter IDs look valid, but they have no combat lifecycle.
+  "c2791",
+  // Invisible Mass of Souls wisps are moved only by their explicit linked
+  // group; standalone variants must never occupy an ordinary enemy slot.
+  "c3501",
+]);
+const MAX_ENEMY_MODELS_PER_MAP = 30;
+const staticBridgeDragonSpawn = Object.freeze({
+  x: 9.144,
+  y: 9.55,
+  z: -48.007,
+  collisionName: "h1113B1",
+});
+const staticBridgeCombatSourceByModel = new Map([
+  ["c2300", "m13_00_00_00:c2300_0000"],
+  ["c3420", "m16_00_00_00:c3420_0000"],
+  ["c3520", "m16_00_00_00:c3520_0007"],
+]);
+const dragonNames = new Map([
+  ["c2300", "Titanite Demon"],
+  ["c2730", "Crossbreed Priscilla"],
+  ["c3420", "Undead Dragon"],
+  ["c3421", "Bounding Demon"],
+  ["c3430", "Hellkite Drake"],
+  ["c3520", "Drake"],
+  ["c5351", "Anor Londo Gargoyle"],
+  ["c4510", "Black Dragon Kalameet"],
+  ["c5260", "Gaping Dragon"],
+  ["c5290", "Seath the Scaleless"],
+]);
+const additionalBossNames = new Map([
+  ["c3230", "Moonlight Butterfly"],
+  ["c5230", "Bed of Chaos"],
+  // The visible c5230 tree is not damageable outside its scripted arena. The
+  // c5401 chaos bug is the encounter's real vulnerable body and is therefore
+  // the portable representation used by the randomizer.
+  ["c5401", "Bed of Chaos"],
+  ["c5250", "Ceaseless Discharge"],
+  ["c5320", "Dark Sun Gwyndolin"],
+]);
+const bossArchetypeNames = new Map([
+  ["c2360:236001", "Super Smough"],
+  ["c5271:527100", "Super Ornstein"],
+]);
+const additionalBossModels = new Set(additionalBossNames.keys());
+const nonBossEncounterSlots = new Set([
+  // The Anor Londo gargoyles reuse a boss model/parameter family but are
+  // ordinary enemies without an encounter health bar.
+  "m15_01_00_00:c5351_0000",
+  "m15_01_00_00:c5351_0001",
+  // Crystal Cave butterflies share the Moonlight Butterfly model family, but
+  // they are ordinary patrol enemies and should remain in the enemy pool.
+  "m17_00_00_00:c3230_0000",
+  "m17_00_00_00:c3230_0001",
+  "m17_00_00_00:c3230_0002",
+]);
+const additionalBossSlots = new Set([
+  // Super Smough uses the phase-one model with distinct second-phase params,
+  // so model-based boss detection alone cannot discover it.
+  "m15_01_00_00:c2360_0001",
+]);
+const activeReplacementThinkParams = new Map([
+  // Ambush/defensive variants depend on their vanilla area setup. Use each
+  // model's ordinary combat brain when it is moved to an unrelated spawn.
+  ["c2670", 267000], // Male Ghost
+  ["c2680", 268000], // Female Ghost
+  ["c3330", 333000], // Pisaca
+  ["c2280", 228000], // Mushroom Child (non-ambush combat brain)
+  ["c2300", 230000], // Titanite Demon (portable combat brain)
+  ["c2780", 278000], // Mimic (awake combat brain; chest variants are event-bound)
+]);
+const forceCombatActivationModels = new Set([
+  "c2280", "c2300", "c2670", "c2680", "c2780",
+]);
+const tangibleGhostModels = new Set(["c2670", "c2680"]);
+const asylumPassiveSlots = new Set([
+  "m18_01_00_00:c2500_0000",
+  "m18_01_00_00:c2500_0001",
+  "m18_01_00_00:c2500_0002",
+]);
+const newLondoPassiveSlots = new Set(
+  Array.from(
+    { length: 15 },
+    (_, index) =>
+      `m16_00_00_00:c2500_${String(index).padStart(4, "0")}`,
+  ),
+);
+const additionalPassiveSlots = new Set([
+  // The second Black Knight in the Kiln should observe the destination's
+  // non-hostile opening behavior regardless of which enemy replaces it.
+  "m18_00_00_00:c2790_0002",
+]);
+const parishBonfirePassiveSlots = new Set([
+  // The Titanite Demon chamber is directly below the Undead Parish bonfire.
+  // Replacements must not acquire the player through the floor or stairwell.
+  "m10_01_00_00:c2300_0000",
+]);
+const deferredBossActivationRegions = new Map([
+  // The regions used by the vanilla battle events are beyond the fog gate and
+  // below the collapsing Asylum floor respectively. Waiting on the event ID
+  // itself is too late and can also expose the character for one load frame.
+  ["m10_01_00_00:c2250_0000", { enter: 1012701 }],
+  // The Butterfly is staged outside its bridge and the vanilla encounter
+  // event does not reliably wake grounded replacement bosses. Activate them
+  // only after the player crosses into the arena.
+  ["m12_00_00_00:c3230_0000", { enter: 1202896 }],
+  ["m12_00_00_01:c3230_0000", { enter: 1202896 }],
+  [
+    "m18_01_00_00:c2230_0000",
+    { enter: 1812896, warp: 1812302 },
+  ],
+]);
+const containedBossCombatRegions = new Map([
+  // Keep the first Asylum boss visible in its encounter. Pause it when the
+  // vanilla side gate closes behind the escaping player, and wake it only
+  // after the upper boss fog has actually been traversed.
+  [
+    "m18_01_00_00:c2232_0000",
+    { enter: 1812996, pauseFlag: 11810315, reentryFlag: 11815390 },
+  ],
+]);
+const safeBossSpawnPositions = new Map([
+  // The Asylum Demon encounter floor. The vanilla entity begins above this
+  // point and enters through a model-specific drop event.
+  ["m18_01_00_00:c2232_0000", { x: 3.41, y: 197.61, z: -23.1 }],
+  // Keep the second Asylum boss far below both playable floors. Its activation
+  // event warps it to region 1812302 only after the player reaches the lower
+  // arena, preventing tall replacements from clipping through the upper floor.
+  ["m18_01_00_00:c2230_0000", { x: 3.31, y: 100, z: -19 }],
+  // Taurus starts inside the tower and normally jumps to the bridge through
+  // a model-specific event. Replacements must begin directly on the bridge.
+  [
+    "m10_01_00_00:c2250_0000",
+    { x: 1.16, y: 15.82, z: -114.34, rotationY: -73.54 },
+  ],
+  // The second Bell Gargoyle has a rooftop staging position.
+  ["m10_01_00_00:c5350_0001", { x: 10.69, y: 48.92, z: 124.35 }],
+  ["m10_01_00_00:c5350_0002", { x: 6.14, y: 48.92, z: 124.35 }],
+  // The Butterfly and Ceaseless encounters also enter from event-controlled
+  // off-arena positions in vanilla.
+  [
+    "m12_00_00_00:c3230_0000",
+    { x: 196.12, y: 8.09, z: 62.25, rotationY: 27.37 },
+  ],
+  [
+    "m12_00_00_01:c3230_0000",
+    { x: 196.12, y: 8.09, z: 62.25, rotationY: 27.37 },
+  ],
+  [
+    "m14_01_00_00:c5250_0000",
+    { x: 396.14, y: -278.14, z: 74.56, rotationY: 130.84 },
+  ],
+  // The primary Four Kings body begins far below the actual combat plane and
+  // rises through a model-specific animation. Portable replacements do not
+  // use that animation, so place them directly on the plane used by the
+  // remaining king bodies.
+  [
+    "m16_00_00_00:c5390_0000",
+    { x: 12.22, y: -311, z: 8.09, rotationY: -88.32 },
+  ],
+]);
+
+const bedOfChaosSafeSpawn = Object.freeze({
+  x: 105.3,
+  y: -51.6,
+  z: 570.2,
+  rotationY: 180,
+});
+
+const bossArchetypeKey = (slot) => {
+  // The Bed destination uses the core entity watched by the vanilla victory
+  // event, while its portable archetype remains the visible c5230 boss body.
+  if (slot.id === "m14_01_00_00:c5401_0000") return "c5230:523000";
+  return `${slot.modelName}:${slot.npcParamId}`;
+};
+
+function effectiveBossSlots(catalog) {
+  const result = new Map(
+    (catalog.bossSlots || [])
+      .filter((slot) => !nonBossEncounterSlots.has(slot.id))
+      .map((slot) => [slot.id, slot]),
+  );
+  for (const slot of catalog.enemySlots) {
+    const modelId = Number(slot.modelName.slice(1));
+    if (
+      (additionalBossModels.has(slot.modelName) ||
+        additionalBossSlots.has(slot.id)) &&
+      !nonBossEncounterSlots.has(slot.id) &&
+      !slot.dummy &&
+      (slot.npcParamId === modelId * 100 || additionalBossSlots.has(slot.id)) &&
+      slot.thinkParamId > 1000
+    ) {
+      result.set(slot.id, slot);
+    }
+  }
+  const bedCore = catalog.enemySlots.find(
+    (slot) => slot.id === "m14_01_00_00:c5401_0000",
+  );
+  if (bedCore) result.set(bedCore.id, bedCore);
+  return [...result.values()];
+}
+
+function pickCompatibleEnemy(rng, slot, pool) {
+  const sizeOrder = { small: 0, medium: 1, large: 2 };
+  let candidates = pool.filter(
+    (enemy) => sizeOrder[enemy.size] <= sizeOrder[slot.maxSize],
+  );
+  if (candidates.length === 0) candidates = pool;
+  return candidates[rng.int(candidates.length)];
+}
+
+function randomizePrototypeEnemies(config) {
+  if (!config.randomizeEnemies) return [];
+  const rng = createStream(config.seed, "enemies", config.version);
+  const enemyIndex = byId(enemies);
+  return enemySlots.map((slot) => {
+    const replacement = pickCompatibleEnemy(rng, slot, enemies);
+    return {
+      slot: slot.id,
+      map: slot.map,
+      from: enemyIndex.get(slot.original).name,
+      to: replacement.name,
+      scaling: config.enemyScaling,
+      areaTier: slot.areaTier,
+    };
+  });
+}
+
+function bossGrounding(slot, catalog) {
+  const safePosition = safeBossSpawnPositions.get(slot.id) || slot.position;
+  return {
+    groundX: safePosition.x,
+    groundY: safePosition.y,
+    groundZ: safePosition.z,
+    groundRotationY: safePosition.rotationY ?? slot.rotation.y,
+  };
+}
+
+function enemyPlacement(config, target, source, scaledNpcParamId, extra = {}) {
+  const effectiveTargetThinkParamId =
+    extra.targetThinkParamId ?? source.thinkParamId;
+  const changed =
+    source.modelName !== target.modelName ||
+    source.npcParamId !== target.npcParamId ||
+    effectiveTargetThinkParamId !== target.thinkParamId;
+  const desiredInitialTeamType =
+    extra.initialTeamType ?? target.teamType;
+  const requiresTeamOverride =
+    Number.isInteger(desiredInitialTeamType) &&
+    source.teamType !== desiredInitialTeamType;
+  return {
+    slot: target.id,
+    sourceSlot: source.id,
+    sourceMap: source.mapId,
+    map: target.mapId,
+    entityId: target.entityId,
+    from: `${target.modelName} [NPC ${target.npcParamId} / AI ${target.thinkParamId}]`,
+    to: `${source.modelName} [NPC ${source.npcParamId} / AI ${source.thinkParamId}]`,
+    modelName: target.modelName,
+    targetModelName: source.modelName,
+    sourceNpcParamId: target.npcParamId,
+    sourceThinkParamId: target.thinkParamId,
+    targetNpcParamId: source.npcParamId,
+    targetThinkParamId: source.thinkParamId,
+    targetBattleGoalId: source.battleGoalId,
+    scaledNpcParamId:
+      (config.enemyScaling === "vanilla" || !changed) &&
+      extra.makeTangible !== true &&
+      !requiresTeamOverride &&
+      !(config.randomizeEnemyDrops && changed)
+        ? null
+        : scaledNpcParamId,
+    changed,
+    scaling: config.enemyScaling,
+    ...(requiresTeamOverride
+      ? { initialTeamType: desiredInitialTeamType }
+      : {}),
+    ...extra,
+  };
+}
+
+function buildDragonPlan(config, catalog) {
+  const bossSlotIds = new Set(effectiveBossSlots(catalog).map((slot) => slot.id));
+  const slots = catalog.enemySlots;
+  const byModel = (modelName, mapId = null) =>
+    slots.filter(
+      (slot) =>
+        slot.modelName === modelName &&
+        (!mapId || slot.mapId === mapId),
+    );
+  const unit = (id, bodies, parts = []) => ({ id, bodies, parts });
+  const hellkiteBodies = byModel("c3430", "m10_01_00_00");
+  const hellkitePrimary = hellkiteBodies.find(
+    (body) => body.id === "m10_01_00_00:c3430_0000",
+  );
+  const hellkiteAuxiliary = hellkiteBodies.filter(
+    (body) => body !== hellkitePrimary,
+  );
+  const hellkiteParts = byModel("c3431", "m10_01_00_00");
+  const anorGargoyleBodies = byModel("c5351", "m15_01_00_00")
+    .sort((left, right) => left.id.localeCompare(right.id));
+  const anorGargoyleParts = byModel("c5353", "m15_01_00_00")
+    .sort((left, right) => left.id.localeCompare(right.id));
+  const hydras = ["m12_00_00_00", "m12_00_00_01", "m13_02_00_00"]
+    .map((mapId) =>
+      unit(
+        `hydra-${mapId}`,
+        byModel("c3530", mapId),
+        byModel("c3531", mapId),
+      ))
+    .filter((entry) => entry.bodies.length && entry.parts.length === 7);
+  const hydraHeadTemplate = byModel("c3531", "m12_00_00_00")
+    .sort((left, right) => left.id.localeCompare(right.id));
+  const isHydra = (entry) => entry.id.startsWith("hydra-");
+  const simpleRegularDragons = [
+    ...(hellkitePrimary
+      ? [unit("hellkite-bridge", [hellkitePrimary], hellkiteParts)]
+      : []),
+    ...anorGargoyleBodies.map((body, index) =>
+      unit(
+        `anor-londo-gargoyle-${index}`,
+        [body],
+        anorGargoyleParts[index] ? [anorGargoyleParts[index]] : [],
+      )),
+    ...byModel("c2300").map((body) =>
+      unit(`titanite-demon-${body.id}`, [body])),
+    unit(
+      "valley-undead-dragon",
+      byModel("c3420", "m16_00_00_00"),
+    ),
+    ...byModel("c3520").map((body) => unit(`drake-${body.id}`, [body])),
+    ...hydras,
+    ...byModel("c3421", "m14_01_00_00").map((body) =>
+      unit(`bounding-${body.id}`, [body])),
+  ].filter((entry) => entry.bodies.length > 0);
+  const units = [
+    unit(
+      "priscilla",
+      byModel("c2730", "m11_00_00_00"),
+      byModel("c2731", "m11_00_00_00"),
+    ),
+    unit(
+      "painted-undead-dragon",
+      byModel("c3420", "m11_00_00_00"),
+      [
+        ...byModel("c3421", "m11_00_00_00"),
+        ...byModel("c3422", "m11_00_00_00"),
+      ],
+    ),
+    unit(
+      "kalameet",
+      byModel("c4510", "m12_01_00_00"),
+      byModel("c4511", "m12_01_00_00"),
+    ),
+    unit(
+      "gaping-dragon",
+      byModel("c5260", "m10_00_00_00"),
+      byModel("c5261", "m10_00_00_00"),
+    ),
+    unit(
+      "seath",
+      byModel("c5290", "m17_00_00_00").filter(
+        (body) => body.id === "m17_00_00_00:c5290_0001",
+      ),
+      byModel("c5291", "m17_00_00_00"),
+    ),
+  ].filter((entry) => entry.bodies.length > 0);
+
+  const enabled = units.filter((entry) => {
+    const boss = entry.bodies.some((body) => bossSlotIds.has(body.id));
+    return boss ? config.randomizeBosses : config.randomizeEnemies;
+  });
+  const assignments = new Map();
+  const rng = createStream(config.seed, "dragons", config.version);
+  const isBossUnit = (entry) =>
+    entry.bodies.some((body) => bossSlotIds.has(body.id));
+  const poolKeys = new Set(enabled.map(
+    (entry) => `${isBossUnit(entry) ? "boss" : "regular"}:${entry.parts.length}`,
+  ));
+  for (const poolKey of poolKeys) {
+    const targets = enabled.filter(
+      (entry) =>
+        `${isBossUnit(entry) ? "boss" : "regular"}:${entry.parts.length}` ===
+        poolKey,
+    );
+    const sources = shuffledWithoutFixedPoints(rng, targets);
+    targets.forEach((target, index) => assignments.set(target.id, sources[index]));
+  }
+
+  const areaNames = new Map(
+    (catalog.maps || []).map((map) => [map.id, map.name]),
+  );
+  const bossNames = catalog.bossNames || {};
+  const result = { enemies: [], bosses: [], reservedSlotIds: new Set() };
+  let enemyIndex = 0;
+  let bossIndex = 0;
+  if (config.randomizeEnemies && simpleRegularDragons.length > 1) {
+    const simpleSources = shuffledWithoutNativeTitaniteDemon(
+      rng,
+      simpleRegularDragons,
+    );
+    simpleRegularDragons.forEach((target, index) => {
+      const source = simpleSources[index];
+      const targetBody = target.bodies[0];
+      const shuffledSourceBody = source.bodies[0];
+      const portableCombatSourceId =
+        staticBridgeCombatSourceByModel.get(shuffledSourceBody.modelName);
+      const sourceBody = portableCombatSourceId
+        ? slots.find((slot) => slot.id === portableCombatSourceId) ??
+          shuffledSourceBody
+        : shuffledSourceBody;
+      const targetIsHydra = isHydra(target);
+      const sourceIsHydra = isHydra(source);
+      const targetPosition = target.id === "hellkite-bridge"
+        ? staticBridgeDragonSpawn
+        : targetBody.position;
+      const portableCollisionName = target.id === "hellkite-bridge"
+        ? staticBridgeDragonSpawn.collisionName
+        : targetBody.collisionName;
+      const portableHydraEntityBase = 9_650_000 + index * 10;
+      const placementExtra = sourceIsHydra && !targetIsHydra
+        ? {
+            compatibility: "portable-hydra-dragon-permutation",
+            linkedDragonGroup: target.id,
+            portableHydraGroup: true,
+            entityId: portableHydraEntityBase,
+            groundX: targetPosition.x,
+            groundY: targetPosition.y,
+            groundZ: targetPosition.z,
+            targetCollisionName: portableCollisionName,
+            forceCombatActivation: true,
+            ...(target.id === "hellkite-bridge"
+              ? {
+                  staticBridgeDragon: true,
+                  ...(config.randomizeEnemyDrops
+                    ? { awardItemLotId: 34_310_000 }
+                    : {}),
+                }
+              : {}),
+          }
+        : sourceIsHydra && targetIsHydra
+          ? {
+              compatibility: "linked-hydra-dragon-permutation",
+              linkedDragonGroup: target.id,
+              linkedEnemyGroup: target.id,
+              // Each lake has its own authored combat distances and goals.
+              // Keep those destination parameters when Hydras swap lakes.
+              targetNpcParamId: targetBody.npcParamId,
+              targetThinkParamId: targetBody.thinkParamId,
+              targetBattleGoalId: targetBody.battleGoalId,
+              forceCombatActivation: targetBody.entityId >= 0,
+            }
+          : target.id === "hellkite-bridge"
+            ? {
+                compatibility: "static-bridge-dragon-permutation",
+                linkedDragonGroup: target.id,
+                staticBridgeDragon: true,
+                // The vanilla Hellkite actor is neutral until its fly-in
+                // lifecycle changes allegiance. Static replacements skip that
+                // lifecycle, so make the bridge occupant hostile immediately.
+                initialTeamType: 0,
+                forceCombatActivation: true,
+                groundX: staticBridgeDragonSpawn.x,
+                groundY: staticBridgeDragonSpawn.y,
+                groundZ: staticBridgeDragonSpawn.z,
+                targetCollisionName: staticBridgeDragonSpawn.collisionName,
+                ...(config.randomizeEnemyDrops
+                  ? { awardItemLotId: 34_310_000 }
+                  : {}),
+              }
+            : {
+                compatibility: "dragon-only-group-permutation",
+                linkedDragonGroup: target.id,
+                ...(forceCombatActivationModels.has(sourceBody.modelName) &&
+                targetBody.entityId >= 0
+                  ? { forceCombatActivation: true }
+                  : {}),
+              };
+      if (
+        sourceBody.modelName === "c2730" &&
+        targetBody.mapId !== "m11_00_00_00"
+      ) {
+        placementExtra.preventInvisibility = true;
+      }
+      if (parishBonfirePassiveSlots.has(targetBody.id)) {
+        Object.assign(placementExtra, {
+          compatibility: "passive-parish-bonfire-permutation",
+          passiveUntilAttacked: true,
+          holdAiUntilAttacked: true,
+          initialTeamType: 2,
+          baseThinkParamId: sourceBody.thinkParamId,
+          destinationThinkParamId: targetBody.thinkParamId,
+          targetThinkParamId: 9_700_000 + enemyIndex,
+          preserveDestinationPerception: true,
+        });
+        delete placementExtra.forceCombatActivation;
+      }
+      result.reservedSlotIds.add(targetBody.id);
+      result.enemies.push(enemyPlacement(
+        config,
+        targetBody,
+        sourceBody,
+        9_150_000 + enemyIndex++,
+        placementExtra,
+      ));
+
+      if (targetIsHydra) {
+        target.parts.forEach((targetPart, partIndex) => {
+          result.reservedSlotIds.add(targetPart.id);
+          if (sourceIsHydra) {
+            const sourcePart = source.parts[partIndex];
+            result.enemies.push(enemyPlacement(
+              config,
+              targetPart,
+              sourcePart,
+              9_150_000 + enemyIndex++,
+              {
+                compatibility: "linked-hydra-dragon-permutation",
+                linkedDragonGroup: target.id,
+                linkedEnemyGroup: target.id,
+                targetNpcParamId: targetPart.npcParamId,
+                targetThinkParamId: targetPart.thinkParamId,
+                targetBattleGoalId: targetPart.battleGoalId,
+                forceCombatActivation: targetPart.entityId >= 0,
+              },
+            ));
+          } else {
+            result.enemies.push(enemyPlacement(
+              config,
+              targetPart,
+              targetPart,
+              null,
+              {
+                compatibility: "disabled-native-hydra-head",
+                linkedDragonGroup: target.id,
+                linkedEnemyGroup: target.id,
+                disableEntity: true,
+                groundX: targetPart.position.x,
+                groundY: -1000,
+                groundZ: targetPart.position.z,
+              },
+            ));
+          }
+        });
+      } else if (sourceIsHydra) {
+        const templateBody = hydras[0].bodies[0];
+        source.parts.forEach((sourcePart, partIndex) => {
+          const templatePart = hydraHeadTemplate[partIndex];
+          const offset = {
+            x: templatePart.position.x - templateBody.position.x,
+            y: templatePart.position.y - templateBody.position.y,
+            z: templatePart.position.z - templateBody.position.z,
+          };
+          const yawDelta =
+            (targetBody.rotation.y - templateBody.rotation.y) * Math.PI / 180;
+          const rotatedX =
+            offset.x * Math.cos(yawDelta) - offset.z * Math.sin(yawDelta);
+          const rotatedZ =
+            offset.x * Math.sin(yawDelta) + offset.z * Math.cos(yawDelta);
+          const syntheticName = `dsr_hydra_${index}_${partIndex}`;
+          result.enemies.push({
+            ...enemyPlacement(
+              config,
+              {
+                ...templatePart,
+                id: `${targetBody.mapId}:${syntheticName}`,
+                mapId: targetBody.mapId,
+                name: syntheticName,
+                entityId: portableHydraEntityBase + partIndex + 1,
+                collisionName: portableCollisionName,
+                position: {
+                  x: targetPosition.x + rotatedX,
+                  y: targetPosition.y + offset.y,
+                  z: targetPosition.z + rotatedZ,
+                },
+                rotation: {
+                  ...templatePart.rotation,
+                  y: targetBody.rotation.y +
+                    (templatePart.rotation.y - templateBody.rotation.y),
+                },
+              },
+              sourcePart,
+              9_150_000 + enemyIndex++,
+              {
+                compatibility: "synthetic-linked-hydra-head",
+                linkedDragonGroup: target.id,
+                linkedEnemyGroup: target.id,
+                portableHydraGroup: true,
+                syntheticEnemy: true,
+                entityId: portableHydraEntityBase + partIndex + 1,
+                groundX: targetPosition.x + rotatedX,
+                groundY: targetPosition.y + offset.y,
+                groundZ: targetPosition.z + rotatedZ,
+                groundRotationY: targetBody.rotation.y +
+                  (templatePart.rotation.y - templateBody.rotation.y),
+                targetCollisionName: portableCollisionName,
+                forceCombatActivation: true,
+              },
+            ),
+            sourceSlot: hydraHeadTemplate[partIndex].id,
+            sourceMap: hydraHeadTemplate[partIndex].mapId,
+          });
+        });
+      } else {
+        target.parts.forEach((targetPart, partIndex) => {
+          result.reservedSlotIds.add(targetPart.id);
+          const sourcePart = source.parts[partIndex];
+          if (sourcePart) {
+            result.enemies.push(enemyPlacement(
+              config,
+              targetPart,
+              sourcePart,
+              9_150_000 + enemyIndex++,
+              {
+                compatibility: "linked-dragon-part-permutation",
+                linkedDragonGroup: target.id,
+              },
+            ));
+          } else {
+            result.enemies.push(enemyPlacement(
+              config,
+              targetPart,
+              targetPart,
+              null,
+              {
+                compatibility: "disabled-unmatched-dragon-part",
+                linkedDragonGroup: target.id,
+                disableEntity: true,
+                groundX: targetPart.position.x,
+                groundY: -1000,
+                groundZ: targetPart.position.z,
+              },
+            ));
+          }
+        });
+        if (source.parts.length > target.parts.length) {
+          const sourceBodyTemplate = source.bodies[0];
+          source.parts.slice(target.parts.length).forEach(
+            (sourcePart, sourcePartIndex) => {
+              const partIndex = target.parts.length + sourcePartIndex;
+              const offsetX = sourcePart.position.x - sourceBodyTemplate.position.x;
+              const offsetY = sourcePart.position.y - sourceBodyTemplate.position.y;
+              const offsetZ = sourcePart.position.z - sourceBodyTemplate.position.z;
+              const yawDelta =
+                (targetBody.rotation.y - sourceBodyTemplate.rotation.y) * Math.PI / 180;
+              const rotatedX =
+                offsetX * Math.cos(yawDelta) - offsetZ * Math.sin(yawDelta);
+              const rotatedZ =
+                offsetX * Math.sin(yawDelta) + offsetZ * Math.cos(yawDelta);
+              const syntheticEntityId = 9_660_000 + index * 10 + partIndex;
+              const syntheticName = `dsr_dragon_part_${index}_${partIndex}`;
+              result.enemies.push({
+                ...enemyPlacement(
+                  config,
+                  {
+                    ...sourcePart,
+                    id: `${targetBody.mapId}:${syntheticName}`,
+                    mapId: targetBody.mapId,
+                    name: syntheticName,
+                    entityId: syntheticEntityId,
+                    collisionName: targetBody.collisionName,
+                    position: {
+                      x: targetPosition.x + rotatedX,
+                      y: targetPosition.y + offsetY,
+                      z: targetPosition.z + rotatedZ,
+                    },
+                    rotation: {
+                      ...sourcePart.rotation,
+                      y: targetBody.rotation.y +
+                        (sourcePart.rotation.y - sourceBodyTemplate.rotation.y),
+                    },
+                  },
+                  sourcePart,
+                  9_150_000 + enemyIndex++,
+                  {
+                    compatibility: "synthetic-linked-dragon-part",
+                    linkedDragonGroup: target.id,
+                    syntheticEnemy: true,
+                    entityId: syntheticEntityId,
+                    groundX: targetPosition.x + rotatedX,
+                    groundY: targetPosition.y + offsetY,
+                    groundZ: targetPosition.z + rotatedZ,
+                    groundRotationY: targetBody.rotation.y +
+                      (sourcePart.rotation.y - sourceBodyTemplate.rotation.y),
+                    targetCollisionName: targetBody.collisionName,
+                  },
+                ),
+                sourceSlot: sourcePart.id,
+                sourceMap: sourcePart.mapId,
+              });
+            },
+          );
+        }
+      }
+    });
+    for (const auxiliary of hellkiteAuxiliary) {
+      result.reservedSlotIds.add(auxiliary.id);
+      result.enemies.push(enemyPlacement(
+        config,
+        auxiliary,
+        auxiliary,
+        null,
+        {
+          compatibility: "disabled-hellkite-flight-auxiliary",
+          linkedDragonGroup: "hellkite-bridge",
+          disableEntity: true,
+          groundX: auxiliary.position.x,
+          groundY: -1000,
+          groundZ: auxiliary.position.z,
+        },
+      ));
+    }
+  }
+  for (const target of enabled) {
+    const source = assignments.get(target.id);
+    [...target.bodies, ...target.parts].forEach((slot) =>
+      result.reservedSlotIds.add(slot.id),
+    );
+    target.bodies.forEach((targetBody, index) => {
+      const sourceBody = source.bodies[index % source.bodies.length];
+      const isBoss = bossSlotIds.has(targetBody.id);
+      const extra = isBoss
+        ? {
+            originalBossName:
+              bossNames[targetBody.modelName] ||
+              dragonNames.get(targetBody.modelName) ||
+              targetBody.modelName,
+            randomizedBossName:
+              bossNames[sourceBody.modelName] ||
+              dragonNames.get(sourceBody.modelName) ||
+              sourceBody.modelName,
+            encounterLocation: {
+              area: areaNames.get(targetBody.mapId) || targetBody.mapId,
+              map: targetBody.mapId,
+              slot: targetBody.name,
+            },
+            compatibility: "grounded-dragon-group-permutation",
+            ...bossGrounding(targetBody, catalog),
+            linkedDragonGroup: target.id,
+            forceCombatActivation: targetBody.entityId >= 0,
+          }
+        : target.id === "hellkite-bridge"
+        ? {
+            compatibility: "static-bridge-dragon-permutation",
+            linkedDragonGroup: target.id,
+            staticBridgeDragon: true,
+            initialTeamType: 0,
+            groundX: staticBridgeDragonSpawn.x,
+            groundY: staticBridgeDragonSpawn.y,
+            groundZ: staticBridgeDragonSpawn.z,
+            targetCollisionName: staticBridgeDragonSpawn.collisionName,
+            forceCombatActivation: targetBody.entityId >= 0,
+            ...(config.randomizeEnemyDrops
+              ? { awardItemLotId: 34_310_000 }
+              : {}),
+          }
+        : {
+            compatibility: "dragon-only-group-permutation",
+            linkedDragonGroup: target.id,
+            forceCombatActivation: targetBody.entityId >= 0,
+          };
+      if (
+        sourceBody.modelName === "c2730" &&
+        targetBody.mapId !== "m11_00_00_00"
+      ) {
+        extra.preventInvisibility = true;
+      }
+      const placement = enemyPlacement(
+        config,
+        targetBody,
+        sourceBody,
+        isBoss ? 9_250_000 + bossIndex++ : 9_150_000 + enemyIndex++,
+        extra,
+      );
+      (isBoss ? result.bosses : result.enemies).push(placement);
+    });
+    target.parts.forEach((targetPart, index) => {
+      const sourcePart = source.parts[index];
+      result.enemies.push(enemyPlacement(
+        config,
+        targetPart,
+        sourcePart,
+        9_150_000 + enemyIndex++,
+        {
+          compatibility: "linked-dragon-part-permutation",
+          linkedDragonGroup: target.id,
+        },
+      ));
+    });
+  }
+
+  if (config.randomizeBosses) {
+    const linkedBossRng = createStream(
+      config.seed,
+      "linked-bosses",
+      config.version,
+    );
+    const linkedBosses = [
+      unit(
+        "sanctuary-guardian",
+        byModel("c3471", "m12_01_00_00"),
+        byModel("c3472", "m12_01_00_00"),
+      ),
+      unit(
+        "bell-gargoyles",
+        byModel("c5350", "m10_01_00_00"),
+        byModel("c5352", "m10_01_00_00"),
+      ),
+      unit(
+        "centipede-demon",
+        byModel("c5200", "m14_01_00_00"),
+        [
+          ...byModel("c5201", "m14_01_00_00"),
+          ...byModel("c5202", "m14_01_00_00"),
+        ],
+      ),
+    ].filter((entry) => entry.bodies.length && entry.parts.length);
+    const linkedBossSources = shuffledWithoutFixedPoints(
+      linkedBossRng,
+      linkedBosses,
+    );
+    linkedBosses.forEach((target, unitIndex) => {
+      const source = linkedBossSources[unitIndex];
+      const singleBellReplacement =
+        target.id === "bell-gargoyles" && source.id !== "bell-gargoyles";
+      [...target.bodies, ...target.parts].forEach((slot) =>
+        result.reservedSlotIds.add(slot.id),
+      );
+      target.bodies.forEach((targetBody, index) => {
+        if (singleBellReplacement && index > 0) {
+          result.enemies.push(enemyPlacement(
+            config,
+            targetBody,
+            targetBody,
+            null,
+            {
+              compatibility: "disabled-extra-bell-gargoyle-body",
+              linkedEnemyGroup: target.id,
+              disableEntity: true,
+              killDisabledEntity: true,
+            },
+          ));
+          return;
+        }
+        const sourceBody = source.bodies[index % source.bodies.length];
+        const isBossSlot = bossSlotIds.has(targetBody.id);
+        const placement = enemyPlacement(
+          config,
+          targetBody,
+          sourceBody,
+          isBossSlot
+            ? 9_300_000 + bossIndex++
+            : 9_350_000 + enemyIndex++,
+          isBossSlot
+            ? {
+                originalBossName:
+                  bossNames[targetBody.modelName] || targetBody.modelName,
+                randomizedBossName:
+                  bossNames[sourceBody.modelName] || sourceBody.modelName,
+                encounterLocation: {
+                  area: areaNames.get(targetBody.mapId) || targetBody.mapId,
+                  map: targetBody.mapId,
+                  slot: targetBody.name,
+                },
+                compatibility: "grounded-linked-boss-group-permutation",
+                ...bossGrounding(targetBody, catalog),
+                linkedEnemyGroup: target.id,
+                forceCombatActivation: targetBody.entityId >= 0,
+              }
+            : {
+                compatibility: "grounded-linked-boss-auxiliary",
+                ...bossGrounding(targetBody, catalog),
+                linkedEnemyGroup: target.id,
+              },
+        );
+        (isBossSlot ? result.bosses : result.enemies).push(placement);
+      });
+      target.parts.forEach((targetPart, index) => {
+        if (singleBellReplacement && index > 0) {
+          result.enemies.push(enemyPlacement(
+            config,
+            targetPart,
+            targetPart,
+            null,
+            {
+              compatibility: "disabled-extra-bell-gargoyle-part",
+              linkedEnemyGroup: target.id,
+              disableEntity: true,
+            },
+          ));
+          return;
+        }
+        const sourcePart = source.parts[index % source.parts.length];
+        result.enemies.push(enemyPlacement(
+          config,
+          targetPart,
+          sourcePart,
+          9_350_000 + enemyIndex++,
+          {
+            compatibility: "linked-boss-part-permutation",
+            linkedEnemyGroup: target.id,
+          },
+        ));
+      });
+    });
+
+    const bedVisualBodies = byModel("c5230", "m14_01_00_00");
+    const bedArmBodies = byModel("c5400", "m14_01_00_00");
+    const bedCoreBodies = byModel("c5401", "m14_01_00_00");
+    [...bedVisualBodies, ...bedArmBodies].forEach((slot) =>
+      result.reservedSlotIds.add(slot.id),
+    );
+    for (const part of [...bedVisualBodies, ...bedArmBodies]) {
+      result.enemies.push(enemyPlacement(config, part, part, null, {
+        compatibility: "disabled-bed-of-chaos-script-part",
+        linkedEnemyGroup: "bed-of-chaos",
+        disableEntity: true,
+        killDisabledEntity: true,
+      }));
+    }
+
+    const fourKingBodies = byModel("c5390", "m16_00_00_00")
+      .sort((left, right) => left.id.localeCompare(right.id));
+    for (const part of fourKingBodies.slice(1)) {
+      result.reservedSlotIds.add(part.id);
+      result.enemies.push(enemyPlacement(config, part, part, null, {
+        compatibility: "disabled-extra-four-kings-body",
+        linkedEnemyGroup: "four-kings",
+        disableEntity: true,
+        killDisabledEntity: true,
+      }));
+    }
+    // The core entity (1410802) is retained as the Bed destination because the
+    // vanilla victory event watches it. The general boss planner replaces its
+    // model and parameters and places it on the intact arena floor.
+  }
+  return result;
+}
+
+function buildMassOfSoulsPlan(config, catalog) {
+  if (!config.randomizeEnemies) {
+    return { placements: [], reservedSlotIds: new Set() };
+  }
+  const slotsById = new Map(catalog.enemySlots.map((slot) => [slot.id, slot]));
+  const group = (index, wispStart) => {
+    const ids = [
+      `m16_00_00_00:c3500_000${index}`,
+      ...Array.from(
+        { length: 6 },
+        (_, offset) =>
+          `m16_00_00_00:c3501_${String(wispStart + offset).padStart(4, "0")}`,
+      ),
+    ];
+    return ids.map((id) => slotsById.get(id)).filter(Boolean);
+  };
+  const groups = [group(0, 0), group(1, 6)];
+  if (groups.some((entry) => entry.length !== 7)) {
+    return { placements: [], reservedSlotIds: new Set() };
+  }
+  const reservedSlotIds = new Set(groups.flat().map((slot) => slot.id));
+  const placements = [];
+  groups.forEach((targetGroup, groupIndex) => {
+    const sourceGroup = groups[1 - groupIndex];
+    targetGroup.forEach((target, index) => {
+      placements.push(enemyPlacement(
+        config,
+        target,
+        sourceGroup[index],
+        null,
+        {
+          compatibility: "linked-mass-of-souls-group-permutation",
+          linkedEnemyGroup: `mass-of-souls-${groupIndex}`,
+        },
+      ));
+    });
+  });
+  return { placements, reservedSlotIds };
+}
+
+function randomizeExtractedEnemies(config, catalog, dragonPlan, bossPlan) {
+  if (!config.randomizeEnemies) return dragonPlan.enemies;
+  const rng = createStream(config.seed, "enemies", config.version);
+  const massOfSoulsPlan = buildMassOfSoulsPlan(config, catalog);
+  const bossSlotIds = new Set(effectiveBossSlots(catalog).map((slot) => slot.id));
+  const bossFamilyModels = new Set(
+    effectiveBossSlots(catalog).flatMap((slot) => [
+      slot.modelName,
+      canonicalBossModel.get(slot.modelName) || slot.modelName,
+    ]),
+  );
+  const slots = catalog.enemySlots.filter(
+    (slot) =>
+      /^m1[0-8]_/u.test(slot.mapId) &&
+      !bossSlotIds.has(slot.id) &&
+      !dragonPlan.reservedSlotIds.has(slot.id) &&
+      !massOfSoulsPlan.reservedSlotIds.has(slot.id) &&
+      slot.teamType === 0 &&
+      slot.modelName !== "c0000" &&
+      slot.modelName.startsWith("c") &&
+      slot.npcParamId > 0 &&
+      slot.thinkParamId > 0 &&
+      slot.baseHp > 0 &&
+      (!bossFamilyModels.has(slot.modelName) ||
+        nonBossEncounterSlots.has(slot.id)) &&
+      !dragonBodyModels.has(slot.modelName) &&
+      !linkedPartModels.has(slot.modelName) &&
+      !internalHelperModels.has(slot.modelName),
+  );
+
+  const regularSlotIds = new Set(slots.map((slot) => slot.id));
+  const specialPlacements = [
+    ...massOfSoulsPlan.placements,
+    ...dragonPlan.enemies,
+    ...dragonPlan.bosses,
+    ...bossPlan,
+  ];
+  const specialModelBySlot = new Map(
+    specialPlacements.map((placement) => [
+      placement.slot,
+      placement.targetModelName,
+    ]),
+  );
+  const fixedModelsByMap = new Map();
+  const addFixedModel = (mapId, modelName) => {
+    if (!fixedModelsByMap.has(mapId)) fixedModelsByMap.set(mapId, new Set());
+    fixedModelsByMap.get(mapId).add(modelName);
+  };
+  for (const slot of catalog.enemySlots) {
+    if (regularSlotIds.has(slot.id)) continue;
+    addFixedModel(
+      slot.mapId,
+      specialModelBySlot.get(slot.id) ?? slot.modelName,
+    );
+  }
+  for (const placement of specialPlacements) {
+    addFixedModel(placement.map, placement.targetModelName);
+  }
+
+  const shuffledSources = limitUniqueEnemyModelsByMap(
+    slots,
+    shuffledWithoutFixedPoints(rng, slots),
+    MAX_ENEMY_MODELS_PER_MAP,
+    fixedModelsByMap,
+  );
+  const assignment = new Map(
+    slots.map((target, index) => [target.id, shuffledSources[index]]),
+  );
+  const newLondoGroundAnchors = catalog.enemySlots
+    .filter((slot) =>
+      slot.mapId === "m16_00_00_00" &&
+      slot.modelName === "c2390" &&
+      !slot.dummy &&
+      slot.position &&
+      slot.collisionName)
+    .sort((left, right) => left.id.localeCompare(right.id));
+
+  function groundedNewLondoGhostSpawn(slot, index) {
+    if (newLondoGroundAnchors.length === 0) return null;
+    const anchor = newLondoGroundAnchors.reduce((best, candidate) => {
+      const distance = Math.hypot(
+        candidate.position.x - slot.position.x,
+        candidate.position.y - slot.position.y,
+        candidate.position.z - slot.position.z,
+      );
+      return !best || distance < best.distance
+        ? { slot: candidate, distance }
+        : best;
+    }, null).slot;
+    let directionX = slot.position.x - anchor.position.x;
+    let directionZ = slot.position.z - anchor.position.z;
+    const length = Math.hypot(directionX, directionZ);
+    if (length < 0.01) {
+      const angle = index * 2.399963229728653;
+      directionX = Math.cos(angle);
+      directionZ = Math.sin(angle);
+    } else {
+      directionX /= length;
+      directionZ /= length;
+    }
+    return {
+      x: anchor.position.x + directionX * 1.25,
+      y: anchor.position.y + 0.25,
+      z: anchor.position.z + directionZ * 1.25,
+      collisionName: anchor.collisionName,
+    };
+  }
+
+  const randomized = slots.map((slot, index) => {
+    const replacement = assignment.get(slot.id) ?? slot;
+    const passiveUntilAttacked =
+      asylumPassiveSlots.has(slot.id) ||
+      newLondoPassiveSlots.has(slot.id) ||
+      additionalPassiveSlots.has(slot.id);
+    const replacementThinkParamId =
+      activeReplacementThinkParams.get(replacement.modelName) ??
+      replacement.thinkParamId;
+    const changed =
+      replacement.modelName !== slot.modelName ||
+      replacement.npcParamId !== slot.npcParamId ||
+      replacementThinkParamId !== slot.thinkParamId;
+    const makeTangible = tangibleGhostModels.has(replacement.modelName);
+    const replacesWallPhasingGhost =
+      slot.mapId === "m16_00_00_00" &&
+      tangibleGhostModels.has(slot.modelName) &&
+      !tangibleGhostModels.has(replacement.modelName);
+    const groundedGhostSpawn = replacesWallPhasingGhost
+      ? groundedNewLondoGhostSpawn(slot, index)
+      : null;
+    const cloneThinkParam = changed || passiveUntilAttacked;
+    const darkrootButterflyPath =
+      (slot.mapId === "m12_00_00_00" || slot.mapId === "m12_00_00_01") &&
+      slot.modelName === "c2330";
+    const requiresCombatEvent =
+      forceCombatActivationModels.has(replacement.modelName) ||
+      darkrootButterflyPath;
+    const assignedEntityId =
+      (passiveUntilAttacked || requiresCombatEvent) && slot.entityId < 0
+        ? 16_099_000 + index
+        : slot.entityId;
+    return enemyPlacement(config, slot, replacement, 9_100_000 + index, {
+      entityId: assignedEntityId,
+      ...(cloneThinkParam
+        ? {
+            baseThinkParamId: replacementThinkParamId,
+            destinationThinkParamId: slot.thinkParamId,
+            targetThinkParamId: 9_600_000 + index,
+            preserveDestinationPerception: !darkrootButterflyPath,
+          }
+        : {
+            targetThinkParamId: replacementThinkParamId,
+          }),
+      ...(makeTangible ? { makeTangible: true } : {}),
+      ...(groundedGhostSpawn
+        ? {
+            groundX: groundedGhostSpawn.x,
+            groundY: groundedGhostSpawn.y,
+            groundZ: groundedGhostSpawn.z,
+            targetCollisionName: groundedGhostSpawn.collisionName,
+          }
+        : {}),
+      ...(requiresCombatEvent &&
+      !passiveUntilAttacked && assignedEntityId >= 0
+        ? { forceCombatActivation: true }
+        : {}),
+      ...(passiveUntilAttacked
+        ? {
+            passiveUntilAttacked: true,
+            // The event still changes allegiance after the first hit, but the
+            // initial PARAM team prevents AI from targeting the player before
+            // the map constructor has started that event.
+            initialTeamType: 2,
+          }
+        : {}),
+      compatibility: passiveUntilAttacked
+        ? asylumPassiveSlots.has(slot.id)
+          ? "passive-asylum-source-ai-permutation"
+          : newLondoPassiveSlots.has(slot.id)
+            ? "passive-new-londo-entrance-permutation"
+            : "passive-until-attacked-permutation"
+        : groundedGhostSpawn
+          ? "grounded-new-londo-ghost-slot-permutation"
+          : darkrootButterflyPath
+            ? "active-darkroot-butterfly-path-permutation"
+            : changed
+              ? "count-preserving-unrestricted-permutation"
+              : replacement.id !== slot.id
+                ? "count-preserving-identical-source-permutation"
+                : "count-preserving-fixed-point",
+    });
+  });
+  return randomized
+    .concat(massOfSoulsPlan.placements)
+    .concat(dragonPlan.enemies);
+}
+
+const canonicalBossModel = new Map([
+  ["c5351", "c5350"],
+]);
+const nonPortableBossReplacementModels = new Set();
+
+function shuffledPortableBosses(rng, archetypeKeys, archetypes) {
+  const portable = archetypes.filter(
+    (archetype) =>
+      !nonPortableBossReplacementModels.has(archetype.modelName),
+  );
+  if (portable.length === 0) return [...archetypes];
+  const candidates = [...portable];
+  while (candidates.length < archetypes.length) {
+    candidates.push(portable[rng.int(portable.length)]);
+  }
+  for (let attempt = 0; attempt < 128; attempt += 1) {
+    const shuffled = rng.shuffle(candidates);
+    if (shuffled.every((replacement, index) => {
+      const replacementModel =
+        canonicalBossModel.get(replacement.modelName) || replacement.modelName;
+      const replacementKey = bossArchetypeKey(replacement);
+      const targetKey = archetypeKeys[index];
+      const targetModel = targetKey.split(":")[0];
+      return (
+        replacementKey !== targetKey &&
+        // Ceaseless Discharge's retreat/navigation logic walks into the
+        // Taurus tower walls on the narrow Undead Burg bridge.
+        !(targetModel === "c2250" && replacementModel === "c5250")
+      );
+    })) {
+      return shuffled;
+    }
+  }
+  throw new Error("Could not create a safe boss permutation.");
+}
+
+function randomizeExtractedBosses(config, catalog, dragonPlan) {
+  if (!config.randomizeBosses || !catalog?.bossSlots?.length) return [];
+  const rng = createStream(config.seed, "bosses", config.version);
+  const areaNames = new Map(
+    (catalog.maps || []).map((map) => [map.id, map.name]),
+  );
+  const bossNames = catalog.bossNames || {};
+  const effectiveSlots = effectiveBossSlots(catalog);
+  const sources = effectiveSlots.filter(
+    (slot) =>
+      !dragonPlan.reservedSlotIds.has(slot.id) &&
+      slot.id !== "m14_01_00_00:c5230_0000" &&
+      slot.npcParamId >= 0 &&
+      slot.thinkParamId >= 0,
+  );
+  const archetypeKeys = [
+    ...new Set(sources.map((slot) => bossArchetypeKey(slot))),
+  ];
+  const archetypes = archetypeKeys.map((archetypeKey) =>
+    sources.find((slot) => bossArchetypeKey(slot) === archetypeKey),
+  );
+  const shuffled = shuffledPortableBosses(rng, archetypeKeys, archetypes);
+  const replacementsByModel = new Map();
+  archetypeKeys.forEach((archetypeKey, index) =>
+    replacementsByModel.set(archetypeKey, shuffled[index]),
+  );
+  const placements = sources.map((slot, index) => {
+    const sourceArchetypeKey = bossArchetypeKey(slot);
+    const sourceArchetypeIndex = archetypeKeys.indexOf(sourceArchetypeKey);
+    const sourceModelName = sourceArchetypeKey.split(":")[0];
+    const replacement = replacementsByModel.get(sourceArchetypeKey);
+    const originalBossName =
+      bossArchetypeNames.get(sourceArchetypeKey) ||
+      bossNames[sourceModelName] ||
+      additionalBossNames.get(sourceModelName) ||
+      `${sourceModelName} [NPC ${slot.npcParamId}]`;
+    const randomizedBossName =
+      bossArchetypeNames.get(bossArchetypeKey(replacement)) ||
+      bossNames[replacement.modelName] ||
+      additionalBossNames.get(replacement.modelName) ||
+      `${replacement.modelName} [NPC ${replacement.npcParamId}]`;
+    const deferredActivation = deferredBossActivationRegions.get(slot.id);
+    const portableThinkParamId = deferredActivation
+      ? 9_700_000 + sourceArchetypeIndex
+      : replacement.thinkParamId;
+    return enemyPlacement(config, slot, replacement, 9_200_000 + index, {
+      ...(deferredActivation
+        ? {
+            // Preserve the replacement's battle goal while borrowing the
+            // destination arena's detection distances. Several bosses (Nito
+            // in particular) otherwise remain idle outside their native map.
+            baseThinkParamId: replacement.thinkParamId,
+            destinationThinkParamId: slot.thinkParamId,
+            targetThinkParamId: portableThinkParamId,
+            preserveDestinationPerception: true,
+          }
+        : {}),
+      originalBossName,
+      randomizedBossName,
+      encounterLocation: {
+        area: areaNames.get(slot.mapId) || slot.mapId,
+        map: slot.mapId,
+        slot: slot.name,
+      },
+      compatibility: slot.id === "m14_01_00_00:c5401_0000"
+        ? "grounded-flat-floor-bed-of-chaos"
+        : canonicalBossModel.has(slot.modelName)
+        ? "linked-boss-form"
+        : "grounded-unrestricted-boss-permutation",
+      ...(deferredActivation
+        ? {
+            activationRegionId:
+              deferredActivation.enter,
+            ...(deferredActivation.warp
+              ? {
+                  activationWarpRegionId:
+                    deferredActivation.warp,
+                }
+              : {}),
+          }
+        : {}),
+      ...(slot.id === "m15_00_00_00:c2320_0000"
+        ? { activationRegionId: 1502996 }
+        : {}),
+      ...(containedBossCombatRegions.has(slot.id)
+        ? {
+            combatRegionId: containedBossCombatRegions.get(slot.id).enter,
+            combatPauseFlagId:
+              containedBossCombatRegions.get(slot.id).pauseFlag,
+            combatReentryFlagId:
+              containedBossCombatRegions.get(slot.id).reentryFlag,
+          }
+        : {}),
+      ...(replacement.modelName === "c2730" &&
+      slot.mapId !== "m11_00_00_00"
+        ? { preventInvisibility: true }
+        : {}),
+      // Some portable boss brains start in a neutral/waiting state when they
+      // are transplanted into another encounter. If the destination does not
+      // already use a deferred or contained activation event, add a small
+      // combat event that enables AI and replans goals as soon as the map
+      // constructor runs.
+      ...(slot.entityId >= 0 ? { forceCombatActivation: true } : {}),
+      portableBossSanitization: slot.modelName !== replacement.modelName ||
+        slot.npcParamId !== replacement.npcParamId,
+      ...(slot.id === "m14_01_00_00:c5401_0000"
+        ? {
+            groundX: bedOfChaosSafeSpawn.x,
+            groundY: bedOfChaosSafeSpawn.y,
+            groundZ: bedOfChaosSafeSpawn.z,
+            groundRotationY: bedOfChaosSafeSpawn.rotationY,
+            preserveBedOfChaosFloor: true,
+          }
+        : bossGrounding(slot, catalog)),
+    });
+  });
+  return placements.concat(dragonPlan.bosses);
+}
+
+function randomizableWorldItemLots(config, catalog) {
+  if (!catalog?.worldItemLots?.length) return [];
+  const permanentlyFixedGoods = new Set([2010, 2015]);
+  const permanentlyFixedNames = new Set([
+    "Archive Prison Extra Key",
+    "Archive Tower Giant Cell Key",
+    "Archive Tower Giant Door Key",
+  ]);
+  const isPermanentlyFixed = (lot) =>
+    lot.entries?.some(
+      (entry) =>
+        entry.category === 0x40000000 &&
+        permanentlyFixedGoods.has(entry.itemId),
+    ) ||
+    lot.name === "Dungeon Cell Key" ||
+    lot.name === "Undead Asylum F2 East Key" ||
+    permanentlyFixedNames.has(lot.name);
+  return catalog.worldItemLots.filter(
+    (lot) =>
+      !isPermanentlyFixed(lot) &&
+      (lot.protectedProgression
+        ? config.randomizeProtectedItems
+        : config.randomizeItems),
+  );
+}
+
+const bulkShopGoodNames = new Set([
+  "Throwing Knife",
+  "Poison Throwing Knife",
+  "Firebomb",
+  "Black Firebomb",
+  "Dung Pie",
+  "Lloyd's Talisman",
+  "Alluring Skull",
+  "Prism Stone",
+]);
+
+const randomizableProtectedShopItems = new Set([
+  "Armor Smithbox",
+  "Bottomless Box",
+  "Crest of Artorias",
+  "Master Key",
+  "Repairbox",
+  "Weapon Smithbox",
+  "Book of the Guilty",
+  "Dried Finger",
+  "Eye of Death",
+  "Orange Guidance Soapstone",
+  "Divine Blessing",
+  "Gold Pine Resin",
+  "Humanity",
+  "Purging Stone",
+  "Transient Curse",
+  "Twin Humanities",
+  "Cast Light",
+  "Fire Orb",
+  "Great Combustion",
+  "Great Heal Excerpt",
+  "Homeward",
+  "Iron Flesh",
+  "Magic Weapon",
+  "Seek Guidance",
+  "Soul Spear",
+  "Force",
+  "Great Heal",
+  "Heal",
+  "Karmic Justice",
+  "Magic Barrier",
+  "Wrath of the Gods",
+  "Combustion",
+  "Fire Whip",
+  "Fireball",
+  "Firestorm",
+  "Flash Sweat",
+  "Great Fireball",
+  "Poison Mist",
+  "Toxic Mist",
+  "Undead Rapport",
+  "Aural Decoy",
+  "Chameleon",
+  "Crystal Magic Weapon",
+  "Crystal Soul Spear",
+  "Fall Control",
+  "Great Heavy Soul Arrow",
+  "Great Soul Arrow",
+  "Heavy Soul Arrow",
+  "Hidden Body",
+  "Hidden Weapon",
+  "Homing Crystal Soulmass",
+  "Homing Soulmass",
+  "Magic Shield",
+  "Repair",
+  "Resist Curse",
+  "Soul Arrow",
+]);
+
+function canonicalShopItemName(name) {
+  return String(name).replace(/^(?:Sorcery|Pyromancy|Miracle):\s*/u, "");
+}
+
+function isBulkShopConsumable(entry) {
+  return (
+    (entry.equipType === 0 && /(?:Arrow|Bolt)$/u.test(entry.name)) ||
+    (entry.equipType === 3 && bulkShopGoodNames.has(entry.name))
+  );
+}
+
+function isConsumableSoul(entry) {
+  return (
+    /^(?:Large )?Soul of /u.test(entry.name) ||
+    entry.name === "Fire Keeper Soul"
+  );
+}
+
+function isUnsupportedCutItem(entry) {
+  // Escape Death is an unfinished miracle. It remains in ShopLineupParam and
+  // has residual English metadata, but retail localized Magic_name tables do
+  // not provide a usable player-facing name for ID 5200.
+  return entry.equipType === 4 && entry.itemId === 5200;
+}
+
+function shopPurchaseLimit(entry) {
+  if (isBulkShopConsumable(entry)) return 99;
+  if (isConsumableSoul(entry)) return 1;
+  if (
+    entry.equipType === 0 ||
+    entry.equipType === 1 ||
+    entry.equipType === 4 ||
+    /^(?:Sorcery|Pyromancy|Miracle):/u.test(entry.name)
+  ) {
+    return 1;
+  }
+  return 10;
+}
+
+function randomizeExtractedItemLots(config, catalog) {
+  const worldLots = randomizableWorldItemLots(config, catalog);
+  const protectedGiftRows = new Set([1090, 1100]);
+  const giftLots = config.randomizeGifts
+    ? (catalog?.gifts || []).filter(
+        (gift) =>
+          !config.progressionLogic || !protectedGiftRows.has(gift.rowId),
+      )
+    : [];
+  const enemyLots = config.randomizeEnemyDrops
+    ? catalog?.enemyDropLots || []
+    : [];
+  const shopRows = config.randomizeShops
+    ? (catalog?.shopEntries || []).filter(
+        (entry) =>
+          !(entry.equipType === 4 && entry.equipId === 5200) &&
+          (!config.progressionLogic ||
+            entry.equipType !== 3 ||
+            entry.eventFlag < 0 ||
+            randomizableProtectedShopItems.has(canonicalShopItemName(entry.name))),
+      )
+    : [];
+  const allLots = [
+    ...worldLots.map((lot) => ({ ...lot, pool: "world" })),
+    ...giftLots.map((lot) => ({ ...lot, pool: "gift" })),
+    ...enemyLots.map((lot) => ({ ...lot, pool: "enemy" })),
+  ];
+  if (allLots.some((lot) => !Array.isArray(lot.entries))) {
+    throw new Error(
+      "The item catalog has no per-slot data. Verify the clean game and import its data again.",
+    );
+  }
+  const lotTargets = allLots.flatMap((lot) =>
+    lot.entries.map((entry) => ({
+      ...entry,
+      rowId: lot.rowId,
+      mapId: lot.mapId,
+      pool: lot.pool,
+      kind: "lot",
+      progression: Boolean(lot.protectedProgression),
+      name: entry.name || lot.name,
+    })).filter((entry) => !isUnsupportedCutItem(entry)),
+  );
+  const shopTargets = shopRows.map((entry) => ({
+    rowId: entry.rowId,
+    pool: "shop",
+    kind: "shop",
+    slot: null,
+    itemId: entry.equipId,
+    category:
+      entry.equipType === 0
+        ? 0
+        : entry.equipType === 1
+          ? 0x10000000
+          : entry.equipType === 2
+            ? 0x20000000
+            : 0x40000000,
+    equipType: entry.equipType,
+    quantity: 1,
+    name: entry.name,
+    eventFlag: entry.eventFlag,
+    progression: false,
+  }));
+  const shopOnlyTargets = shopTargets.filter(isBulkShopConsumable);
+  const globalTargets = [
+    ...lotTargets,
+    ...shopTargets.filter((entry) => !isBulkShopConsumable(entry)),
+  ];
+  const result = { items: [], gifts: [], enemyDrops: [], shops: [] };
+  if (globalTargets.length + shopOnlyTargets.length < 2) return result;
+
+  const areaNames = new Map(
+    (catalog.maps || []).map((map) => [map.id, map.name]),
+  );
+  const describeLocation = (entry) =>
+    entry.pool === "world"
+      ? {
+          area: areaNames.get(entry.mapId) || entry.mapId,
+          map: entry.mapId,
+          itemLot: entry.rowId,
+        }
+      : entry.pool === "gift"
+        ? {
+            area: `NPC gift: ${entry.name}`,
+            map: "ItemLotParam",
+            itemLot: entry.rowId,
+          }
+        : entry.pool === "shop"
+          ? {
+              area: `Shop inventory: ${entry.name}`,
+              map: "ShopLineupParam",
+              itemLot: entry.rowId,
+            }
+          : {
+              area: `Enemy drop: ${entry.name}`,
+              map: "ItemLotParam",
+              itemLot: entry.rowId,
+            };
+  const addPlacement = (target, source) => {
+    const singleQuantity =
+      [0, 1, 2, 4].includes(source.equipType) ||
+      /^(Sorcery|Pyromancy|Miracle):/.test(source.name);
+    const placement = {
+      rowId: target.rowId,
+      sourceRowId: source.rowId,
+      sourceSlot: source.slot,
+      targetKind: target.kind,
+      targetSlot: target.slot,
+      itemId: source.itemId,
+      itemCategory: source.category,
+      equipType: source.equipType,
+      itemQuantity: singleQuantity
+        ? 1
+        : Math.max(1, Number(source.quantity) || 1),
+      ...(target.kind === "shop"
+        ? { shopQuantity: shopPurchaseLimit(source) }
+        : {}),
+      from: target.name,
+      to: source.name,
+      itemName: source.name,
+      sourcePool: source.pool,
+      targetPool: target.pool,
+      originalLocation: describeLocation(source),
+      randomizedLocation: describeLocation(target),
+      progression: source.progression,
+      preserved:
+        target.kind === source.kind &&
+        target.rowId === source.rowId &&
+        target.slot === source.slot,
+    };
+    if (target.pool === "world") {
+      placement.location = `itemlot:${target.rowId}`;
+      placement.map = target.mapId;
+      result.items.push(placement);
+    } else if (target.pool === "gift") {
+      result.gifts.push(placement);
+    } else if (target.pool === "enemy") {
+      result.enemyDrops.push(placement);
+    } else {
+      result.shops.push(placement);
+    }
+  };
+  for (const [stream, targets] of [
+    ["all-item-sources", globalTargets],
+    ["shop-consumables", shopOnlyTargets],
+  ]) {
+    if (targets.length === 0) continue;
+    const rng = createStream(config.seed, stream, config.version);
+    let sources = stream === "all-item-sources"
+      ? shuffledWithoutDlcRestrictedItems(rng, targets)
+      : shuffledWithoutFixedPoints(rng, targets);
+    if (stream === "all-item-sources") {
+      sources = keepConsumableSoulsInFiniteShops(targets, sources);
+    }
+    targets.forEach((target, index) => addPlacement(target, sources[index]));
+  }
+  return result;
+}
+
+function keepConsumableSoulsInFiniteShops(targets, initialSources) {
+  const sources = [...initialSources];
+  const invalid = () => targets
+    .map((target, index) => ({ target, index }))
+    .filter(({ target, index }) =>
+      target.kind === "shop" &&
+      target.eventFlag < 0 &&
+      isConsumableSoul(sources[index]));
+  for (const { index: soulIndex } of invalid()) {
+    const donorIndex = targets.findIndex((target, index) =>
+      target.kind === "shop" &&
+      target.eventFlag >= 0 &&
+      !isConsumableSoul(sources[index]) &&
+      sources[index] !== targets[soulIndex] &&
+      sources[soulIndex] !== target);
+    if (donorIndex < 0) {
+      throw new Error(
+        "Could not assign consumable souls to finite shop stock.",
+      );
+    }
+    [sources[soulIndex], sources[donorIndex]] =
+      [sources[donorIndex], sources[soulIndex]];
+  }
+  return sources;
+}
+
+function isDlcRestrictedItem(entry) {
+  return (
+    entry.progression === true ||
+    /(?:Titanite|\bEmber\b)/iu.test(entry.name) ||
+    entry.name === "Havel's Ring" ||
+    entry.name === "Fire Keeper Soul" ||
+    entry.name === "Rusted Iron Ring"
+  );
+}
+
+function shuffledWithoutNativeTitaniteDemon(rng, values) {
+  if (values.length < 2) return [...values];
+  for (let attempt = 0; attempt < 256; attempt += 1) {
+    const shuffled = shuffledWithoutFixedPoints(rng, values);
+    if (shuffled.every((value, index) => {
+      const targetModel = values[index].bodies[0]?.modelName;
+      const sourceModel = value.bodies[0]?.modelName;
+      return targetModel !== "c2300" || sourceModel !== "c2300";
+    })) {
+      return shuffled;
+    }
+  }
+  throw new Error("Could not keep Titanite Demons out of native Titanite Demon slots.");
+}
+
+function shuffledWithoutDlcRestrictedItems(rng, values) {
+  if (values.length < 2) return [...values];
+  for (let attempt = 0; attempt < 32; attempt += 1) {
+    const shuffled = shuffledWithoutFixedPoints(rng, values);
+    const badTargets = values
+      .map((target, index) => ({ target, index }))
+      .filter(
+        ({ target, index }) =>
+          target.mapId === "m12_01_00_00" &&
+          isDlcRestrictedItem(shuffled[index]),
+      );
+    let repaired = true;
+    for (const { index: dlcIndex } of badTargets) {
+      const restrictedSource = shuffled[dlcIndex];
+      const donorIndex = values.findIndex(
+        (target, index) =>
+          target.mapId !== "m12_01_00_00" &&
+          !isDlcRestrictedItem(shuffled[index]) &&
+          shuffled[index] !== values[dlcIndex] &&
+          restrictedSource !== target,
+      );
+      if (donorIndex < 0) {
+        repaired = false;
+        break;
+      }
+      [shuffled[dlcIndex], shuffled[donorIndex]] =
+        [shuffled[donorIndex], shuffled[dlcIndex]];
+    }
+    if (repaired) return shuffled;
+  }
+  throw new Error(
+    "Could not keep DLC-restricted items out of DLC locations.",
+  );
+}
+
+function shuffledWithoutFixedPoints(rng, values) {
+  if (values.length < 2) return [...values];
+  for (let attempt = 0; attempt < 32; attempt += 1) {
+    const shuffled = rng.shuffle(values);
+    if (shuffled.every((value, index) => value !== values[index])) return shuffled;
+  }
+  return [...values.slice(1), values[0]];
+}
+
+function limitUniqueEnemyModelsByMap(
+  targets,
+  initialSources,
+  maximumUnique,
+  fixedModelsByMap = new Map(),
+) {
+  const sources = [...initialSources];
+  const indicesByMap = new Map();
+  targets.forEach((target, index) => {
+    if (!indicesByMap.has(target.mapId)) indicesByMap.set(target.mapId, []);
+    indicesByMap.get(target.mapId).push(index);
+  });
+
+  const modelCounts = () => {
+    const result = new Map();
+    for (const [mapId, indices] of indicesByMap) {
+      const counts = new Map();
+      for (const modelName of fixedModelsByMap.get(mapId) ?? []) {
+        counts.set(modelName, 1);
+      }
+      for (const index of indices) {
+        const modelName = sources[index].modelName;
+        counts.set(modelName, (counts.get(modelName) || 0) + 1);
+      }
+      result.set(mapId, counts);
+    }
+    return result;
+  };
+
+  for (let pass = 0; pass < 200; pass += 1) {
+    let countsByMap = modelCounts();
+    const overBudget = [...countsByMap]
+      .filter(([, counts]) => counts.size > maximumUnique)
+      .sort((left, right) =>
+        right[1].size - left[1].size ||
+        left[0].localeCompare(right[0]));
+    if (overBudget.length === 0) return sources;
+
+    let madeProgress = false;
+    for (const [mapId, initialCounts] of overBudget) {
+      const mapIndices = indicesByMap.get(mapId);
+      const models = [...initialCounts]
+        .sort((left, right) =>
+          left[1] - right[1] ||
+          left[0].localeCompare(right[0]));
+      for (const [modelName] of models) {
+        const sourceIndices = mapIndices.filter(
+          (index) => sources[index].modelName === modelName,
+        );
+        const before = [...sources];
+        let completed = true;
+
+        for (const sourceIndex of sourceIndices) {
+          countsByMap = modelCounts();
+          const destinationCounts = countsByMap.get(mapId);
+          const candidates = [];
+          for (
+            let partnerIndex = 0;
+            partnerIndex < sources.length;
+            partnerIndex += 1
+          ) {
+            const partnerMap = targets[partnerIndex].mapId;
+            const partnerModel = sources[partnerIndex].modelName;
+            if (
+              partnerMap === mapId ||
+              partnerModel === modelName ||
+              !destinationCounts.has(partnerModel) ||
+              sources[sourceIndex].id === targets[partnerIndex].id ||
+              sources[partnerIndex].id === targets[sourceIndex].id
+            ) {
+              continue;
+            }
+
+            const partnerCounts = countsByMap.get(partnerMap);
+            const partnerUniqueAfter =
+              partnerCounts.size +
+              (partnerCounts.has(modelName) ? 0 : 1) -
+              (partnerCounts.get(partnerModel) === 1 ? 1 : 0);
+            if (partnerUniqueAfter > maximumUnique) continue;
+            candidates.push({
+              index: partnerIndex,
+              introducesModel: partnerCounts.has(modelName) ? 0 : 1,
+              uniqueAfter: partnerUniqueAfter,
+              currentUnique: partnerCounts.size,
+            });
+          }
+
+          candidates.sort((left, right) =>
+            left.introducesModel - right.introducesModel ||
+            left.uniqueAfter - right.uniqueAfter ||
+            left.currentUnique - right.currentUnique ||
+            left.index - right.index);
+          if (candidates.length === 0) {
+            completed = false;
+            break;
+          }
+          const partnerIndex = candidates[0].index;
+          [sources[sourceIndex], sources[partnerIndex]] =
+            [sources[partnerIndex], sources[sourceIndex]];
+        }
+
+        const uniqueAfter = modelCounts().get(mapId).size;
+        if (completed && uniqueAfter < initialCounts.size) {
+          madeProgress = true;
+          break;
+        }
+        sources.splice(0, sources.length, ...before);
+      }
+    }
+
+    if (!madeProgress) {
+      const unresolved = [...modelCounts()]
+        .filter(([, counts]) => counts.size > maximumUnique)
+        .map(([mapId, counts]) => `${mapId}=${counts.size}`)
+        .join(", ");
+      throw new Error(
+        `Could not satisfy the per-map enemy model budget: ${unresolved}`,
+      );
+    }
+  }
+  throw new Error("Enemy model-budget balancing did not converge.");
+}
+
+function randomizeStartingClasses(config, catalog) {
+  if (
+    (!config.randomizeStartingClass && !config.randomizeStartingEquipment) ||
+    !catalog?.startingClasses?.length
+  ) {
+    return [];
+  }
+  const classes = catalog.startingClasses;
+  const statsRng = createStream(config.seed, "starting-classes", config.version);
+  const equipmentRng = createStream(
+    config.seed,
+    "starting-equipment",
+    config.version,
+  );
+  const statsSources = config.randomizeStartingClass
+    ? shuffledWithoutFixedPoints(statsRng, classes)
+    : classes;
+  const equipmentPools = catalog.startingEquipmentPools;
+  const hasGeneralEquipmentPools = Boolean(
+    equipmentPools?.weapons?.length &&
+      equipmentPools?.helms?.length &&
+      equipmentPools?.armors?.length &&
+      equipmentPools?.gauntlets?.length &&
+      equipmentPools?.legs?.length,
+  );
+  const specialIds = new Set(["hunter", "sorcerer", "pyromancer", "cleric"]);
+  const vanillaStartingWeaponIds = new Set();
+  const vanillaStartingArmorIds = new Set();
+  for (const itemLot of catalog.startingItemLots || []) {
+    for (const [name, value] of Object.entries(itemLot.cells || {})) {
+      if (name.startsWith("lotItemId") && Number(value) > 0) {
+        vanillaStartingWeaponIds.add(Number(value));
+      }
+    }
+  }
+  for (const startingClass of classes) {
+    for (const row of [startingClass.display, startingClass.start]) {
+      for (const field of ["equip_Wep_Right", "equip_Subwep_Right", "equip_Wep_Left", "equip_Subwep_Left"]) {
+        if (Number(row[field]) >= 0) vanillaStartingWeaponIds.add(Number(row[field]));
+      }
+      for (const field of ["equip_Helm", "equip_Armer", "equip_Gaunt", "equip_Leg"]) {
+        if (Number(row[field]) >= 0) vanillaStartingArmorIds.add(Number(row[field]));
+      }
+    }
+  }
+  const randomArmorPools = {
+    helms: (equipmentPools?.helms || []).filter(
+      (item) => !vanillaStartingArmorIds.has(item.id),
+    ),
+    armors: (equipmentPools?.armors || []).filter(
+      (item) => !vanillaStartingArmorIds.has(item.id),
+    ),
+    gauntlets: (equipmentPools?.gauntlets || []).filter(
+      (item) => !vanillaStartingArmorIds.has(item.id),
+    ),
+    legs: (equipmentPools?.legs || []).filter(
+      (item) => !vanillaStartingArmorIds.has(item.id),
+    ),
+  };
+  // One shared set makes the no-duplicate rule explicit across every class
+  // and every armor slot, even if future game data contains overlapping IDs.
+  const usedArmorIds = new Set();
+  const pickUnique = (pool, used, label) => {
+    const available = pool.filter((item) => !used.has(item.id));
+    if (available.length === 0) {
+      throw new Error(`No unique options remain in the ${label} pool.`);
+    }
+    const selected = available[equipmentRng.int(available.length)];
+    used.add(selected.id);
+    return selected;
+  };
+  const weaponAssignments = new Map();
+  if (config.randomizeStartingEquipment && hasGeneralEquipmentPools) {
+    const requests = [];
+    classes.forEach((target, index) => {
+      const stats = statsSources[index].start;
+      const baseStrength = Number(stats.baseStr);
+      const otherwiseUsableWeapons = equipmentPools.weapons.filter(
+        (weapon) =>
+          weapon.dexterity <= Number(stats.baseDex) &&
+          weapon.intelligence <= Number(stats.baseMag) &&
+          weapon.faith <= Number(stats.baseFai) &&
+          !vanillaStartingWeaponIds.has(weapon.id) &&
+          weapon.id < 2_000_000 &&
+          weapon.id % 1_000 === 0 &&
+          weapon.name !== "Fists" &&
+          !(weapon.id >= 1_200_000 && weapon.id < 1_300_000),
+      );
+      const oneHandedWeapons = otherwiseUsableWeapons.filter(
+        (weapon) => weapon.strength <= baseStrength,
+      );
+      const twoHandCompatibleWeapons = otherwiseUsableWeapons.filter(
+        (weapon) => weapon.strength <= Math.floor(baseStrength * 1.5),
+      );
+      const roles = specialIds.has(target.id)
+        ? ["primary", "offhand", "special"]
+        : ["primary", "offhand"];
+      for (const role of roles) {
+        const candidates =
+          role === "primary"
+            ? twoHandCompatibleWeapons.filter(
+                (weapon) => weapon.isPrimaryWeapon === true,
+              )
+            : oneHandedWeapons;
+        if (candidates.length === 0) {
+          throw new Error(
+            `Not enough compatible equipment for ${target.name}:${role}.`,
+          );
+        }
+        requests.push({
+          key: `${target.id}:${role}`,
+          candidates: equipmentRng.shuffle(candidates),
+        });
+      }
+    });
+
+    // Bipartite matching gives every slot a unique weapon and can reassign an
+    // earlier choice when a class has fewer compatible alternatives.
+    requests.sort(
+      (left, right) =>
+        left.candidates.length - right.candidates.length ||
+        left.key.localeCompare(right.key),
+    );
+    const ownerByItemId = new Map();
+    const requestByKey = new Map(requests.map((request) => [request.key, request]));
+    const assign = (request, seenItems, seenRequests) => {
+      if (seenRequests.has(request.key)) return false;
+      seenRequests.add(request.key);
+      for (const candidate of request.candidates) {
+        if (seenItems.has(candidate.id)) continue;
+        seenItems.add(candidate.id);
+        const currentOwnerKey = ownerByItemId.get(candidate.id);
+        if (
+          !currentOwnerKey ||
+          assign(
+            requestByKey.get(currentOwnerKey),
+            seenItems,
+            seenRequests,
+          )
+        ) {
+          ownerByItemId.set(candidate.id, request.key);
+          weaponAssignments.set(request.key, candidate);
+          return true;
+        }
+      }
+      return false;
+    };
+    for (const request of requests) {
+      if (!assign(request, new Set(), new Set())) {
+        throw new Error(
+          `Could not assign a unique weapon to ${request.key}.`,
+        );
+      }
+    }
+  }
+
+  return classes.map((target, index) => {
+    const statsSource = statsSources[index];
+    let equipment = null;
+    if (config.randomizeStartingEquipment && hasGeneralEquipmentPools) {
+      const preserveVanillaArmor = target.id === "deprived";
+      const vanillaArmor = (field, name) => ({
+        id: Number(target.start[field]),
+        name,
+      });
+      equipment = {
+        pickupWeapon: weaponAssignments.get(`${target.id}:primary`),
+        pickupOffhand: weaponAssignments.get(`${target.id}:offhand`),
+        pickupSpecial: specialIds.has(target.id)
+          ? weaponAssignments.get(`${target.id}:special`)
+          : null,
+        helm: preserveVanillaArmor
+          ? vanillaArmor("equip_Helm", "No helmet")
+          : pickUnique(randomArmorPools.helms, usedArmorIds, "helm"),
+        armor: preserveVanillaArmor
+          ? vanillaArmor("equip_Armer", "No chest armor")
+          : pickUnique(randomArmorPools.armors, usedArmorIds, "chest armor"),
+        gauntlets: preserveVanillaArmor
+          ? vanillaArmor("equip_Gaunt", "No gauntlets")
+          : pickUnique(randomArmorPools.gauntlets, usedArmorIds, "gauntlets"),
+        legs: preserveVanillaArmor
+          ? vanillaArmor("equip_Leg", "No leg armor")
+          : pickUnique(randomArmorPools.legs, usedArmorIds, "leg armor"),
+        preserveVanillaArmor,
+      };
+    }
+    return {
+      slot: target.id,
+      name: target.name,
+      from: target.name,
+      to:
+        statsSource.id === target.id
+          ? target.name
+          : `${target.name} with ${statsSource.name} stats`,
+      statsFrom: statsSource.id,
+      equipmentFrom: target.id,
+      equipment,
+      randomizeStats: config.randomizeStartingClass,
+      randomizeEquipment:
+        config.randomizeStartingEquipment && hasGeneralEquipmentPools,
+    };
+  });
+}
+
+function randomizeBosses(config) {
+  if (!config.randomizeBosses) return [];
+  const rng = createStream(config.seed, "bosses", config.version);
+  const bossIndex = byId(bosses);
+  return bossSlots.map((slot) => {
+    const candidates = bosses.filter(
+      (boss) =>
+        boss.safe &&
+        boss.arena.every((tag) => slot.capabilities.includes(tag)),
+    );
+    const pool = candidates.length > 0 ? candidates : [bossIndex.get(slot.original)];
+    const replacement = pool[rng.int(pool.length)];
+    return {
+      slot: slot.id,
+      map: slot.map,
+      from: bossIndex.get(slot.original).name,
+      to: replacement.name,
+      compatibility: candidates.length > 0 ? "safe" : "vanilla-fallback",
+    };
+  });
+}
+
+function randomizeItems(config) {
+  const itemIndex = byId(items);
+  const normalItems = items.filter((item) => !item.progression);
+  const keyItems = items.filter((item) => item.progression);
+  const keyLocations = itemLocations.filter(
+    (location) => itemIndex.get(location.original).progression,
+  );
+  const assignments = new Map(
+    itemLocations.map((location) => [location.id, itemIndex.get(location.original)]),
+  );
+  const keyDestinationIds = new Set();
+
+  if (config.randomizeProtectedItems) {
+    const rng = createStream(config.seed, "progression", config.version);
+    const safeLocations = itemLocations
+      .filter((location) => location.acceptsProgression)
+      .sort((left, right) => left.sphere - right.sphere);
+    const available = rng.shuffle(safeLocations.filter((location) => location.sphere <= 1));
+    keyItems.forEach((item, index) => {
+      const destination = available[index % available.length];
+      const originalLocation = keyLocations.find(
+        (location) => location.original === item.id,
+      );
+      const displacedItem = assignments.get(destination.id);
+      assignments.set(destination.id, item);
+      assignments.set(originalLocation.id, displacedItem);
+      keyDestinationIds.add(destination.id);
+    });
+  }
+
+  if (config.randomizeItems) {
+    const rng = createStream(config.seed, "items", config.version);
+    const targetLocations = itemLocations.filter(
+      (location) => !keyDestinationIds.has(location.id),
+    );
+    const fixedKeyIds = new Set(
+      config.randomizeProtectedItems
+        ? []
+        : keyLocations.map((location) => location.id),
+    );
+    const randomizableLocations = targetLocations.filter(
+      (location) => !fixedKeyIds.has(location.id),
+    );
+    let shuffled = rng.shuffle(normalItems);
+
+    const promoteCategory = (category, sphere, startIndex = 0) => {
+      const targetIndex = randomizableLocations.findIndex(
+        (location, index) => index >= startIndex && location.sphere <= sphere,
+      );
+      const itemIndexByCategory = shuffled.findIndex(
+        (item, index) => index >= startIndex && item.category === category,
+      );
+      if (targetIndex >= 0 && itemIndexByCategory >= 0) {
+        [randomizableLocations[startIndex], randomizableLocations[targetIndex]] = [
+          randomizableLocations[targetIndex],
+          randomizableLocations[startIndex],
+        ];
+        [shuffled[startIndex], shuffled[itemIndexByCategory]] = [
+          shuffled[itemIndexByCategory],
+          shuffled[startIndex],
+        ];
+      }
+    };
+
+    let guaranteed = 0;
+    if (config.guaranteeEarlyWeapon) {
+      promoteCategory("weapon", 0, guaranteed);
+      guaranteed += 1;
+    }
+    if (config.balancedEarlyLoot) {
+      promoteCategory("shield", 1, guaranteed);
+      guaranteed += 1;
+      promoteCategory("upgrade", 1, guaranteed);
+    }
+    randomizableLocations.forEach((location, index) => {
+      assignments.set(location.id, shuffled[index % shuffled.length]);
+    });
+  }
+
+  if (!config.randomizeItems && !config.randomizeProtectedItems) return [];
+
+  return itemLocations.map((location) => {
+    const original = itemIndex.get(location.original);
+    const replacement = assignments.get(location.id);
+    return {
+      location: location.id,
+      map: location.map,
+      sphere: location.sphere,
+      from: original.name,
+      to: replacement.name,
+      progression: replacement.progression,
+      preserved: original.id === replacement.id,
+    };
+  });
+}
+
+export function generate(inputConfig, { gameCatalog = null } = {}) {
+  const config = normalizeConfig(inputConfig);
+  const errors = validateConfig(config);
+  if (errors.length > 0) {
+    throw new Error(errors.join("\n"));
+  }
+  if (gameCatalog && gameCatalog.schemaVersion !== 17) {
+    throw new Error(
+      `Catalog schema ${gameCatalog.schemaVersion} is obsolete. ` +
+        "Verify the clean game and import its data again.",
+    );
+  }
+
+  const extractedData = Boolean(
+    gameCatalog?.enemySlots?.length && gameCatalog?.enemyArchetypes?.length,
+  );
+  const dragonPlan = extractedData
+    ? buildDragonPlan(config, gameCatalog)
+    : null;
+  const bossPlan = extractedData
+    ? randomizeExtractedBosses(config, gameCatalog, dragonPlan)
+    : null;
+  const itemLotPlan = extractedData
+    ? randomizeExtractedItemLots(config, gameCatalog)
+    : null;
+  const result = {
+    schemaVersion: 1,
+    randomizerVersion: config.version,
+    dataStatus: extractedData ? "extracted" : "prototype",
+    warning: extractedData
+      ? "Real game data detected. The output uses conservative slots and validated MSB/PARAM edits."
+      : "This result uses development data and does not contain real IDs for a game patch.",
+    seed: config.seed,
+    config,
+    placements: {
+      enemies: extractedData
+        ? randomizeExtractedEnemies(
+            config,
+            gameCatalog,
+            dragonPlan,
+            bossPlan,
+          )
+        : randomizePrototypeEnemies(config),
+      bosses: extractedData
+        ? bossPlan
+        : randomizeBosses(config),
+      items: extractedData
+        ? itemLotPlan.items
+        : randomizeItems(config),
+      startingClasses: extractedData
+        ? randomizeStartingClasses(config, gameCatalog)
+        : [],
+      gifts: extractedData ? itemLotPlan.gifts : [],
+      enemyDrops: extractedData
+        ? itemLotPlan.enemyDrops
+        : [],
+      shops: extractedData ? itemLotPlan.shops : [],
+    },
+    validation: {
+      valid: true,
+      finalBossReachable: !config.randomizeProtectedItems,
+      notes: extractedData
+        ? [
+            "All hostile regular-enemy slots use a count-preserving global permutation within a 30-character-model total map budget; friendly NPCs and invisible technical helpers stay vanilla.",
+            "Area scaling inherits destination combat stats and replaces hidden level multipliers from the selected enemy.",
+            "Bosses use an unrestricted permutation and are grounded at their destination encounter; dragons only exchange complete linked dragon groups.",
+            config.randomizeProtectedItems
+              ? "Protected world items joined the full item pool; the two Asylum escape keys stayed vanilla."
+              : "World items were randomized while protected progression lots stayed vanilla.",
+            config.randomizeStartingClass
+              ? "Starting-class base stats were redistributed."
+              : "Starting-class base stats were preserved.",
+            config.randomizeStartingEquipment
+              ? "Asylum pickups were selected for each class's final stats."
+              : "Starting loadouts were preserved.",
+            config.randomizeGifts
+              ? "Items granted by NPCs joined the enabled global item pool."
+              : "NPC gifts were preserved.",
+            config.randomizeEnemyDrops
+              ? "Enemy drops joined the enabled global item pool."
+              : "Enemy drops were preserved.",
+            config.guaranteedEnemyDrops
+              ? "Every catalogued enemy drop lot was normalized to a 100% total item chance."
+              : "Enemy drop rates were preserved.",
+            config.randomizeShops
+              ? config.progressionLogic
+                ? "Shop inventory joined the enabled global item pool; arrows, bolts, and throwable stock stayed shop-only, selected event-bound goods were randomized, and the remaining progression stock stayed protected."
+                : "Shop inventory joined the enabled global item pool; arrows, bolts, and throwable stock stayed shop-only."
+              : "Shops were preserved.",
+          ]
+        : config.randomizeProtectedItems
+          ? ["Prototype progression was validated through the opening sphere; full graph validation remains pending."]
+          : ["Key items were preserved."],
+    },
+  };
+
+  result.placementHash = createHash("sha256")
+    .update(JSON.stringify({
+      placements: result.placements,
+      guaranteedEnemyDrops: config.guaranteedEnemyDrops,
+    }))
+    .digest("hex");
+  return result;
+}
