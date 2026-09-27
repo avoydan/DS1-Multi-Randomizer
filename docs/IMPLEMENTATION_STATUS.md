@@ -30,7 +30,11 @@
   `patch-enemies` argument vectors through Node `child_process.spawn`, streams
   typed stdout/stderr log events, emits coarse process-status events, and
   returns typed success, process-failure, or spawn-failure results. It is not
-  wired into the adapter or generation pipeline yet.
+  wired into the adapter or generation pipeline yet. Task 1's implementation
+  is in commit `5402b447f3d53a1896ca59267fc5fe10461bc071`; its seven
+  focused tests, backend build, and backend typecheck passed on 2026-09-27.
+  The task remains blocked because Git could not create `.git/index.lock` to
+  commit the task's plan/status update under the current filesystem policy.
 - Not yet done: vendoring the upstream JS core, a public fork (required by
   `docs/LICENSING.md` before any distribution), and an actual subprocess
   orchestration sequence connecting the existing planner and executor.
