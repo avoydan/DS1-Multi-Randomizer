@@ -108,3 +108,43 @@ modules and the nearest enclosing manifest is this repository's root
 file (`MODULE_TYPELESS_PACKAGE_JSON`). Upstream's own `package.json` is not
 vendored because it carries Electron/`electron-builder` configuration that
 is out of scope; only the `"type": "module"` declaration is reproduced.
+
+## The workspace is planned from the normalized upstream seed, and the package layout is asserted
+
+Date: 2026-09-28
+
+`executeCombinedGeneration()`
+(`apps/backend/src/adapters/combinedRandomizerBridge.ts`) calls
+`normalizeConfig` **before** `planCombinedRandomizerWorkspace()`, and plans
+with `config.seed` rather than `request.combinedSeed`
+(`docs/COMBINED_ENGINE_INTEGRATION.md`, "Execution bridge proof").
+
+Why: two independent pieces of code derive the same `seed_<...>` directory
+name. The planner applies `sanitizeUpstreamSeed()` to the seed it is given;
+upstream `writeOutput` applies its own `safeSeed()` to `result.seed`, which
+`normalizeConfig` has already trimmed and string-coerced. Feeding the planner
+the raw request seed makes the two disagree whenever normalization changes
+anything — `"  abc  "` plans `seed__abc__` while upstream writes `seed_abc` —
+and the `patch-enemies --placements` argument then points at a file that was
+never written. The process fails with an upstream error message that describes
+a missing file rather than the actual cause.
+
+Normalizing first makes the planner's input identical to upstream's, so the
+two derivations cannot diverge. As a backstop against a future pin changing
+`safeSeed`, the directory `writeOutput` returns is compared against the
+planned one and a mismatch is reported as `OUTPUT_LAYOUT_MISMATCH` instead of
+being silently carried into the patch step.
+
+The alternative — dropping `sanitizeUpstreamSeed()` and using whatever
+directory `writeOutput` returns — was rejected: the planner must produce the
+complete `patch-enemies` argument vector while staying pure and
+filesystem-free, which it cannot do if one of its paths is only knowable after
+an upstream async write.
+
+A related consequence: the bridge does **not** normalize the seed into
+upstream's `/^[\w.-]{1,64}$/` charset. A non-compliant seed is reported as
+`INVALID_CONFIG` and left to the boundary that produces `combinedSeed`
+(integration Blocker 2). Trimming is upstream's own documented normalization;
+rewriting a user's seed into a different value is a product decision about
+reproducibility, and hiding it inside the execution bridge would make the
+recorded manifest seed differ from the seed the user typed.

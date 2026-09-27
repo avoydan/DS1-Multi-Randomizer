@@ -12,8 +12,12 @@ const adapters = {
   combined: new ExternalAdapter({
     name: 'combined',
     engineRoot: path.join(repoRoot, 'engines', 'combined'),
-    expectedSource: 'vendor/src/cli.js',
-    expectedExecutable: 'vendor/DSR-Randomizer.exe',
+    // The vendored combined engine has no CLI entry point and no portable
+    // executable: `src/cli.js` is deliberately excluded from the vendor set,
+    // and `DsrDataTool.dll` is a .NET assembly run through a dotnet host.
+    // See docs/COMBINED_ENGINE_INTEGRATION.md ("JS core vendor proof").
+    expectedSource: 'vendor/src/core/generator.js',
+    expectedExecutable: 'vendor/tools/DsrDataTool/bin/Release/net8.0/DsrDataTool.dll',
   }),
   fog: new ExternalAdapter({
     name: 'fog',

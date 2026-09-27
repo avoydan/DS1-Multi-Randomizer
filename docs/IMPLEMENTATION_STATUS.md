@@ -60,14 +60,56 @@
 - Documentation correction: upstream `validateConfig(config, { requireGame })`
   **returns** a `string[]` of errors and never throws. The earlier analysis
   said it throws; consumers must check the returned array.
-- Not yet done: a public fork (required by `docs/LICENSING.md` before any
-  distribution) and an actual orchestration sequence connecting the JS core,
-  the workspace planner, and the DsrDataTool executor. The adapter's
-  `generate()` is still `NOT_IMPLEMENTED`; the pipeline does not invoke
-  `DsrDataTool.dll` or the JS core yet.
-- Known defect, deliberately not fixed here (pipeline wiring is out of scope
-  for the vendoring task): `core/pipeline.ts` probes the combined engine at
+- A minimal combined-engine execution bridge
+  (`apps/backend/src/adapters/combinedRandomizerBridge.ts`,
+  `executeCombinedGeneration`) now chains all five previously independent
+  pieces into one internal path: typed request → pure config mapping → the
+  vendored JS core (`normalizeConfig`/`validateConfig`/`generate`/
+  `writeOutput`) → the pure workspace planner → the `DsrDataTool` executor
+  (`scan` when the workspace has no catalog, then `patch-enemies`). It
+  returns a typed success carrying the package directory, placements path,
+  `patch-manifest.json` path, upstream version, placement hash, and seed, or
+  one of fourteen documented failure codes. Only `GENERATION_FAILED` is
+  marked retryable. See `docs/COMBINED_ENGINE_INTEGRATION.md` ("Execution
+  bridge proof") for the exact data flow.
+- Generation is proven workspace-only against fixtures: 19 focused tests run
+  the real vendored `generate()`/`writeOutput()` in a temporary workspace
+  with a synthetic schema-17 catalog, faking only the `DsrDataTool` process
+  layer. They assert a real package is produced with
+  `dataStatus: "extracted"`, that the process layer receives the planner's
+  exact `scan`/`patch-enemies` argument vectors and nothing else, that the
+  placements file exists before `patch-enemies` is invoked, that a fixture
+  game directory is byte-identical before and after a successful run, and
+  that the same request twice yields the same placement hash. Backend tests
+  54/54 pass; backend build and the full workspace typecheck are clean
+  (2026-09-28).
+- The bridge rejects `dataStatus !== "extracted"` before writing any file and
+  before spawning any process, so integration Blocker 1's silent prototype
+  fallback can no longer reach a package directory. It also pre-checks
+  `catalog.schemaVersion !== 17` so an obsolete catalog reports
+  `CATALOG_STALE` instead of an opaque generation error.
+- The bridge plans the workspace from the **normalized** upstream seed rather
+  than the raw request seed, because upstream derives its own
+  `seed_<safeSeed>` package directory from the normalized value; planning
+  from the raw value would point `--placements` at a file upstream never
+  wrote. See `docs/DECISIONS.md`.
+- Three upstream config keys are pinned by the bridge rather than inherited
+  from `defaultConfig`: `generateSpoilerLog: false` (no request field exists —
+  Blocker 3 — and the upstream default `true` would emit an unrequested
+  spoiler file), plus `useExtractedData: true` and `dryRun: false`, both
+  verified inert at the pinned commit (read nowhere in the vendored core or
+  `DsrDataTool`).
+- Fixed: `core/pipeline.ts`'s combined-engine probe pointed at
   `vendor/src/cli.js` and `vendor/DSR-Randomizer.exe`, neither of which
-  exists or should — so engine-presence status still reports the combined
-  engine as missing. Correct targets are `vendor/src/core/generator.js` and
-  the built `DsrDataTool.dll`.
+  exists or should, so engine status always reported the combined engine as
+  missing. It now probes `vendor/src/core/generator.js` and the built
+  `vendor/tools/DsrDataTool/bin/Release/net8.0/DsrDataTool.dll`, with a test
+  asserting the combined engine reports `source` mode. The bridge itself
+  never consults `ExternalAdapter`.
+- Still not done: `CombinedRandomizerAdapter.generate()` remains
+  `NOT_IMPLEMENTED` — connecting it to the bridge is a separate task — and
+  the bridge has never executed the real `DsrDataTool` against a real Dark
+  Souls installation, so a genuine `scan`/`patch-enemies` round trip is
+  unproven. Blockers 2 (seed charset, now surfacing as `INVALID_CONFIG`),
+  3 (`generateSpoilerLog` request field), and 6 (catalog/game-directory
+  staleness) remain open, as does the public GPL fork.

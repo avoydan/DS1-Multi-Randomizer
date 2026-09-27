@@ -730,3 +730,191 @@ repository was read or written.
   missing `generateSpoilerLog` request field, catalog/game-dir coupling) are
   untouched by this task. Blocker 5's build half stays resolved; the
   `DsrDataTool.dll` runtime dependency is unchanged.
+
+## Execution bridge proof
+
+Resolves "no executor exists yet" and the `core/pipeline.ts` probe defect from
+the previous two sections. This is the first section that describes code which
+actually *runs* a generation: `generate()` and `writeOutput()` are called for
+real, against a synthetic catalog, in a temporary workspace.
+
+Implemented by `apps/backend/src/adapters/combinedRandomizerBridge.ts`
+(`executeCombinedGeneration`). It is an internal path, deliberately not yet
+wired into `CombinedRandomizerAdapter.generate()` (Task 7) or the pipeline.
+
+### Exact data flow
+
+```
+CombinedRandomizerRequest
+  |
+  |-1- mapCombinedRandomizerConfig(request)            pure, no I/O
+  |      items.enabled && items.*     -> config.*
+  |      enemies.enabled && enemies.* -> config.*
+  |      nothing enabled              -> NO_RANDOMIZATION_FEATURES_ENABLED
+  |
+  |-2- loadCombinedRandomizerCore()                    dynamic import of file: URLs
+  |      absent tree                  -> JS_CORE_MISSING
+  |      exports missing              -> JS_CORE_INCOMPLETE
+  |
+  |-3- { ...mapped, outputDirectory: resolve(workspacePath),
+  |      generateSpoilerLog: false, useExtractedData: true, dryRun: false }
+  |      core.normalizeConfig(input)                   trims/coerces seed
+  |      core.validateConfig(config, { requireGame: false })
+  |      non-empty error array         -> INVALID_CONFIG
+  |
+  |-4- planCombinedRandomizerWorkspace({ gamePath, workspacePath,
+  |      combinedSeed: config.seed })                  pure, no I/O
+  |      workspace inside game dir    -> WORKSPACE_INSIDE_GAME_DIRECTORY
+  |      => catalogPath, seedDirectory, scanArgs, patchEnemiesArgs
+  |
+  |-5- catalog present? -- no --> DsrDataToolExecutor.execute(scanArgs)
+  |      spawn failure               -> DATA_TOOL_MISSING
+  |      non-zero exit               -> DATA_TOOL_FAILED
+  |      still no catalog file       -> CATALOG_UNAVAILABLE
+  |      unparseable                 -> CATALOG_UNREADABLE
+  |      schemaVersion !== 17        -> CATALOG_STALE
+  |
+  |-6- core.generate(config, { gameCatalog })          pure, synchronous
+  |      throws                      -> GENERATION_FAILED (retryable)
+  |      dataStatus !== extracted    -> PROTOTYPE_RESULT_REJECTED
+  |
+  |-7- core.writeOutput(result, plan.workspaceDirectory)
+  |      throws                      -> OUTPUT_WRITE_FAILED
+  |      directory != planned        -> OUTPUT_LAYOUT_MISMATCH
+  |      => <workspace>/seed_<safeSeed>/{randomizer,config}.json, README.txt
+  |
+  |-8- DsrDataToolExecutor.execute(patchEnemiesArgs)
+  |      spawn failure               -> DATA_TOOL_MISSING
+  |      non-zero exit               -> DATA_TOOL_FAILED
+  |      => <seed dir>/mod/**, <seed dir>/patch-manifest.json
+  |
+  +--> { ok: true, seedDirectory, workspaceDirectory, catalogPath,
+         placementsPath, patchManifestPath, randomizerVersion,
+         placementHash, seed, catalogScanned }
+```
+
+Activation is *not* part of this flow. The bridge stops at a validated package
+inside the workspace; copying `mod/**` over the live installation stays with
+the backend's own single backup authority, in a later stage.
+
+### Ordering constraints that are load-bearing, not incidental
+
+1. **Normalize the config before planning the workspace.** Upstream
+   `normalizeConfig` trims and string-coerces `seed`, and `writeOutput`
+   derives its directory as `seed_<safeSeed(result.seed)>` from that
+   *normalized* value. Planning from the raw `request.combinedSeed` desyncs
+   the two — `"  abc  "` plans `seed__abc__` while upstream writes
+   `seed_abc`, and `--placements` then points at a file that was never
+   written. The planner is therefore called with `config.seed`, and the
+   directory upstream reports back is asserted to equal the planned one
+   (`OUTPUT_LAYOUT_MISMATCH` guards against a future pin drifting).
+2. **Reject `dataStatus !== "extracted"` before writing anything and before
+   spawning anything.** Otherwise a prototype package — which upstream's own
+   README marks "must not be installed into the game" — reaches a package
+   directory that later stages treat as installable.
+3. **Check `schemaVersion` before calling `generate()`.** Upstream throws on
+   an obsolete schema, which would otherwise arrive as an opaque
+   `GENERATION_FAILED` rather than an actionable "re-import the game data".
+4. **Load the vendored core and validate the config before any filesystem or
+   process work.** An absent vendor tree or an unusable seed is reported
+   without having scanned a game directory.
+
+### Three config keys the bridge pins rather than inherits
+
+`CombinedRandomizerRequest` carries none of them, so upstream `defaultConfig`
+would otherwise decide:
+
+- `generateSpoilerLog: false` — upstream defaults to `true`, which would emit
+  `spoiler.txt` no caller asked for. Integration Blocker 3 (the missing
+  request field) is unchanged; this only stops a silent default.
+- `useExtractedData: true`, `dryRun: false` — as specified in the data flow
+  earlier in this document. Verified inert at the pinned commit: neither key
+  is read anywhere in the vendored core or in `DsrDataTool/Program.cs`. They
+  are set so the recorded `config.json` states them explicitly rather than by
+  omission.
+
+The seed itself is **not** rewritten. An upstream-incompatible seed returns
+`INVALID_CONFIG`; deriving a compliant token belongs to the boundary that
+produces `combinedSeed` (Blocker 2), not to this bridge, so the seam stays
+visible instead of being silently papered over.
+
+### `DsrDataTool` location
+
+`dotnetExecutablePath` defaults to `dotnet` on `PATH`, overridable per call or
+via the `DS1TR_DOTNET_PATH` environment variable — the documented local SDK
+lives outside the repository tree (`docs/DECISIONS.md`, Windows `MAX_PATH`).
+`dataToolDllPath` defaults to the vendored build output at
+`engines/combined/vendor/tools/DsrDataTool/bin/Release/net8.0/DsrDataTool.dll`.
+Both are gitignored/environment-local, so their absence is reported as
+`DATA_TOOL_MISSING` rather than crashing.
+
+### Verification performed
+
+`npm run test -w @ds1tr/backend` — 54 tests pass (19 new); backend `build` and
+the full workspace `typecheck` are clean (2026-09-28).
+
+The 19 new tests run the **real** vendored `generate()`/`writeOutput()` in a
+real temporary workspace against a synthetic schema-17 catalog (three enemy
+slots, two archetypes — the minimum that yields `dataStatus: "extracted"`).
+Only the `DsrDataTool` process layer is faked, because running it needs both
+the built .NET assembly and a real Dark Souls installation. What that proves:
+
+- a complete package is produced: `randomizer.json` (with
+  `dataStatus: "extracted"` and three real enemy placements), `config.json`,
+  `README.txt`, plus the manifest the fake patch step writes;
+- the argument vectors handed to the process layer are **byte-for-byte the
+  planner's** `scanArgs`/`patchEnemiesArgs`; no ad-hoc paths, and
+  `install`/`restore` never appear;
+- the placements file already exists at the moment `patch-enemies` is
+  invoked — asserted from *inside* the fake, the only place ordering is
+  observable;
+- a fixture game directory is **byte-identical before and after** a full
+  successful run;
+- the same request run twice in different workspaces yields the same
+  `placementHash` and identical placements;
+- `scan` runs first, with the planner's exact arguments, when the workspace
+  has no catalog, and is skipped when one is present;
+- a whitespace-padded seed still lands in the planned package directory
+  (ordering constraint 1 above, made executable);
+- prototype data, an obsolete schema, a malformed catalog, an
+  upstream-rejected seed, a workspace inside the game directory, and a
+  request with nothing enabled each return their documented code **with the
+  process layer never invoked and no package directory created**;
+- `spawn-failure` maps to `DATA_TOOL_MISSING`, a non-zero exit to
+  `DATA_TOOL_FAILED` with stdout/stderr preserved, and an upstream
+  `generate()` throw to a **retryable** `GENERATION_FAILED`.
+
+No real Dark Souls installation was involved, and no file outside the
+repository and the OS temp directory was read or written.
+
+### The `pipeline.ts` probe, fixed here
+
+`ExternalAdapter` for the combined engine probed `vendor/src/cli.js` and
+`vendor/DSR-Randomizer.exe`, neither of which exists or should, so
+engine-presence status always reported the combined engine as `missing`. The
+two literals now point at `vendor/src/core/generator.js` and the built
+`vendor/tools/DsrDataTool/bin/Release/net8.0/DsrDataTool.dll`, and a test
+asserts the combined engine now reports `source` mode. The generator is
+committed, so that assertion is deterministic; the DLL is gitignored build
+output and is deliberately not asserted.
+
+This was a documented handoff from the vendoring task, not a dependency of the
+bridge: `executeCombinedGeneration` never consults `ExternalAdapter` and
+resolves its own paths.
+
+### Blockers unresolved by this task
+
+- **Blocker 2 (seed charset)** — deliberately left open and now observable:
+  `deriveSeeds()` still passes the raw master seed through, so an
+  upstream-incompatible master seed surfaces as `INVALID_CONFIG` from the
+  bridge. Fixing it belongs to the seed boundary.
+- **Blocker 3 (`generateSpoilerLog` request field)** — unchanged; the bridge
+  pins the value off rather than adding a contract field.
+- **Blocker 6 (catalog/game-dir coupling)** — unchanged. The bridge reuses an
+  existing catalog without verifying it was scanned against this `gamePath`;
+  `verifyCatalogSources` is not vendored. `forceCatalogRescan` exists as a
+  caller-side escape hatch, which is not the same as staleness detection.
+- **No public GPL fork** — unchanged.
+- **`DsrDataTool` runtime dependency** — unchanged. Nothing in this task
+  executed the real tool, so a genuine `scan`/`patch-enemies` round trip
+  against real game data is still unproven; that is the end-to-end task.
