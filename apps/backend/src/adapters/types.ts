@@ -3,7 +3,7 @@ import type { EngineName, EngineStatus, RandomizerConfig } from '@ds1tr/contract
 export interface EngineRunContext {
   gamePath: string;
   workspacePath: string;
-  seed: number;
+  seed: string | number;
   config: RandomizerConfig;
   log: (message: string) => void;
 }

@@ -3,6 +3,7 @@ import { URL } from 'node:url';
 import type { RandomizerConfig } from '@ds1tr/contracts';
 import { validateInstallation } from './core/installation.js';
 import { createPipelinePlan } from './core/pipeline.js';
+import { InvalidConfigurationError } from './core/configValidation.js';
 
 const HOST = process.env.DS1TR_HOST ?? '127.0.0.1';
 const PORT = Number(process.env.DS1TR_PORT ?? 43177);
@@ -31,7 +32,7 @@ const server = http.createServer(async (req, res) => {
     const url = new URL(req.url ?? '/', `http://${HOST}:${PORT}`);
 
     if (req.method === 'GET' && url.pathname === '/api/health') {
-      return send(res, 200, { ok: true, service: 'ds1-triple-randomizer-backend', version: '0.1.0' });
+      return send(res, 200, { ok: true, service: 'ds1-triple-randomizer-backend', version: '0.2.0' });
     }
 
     if (req.method === 'POST' && url.pathname === '/api/installation/validate') {
@@ -54,6 +55,9 @@ const server = http.createServer(async (req, res) => {
 
     return send(res, 404, { error: 'Not found' });
   } catch (error) {
+    if (error instanceof InvalidConfigurationError) {
+      return send(res, 400, { error: 'Invalid configuration', problems: error.problems });
+    }
     return send(res, 500, { error: error instanceof Error ? error.message : String(error) });
   }
 });

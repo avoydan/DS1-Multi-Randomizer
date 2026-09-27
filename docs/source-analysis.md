@@ -1,5 +1,20 @@
 # Upstream source analysis
 
+## Approved engine direction
+
+`kellernz1/ds-randomizer` is the primary Items + Enemies engine. It receives
+the user's normalized master seed directly and performs its own versioned,
+named-stream derivation. The application derives a separate Fog retry stream.
+
+The combined engine and FogMod are one sequential pipeline:
+
+```text
+combined package -> materialized workspace -> compatibility bridge -> FogMod
+```
+
+Fog compatibility is not yet proven. In particular, FogMod must preserve
+combined EMEVD changes and receive reliable key-location information.
+
 ## DarkSoulsItemRandomizer
 
 Repository: https://github.com/HotPocketRemix/DarkSoulsItemRandomizer
@@ -10,7 +25,8 @@ Key observations:
 - Actual data logic is split across modules such as `randomize_item_table.py`, `item_table.py`, `item_lot_param.py`, `shop_lineup_param.py`, and `chr_init_param.py`.
 - DS1R output targets `param/GameParam/GameParam.parambnd.dcx`.
 - The current implementation creates `.bak` files itself. Triple Randomizer should bypass/disable this behavior and own backups centrally.
-- Best integration strategy: extract a headless `generate(config, seed, inputPath, outputPath)` service from the existing code, preserving the randomization algorithms.
+- Role: behavior and option reference only. Do not copy, modify, or redistribute
+  source without written permission.
 
 ## Dark-Souls-Enemy-Randomizer
 
@@ -23,7 +39,8 @@ Key observations:
 - Engine code still imports Tkinter and directly assumes working-directory-relative game and `enemyRandomizerData` paths.
 - Constructor performs environment checks, setup, backup/copy creation, and may patch the game executable. This means creating `Randomizer()` currently has side effects.
 - It modifies MSB, LuaBND, EMEVD, FFX and GameParam-related data depending on options.
-- Best integration strategy: introduce an explicit environment/context object and split constructor side effects into `inspect()` / `prepare()` / `generate()` phases. Replace Tkinter message/progress dependencies with callbacks/logger events.
+- Role: behavior and option reference only. Do not copy, modify, or redistribute
+  source without written permission.
 
 ## FogMod
 
@@ -41,18 +58,21 @@ Key observations:
 
 ## Compatibility facts that shape our pipeline
 
-FogMod's own documentation recommends Item -> Enemy -> Fog order. It also notes that some Item seeds are not solvable by Fog logic and some Enemy outputs can produce invalid MSB data for Fog processing. Therefore the final pipeline needs engine-specific retry scopes rather than just running three commands once.
+FogMod's documentation recommends legacy Item -> Enemy -> Fog order, but this
+does not establish compatibility with the combined engine. Both combined and
+FogMod modify MSB, EMEVD, and GameParam data. File-overlay merging is not safe.
 
 Proposed retry behavior:
 
 ```text
 create clean workspace snapshot
-  -> items(seed_i)
-  -> enemies(seed_e)
-  -> fog dry-run(seed_f)
-       item-logic failure -> regenerate Items (derived retry seed), then Enemy, then Fog
-       invalid-MSB failure -> regenerate Enemy only, then Fog
-       success -> Fog write -> validate -> atomic install
+  -> combined(master seed, attempt)
+  -> materialize combined package
+  -> compatibility validation/bridge
+  -> fog dry-run(derived retry seed)
+       upstream incompatibility -> retry the combined stage as one unit
+       fog-only rejection -> retry Fog with a deterministic attempt
+       success -> Fog write -> final validation -> atomic activation
 ```
 
 ## Licensing boundary
@@ -64,4 +84,5 @@ At the time of this analysis, no root `LICENSE` file was found through the GitHu
 - HotPocketRemix/DarkSoulsItemRandomizer
 - everKalle/Dark-Souls-Enemy-Randomizer
 
-That does not prevent local technical experimentation, but redistribution of copied/modified upstream source should be clarified before a public release. The architecture therefore keeps each engine behind an adapter so we can initially require the user to provide/download the upstream mod independently if necessary.
+Their behavior can inform independently implemented GPL extensions, but their
+source and binaries are not distribution dependencies.

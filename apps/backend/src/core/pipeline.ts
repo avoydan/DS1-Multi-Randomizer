@@ -3,22 +3,17 @@ import { fileURLToPath } from 'node:url';
 import type { PipelinePlan, RandomizerConfig } from '@ds1tr/contracts';
 import { deriveSeeds } from './seeds.js';
 import { ExternalAdapter } from '../adapters/externalAdapter.js';
+import { effectiveCombinedEnabled, validateRandomizerConfig } from './configValidation.js';
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(currentDir, '../../../../');
 
 const adapters = {
-  items: new ExternalAdapter({
-    name: 'items',
-    engineRoot: path.join(repoRoot, 'engines', 'item'),
-    expectedSource: 'vendor/randomizer_gui.py',
-    expectedExecutable: 'vendor/DarkSoulsItemRandomizer.exe',
-  }),
-  enemies: new ExternalAdapter({
-    name: 'enemies',
-    engineRoot: path.join(repoRoot, 'engines', 'enemy'),
-    expectedSource: 'vendor/randomizer_rng.py',
-    expectedExecutable: 'vendor/EnemyRandomizer.exe',
+  combined: new ExternalAdapter({
+    name: 'combined',
+    engineRoot: path.join(repoRoot, 'engines', 'combined'),
+    expectedSource: 'vendor/src/cli.js',
+    expectedExecutable: 'vendor/DSR-Randomizer.exe',
   }),
   fog: new ExternalAdapter({
     name: 'fog',
@@ -29,18 +24,17 @@ const adapters = {
 };
 
 export async function createPipelinePlan(config: RandomizerConfig): Promise<PipelinePlan> {
+  validateRandomizerConfig(config);
   const seeds = deriveSeeds(config.masterSeed);
   const engineStatus = await Promise.all([
-    adapters.items.status(),
-    adapters.enemies.status(),
+    adapters.combined.status(),
     adapters.fog.status(),
   ]);
 
   return {
     seeds,
     stages: [
-      { engine: 'items', enabled: config.items.enabled, seed: seeds.items },
-      { engine: 'enemies', enabled: config.enemies.enabled, seed: seeds.enemies },
+      { engine: 'combined', enabled: effectiveCombinedEnabled(config), seed: seeds.combined },
       { engine: 'fog', enabled: config.fog.enabled, seed: seeds.fog },
     ],
     engineStatus,

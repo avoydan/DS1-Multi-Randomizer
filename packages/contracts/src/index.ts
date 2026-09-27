@@ -1,20 +1,33 @@
-export type EngineName = 'items' | 'enemies' | 'fog';
+export type EngineName = 'combined' | 'fog';
 
 export interface ItemOptions {
   enabled: boolean;
-  difficulty: 'easy' | 'medium' | 'hard';
-  keyPlacement: 'vanilla' | 'shuffled' | 'race' | 'race-plus';
-  fashionSouls: boolean;
-  laundromatMixup: boolean;
+  randomizeWorldItems: boolean;
+  randomizeProtectedItems: boolean;
+  progressionLogic: boolean;
+  guaranteeEarlyWeapon: boolean;
+  balancedEarlyLoot: boolean;
+  randomizeStartingClass: boolean;
+  randomizeStartingEquipment: boolean;
+  randomizeGifts: boolean;
+  randomizeEnemyDrops: boolean;
+  guaranteedEnemyDrops: boolean;
+  randomizeShops: boolean;
 }
+
+export type EnemyScaling = 'vanilla' | 'area' | 'progressive';
 
 export interface EnemyOptions {
   enabled: boolean;
+  randomizeRegularEnemies: boolean;
   randomizeBosses: boolean;
-  difficultyCurve: boolean;
-  uniqueBosses: boolean;
-  hostileNpcs: boolean;
+  scaling: EnemyScaling;
 }
+
+export type FogLanguage =
+  | 'ENGLISH' | 'FRENCH' | 'GERMAN' | 'ITALIAN' | 'JAPANESE'
+  | 'KOREAN' | 'NSPANISH' | 'POLISH' | 'PORTUGUESE' | 'RUSSIAN'
+  | 'SCHINESE' | 'SPANISH' | 'TCHINESE';
 
 export interface FogOptions {
   enabled: boolean;
@@ -24,9 +37,19 @@ export interface FogOptions {
   majorPvpFogs: boolean;
   minorPvpFogs: boolean;
   lordvesselGates: boolean;
-  disconnected: boolean;
-  glitchedLogic: boolean;
+  randomStart: boolean;
+  disconnectedFogs: boolean;
+  noFallBedOfChaos: boolean;
   scaling: boolean;
+  glitchedLogic: boolean;
+  requireLordSouls: boolean;
+  pacifistMode: boolean;
+  language: FogLanguage;
+}
+
+export interface OutputOptions {
+  includeDlc: boolean;
+  generateSpoilerLog: boolean;
 }
 
 export interface RandomizerConfig {
@@ -35,11 +58,11 @@ export interface RandomizerConfig {
   items: ItemOptions;
   enemies: EnemyOptions;
   fog: FogOptions;
+  output: OutputOptions;
 }
 
 export interface DerivedSeeds {
-  items: number;
-  enemies: number;
+  combined: string;
   fog: number;
 }
 
@@ -66,7 +89,7 @@ export interface PipelinePlan {
   stages: Array<{
     engine: EngineName;
     enabled: boolean;
-    seed: number;
+    seed: string | number;
   }>;
   engineStatus: EngineStatus[];
 }

@@ -12,8 +12,7 @@ function derive(masterSeed: string, engine: EngineName): number {
 export function deriveSeeds(masterSeed: string): DerivedSeeds {
   const normalized = masterSeed.trim() || '0';
   return {
-    items: derive(normalized, 'items'),
-    enemies: derive(normalized, 'enemies'),
+    combined: normalized,
     fog: derive(normalized, 'fog'),
   };
 }
