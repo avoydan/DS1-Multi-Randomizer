@@ -11,7 +11,7 @@
     "dev": "concurrently -k \"npm run dev -w @ds1tr/backend\" \"npm run dev -w @ds1tr/desktop\"",
     "build": "npm run build -w @ds1tr/contracts && npm run build -w @ds1tr/backend && npm run build -w @ds1tr/desktop",
     "test": "npm run test -w @ds1tr/backend",
-    "typecheck": "npm run typecheck -w @ds1tr/contracts && npm run typecheck -w @ds1tr/backend && npm run typecheck -w @ds1tr/desktop"
+    "typecheck": "npm run build -w @ds1tr/contracts && npm run typecheck -w @ds1tr/backend && npm run typecheck -w @ds1tr/desktop"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

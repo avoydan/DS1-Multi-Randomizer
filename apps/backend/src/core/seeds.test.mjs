@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { deriveSeeds } from './seeds.ts';
+import { deriveSeeds } from '../../dist/core/seeds.js';
 
 test('derives stable combined and Fog seeds from one master seed', () => {
   assert.deepEqual(deriveSeeds('abc'), {

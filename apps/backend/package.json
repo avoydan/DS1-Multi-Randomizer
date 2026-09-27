@@ -7,7 +7,8 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc -p tsconfig.json",
-    "test": "tsx --test src/core/seeds.test.mjs src/core/configValidation.test.mjs",
+    "pretest": "npm --prefix ../.. run build -w @ds1tr/contracts && npm run build",
+    "test": "node --test src/core/seeds.test.mjs src/core/configValidation.test.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "start": "node dist/server.js"
   },

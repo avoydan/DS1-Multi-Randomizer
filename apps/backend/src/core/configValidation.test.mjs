@@ -4,7 +4,7 @@ import {
   effectiveCombinedEnabled,
   InvalidConfigurationError,
   validateRandomizerConfig,
-} from './configValidation.ts';
+} from '../../dist/core/configValidation.js';
 
 function validConfig() {
   return {
