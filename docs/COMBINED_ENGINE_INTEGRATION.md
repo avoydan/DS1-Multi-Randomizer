@@ -347,3 +347,109 @@ the upstream tool as written.
 8. Backend activation stage reading `patch-manifest.json` and applying it
    under the backend's own backup authority (outside `generate()` itself,
    but the natural next consumer of its result).
+
+## Workspace execution proof
+
+Resolves task 1 above plus the specific question: can the combined engine
+generate against a controlled workspace without ever calling upstream
+`install`/`restore` and without writing to the live game directory? This
+section documents that proof and the pure module that implements it
+(`apps/backend/src/adapters/combinedRandomizerWorkspace.ts`).
+
+### Required workspace layout
+
+```
+<workspacePath>/
+  dsr-catalog.json                 <- written by `scan`
+  seed_<sanitizedCombinedSeed>/
+    randomizer.json                <- written by generate()+writeOutput() (task 4/5, not this task)
+    config.json
+    (spoiler.txt / cheat-locations.txt / README.txt)
+    patch-manifest.json            <- written by `patch-enemies`
+    mod/                            <- written by `patch-enemies`
+      map/MapStudio/<mapId>.msb
+      event/... , param/... , (AI/effect bundles)
+```
+
+`seed_<...>` uses upstream's own `safeSeed()` transform
+(`seed.replace(/[^\w.-]/gu, "_")`, `src/core/output.js`), reimplemented here
+as `sanitizeUpstreamSeed()` — this is independent of the still-open seed
+charset blocker (Blocker 2): it only affects the directory name, not
+`config.seed` itself.
+
+### Required source game files
+
+Read-only, from `--game` (never written): the same set already documented
+under "Exact files/directories read" above — `DarkSoulsRemastered.exe`,
+`map/MapStudio/*.msb`, `event/*.emevd.dcx`,
+`param/GameParam/GameParam.parambnd.dcx`,
+`paramdef/paramdef.paramdefbnd.dcx`, `msg/ENGLISH/item.msgbnd.dcx` (scan
+only), plus AI/effect bundles (patch-enemies only). No files are copied out
+of the game directory ahead of time beyond what `scan` reads into
+`dsr-catalog.json` — there is no separate "pristine snapshot" copy step
+inside the upstream tool itself; that concept (`PristineSnapshot` in
+`docs/ARCHITECTURE.md`) remains an application-level responsibility, not an
+upstream one.
+
+### Allowed upstream calls
+
+- `DsrDataTool scan --game <gamePath> --output <workspace>/dsr-catalog.json`
+- `DsrDataTool patch-enemies --game <gamePath> --catalog <catalog> --placements <workspace>/seed_<seed>/randomizer.json --output <workspace>/seed_<seed>`
+- In-process `generate()` / `writeOutput()` (already covered above; not
+  re-verified in this task)
+
+### Forbidden upstream calls
+
+- `DsrDataTool install` — writes into `--game`, owns a second backup
+  authority (`<package>/backup/`), calls `EnsureGameClosed()`.
+- `DsrDataTool restore` — same category as `install`.
+- `src/cli.js ui`, `src/server.js` (`startServer`/`dispatchApi`) — Electron/
+  HTTP orchestration, hard-codes its own catalog/dotnet paths, out of scope
+  per the original integration doc.
+
+`combinedRandomizerWorkspace.ts` structurally cannot build `install`/
+`restore` argument vectors — it has no function that emits them, by
+construction, not by a runtime check.
+
+### Read/write boundaries
+
+- `gameDirectory`: read-only for `scan` and `patch-enemies`. Never written
+  by either command (verified against `Program.cs`: only `InstallPackage`/
+  `RestorePackage` call `File.Copy`/`AtomicCopy` against a
+  `ResolveGamePath(gameDirectory, ...)` target).
+- `workspaceDirectory`: read/write for both allowed commands and for
+  `writeOutput()`. `planCombinedRandomizerWorkspace()` refuses to plan a
+  workspace equal to, or nested inside, the game directory — enforced in
+  TypeScript *before* any path is ever handed to a subprocess, ahead of and
+  independent from `patch-enemies`'s own equivalent guard
+  (`PatchEnemies`, "Patch output cannot be placed inside the game
+  installation.").
+
+### Can live-game modification be fully avoided during generation?
+
+**Yes, for the generation stage.** Every path both `scan` and
+`patch-enemies` write to is derived from `workspaceDirectory`, never from
+`gameDirectory`, and this is now enforced twice: once by upstream's own
+runtime check, and once ahead of that, in pure, unit-tested TypeScript that
+never touches the filesystem. Live-game modification only happens later,
+in the backend's own activation stage (task 8), which is intentionally a
+separate, later step outside `generate()`.
+
+This task does **not** prove that a full generation run succeeds end to
+end — that requires the pinned fork to be vendored and `DsrDataTool.dll`
+to be built (Blocker 5, untouched by this task), plus a real or fixture
+DSR installation to scan and patch against, neither of which exists in
+this environment. What is proven here is narrower and load-bearing on its
+own: the *shape* of every path and argument vector the workspace-only run
+would use is fully determined, workspace-contained, and testable without
+that binary or a real game install.
+
+### Exact next implementation task
+
+Vendor the pinned GPL fork under `engines/combined/vendor/` (matching the
+`expectedSource`/`expectedExecutable` paths already read by
+`apps/backend/src/core/pipeline.ts`'s `ExternalAdapter`), build
+`DsrDataTool.dll`, and wire a `child_process.spawn`-based executor that
+consumes `CombinedRandomizerWorkspacePlan.scanArgs`/`patchEnemiesArgs` and
+emits `progress`/`log` events — this is Blocker 5 plus task 6/7 from the
+implementation split above, deliberately not attempted in this task.
