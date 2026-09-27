@@ -70,7 +70,7 @@ Never modify the state of another task except when activating your own task.
 
 # TASK 1 — CODEX
 
-State: BLOCKED
+State: DONE
 
 ## DsrDataTool executor
 
@@ -134,6 +134,7 @@ Completion record:
 - Verification: 7 focused executor tests passed; backend build and typecheck passed (2026-09-27).
 - Result: The existing committed executor accepts planner arguments, runs only `scan` and `patch-enemies`, and returns typed process results and events. Implementation and verification are complete; task completion remains pending.
 - Blockers: Git cannot create `.git/index.lock` (`Permission denied`) under the current filesystem policy, so this plan/status update cannot be committed. The plan file was already untracked at task start.
+- None. Git sandbox limitation was resolved by the user committing the status update manually.
 
 ---
 
