@@ -10,7 +10,11 @@
   an external randomizer or access game/workspace files.
 - A pure, deterministic mapping layer converts combined requests to the
   upstream item/enemy configuration shape, applies parent `enabled` flags, and
-  rejects requests with no enabled randomization category.
+  rejects requests with no enabled randomization category. Task 3 verified
+  all required item/enemy combinations, parent gating, deterministic output,
+  and the case where only safeguard options are selected. Six focused mapper
+  tests and backend build/typecheck passed on 2026-09-28. No generation,
+  filesystem, subprocess, or game access was added.
 - A pure, deterministic workspace planner
   (`combinedRandomizerWorkspace.ts`) computes the catalog path, per-seed
   output directory, and `scan`/`patch-enemies` argument vectors for a

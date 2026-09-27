@@ -127,3 +127,25 @@ test('rejects a request with every randomization category disabled', () => {
     message: 'Enable at least one item or enemy randomization feature.',
   });
 });
+
+test('rejects enabled parent options when only non-category safeguards are selected', () => {
+  const result = mapCombinedRandomizerConfig(createRequest({
+    items: {
+      ...itemOptions,
+      randomizeWorldItems: false,
+      randomizeStartingClass: false,
+      randomizeStartingEquipment: false,
+      randomizeGifts: false,
+      randomizeEnemyDrops: false,
+      randomizeShops: false,
+    },
+    enemies: {
+      ...enemyOptions,
+      randomizeRegularEnemies: false,
+      randomizeBosses: false,
+    },
+  }));
+
+  assert.equal(result.ok, false);
+  assert.equal(result.code, 'NO_RANDOMIZATION_FEATURES_ENABLED');
+});

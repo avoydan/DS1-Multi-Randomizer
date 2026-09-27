@@ -261,7 +261,7 @@ Completion record:
 
 # TASK 3 — CODEX
 
-State: PENDING
+State: DONE
 
 ## Combined request → upstream config mapping
 
@@ -291,10 +291,13 @@ Testing must include:
 
 Completion record:
 
-- Commit:
-- Verification:
-- Result:
-- Blockers:
+- Commit: recorded in a follow-up completion-record commit.
+- Verification: 6 focused mapper tests passed; contracts and backend builds,
+  and backend typecheck passed (2026-09-28).
+- Result: The existing pure mapper satisfies the Task 3 mapping and parent
+  gating requirements. Added a test rejecting requests that select only
+  non-category safeguards. No runtime mapping changes were needed.
+- Blockers: None.
 
 ---
 
