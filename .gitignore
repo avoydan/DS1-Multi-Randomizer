@@ -5,5 +5,8 @@ release/
 .DS_Store
 .vscode/
 .idea/
-engines/*/vendor/
+engines/*/vendor/**/.tools/
+engines/*/vendor/**/.tmp/
+engines/*/vendor/**/bin/
+engines/*/vendor/**/obj/
 workspace/

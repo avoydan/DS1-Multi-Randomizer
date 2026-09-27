@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- The tool can build from the local package cache when NuGet's advisory
+         endpoint is temporarily unreachable (common in restricted networks). -->
+    <NuGetAudit>false</NuGetAudit>
+    <RestoreIgnoreFailedSources>true</RestoreIgnoreFailedSources>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="JuicerMV.SoulsFormats" Version="0.1.3" />
+  </ItemGroup>
+</Project>

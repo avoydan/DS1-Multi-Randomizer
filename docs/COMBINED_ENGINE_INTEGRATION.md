@@ -452,4 +452,112 @@ Vendor the pinned GPL fork under `engines/combined/vendor/` (matching the
 `DsrDataTool.dll`, and wire a `child_process.spawn`-based executor that
 consumes `CombinedRandomizerWorkspacePlan.scanArgs`/`patchEnemiesArgs` and
 emits `progress`/`log` events — this is Blocker 5 plus task 6/7 from the
-implementation split above, deliberately not attempted in this task.
+implementation split above.
+
+**Update:** the vendoring and build half of the task above is now done —
+see "Vendored build proof" below. What remains is only the
+`child_process.spawn`-based executor and its wiring into the adapter/
+pipeline.
+
+## Vendored build proof
+
+Resolves the vendoring and reproducible-build half of Blocker 5. Does
+**not** wire anything into the runtime pipeline and does not implement the
+Node executor — see "Exact next implementation task" above for what is
+still open.
+
+### What was vendored
+
+A selective vendor (not a full mirror) of `kellernz1/ds-randomizer` at
+pinned commit `f120efe0e95b957b7e76109868c3c9966e22720c`
+(2026-08-20T16:13:04-03:00), under `engines/combined/vendor/`. Every file
+was verified byte-identical to that commit at vendor time. Full file list,
+purpose, and update procedure: `engines/combined/vendor/UPSTREAM_PIN.md`.
+
+Only the files needed to build `DsrDataTool.dll` were vendored:
+`LICENSE`, `THIRD_PARTY_NOTICES.md`, `NuGet.Config`,
+`scripts/{install-dotnet.ps1,dotnet-local.ps1}`,
+`tools/DsrDataTool/{DsrDataTool.csproj,Program.cs}`. The upstream JS core
+(`src/core/*.js`) is intentionally **not** vendored yet — deferred to the
+task that wires the in-process `generate()` call, so nothing sits unused
+and unbuilt in the tree.
+
+`.gitignore`'s `engines/*/vendor/` blanket rule (which would have silently
+prevented ever committing vendored source at all) was narrowed to
+`engines/*/vendor/**/{.tools,.tmp,bin,obj}/`, so only actual build output
+is excluded, not the vendored source itself.
+
+### Build command
+
+Reproduced upstream's own `npm run build:data-tool`
+(`dotnet build tools/DsrDataTool/DsrDataTool.csproj --configuration Release
+--configfile NuGet.Config`) using a locally-installed .NET 8 SDK, isolated
+from any machine-wide dotnet/NuGet state:
+
+```powershell
+$env:DOTNET_CLI_HOME = "<short-path>\dn8sdk-clihome"
+$env:NUGET_PACKAGES  = "<short-path>\dn8sdk-nuget"
+$env:DOTNET_SKIP_FIRST_TIME_EXPERIENCE = "1"
+$env:DOTNET_CLI_TELEMETRY_OPTOUT = "1"
+
+<short-path>\dn8sdk\dotnet.exe build `
+  engines\combined\vendor\tools\DsrDataTool\DsrDataTool.csproj `
+  --configuration Release `
+  --configfile engines\combined\vendor\NuGet.Config
+```
+
+Result: `Build succeeded. 0 Warning(s). 0 Error(s).` Restored dependency:
+`JuicerMV.SoulsFormats` 0.1.3 from `nuget.org` (the only source
+`NuGet.Config` allows). SDK used: `8.0.425` (`dotnet --list-sdks`),
+matching the vendored `DsrDataTool.csproj`'s `net8.0` target.
+
+**Windows `MAX_PATH` deviation from upstream's own convention:** upstream's
+`scripts/install-dotnet.ps1` installs the local SDK to
+`<project root>/.tools/dotnet`. Running that unmodified against
+`engines/combined/vendor/.tools/dotnet` failed during SDK extraction
+(`DirectoryNotFoundException` on a ~245-character `dotnet-watch` tool
+path — Windows' legacy 260-character path limit, not raised on this
+machine, which requires an administrator-level registry change and was
+out of scope for this task). The SDK was instead installed to a short
+path outside the repository entirely
+(`C:\Users\<user>\dn8sdk`, well under the limit even for the SDK's longest
+internal paths) and referenced explicitly rather than via `PATH`. This is
+an environment-local build-tool location, not a vendored file, and is not
+committed. See `docs/DECISIONS.md` for why this was chosen over enabling
+long paths.
+
+### Resulting artifact
+
+```
+engines/combined/vendor/tools/DsrDataTool/bin/Release/net8.0/DsrDataTool.dll
+```
+
+(alongside `DsrDataTool.exe`, `SoulsFormats.dll`, `ZstdSharp.dll`,
+`DsrDataTool.deps.json`, `DsrDataTool.runtimeconfig.json`, `DsrDataTool.pdb`
+in the same directory — all gitignored build output, reproducible from the
+vendored `.csproj`/`.cs` plus the pinned NuGet dependency, not committed).
+
+Verified by running `dotnet DsrDataTool.dll --help` from that directory:
+it printed the exact five-command usage text documented earlier in this
+file (`scan`, `patch-enemies`, `install`, `restore`, `inspect-boss-bars`)
+and exited 0, with no `--game`/`--output` arguments supplied — so no file
+of any kind, live game or otherwise, was read or written by this
+verification step.
+
+### Blockers unresolved by this task
+
+- **No public fork exists.** `docs/LICENSING.md` requires "a public source
+  tag matching each distributed binary." Creating and maintaining a fork
+  under a project-controlled GitHub account is an account-owning action
+  this task could not take. The local vendor directory satisfies "exact
+  pinned commit" and "preserved notices" today; it does not yet satisfy
+  the public-tag requirement, which only matters once a binary is
+  distributed to end users.
+- **The JS core is still unvendored.** `generate()`/`writeOutput()` remain
+  analyzed-but-not-present in this repository.
+- **No executor exists yet.** Nothing in this repository can currently
+  invoke the built `DsrDataTool.dll`; `combinedRandomizerAdapter.ts`'s
+  `generate()` is still `NOT_IMPLEMENTED`. This was explicitly out of
+  scope for this task.
+- Blockers 1-4 and 6 from the original integration analysis remain
+  untouched, as instructed.

@@ -18,6 +18,16 @@
   game directory. It performs no filesystem I/O and never constructs
   `install`/`restore` arguments. See
   `docs/COMBINED_ENGINE_INTEGRATION.md` ("Workspace execution proof").
-- Not yet done: vendoring the pinned fork, building `DsrDataTool.dll`, and
-  an actual subprocess executor that spawns `scan`/`patch-enemies` using
-  this plan. The adapter's `generate()` is still `NOT_IMPLEMENTED`.
+- `kellernz1/ds-randomizer` is selectively vendored (files needed for
+  `DsrDataTool.dll` only) and pinned at commit
+  `f120efe0e95b957b7e76109868c3c9966e22720c` under
+  `engines/combined/vendor/` (`UPSTREAM_PIN.md` has the full file list and
+  update procedure). `DsrDataTool.dll` builds successfully from this
+  vendor directory with a locally-installed .NET 8 SDK; see
+  `docs/COMBINED_ENGINE_INTEGRATION.md` ("Vendored build proof") for the
+  exact command and artifact path.
+- Not yet done: vendoring the upstream JS core, a public fork (required by
+  `docs/LICENSING.md` before any distribution), and an actual subprocess
+  executor that spawns `scan`/`patch-enemies` using the workspace plan.
+  The adapter's `generate()` is still `NOT_IMPLEMENTED`; nothing in this
+  repository invokes `DsrDataTool.dll` yet.

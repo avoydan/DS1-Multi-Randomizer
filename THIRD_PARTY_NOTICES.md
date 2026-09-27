@@ -2,14 +2,16 @@
 
 DS1 Triple Randomizer is licensed under GPL-3.0-only.
 
-No upstream randomizer source code or Dark Souls Remastered game data is
-currently included in this repository.
-
-Planned integrations:
+No Dark Souls Remastered game data is included in this repository. A
+selective, pinned vendor of `kellernz1/ds-randomizer` (the files needed to
+build `DsrDataTool.dll`) is included under `engines/combined/vendor/` — see
+`engines/combined/vendor/UPSTREAM_PIN.md` for the exact pinned commit and
+file list.
 
 | Component | Upstream | License | Distribution policy |
 | --- | --- | --- | --- |
-| DSR Randomizer | kellernz1/ds-randomizer | GPL-3.0-only | Use a pinned fork; preserve source, history, license, and notices. |
+| DSR Randomizer | kellernz1/ds-randomizer | GPL-3.0-only | Selectively vendored at a pinned commit under `engines/combined/vendor/`; preserve source, history where practical, license, and notices. A public fork with a source tag matching each distributed binary is still required before distribution (see `docs/LICENSING.md`). |
+| SoulsFormats (via `JuicerMV.SoulsFormats` NuGet package, used by `DsrDataTool`) | JKAnderson/SoulsFormats (distributed as JuicerMV/SoulsFormats) | GPL-3.0-only | Not vendored; restored from NuGet at build time. Dependency notices and license terms must accompany distributed binaries. |
 | FogMod | thefifthmatt/FogMod | Apache-2.0 | Preserve its LICENSE, NOTICE if present, attribution, and modification notices. |
 | DarkSoulsItemRandomizer | HotPocketRemix/DarkSoulsItemRandomizer | No explicit repository license found | Reference behavior only; do not vendor or redistribute without written permission. |
 | Dark-Souls-Enemy-Randomizer | everKalle/Dark-Souls-Enemy-Randomizer | No explicit repository license found | Reference behavior only; do not vendor or redistribute without written permission. |
