@@ -140,7 +140,7 @@ Completion record:
 
 # TASK 2 — CLAUDE
 
-State: PENDING
+State: DONE
 
 ## Vendor and pin the upstream JavaScript generation core
 
@@ -181,10 +181,81 @@ Verification:
 
 Completion record:
 
-- Commit:
-- Verification:
+- Commit: `a969d2a8896b106b9b11a1c00d2e6d9f963db4cb`
+  (`feat(combined): vendor pinned upstream JS generation core`).
+- Verification (2026-09-28):
+  - **Exact revision**: all twelve vendored files verified equal to pinned
+    commit `f120efe0e95b957b7e76109868c3c9966e22720c` by comparing Git blob
+    object IDs (upstream `rev-parse <pin>:<path>` vs. local
+    `hash-object`). Raw `diff` is unreliable here because `core.autocrlf`
+    rewrites line endings on Windows checkout. The staged blobs in the
+    commit above were re-checked against upstream after staging. Object IDs
+    are recorded in `engines/combined/vendor/UPSTREAM_PIN.md`.
+  - **Minimal dependency/import verification**: every module specifier in
+    the five vendored files is either a Node builtin (`node:crypto`,
+    `node:fs/promises`, `node:path`) or one of three relative specifiers
+    inside the vendored set; no dynamic `import()`, no `require()`, no
+    third-party packages, so the set needs no `node_modules`. Asserted
+    executably, not by inspection, in
+    `apps/backend/src/adapters/combinedRandomizerCore.test.mjs`.
+  - **Focused checks**: `npm run test -w @ds1tr/backend` — 35/35 pass
+    (7 new); `npm run typecheck -w @ds1tr/backend` and
+    `npm run build -w @ds1tr/backend` both clean. `generate()` was never
+    called; no game directory was touched.
 - Result:
+  - **Minimal module set** (the transitive closure of `generate()` and
+    `writeOutput()`), vendored under `engines/combined/vendor/src/`:
+    `core/config.js`, `core/generator.js`, `core/output.js`, `core/rng.js`,
+    `data/prototype-data.js`. `rng.js` and `prototype-data.js` are present
+    only because `generator.js` statically imports them.
+  - **Excluded**: `src/cli.js`, `src/server.js`, `src/desktop/**`,
+    `src/core/share.js`, `src/data/catalog.js`, `src/game/detection.js`,
+    `public/**`, upstream `package.json`, `test/**`. Rationale per file in
+    `UPSTREAM_PIN.md`.
+  - **Callable entry point**: `generate(config, { gameCatalog })` in
+    `core/generator.js` — pure and synchronous. Six exports form the whole
+    boundary: `generate`, `normalizeConfig`, `validateConfig`,
+    `defaultConfig`, `RANDOMIZER_VERSION` (`0.5.66`), `writeOutput`.
+  - **Loading from the backend**:
+    `apps/backend/src/adapters/combinedRandomizerCore.ts` — a computed
+    dynamic `import()` of `pathToFileURL()` specifiers resolved from
+    `import.meta.url` (a static TS import cannot reach a tree outside the
+    backend `rootDir`; a bare Windows path is not a valid ESM specifier).
+    Upstream types are hand-written in the backend so vendored bytes stay
+    byte-identical. Returns typed `JS_CORE_MISSING` /
+    `JS_CORE_INCOMPLETE` failures instead of throwing.
+  - **Licenses/notices preserved**: the vendored `LICENSE` and
+    `THIRD_PARTY_NOTICES.md` are unchanged (same upstream repository, same
+    GPL-3.0-only terms, so the JS core adds no new notice obligations);
+    this repository’s `THIRD_PARTY_NOTICES.md` and `UPSTREAM_PIN.md`
+    were updated to describe the wider vendor scope. `.gitignore` now also
+    excludes `engines/*/vendor/**/data/dsr-catalog.json`, matching
+    upstream’s own ignore and `docs/LICENSING.md`’s ban on
+    distributing extracted game catalogs.
+  - **Doc correction**: upstream `validateConfig(config, { requireGame })`
+    *returns* a `string[]` of errors and never throws. The earlier analysis
+    said it throws; Task 3 must check the returned array.
+  - `engines/combined/vendor/package.json` is repository-authored (not
+    vendored) and supplies only `"type": "module"`, without which Node
+    reparses the vendored ESM (`MODULE_TYPELESS_PACKAGE_JSON`).
+  - Concrete boundary documented in
+    `docs/COMBINED_ENGINE_INTEGRATION.md` ("JS core vendor proof").
 - Blockers:
+  - **New, for Task 4/7**: `apps/backend/src/core/pipeline.ts` probes the
+    combined engine at `vendor/src/cli.js` and `vendor/DSR-Randomizer.exe`.
+    Neither exists and neither should — `src/cli.js` is deliberately
+    excluded and there is no upstream portable `.exe` in this integration
+    model — so `ExternalAdapter` keeps reporting the combined engine as
+    missing even though the core is vendored. Correct targets:
+    `vendor/src/core/generator.js` and the built
+    `vendor/tools/DsrDataTool/bin/Release/net8.0/DsrDataTool.dll`. Not
+    fixed here: changing it is pipeline wiring, explicitly out of scope.
+  - **Unchanged**: no public GPL fork exists yet (account-owning action;
+    `docs/LICENSING.md` requires it before distributing any binary).
+    Vendoring the JS core does not change this.
+  - **Unchanged**: integration Blockers 1, 2, 3, and 6 (silent prototype
+    fallback, seed charset, missing `generateSpoilerLog` request field,
+    catalog/game-dir coupling) were out of scope and remain open.
 
 ---
 
