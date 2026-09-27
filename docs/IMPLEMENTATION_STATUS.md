@@ -26,8 +26,13 @@
   vendor directory with a locally-installed .NET 8 SDK; see
   `docs/COMBINED_ENGINE_INTEGRATION.md` ("Vendored build proof") for the
   exact command and artifact path.
+- `DsrDataToolExecutor` runs only the planner-provided `scan` and
+  `patch-enemies` argument vectors through Node `child_process.spawn`, streams
+  typed stdout/stderr log events, emits coarse process-status events, and
+  returns typed success, process-failure, or spawn-failure results. It is not
+  wired into the adapter or generation pipeline yet.
 - Not yet done: vendoring the upstream JS core, a public fork (required by
   `docs/LICENSING.md` before any distribution), and an actual subprocess
-  executor that spawns `scan`/`patch-enemies` using the workspace plan.
-  The adapter's `generate()` is still `NOT_IMPLEMENTED`; nothing in this
-  repository invokes `DsrDataTool.dll` yet.
+  orchestration sequence connecting the existing planner and executor.
+  The adapter's `generate()` is still `NOT_IMPLEMENTED`; the pipeline does not
+  invoke `DsrDataTool.dll` yet.
