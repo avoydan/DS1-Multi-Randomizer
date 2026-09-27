@@ -1,5 +1,118 @@
 # AGENTS.md
 
+## Agent-specific workflow policy
+
+### Claude
+Claude may use `six-step-workflow` by default for implementation tasks.
+
+The workflow is preferred when it improves correctness, review quality, and regression safety.
+
+### Codex
+Codex must NOT use `six-step-workflow` by default because of usage efficiency constraints.
+
+For normal Codex tasks, use the minimal workflow:
+
+1. inspect only directly relevant files
+2. implement the requested change
+3. run focused tests/typecheck
+4. report results
+5. stop
+
+Codex may use `six-step-workflow` only when:
+- the user explicitly requests it, or
+- the task is genuinely architecture-level, cross-cutting, or high-risk.
+
+Do not automatically invoke broad regression reviews or heavyweight skills for small isolated Codex tasks.
+
+
+## Multi-agent workflow
+
+This repository may be worked on by ChatGPT, Codex, and Claude.
+
+The repository is the source of truth.
+Do not rely on chat history as persistent project memory.
+
+Project memory is stored in:
+- AGENTS.md
+- docs/ARCHITECTURE.md
+- docs/DECISIONS.md
+- docs/IMPLEMENTATION_STATUS.md
+- task-specific analysis documents in docs/
+
+### Roles
+
+Claude:
+- larger repository analysis
+- upstream project analysis
+- substantial backend implementation
+- larger refactors
+- compatibility work
+- difficult integration work
+
+Codex:
+- narrow implementation tasks
+- TypeScript contracts
+- focused adapters
+- tests
+- build/typecheck fixes
+- Electron/React wiring
+- small backend changes
+- small documentation updates
+
+ChatGPT:
+- architecture review
+- task decomposition
+- reviewing agent reports
+- deciding task order
+- preparing prompts
+- resolving conflicting recommendations
+
+These roles are defaults, not hard technical restrictions.
+
+### Work rules
+
+- One agent works on a given implementation task at a time.
+- Do not duplicate analysis already documented in the repository.
+- Do not scan the entire repository unless explicitly necessary.
+- Read only files relevant to the current task.
+- Do not expand scope automatically.
+- If the task becomes substantially larger than expected, stop and report.
+- Do not implement future tasks in advance.
+- Prefer focused tests over full test suites.
+- Run full typecheck/build/test only at meaningful milestones.
+- Do not perform speculative refactors.
+- Do not reinstall or update dependencies without a concrete reason.
+- Keep tool and token usage conservative.
+
+### Task completion protocol
+
+At the end of every meaningful task:
+
+1. Update docs/IMPLEMENTATION_STATUS.md.
+2. Update docs/DECISIONS.md only if an architectural decision was made or changed.
+3. Report:
+   - what was changed
+   - files changed
+   - tests/typechecks run
+   - blockers
+   - remaining work
+4. Suggest one Git commit message.
+5. Stop and wait for the next instruction.
+
+### Handoff protocol
+
+Before another agent continues the work:
+
+1. Finish the current task.
+2. Update project documentation.
+3. Commit the completed work.
+4. Start a fresh agent thread when practical.
+5. The next agent reads the repository state instead of reconstructing previous chat history.
+
+Never use another agent's chat transcript as the primary project handoff.
+Use committed code and project documentation.
+
+
 ## Project
 DS1 Triple Randomizer is a Windows desktop application for Dark Souls Remastered.
 
@@ -196,3 +309,33 @@ Recommend offline play for modified game data.
 5. Run build/tests.
 6. Explain architecture-changing decisions.
 7. Do not rewrite working engines merely for language consistency.
+
+## Codex efficiency policy
+
+- Work on one narrowly scoped task at a time.
+- Do not scan the whole repository unless explicitly necessary.
+- Do not reread unchanged files that were already analyzed.
+- Prefer project documentation in `docs/` over rediscovering prior findings.
+- Do not inspect upstream repositories broadly; inspect only files required for the current question.
+- Do not expand scope automatically.
+- If a task turns out larger than expected, stop and report before continuing.
+- Prefer focused tests over full test suites.
+- Run full build, typecheck, and tests only after meaningful milestones or when explicitly requested.
+- Do not reinstall dependencies unless necessary.
+- Do not run unnecessary network searches.
+- Do not perform speculative refactors.
+- Do not implement future steps in advance.
+- After each meaningful task, provide a short summary and stop.
+- Prefer completing one small task fully over partially completing several large tasks.
+- Use existing analysis documents as project memory.
+- Keep tool usage conservative.
+
+For difficult architecture, reverse engineering, compatibility, or debugging tasks:
+
+- Use a higher reasoning level only when necessary.
+
+For routine implementation, UI work, typing fixes, tests, and small refactors:
+
+- Prefer a normal/medium reasoning level.
+
+
