@@ -455,3 +455,46 @@ regular enemies + Fog remains 0/40 until the combined engine adjusts skip
 counts. That fix belongs in the vendored `DsrDataTool`, and it is an open
 user decision.
 
+## DsrDataTool keeps DS1 skip counts consistent (local vendored modification)
+
+Date: 2026-09-28. User-authorized correctness fix to the combined engine, not a Fog workaround.
+
+- **Removals and insertions.** `RemoveEventInstruction` and `InsertEventInstruction` now
+  adjust every enclosing DS1 "skip N lines" instruction (`1000[01/03/05/07]`,
+  `1003[01/03/05/07]`, `1005[01]`) through the new `EventSkipRanges.cs`:
+  - a removal inside a range shrinks it;
+  - an insertion grows every skip that covers its **anchor**. Every call site now states
+    an anchor: boss health-bar companions use `After` the health bar, and the Asylum AI
+    re-enable uses `Before` the terminal instruction. A position alone is ambiguous at a
+    range's last line.
+- **Unchanged cases.** Same-length replacements (in-place argument edits) and edits
+  outside a range leave skips unchanged. Nested and overlapping skips are each adjusted.
+- **Refusals.** The tool throws if an edit would:
+  - remove a skip;
+  - insert right after a skip instruction;
+  - change a parameterized count;
+  - overflow a count.
+- **Documentation.** The modification is documented in
+  `engines/combined/vendor/UPSTREAM_PIN.md` ("Local modifications"), with a GPL-3.0 §5(a)
+  notice in `Program.cs` and a patch in `vendor/patches/`. That document previously
+  forbade in-place edits; they are now allowed only as listed and patched until the
+  public GPL fork exists. Backend 0.16.1, because combined packages change for the same
+  seed.
+- **Verification** (`engines/combined/tests/DsrDataTool.Tests`):
+  - 14 unit tests, including the `11505392` and `11600400` cases;
+  - `verify-skips`, which checks that every surviving base skip covers exactly its
+    original surviving instructions. It flags the unpatched tool's output.
+  - Combined-only 40-seed sweep with bosses: 40/40 packages, 0 mismatches, about 134
+    skips adjusted per package.
+
+**Effect on Fog (measured, merge rules unchanged).** Items + Enemies + Fog is still 0/40:
+
+- `11505392`: the combined engine now changes SKIP 7 to 6, and merge rule 4 refuses any
+  control-flow change. This happens in 40 of 40 seeds.
+- `11600400`: the corrected skip at base 2 is adjacent to FogMod's edits at 0–1, so the
+  adjacency rule refuses it. This happens in 39 of 40 seeds.
+
+Allowing a skip-count change that is exactly explained by the same side's own
+count-changing edits in its range would be a change to rule 4. That is an open user
+decision; the rules were not changed.
+

@@ -774,11 +774,21 @@ live install only read and unchanged)
   No seed exhausted the 3-attempt budget in these sweeps, but one earlier
   seed (`e2e-3`) did.
 
+**After the DsrDataTool skip-count fix** (backend 0.16.1, 40-seed sweeps)
+
+- Items + Fog: 40/40.
+- Items + Enemies + Fog: 0/40. The combined output is now correct: skip checks
+  pass 47/47. FogHost refuses two events under the unchanged rules:
+  - `m15_00_00_00:11505392` (40 seeds), by rule 4: the combined engine changes
+    SKIP 7 to 6;
+  - `m16_00_00_00:11600400` (39 seeds), by rule 3: the corrected skip at base 2
+    is adjacent to FogMod's edits at 0–1.
+
 **Open**
 
-- Enemies + Fog is blocked by the combined engine's unadjusted skip counts.
-  The fix belongs in `DsrDataTool` (user decision). The merge must keep
-  refusing these events.
+- Enemies + Fog needs a user decision on whether rule 4 may accept a
+  skip-count change that exactly matches the same side's own count-changing
+  edits inside that skip's range.
 - The key-item retry budget is too small for enemies + Fog on some seeds.
 - The boss conflict set (`11810310` and others) is still unmeasured, because
   boss randomization + Fog is rejected.

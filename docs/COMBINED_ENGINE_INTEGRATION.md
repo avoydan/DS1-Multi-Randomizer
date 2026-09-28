@@ -1103,3 +1103,15 @@ DS1TR_E2E_GUARD_PATHS="$LIVE" DS1TR_E2E_STALE_WORKSPACE="<kept workspace A>"   n
    (`outputDirectory`, `generatedAt`). Determinism comparisons and the run
    manifest must exclude them; the patched game files themselves are fully
    deterministic.
+
+## Local fix: DS1 skip counts (2026-09-28)
+
+The vendored `DsrDataTool` deleted instructions inside DS1 "skip N lines" ranges without
+changing N, so skips covered different instructions in every enemy-randomized package
+(38 ranges in 21 events for one seed; about 134 per package with bosses). It now adjusts
+enclosing skip counts on every instruction-count-changing edit (`EventSkipRanges.cs`).
+Details: `docs/DECISIONS.md`, "DsrDataTool keeps DS1 skip counts consistent". The checks
+are in `engines/combined/tests/DsrDataTool.Tests`:
+
+- unit tests;
+- `verify-skips <pristine>/event <package>/mod/event`.

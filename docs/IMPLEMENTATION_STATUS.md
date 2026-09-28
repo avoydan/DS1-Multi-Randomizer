@@ -1,5 +1,30 @@
 # Implementation status
 
+DsrDataTool skip-count fix (2026-09-28; backend 0.16.1; user-authorized local vendored
+modification). The combined engine now keeps DS1 "skip N lines" counts consistent when it
+removes or inserts event instructions. Details: `docs/DECISIONS.md`.
+
+- **Tests:**
+  - DsrDataTool tests 14/14 (`engines/combined/tests/DsrDataTool.Tests`);
+  - FogHost 37/37;
+  - backend 108/108;
+  - typecheck clean.
+- **Real-format 40-seed sweeps**, with every combined package checked by `verify-skips`
+  (live install unchanged):
+
+  | Configuration | Result |
+  |---|---|
+  | Combined-only, Items + Enemies + Bosses | **40/40**; 40/40 packages with 0 skip mismatches (about 134 skips adjusted per package) |
+  | Items + Fog | **40/40**; 48/48 skip checks pass; key-item retries on 8 of 48 attempts |
+  | Items + Enemies + Fog | **0/40**; 47/47 skip checks pass (38 skips adjusted per package) |
+
+  The Items + Enemies + Fog failures are FogHost merge refusals, not engine errors:
+  - `11505392`: rule 4, because the combined engine now correctly changes a SKIP count
+    (40 seeds);
+  - `11600400`: the adjacency rule (39 seeds).
+- **Open decision:** whether rule 4 may accept a skip-count change that is exactly
+  explained by the same side's own edits inside that range.
+
 FogHost 0.2.0 (2026-09-28): instruction-level EMEVD merge (user option B), a FogMod
 scaling crash fix (patch 6), and boss randomization off by default on the desktop
 (desktop 0.4.1).
