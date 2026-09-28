@@ -25,7 +25,9 @@ Verification: backend tests 83/83 pass, including the build (2026-09-28).
 Still open:
 - the C# host is unbuilt, so none of the host rules is compiled or tested;
 - boss randomization together with Fog is unproven (`11810310` conflict);
-- the key-item retry rate is unmeasured.
+- the key-item retry rate is unmeasured;
+- FogMod's `scale` mechanism is unread, so scaling composition is a
+  hypothesis (open item 8).
 
 Task 10 implemented the backend FogHost process adapter in
 `apps/backend/src/adapters/fogHostProcess.ts`. It writes a typed schema-v1

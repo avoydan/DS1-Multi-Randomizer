@@ -491,7 +491,14 @@ they cannot be compiled or tested until the host is built (open item 1).
 - an empty `game/script/talk`.
 
 It also plans `<attempt>/base/<path>`, a pristine copy of each combined
-file. The attempt directory must not overlap the pristine directory or the
+file. `buildFogCompatibility` takes that base directory as an input, so the
+caller (Task 12) computes `<attempt>/base` before it builds the
+compatibility object; it does not need a finished staging plan for that.
+
+**Final package (refines the Task 9 rule):** a `combinedFiles` path that is
+missing from the response `files` (FogMod did not rewrite it) is taken from
+staging. Staging holds the combined output, which the host has
+hash-verified. The attempt directory must not overlap the pristine directory or the
 combined package. The copying itself and the retry loop belong to Task 12.
 
 ### Host rules
@@ -523,9 +530,10 @@ its stock carry-over. Events are compared by ID and full content
    skipping any already present. Any other event-0 difference is a
    `FOG_MERGE_CONFLICT`.
 
-The merge and conflict check also run in **`dryRun`**: the host has B, C
-and FogMod's templates without writing anything. A successful `dryRun`
-therefore guarantees that `write` hits no merge conflict.
+The merge and conflict check also run in **`dryRun`**. There, T is computed
+in memory (FogMod's template plus the stock carry-over) and FogMod's
+`Write()` is never called. A successful `dryRun` therefore guarantees that
+`write` hits no merge conflict.
 
 **NpcParam and MSB**
 
@@ -569,7 +577,8 @@ The two scaling mechanisms compose; they do not double-scale.
 - The `baseId` mapping makes FogMod treat each scaled row as the vanilla
   row it stands in for.
 
-No option combination is rejected.
+No option combination is rejected. **This is a hypothesis on the FogMod
+side:** FogMod's `scale` code has not been read (open item 8).
 
 ### Retry and rejection
 
@@ -608,3 +617,11 @@ Attempt seeds come from `deriveAttemptSeeds(master, c, f)`:
    key items outside annotated lots, the combined retry budget runs out.
    The remedy would be to constrain combined key-item locations when Fog is
    enabled, which is a product decision.
+8. **FogMod's `scale` mechanism is unread.** The composition rule and
+   invariants 1 and 3 assume that FogMod scales by editing NpcParam rows in
+   place. If it instead creates tier rows and re-points each part's
+   `NPCParamID`, invariant 1 fails on every scale-enabled run, and that is
+   the desktop default (Fog on, `scaling: true`). This must be confirmed
+   against the FogMod source when the host is built. The fallback is either
+   to reject Fog `scale` together with combined scaling other than
+   `vanilla`, or to make one mechanism the owner.

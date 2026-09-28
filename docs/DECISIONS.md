@@ -276,11 +276,14 @@ Both-sides event edits are `FOG_MERGE_CONFLICT`. Full rules:
 
 The decisions:
 
-- **Scaling composes; no option combination is rejected.** This corrects
-  the Task 9 "double-scales" note. `DsrDataTool` scaling (`area` and
-  `progressive` are identical there) normalizes a replacement to the
-  destination slot's vanilla strength, which is exactly what FogMod's
-  `scale` assumes before it re-tiers by fog position.
+- **Scaling composes; no option combination is rejected (hypothesis on
+  the FogMod side).** This corrects the Task 9 "double-scales" note.
+  `DsrDataTool` scaling (`area` and `progressive` are identical there)
+  normalizes a replacement to the destination slot's vanilla strength. That
+  should be what FogMod's `scale` expects before it re-tiers by fog
+  position, but FogMod's scaling code has not been read. This must be
+  confirmed when the host is built (`FOGHOST_INTEGRATION.md` open item 8);
+  the fallback is to reject the combination or to pick one owner.
 - **Retry scope comes from a backend table, not from the host.**
   `FOG_SEED_UNSOLVABLE` retries Fog. `FOG_UPSTREAM_INCOMPATIBLE` retries
   the combined stage and resets the Fog attempt. Merge conflicts and
