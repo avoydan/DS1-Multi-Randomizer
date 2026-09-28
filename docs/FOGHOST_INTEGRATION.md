@@ -540,8 +540,40 @@ its stock carry-over. Events are compared by ID and full content
 3. **Edited vanilla event** (in both, C ≠ B):
    - T's copy equals B's (FogMod did not change it): T takes C's event.
    - T's copy equals C's: keep it.
-   - Otherwise: `FOG_MERGE_CONFLICT`. No per-event winner table exists yet;
-     `11810310` (Asylum Demon) is the known instance (open item 5).
+   - Otherwise both sides edited the event. **FogHost 0.2.0** attempts an
+     instruction-level merge (`tools/fog-host/src/InstructionMerge.cs`) and
+     reports `FOG_MERGE_CONFLICT` unless every rule below holds. Instruction
+     classes come from the DS1 EMEDF (DarkScript3 `ds1-common.emedf.json`,
+     used as a reference only):
+     - banks 0–999 are conditions and register into condition groups;
+     - banks 1000–1999 are control flow (WAIT/SKIP/END);
+     - banks 2000 and up are commands.
+
+     DS1 has no labels or GOTO. Positional control flow is the "skip N lines"
+     family: `1000[01/03/05/07]`, `1003[01/03/05/07]`, `1005[01]`, where the
+     first argument byte is the line count.
+
+     Merge rules:
+     1. B, C and T have the same rest behavior.
+     2. Each side's edit script is the LCS diff against B, as hunks of
+        deleted base lines plus inserted instructions. The earliest and
+        latest alignments must agree; otherwise the alignment is ambiguous
+        (for example, repeated instructions) and the merge is refused.
+     3. No base instruction or insertion point is touched by both sides.
+        Hunks may not overlap or be adjacent.
+     4. Neither side inserts, deletes or modifies a control-flow instruction.
+     5. At most one side changes condition instructions.
+     6. No hunk that changes the line count may touch the lines a skip
+        covers, or the line right after them: `[p+1, p+n+1]` for a skip at
+        base `p` with count `n`. A count-preserving replacement keeps every
+        position and is allowed.
+     7. Event parameters are unchanged on both sides after re-indexing, and
+        no parameterized instruction is deleted. Merged parameters are B's,
+        re-indexed.
+
+     The merged event is B with both hunk sets applied, in base order.
+     Invariant 4 then requires it to be written exactly. All files are
+     examined before failing, so the error lists every conflicting event.
 4. **Event 0**: every instruction in C₀ that is not in B₀ must be a
    `2000[00]` initialization. These are appended to T₀ in C's order,
    skipping any already present. Any other event-0 difference is a
@@ -724,10 +756,29 @@ live install only read and unchanged)
   The fifth seed exhausted all three combined attempts on key item
   `peculiar_doll` being outside the annotated lots.
 
+**FogHost 0.2.0** (instruction-level merge, patch 6; 40-seed sweeps)
+
+- Items + Fog: 40/40 seeds pass.
+- Items + regular enemies + Fog: 0/40.
+  - Every conflict is one of two events: `m15_00_00_00:11505392` (39 seeds)
+    and `m16_00_00_00:11600400` (38 seeds). In both, the combined engine
+    deletes an instruction inside a SKIP range without adjusting its count.
+    That is a `DsrDataTool` bug; see `docs/DECISIONS.md`.
+  - `m15_00_00_00:11500001` merges at instruction level.
+  - Patch 6 removed 11 `FOG_ENGINE_FAILED` crashes (null area key in
+    FogMod's scale pass).
+- Key-item retry rate (a key item outside FogMod's annotated lots):
+  - Items + Fog: 16.7% of combined attempts; 15% of seeds needed a retry.
+  - With enemies: 14.9% of attempts; 12.5% of seeds.
+
+  No seed exhausted the 3-attempt budget in these sweeps, but one earlier
+  seed (`e2e-3`) did.
+
 **Open**
 
-- Enemies + Fog needs either an instruction-level EMEVD merge that is safe
-  for control flow and skips, or a product rule. This is a user decision.
+- Enemies + Fog is blocked by the combined engine's unadjusted skip counts.
+  The fix belongs in `DsrDataTool` (user decision). The merge must keep
+  refusing these events.
 - The key-item retry budget is too small for enemies + Fog on some seeds.
 - The boss conflict set (`11810310` and others) is still unmeasured, because
   boss randomization + Fog is rejected.

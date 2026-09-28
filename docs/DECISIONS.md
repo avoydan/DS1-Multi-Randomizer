@@ -407,3 +407,51 @@ read):
 Resolving the conflict needs either an instruction-level merge (control-flow and skip
 aware) or a product rule for enemies + Fog; that is an open decision.
 
+## FogHost 0.2.0: instruction-level EMEVD merge, unannotated-collision scaling fix, bosses off by default
+
+Date: 2026-09-28. User chose option (B) for regular enemies + Fog.
+
+1. **Instruction-level merge for events edited by both engines.** The merge
+   succeeds only when the two edits are provably independent; otherwise it
+   reports `FOG_MERGE_CONFLICT`, listing every conflicting event. It requires:
+   - identical rest behavior;
+   - unambiguous LCS edit scripts;
+   - no shared or adjacent base position;
+   - no control-flow instruction (banks 1000–1999) touched by either side;
+   - condition instructions (banks 0–999) changed by at most one side;
+   - no line-count-changing edit within `[p+1, p+n+1]` of any DS1 skip
+     instruction;
+   - unchanged, re-indexable event parameters.
+
+   Instruction classes follow the DS1 EMEDF (DarkScript3, reference only). A
+   count-preserving replacement inside a skip range is allowed, because
+   positions do not move. Post-write invariant 4 is unchanged: the merged
+   event must be written exactly. Details: `docs/FOGHOST_INTEGRATION.md`,
+   rule 3.
+2. **Vendored FogMod patch 6.** FogMod's scale pass used `null` as a
+   `Dictionary` key for enemies on collisions without an area annotation.
+   That crashed 11 of 40 real-format enemy seeds (`FOG_ENGINE_FAILED`). A
+   sentinel key keeps those groups unscaled, which is upstream's intended
+   behavior.
+3. **Desktop default: boss randomization off.** Fog is on by default, and
+   boss randomization + Fog is rejected. Only the initial state changes
+   (desktop 0.4.1). A user who turns bosses on with Fog still gets
+   `FOG_BOSS_RANDOMIZATION_UNSUPPORTED`.
+
+**Finding: the combined engine breaks skip ranges.** `DsrDataTool.RemoveEventInstruction`
+shifts event parameters but never adjusts the line count of an enclosing
+`SKIP` (DS1 `1000[01/03/05/07]`, `1003[01/03/05/07]`, `1005[01]`). In one
+real-format package (seed `enemies-1`), 38 skip ranges in 21 events lose
+lines without the count changing. The skip then covers different
+instructions, and this happens in combined-only packages as well. Two
+examples:
+
+- In `11505392`, the SKIP 7 now also skips `2004[01]` (set AI state).
+- In `11505011`, each SKIP 1 now skips the next condition registration.
+
+FogHost correctly refuses to merge such events when FogMod also edits them.
+On real data that is always `11505392`, and nearly always `11600400`. So
+regular enemies + Fog remains 0/40 until the combined engine adjusts skip
+counts. That fix belongs in the vendored `DsrDataTool`, and it is an open
+user decision.
+

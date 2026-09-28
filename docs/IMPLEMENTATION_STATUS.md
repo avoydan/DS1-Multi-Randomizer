@@ -1,5 +1,29 @@
 # Implementation status
 
+FogHost 0.2.0 (2026-09-28): instruction-level EMEVD merge (user option B), a FogMod
+scaling crash fix (patch 6), and boss randomization off by default on the desktop
+(desktop 0.4.1).
+
+- **Merge policy:** `docs/FOGHOST_INTEGRATION.md` rule 3 and `docs/DECISIONS.md`.
+- **Verification:**
+  - FogHost self-tests 37/37 (15 new merge tests, including the `11505392` pattern);
+  - backend 108/108;
+  - root typecheck clean.
+- **Real-format sweeps** (`fogHostE2e.mjs`, `DS1TR_E2E_SWEEP=40`; live install
+  unchanged):
+
+  | Configuration | Result |
+  |---|---|
+  | Items + Fog | **40/40**. Key items fell outside annotated lots on 8 of 48 combined attempts (16.7%); 6 of 40 seeds needed a combined retry; none exhausted the budget. |
+  | Items + regular enemies + Fog | **0/40**. 39 are `FOG_MERGE_CONFLICT`: `m15_00_00_00:11505392` in 39 seeds and `m16_00_00_00:11600400` in 38. `m15_00_00_00:11500001` merged at instruction level in 39 seeds. Key items fell outside annotated lots on 7 of 47 attempts (14.9%); 5 seeds needed a combined retry. One transient `DATA_TOOL_FAILED` did not reproduce on rerun. |
+
+  Before patch 6, 11 of 40 enemy seeds crashed with `FOG_ENGINE_FAILED`.
+- **Blocker:** both remaining conflicts are caused by the combined engine.
+  `DsrDataTool.RemoveEventInstruction` deletes instructions inside SKIP ranges without
+  adjusting the line count. One package had 38 such skips in 21 events, and this
+  affects combined-only packages too. FogHost refuses to merge them by design. Fixing it
+  needs a change to the vendored `DsrDataTool`, which is a user decision.
+
 FogHost v1 (2026-09-28): `tools/fog-host` (FogHost 0.1.0, .NET 8) is built and verified;
 `@ds1tr/backend` is 0.16.0.
 
