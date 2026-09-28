@@ -21,9 +21,9 @@ const adapters = {
   }),
   fog: new ExternalAdapter({
     name: 'fog',
-    engineRoot: path.join(repoRoot, 'engines', 'fog'),
-    expectedSource: 'vendor/FogMod/Randomizer.cs',
-    expectedExecutable: 'vendor/FogMod.exe',
+    engineRoot: repoRoot,
+    expectedSource: 'tools/fog-host/FogHost.csproj',
+    expectedExecutable: 'tools/fog-host/bin/Release/net8.0/FogHost.exe',
   }),
 };
 

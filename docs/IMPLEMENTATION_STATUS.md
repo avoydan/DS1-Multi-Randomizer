@@ -1,5 +1,16 @@
 # Implementation status
 
+Task 10 implemented the backend FogHost process adapter in
+`apps/backend/src/adapters/fogHostProcess.ts`. It writes a typed schema-v1
+request to a fresh JSON path, launches `FogHost.exe generate`, reads the
+authoritative response, forwards structured progress and plain log text,
+and reports host crashes and timeouts as non-retryable typed failures. It
+rejects stale response paths and invalid request options before launch. The
+Fog status probe now points to the planned `tools/fog-host` project and
+executable. Seven focused tests, backend build, and backend typecheck passed
+(2026-09-28). `@ds1tr/backend` is 0.11.0. The C# host is still unbuilt;
+Task 11 owns compatibility inputs and Task 12 owns pipeline wiring.
+
 Task 9 designed the FogHost integration (`docs/FOGHOST_INTEGRATION.md`;
 decision in `docs/DECISIONS.md`). It is docs only: no code changed and there
 is no version bump. The design is a console host that compiles FogMod's

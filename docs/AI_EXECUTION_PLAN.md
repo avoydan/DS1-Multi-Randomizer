@@ -720,7 +720,7 @@ Completion record:
 
 # TASK 10 — CODEX
 
-State: PENDING
+State: DONE
 
 ## Implement FogHost process adapter
 
@@ -735,10 +735,10 @@ by the preceding task.
 
 Completion record:
 
-- Commit:
-- Verification:
-- Result:
-- Blockers:
+- Commit: recorded in a follow-up documentation commit.
+- Verification: 7 focused FogHost process tests passed; backend build and typecheck passed (2026-09-28).
+- Result: Typed schema-v1 JSON request/response boundary, process timeout and crash handling, progress/log forwarding, and corrected FogHost availability probe. Backend version 0.11.0.
+- Blockers: None for the process adapter. The C# host itself remains unbuilt and unassigned (Task 9 open item).
 
 ---
 
