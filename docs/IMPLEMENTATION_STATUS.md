@@ -44,6 +44,8 @@ Verified (2026-09-28):
 
 Not verified / release blockers (not fixed here; outside a correctness fix):
 - **Fog is not functional.** FogHost is unbuilt and no data root exists.
+  No planned task builds it (the Task 12 prerequisite has no numbered task),
+  so Task 17's FogHost availability check cannot pass until one is added.
   Fog-enabled generation always returns `FOG_PREREQUISITES_MISSING`. The
   combined -> Fog bridge, Fog retries, the Fog package layout
   (`gameTreeRoot: ''`) and Fog activation have never run. When FogHost is

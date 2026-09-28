@@ -953,7 +953,9 @@ Completion record:
   `npm test` failing when run from `apps/backend` (integration test cwd).
   Manifest `appVersion` matches backend 0.15.1. Full findings in
   `docs/IMPLEMENTATION_STATUS.md` (Task 16).
-- Blockers: FogHost is unbuilt, so Fog/world randomization cannot run at all
+- Blockers: FogHost is unbuilt and no planned task builds it (Task 12's
+  prerequisite has no numbered task), so Task 17's FogHost check cannot pass
+  until one is added. Fog/world randomization cannot run at all
   and the desktop default (Fog enabled) always fails generation. No in-app
   recovery from `modified` or `version-changed` states. The public GPL fork
   and FogMod `dist/` data distribution are unresolved. See the status doc.

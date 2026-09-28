@@ -19,13 +19,14 @@
 
 import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
-import { cp, mkdtemp, readdir, rename, rm, stat } from 'node:fs/promises';
+import { cp, mkdtemp, readFile, readdir, rename, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
 import { GameStateAuthority, executableName, managedRoots } from '../dist/core/gameState.js';
 import { generateRun } from '../dist/core/generationPipeline.js';
 
+const backendVersion = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8')).version;
 const livePath = process.argv[2] ?? process.env.DS1TR_E2E_GAME_PATH;
 if (!livePath) {
   console.error('Usage: releaseAuditE2e.mjs <live DSR directory>');
@@ -127,7 +128,7 @@ try {
   check('manifest binds snapshot', m.pristineSnapshotId === imported.snapshot.snapshotId);
   check('manifest records seeds, engine, retries, validation',
     m.attempts.length === 1 && m.attempts[0].result === 'success' && /^[0-9a-f]{32}$/.test(m.attempts[0].combinedSeed)
-    && typeof m.engines.combined === 'string' && m.validation.length > 0 && m.appVersion === '0.15.1');
+    && typeof m.engines.combined === 'string' && m.validation.length > 0 && m.appVersion === backendVersion);
   const modFiles = m.files.filter((file) => file.path.startsWith('mod/'));
   check('package patches game files', modFiles.length > 0, `${modFiles.length} mod files`);
   check('GameParam patched (paramdef-dependent item data)',
