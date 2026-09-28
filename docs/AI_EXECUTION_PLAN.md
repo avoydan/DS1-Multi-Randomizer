@@ -763,7 +763,7 @@ Do not begin frontend work.
 
 Completion record:
 
-- Commit: see `docs: record task 11 commit hash`
+- Commit: `9e575bf80e62f59cfa4b503f4f8ee6895086ebde` (`feat(backend): add Combined to Fog compatibility bridge`).
 - Verification: backend `npm test` 83/83 passed, including the build (2026-09-28).
 - Result: FogHost schema v2 `compatibility` (combined shared files with base/output hashes, merge-base directory, preserved scaled NpcParam rows with vanilla base rows); pure staging planner; backend-owned bounded retry table; `deriveAttemptSeeds`; host rules for three-way EMEVD merge, NpcParam preservation, stock key items and post-write invariants in `docs/FOGHOST_INTEGRATION.md`. Fog and combined scaling compose. Backend version 0.12.0.
 - Blockers: the C# host is still unbuilt and unassigned, so the host rules are specified but not compiled or tested. Boss randomization together with Fog is unproven (`11810310` both-sides edit). The key-item retry rate is unmeasured.
