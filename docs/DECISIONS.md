@@ -222,9 +222,7 @@ Date: 2026-09-28
 Fog runs in a dedicated console host, `tools/fog-host` (`FogHost.exe
 generate --request <json> --response <json>`). The host compiles FogMod's
 engine sources at the audited commit `28711c3f…e526` directly.
-(**Superseded pin, 2026-09-28:** `28711c3` cannot generate DS1R; use
-`6e6dc78`. See `docs/FOGHOST_IMPLEMENTATION_CHECKLIST.md` §0. The
-implementing task records the full decision.) It never
+(**Superseded pin:** FogHost uses `6e6dc78`; see "FogHost v1" below.) It never
 uses `Program.cs` (its CLI path forces `FromGame.DS3`), `MainForm*` or
 WinForms. It forces `FromGame.DS1R`, sets the CWD to a supplied FogMod data
 root, points FogMod's `gameDir` at a fresh per-attempt staging directory
@@ -359,3 +357,53 @@ in the game. If the library moves or the state directory is lost, an
 installation with an active package reads `no-snapshot`. `importPristine`
 would then accept the modded files as pristine. Reference hashes (or an
 in-game marker) are needed to close this.
+
+## FogHost v1: FogMod re-pinned to 6e6dc78; user-supplied data root; no Fog rescaling of combined rows; boss randomization + Fog rejected
+
+Date: 2026-09-28. Implemented in `tools/fog-host` (FogHost 0.1.0), backend 0.16.0.
+
+1. **FogMod pin `6e6dc78`, not `28711c3`.** `28711c3`'s DS3 update breaks DS1R:
+   entrances are keyed `Area_ID` while DS1 code looks them up by name, and the DS1
+   connector loop only exits in a DS3 branch (every seed throws). Both failures were
+   observed at runtime. `6e6dc78` is the last DS1-only commit; `dist/DS1R` is identical,
+   and `GameDataWriter.cs` differs only by renames. SoulsIds `e31a6fd` and
+   `JuicerMV.SoulsFormats` 0.1.3 (the package `DsrDataTool` already uses, GPL-3.0-only)
+   build it on .NET 8 after a six-rename API port.
+2. **Data root is user-supplied and verified, never bundled or downloaded.** FogMod
+   `dist/DS1R` is FromSoftware-derived. FogHost verifies the exact 59-file read set
+   against an embedded SHA-256 manifest on every run (LF-normalized for `.txt`/`.xml`).
+   Unexpected files in directories FogMod enumerates are rejected. A missing, altered or
+   extra file is `FOG_DATA_MISSING` with the file list and the pin. The backend locates
+   the root from `DS1TR_FOG_DATA_ROOT`; unset means `FOG_PREREQUISITES_MISSING`.
+3. **Scaling v1: FogMod never rescales combined NpcParam rows.** Source reading showed
+   FogMod scales per (NpcParam ID, area) via SpEffects, skips non-vanilla rows, and
+   re-points MSB parts to clone rows for IDs used in several areas. The Task 11
+   "composed scaling" rule is withdrawn. Preserved rows are kept, never restored or
+   scaled, and must be byte-for-byte cell-identical after the write. Invariant 1 now
+   allows a part whose input row is not preserved to move only to a FogMod scale clone
+   (a new row whose `pcAttr` hint encodes the input row). Preserved IDs must not be
+   vanilla rows. Randomized enemies keep the combined destination-slot normalization
+   and get no fog-graph tier.
+4. **Boss randomization + Fog is rejected** before any engine runs, with
+   `FOG_BOSS_RANDOMIZATION_UNSUPPORTED` (`generationPipeline.ts`). It is never silently
+   disabled; the manifest records the options as requested.
+
+Why: the three product decisions were made by the user. The pin change follows from the
+runtime evidence. Writes are deferred inside the patched writer, so dry runs write
+nothing, and merge conflicts or invariant violations are raised before staging changes.
+
+Measured on real-format data (`apps/backend/scripts/fogHostE2e.mjs`, live install only
+read):
+
+- Items + Fog passed 7/7 seeds. One seed needed one combined retry for a key item
+  outside FogMod's annotated lots.
+- **Regular-enemy randomization + Fog failed on every seed tried (5/5)** with
+  `FOG_MERGE_CONFLICT` on event `11505392` (Sen's Fortress). The combined engine removes
+  one `2004[17]` instruction, and FogMod rewrites the same event's `3[02]` boss-trigger
+  region check at runtime. The event-level merge rule refuses this, as designed; no
+  corrupt package is produced.
+- One enemy seed exhausted all three combined attempts on `peculiar_doll`.
+
+Resolving the conflict needs either an instruction-level merge (control-flow and skip
+aware) or a product rule for enemies + Fog; that is an open decision.
+

@@ -962,6 +962,23 @@ Completion record:
 
 ---
 
+# NOTE — FogHost prerequisite (outside the numbered queue)
+
+The FogHost build prerequisite named in Task 12 and in the Task 16 blockers
+has been implemented manually, outside this queue. It is not a numbered task
+and changes no task state.
+
+- `tools/fog-host`, FogHost 0.1.0, FogMod re-pinned to `6e6dc78`; backend 0.16.0.
+- The FogMod data root is supplied by the user via `DS1TR_FOG_DATA_ROOT`.
+- Boss randomization + Fog is rejected.
+- Items + Fog is proven on real-format data.
+- Regular enemies + Fog is blocked by an EMEVD merge conflict (open decision).
+
+See `docs/IMPLEMENTATION_STATUS.md` and `docs/FOGHOST_INTEGRATION.md`
+("FogHost v1 implementation").
+
+---
+
 # TASK 17 — CODEX
 
 State: PENDING

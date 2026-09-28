@@ -4,8 +4,10 @@ Task 9. Design of the dedicated C# host around FogMod's callable engine, the
 JSON process boundary Task 10 implements, and the concrete MSB/EMEVD/GameParam
 overlap with the combined Items + Enemies engine that Task 11 must bridge.
 
-Nothing here is implemented yet. Source facts cite the audited FogMod commit
-and the vendored `DsrDataTool` (`engines/combined/vendor/tools/DsrDataTool/Program.cs`).
+**Implemented (FogHost v1, 2026-09-28):** `tools/fog-host` (FogHost 0.1.0) around
+FogMod **`6e6dc78`** (not `28711c3`, see below), backend 0.16.0. The sections below
+are the design; where FogHost v1 differs, the "FogHost v1 implementation" section at
+the end is authoritative. Pins and patches: `tools/fog-host/vendor/UPSTREAM_PIN.md`.
 
 ## Audited source
 
@@ -163,7 +165,8 @@ per-attempt staging directory owned by the backend:
 - the host refuses a staging directory that contains
   `DarkSoulsRemastered.exe` (`FOG_STAGING_UNSAFE`) — it must never be a live
   installation;
-- after a successful `write`, the host deletes every `*.bak` created in the
+- (v1: the patched writer makes no backups at all; the host still deletes
+  any new `*.bak` defensively.) After a successful `write`, the host deletes every `*.bak` created in the
   staging directory. FogMod's `.bak` files are never a backup authority
   (`AGENTS.md` backup policy).
 
@@ -291,7 +294,7 @@ sites by message prefix. Everything unrecognized is non-retryable.
 | `Couldn't find … in item lots` (`ItemReader.cs`) | `FOG_UPSTREAM_INCOMPATIBLE` | `combined` |
 | `Item … found in both … and …` (`ItemReader.cs`) | `FOG_UPSTREAM_INCOMPATIBLE` | `combined` |
 | `Couldn't solve seed …` (`GraphConnector.cs`) | `FOG_SEED_UNSOLVABLE` | `fog` |
-| `No swappable edge found to inaccessible areas…` (`GraphConnector.cs`) | `FOG_SEED_UNSOLVABLE` | `fog` |
+| `Bad seed: Can't find edge to self-link…` (`GraphConnector.cs` at `6e6dc78`; the former `No swappable edge…` row exists only at `28711c3`) | `FOG_SEED_UNSOLVABLE` | `fog` |
 | `Could not find edge into unreachable areas…` (`GraphConnector.cs`) | `FOG_SEED_UNSOLVABLE` | `fog` |
 | `Ran out of eligible edges` (`GraphConnector.cs`) | `FOG_SEED_UNSOLVABLE` | `fog` |
 | request/data-root/staging validation | `FOG_REQUEST_INVALID` / `FOG_DATA_MISSING` / `FOG_STAGING_UNSAFE` | none |
@@ -435,12 +438,12 @@ unchanged here and replaced by Task 10.
 
 ## Blockers and open items (not blocking Task 9)
 
-1. **No task builds or vendors the C# FogHost.** Task 10 is the
+1. **Resolved by FogHost v1** (`tools/fog-host`). Original: **No task builds or vendors the C# FogHost.** Task 10 is the
    backend-side process adapter, Task 11 the bridge, Task 17 only checks
    FogHost availability. Building `tools/fog-host` (vendoring FogMod at the
    pinned commit, pinning SoulsFormats/SoulsIds, the Program replacement) is
    unassigned. The plan needs a task for it, or Task 11 must absorb it.
-2. **FogMod `dist/` is game-derived data.** `dist\DS1R` contains
+2. **Resolved by FogHost v1:** user-supplied, hash-verified, never bundled. Original: **FogMod `dist/` is game-derived data.** `dist\DS1R` contains
    FromSoftware MSBs, EMEVDs, GameParam, talk ESDs and `menu.msgbnd` with
    FogMod edits. Apache-2.0 covers FogMod's code, not that data, and
    `docs/LICENSING.md` forbids shipping maps/events/params. These files are
@@ -448,7 +451,7 @@ unchanged here and replaced by Task 10.
    How users obtain them (e.g. pointing at a locally downloaded FogMod
    release) is an open packaging/licensing decision; the contract therefore
    takes `fogDataRoot` as an input path.
-3. **Dependency pins**: SoulsIds is pinned to `e31a6fd` (Apache-2.0); the
+3. **Resolved:** SoulsIds `e31a6fd`, `JuicerMV.SoulsFormats` 0.1.3. Original: **Dependency pins**: SoulsIds is pinned to `e31a6fd` (Apache-2.0); the
    SoulsFormats revision is still to be chosen
    (`docs/FOGHOST_IMPLEMENTATION_CHECKLIST.md` §3).
 4. **Legacy-modified installs** (Task 8 finding 1) also affect FogMod: its
@@ -555,8 +558,9 @@ in memory (FogMod's template plus the stock carry-over) and FogMod's
   `NPCParamID` is a preserved `id`.
 - FogMod's "delete non-vanilla NpcParam rows" pass keeps every preserved
   `id`.
-- With FogMod `scale`, each preserved row receives exactly the change
-  FogMod's scaling applies to its `baseId` row.
+- ~~With FogMod `scale`, each preserved row receives exactly the change
+  FogMod's scaling applies to its `baseId` row.~~ **v1:** preserved rows are
+  never scaled (see "FogHost v1 implementation").
 
 **Key items: no patch.** `ItemReader` stays stock and finds key items
 wherever the combined engine placed them among the annotated lots. A key
@@ -567,18 +571,23 @@ raises `FOG_UPSTREAM_INCOMPATIBLE` with retry scope `combined`.
 hashed. Any violation is `FOG_COMPATIBILITY_VIOLATED`:
 
 1. Every enemy part from a combined MSB that still exists in the output
-   keeps its `ModelName`, `NPCParamID` and `ThinkParamID`, and its model
-   stays declared. If FogMod removed a combined-changed enemy part, that is
-   also a violation.
+   keeps its `ModelName` and `ThinkParamID`, and its model stays declared.
+   **v1:** it keeps its `NPCParamID`, except that a part whose input row is
+   not preserved may move to a FogMod scale clone (a row absent from the
+   input whose `pcAttr` hint encodes the input row). A removed part is a
+   violation.
 2. `ItemLotParam`, `ShopLineupParam`, `CharaInitParam` and `NpcThinkParam`
    are identical to the staging input.
-3. Each preserved NpcParam row exists. Without `scale` it is identical to
-   the input. With `scale`, its changed cells equal the changes FogMod made
-   to its `baseId` row.
+3. **v1:** each preserved NpcParam row exists and is cell-identical to the
+   input, with or without `scale`.
 4. Every event merged by rules 1, 3 and 4 is present and identical in the
    written EMEVD.
 
 ### Scaling rule
+
+> **Withdrawn by FogHost v1.** FogMod does not scale non-vanilla rows and
+> re-points parts to clone rows; the composition below never happened. v1 rule:
+> FogMod never rescales combined rows (see "FogHost v1 implementation").
 
 The two scaling mechanisms compose; they do not double-scale.
 
@@ -620,6 +629,9 @@ Attempt seeds come from `deriveAttemptSeeds(master, c, f)`:
 
 ### Open items added by Task 11
 
+(Status as of FogHost v1: 5 measured; 6 resolved; 7 measured; 8 resolved. See
+"FogHost v1 implementation".)
+
 5. **`11810310` and other events edited on both sides** fail with
    `FOG_MERGE_CONFLICT` until a verified per-event rule exists, which needs
    the FogMod template diff. As a result, **boss randomization combined with
@@ -642,3 +654,81 @@ Attempt seeds come from `deriveAttemptSeeds(master, c, f)`:
    against the FogMod source when the host is built. The fallback is either
    to reject Fog `scale` together with combined scaling other than
    `vanilla`, or to make one mechanism the owner.
+
+## FogHost v1 implementation
+
+`tools/fog-host`, .NET 8, FogHost 0.1.0. Decisions: `docs/DECISIONS.md`, "FogHost v1".
+
+**Differences from the design above**
+
+- **FogMod pin `6e6dc78`.** `28711c3` cannot generate DS1R. The option default
+  is `v4`, not `v5`, so `fogOptions` reads e.g. `boss lords scale v4 warp world <seed>`.
+- **Host flow.** The host reimplements `Randomizer.Randomize`'s DS1 body:
+  annotations, `Graph.Construct`, `ItemReader.FindItems`,
+  `GraphConnector.Connect`, then the patched `GameDataWriter.Write`.
+- **Deferred writes.** The patched writer defers every write through
+  `FogHostHooks`:
+  - `dryRun` runs the whole writer, including the EMEVD merge and the
+    in-memory invariants, and writes nothing;
+  - `write` executes the deferred writes only after the merge and the
+    in-memory invariants pass, then re-reads the written files and checks
+    the invariants again. SoulsIds swallows BND writer exceptions, so the
+    re-read is needed.
+- **No backups.** The writer makes no `.bak` files. The host also deletes
+  any new `.bak` it finds.
+- **`files` lists exactly what FogMod wrote:** 54 files for the pinned data
+  (18 EMEVD, 17 MSB, GameParam, `menu.msgbnd`, 17 talk ESDs). FogMod reads
+  but never writes the PTDE-era `m12_00_00_00.msb`.
+- **Data root.** It must contain exactly the 59 files FogMod reads:
+  - `dist/fog.txt`;
+  - `dist/DS1R/{Layouts,event,map/MapStudio,script/talk}` and
+    `param/GameParam/GameParam.parambnd.dcx`.
+
+  They are SHA-256 verified on every run. `msg/` and `Names/` are not read.
+  Any extra file in an enumerated directory is rejected. The backend takes the
+  root from `DS1TR_FOG_DATA_ROOT`. `getFogPrerequisites` now receives the Fog
+  language, because the read set includes `msg/<language>/menu.msgbnd.dcx`.
+  Before this change a non-English run would have staged the wrong file.
+- **Staging checks.** Staging must hold the whole read set, and the combined
+  and base hashes must match. It must not overlap the data root or the base
+  directory, and `logPath` must be outside it.
+- **Preserved rows.** Preserved IDs must be non-vanilla rows present in the
+  staged GameParam. Their `baseId` must be a vanilla row.
+- **Invariant 2 method:**
+  - `ItemLotParam` is compared cell by cell;
+  - `ShopLineupParam`, `CharaInitParam` and `NpcThinkParam` are not loaded
+    by FogMod (they have no layout), so their BND entries must be
+    byte-identical.
+- **Boss randomization + Fog** is rejected by the pipeline
+  (`FOG_BOSS_RANDOMIZATION_UNSUPPORTED`) before any engine runs.
+
+**Verification** (FogHost self-tests 22/22 with the data root; backend 108/108)
+
+- Two-process determinism, dry-run immutability, `.bak` cleanup, boundary
+  seeds, and data-root failures: missing, altered, extra, and CRLF-tolerant.
+- Combined-row survival with scale on and off, and the merge rules.
+- The backend adapter invoking the built host.
+
+**Real-format proof** (`apps/backend/scripts/fogHostE2e.mjs`; temp reconstruction,
+live install only read and unchanged)
+
+- **Items + Fog: 7/7 seeds pass.** This includes activating and restoring the
+  Fog package on the temp copy and a byte-identical rerun. One seed needed one
+  combined retry (`FOG_UPSTREAM_INCOMPATIBLE`).
+- **Regular enemies + Fog: 0/5.** Four seeds hit `FOG_MERGE_CONFLICT` on
+  `m15_00_00_00` event `11505392`:
+  - the combined engine removes one `2004[17]`;
+  - FogMod's runtime boss-trigger edit rewrites the same event's `3[02]`;
+  - FogMod's template leaves the event unchanged.
+
+  The fifth seed exhausted all three combined attempts on key item
+  `peculiar_doll` being outside the annotated lots.
+
+**Open**
+
+- Enemies + Fog needs either an instruction-level EMEVD merge that is safe
+  for control flow and skips, or a product rule. This is a user decision.
+- The key-item retry budget is too small for enemies + Fog on some seeds.
+- The boss conflict set (`11810310` and others) is still unmeasured, because
+  boss randomization + Fog is rejected.
+

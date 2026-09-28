@@ -1,5 +1,44 @@
 # Implementation status
 
+FogHost v1 (2026-09-28): `tools/fog-host` (FogHost 0.1.0, .NET 8) is built and verified;
+`@ds1tr/backend` is 0.16.0.
+
+- **Engine.** FogMod is re-pinned to `6e6dc78`, because `28711c3` cannot run DS1R. The
+  host uses SoulsIds `e31a6fd` and `JuicerMV.SoulsFormats` 0.1.3. `GameDataWriter.cs`
+  carries a documented patch set: API port, no backups, deferred writes, preserved
+  NpcParam rows, and an EMEVD merge hook.
+- **Host behavior:**
+  - the schema-v2 contract is unchanged;
+  - DS1R only, with `dryRun` and `write` modes, and writes only to staging;
+  - deterministic output, SHA-256 output list;
+  - three-way EMEVD merge;
+  - in-memory and post-write invariants;
+  - typed failures.
+- **Data root.** The FogMod data root is supplied by the user (`DS1TR_FOG_DATA_ROOT`),
+  never bundled. It is verified against a 59-file SHA-256 manifest.
+- **Backend changes:**
+  - a new default `getFogPrerequisites` that receives the Fog language (fixes the
+    staged `msg/<language>` file);
+  - boss randomization + Fog is rejected with `FOG_BOSS_RANDOMIZATION_UNSUPPORTED`.
+- **Verification:**
+  - FogHost self-tests: 22/22 with a data root, 12 passed + 10 skipped without one;
+  - backend `npm test`: 108/108;
+  - root typecheck clean;
+  - real-format proof `apps/backend/scripts/fogHostE2e.mjs`:
+    - Items + Fog passes 7/7 seeds, including Fog package activation and restore on
+      a temp copy (live install unchanged);
+    - **regular enemies + Fog fails 5/5**: four seeds hit `FOG_MERGE_CONFLICT` on
+      `m15_00_00_00` event `11505392` (both engines edit it), and one seed exhausted
+      the key-item retries.
+- **Remaining:**
+  - enemies + Fog needs an instruction-level merge or a product rule (user
+    decision);
+  - the desktop default (bosses on, Fog on) is now rejected by design;
+  - the FogHost self-tests are not part of `npm test`;
+  - no public GPL fork yet.
+
+  Details: `docs/FOGHOST_INTEGRATION.md`, "FogHost v1 implementation".
+
 FogHost preparation (2026-09-28, docs only, no code): the implementation
 handoff is `docs/FOGHOST_IMPLEMENTATION_CHECKLIST.md`. It covers:
 - the exact pins: FogMod `28711c3`, SoulsIds `e31a6fd` (Apache-2.0, verified),

@@ -2,6 +2,11 @@
 
 Prepared 2026-09-28 as the handoff for the task that builds the C# FogHost.
 
+> **Status: implemented** as FogHost v1 (`tools/fog-host`). This checklist is kept as the
+> research record. Differences found while implementing (for example 54 written files,
+> not 55, and backups disabled rather than cleaned) are in `docs/FOGHOST_INTEGRATION.md`,
+> "FogHost v1 implementation".
+
 - Design: `docs/FOGHOST_INTEGRATION.md`.
 - Backend contract: `apps/backend/src/adapters/fogHostProcess.ts` (schema v2)
   and `fogCompatibility.ts`.
