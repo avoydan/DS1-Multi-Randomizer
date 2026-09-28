@@ -25,6 +25,8 @@
   overwrite combined event changes, so a compatibility bridge is required.
 - Combined should receive the user's normalized master seed directly. Fog uses
   its own deterministically derived stream.
+  *(Superseded 2026-09-28, Task 6: combined now receives a named SHA-256
+  derivation of the master seed; see `docs/DECISIONS.md`.)*
 - Combined is GPL-3.0-only. FogMod is Apache-2.0. The legacy Item and Enemy
   repositories have no explicit repository license and must remain behavior
   references unless written permission is obtained.

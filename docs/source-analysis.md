@@ -3,8 +3,12 @@
 ## Approved engine direction
 
 `kellernz1/ds-randomizer` is the primary Items + Enemies engine. It receives
-the user's normalized master seed directly and performs its own versioned,
-named-stream derivation. The application derives a separate Fog retry stream.
+a named SHA-256 derivation of the master seed (32 hex characters, compliant
+with upstream's seed charset) and performs its own versioned, named-stream
+derivation from it. The application derives a separate Fog retry stream.
+
+> Superseded (2026-09-28, Task 6): this previously said the combined engine
+> receives the normalized master seed directly. See `docs/DECISIONS.md`.
 
 The combined engine and FogMod are one sequential pipeline:
 

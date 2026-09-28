@@ -153,11 +153,11 @@ recorded manifest seed differ from the seed the user typed.
 
 Date: 2026-09-28
 
-Status: **proposed, pending user confirmation.** Conflicts with
-`docs/ARCHITECTURE.md` § Master seed ("pass the normalized user master seed
-directly to the combined engine"); the alternative is to keep pass-through and
-restrict master seeds to upstream's ASCII charset. See Task 6 in
-`docs/AI_EXECUTION_PLAN.md`.
+Status: **accepted** (user confirmed option A, 2026-09-28). Supersedes the
+earlier direction in `docs/ARCHITECTURE.md` § Master seed and
+`docs/source-analysis.md` of passing the normalized master seed directly to
+the combined engine; the rejected alternative was keeping pass-through and
+restricting master seeds to upstream's ASCII charset.
 
 `deriveSeeds()` (`apps/backend/src/core/seeds.ts`) now derives `combined` as
 the first 32 lowercase hex characters of

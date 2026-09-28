@@ -10,7 +10,10 @@ SHA-256) against the game directory before generation, failing with
 `CATALOG_SOURCE_MISMATCH` and never rescanning automatically (Blocker 6).
 Backend tests 66/66 pass and the full workspace typecheck is clean
 (2026-09-28). `@ds1tr/backend` is `0.9.0`. Implementation commit:
-`e2664164d1aa1131952e1ddb1a19a87d960198af`. Still open: adapter wiring
+`e2664164d1aa1131952e1ddb1a19a87d960198af`. The user confirmed the seed
+derivation (option A); `ARCHITECTURE.md`, `source-analysis.md`, and
+`CODEX_PROGRESS.md` now mark the earlier pass-through direction superseded.
+Still open: adapter wiring
 (Task 7), a real `DsrDataTool` run (Task 8), the public GPL fork.
 
 Task 5 extended the focused combined bridge tests (commit

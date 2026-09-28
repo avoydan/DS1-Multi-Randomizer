@@ -477,7 +477,7 @@ Completion record:
 
 # TASK 6 — CLAUDE
 
-State: ACTIVE
+State: DONE
 
 ## Resolve remaining combined-engine blockers
 
@@ -528,11 +528,10 @@ Completion record:
     Recorded in `docs/DECISIONS.md`.
   - `@ds1tr/backend` bumped to `0.9.0`.
 - Blockers:
-  - **Awaiting a user decision on the Blocker 2 approach.** The implemented
-    SHA-256 derivation conflicts with `docs/ARCHITECTURE.md` § Master seed
-    and `docs/source-analysis.md` ("approved engine direction"), which say
-    the combined engine receives the normalized master seed directly.
-    Options put to the user:
+  - **Blocker 2 approach decided: user chose (A)** (2026-09-28). The
+    derivation is kept; `ARCHITECTURE.md`, `source-analysis.md`, and
+    `CODEX_PROGRESS.md` carry superseded notes and the `DECISIONS.md` entry
+    is accepted. Options that were put to the user:
     - **(A)** keep the derivation (commit `e266416`); then add superseded
       notes to `ARCHITECTURE.md`, `source-analysis.md`, and
       `CODEX_PROGRESS.md`, drop the "proposed" status in `DECISIONS.md`, and
@@ -543,7 +542,7 @@ Completion record:
       `configValidation.ts` with tests, rewrite the `DECISIONS.md` entry, and
       bump the backend version.
     Blockers 3 and 6 are resolved regardless of the answer.
-  - Otherwise none for this task. Remaining before real use: adapter wiring (Task 7),
+  - None remaining for this task. Remaining before real use: adapter wiring (Task 7),
     a real `DsrDataTool` run against an installation (Task 8), and the
     public GPL fork (external action). The catalog check proves the catalog
     matches the directory, not that the directory is vanilla — pristine

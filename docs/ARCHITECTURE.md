@@ -136,9 +136,18 @@ Activation should remain separate from generation if practical.
 ## Master seed
 Use a stable cross-version algorithm, preferably SHA-256.
 
-Pass the normalized user master seed directly to the combined engine. It owns
-its versioned internal item/enemy streams. Derive Fog and retry streams in the
-application with stable SHA-256 namespaces. Record both derivation versions.
+The combined engine receives a named SHA-256 derivation of the master seed:
+the first 32 lowercase hex characters of
+`SHA-256("ds1-triple-randomizer:v1:<trimmed master seed>:combined")`. This
+satisfies upstream's `/^[\w.-]{1,64}$/` seed charset for any free-text master
+seed. The combined engine owns its versioned internal item/enemy streams from
+that token. Derive Fog and retry streams in the application with stable
+SHA-256 namespaces. Record both derivation versions.
+
+> Superseded (2026-09-28, Task 6): this section previously said to pass the
+> normalized master seed directly to the combined engine. See
+> `docs/DECISIONS.md` — "The combined-engine seed is a named SHA-256
+> derivation of the master seed".
 
 ## Retry derivation
 Retries must remain reproducible.
@@ -160,7 +169,7 @@ Conceptual schema:
   "engines": {
     "combined": {
       "version": "...",
-      "inputSeed": "123456",
+      "inputSeed": "<32-hex combined derivation of masterSeed>",
       "attempt": 0
     },
     "fog": {
