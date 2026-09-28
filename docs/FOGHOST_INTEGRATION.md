@@ -226,10 +226,8 @@ per-attempt staging directory owned by the backend:
   `msbinfo`, `dumpcols`, …) are never settable through `options`; `dryrun`
   is set only via `mode`.
 - `language`: one of `FogLanguage`; sets `opt.Language`.
-- `compatibility`: reserved for the Task 11 bridge inputs (upstream event
-  preservation, NpcParam preservation, key-item locations). Schema v1
-  rejects a non-empty object; Task 11 defines its contents and bumps
-  `schemaVersion`.
+- `compatibility`: the Task 11 bridge inputs. Task 11 bumped request and
+  response `schemaVersion` to **2**; see "Compatibility bridge (Task 11)".
 
 ### Response
 
@@ -357,9 +355,8 @@ neither (no references in `DsrDataTool`), so these are safe today but must
 stay on the bridge's watch list. `NpcThinkParam` custom rows
 (`AddCustomThinkRows`) are not touched by FogMod.
 
-Option rule for Task 11: FogMod `scale` on top of combined enemy scaling
-double-scales; the bridge must define whether they are mutually exclusive
-or which one owns scaling.
+Option rule (resolved by Task 11, see "Compatibility bridge"): the two
+scaling mechanisms compose and are not mutually exclusive.
 
 ### 3. Key items — FogMod only looks in annotated item lots
 
@@ -443,3 +440,171 @@ unchanged here and replaced by Task 10.
 4. **Legacy-modified installs** (Task 8 finding 1) also affect FogMod: its
    carry-over code actively imports legacy Enemy Randomizer events from the
    game EMEVD. Staging must be built only from verified pristine data.
+
+## Compatibility bridge (Task 11)
+
+Implemented backend side in `apps/backend/src/adapters/fogCompatibility.ts`
+(pure, no I/O) and `fogHostProcess.ts` (schema v2). The host-side rules
+below are the specification for FogHost's `GameDataWriter.cs` patch set;
+they cannot be compiled or tested until the host is built (open item 1).
+
+### Schema v2 `compatibility`
+
+```json
+{
+  "baseDirectory": "C:\\...\\workspace\\fog\\c0-f0\\base",
+  "combinedFiles": [
+    { "path": "event/m10_00_00_00.emevd.dcx",
+      "baseSha256": "<pristine>", "combinedSha256": "<combined output>" }
+  ],
+  "preservedNpcParams": [ { "id": 910000, "baseId": 223000 } ]
+}
+```
+
+- `combinedFiles`: the MSB, EMEVD and GameParam entries of the combined
+  `patch-manifest.json` (`patchedMaps`, `events`, `gameParam`). Lua and FFX
+  entries are not shared with FogMod and are excluded. `source` must be a
+  game-relative forward-slash path and `output` must equal `mod/<source>`.
+  Entries are sorted ordinally and unique, with lowercase hashes.
+  `generatedAt` and `outputDirectory` are never copied, so the object is
+  stable across reruns.
+- `preservedNpcParams`: every numeric `scaledNpcParamId` in the placements
+  file's `enemies` and `bosses` lists. `baseId` is the placement's
+  `sourceNpcParamId`, i.e. the **destination slot's vanilla** NpcParam row.
+  `AddScaledNpcRows` copies that row's non-combat fields and, when scaling
+  is not `vanilla`, its combat fields. A scaled ID that maps to two base
+  rows is rejected. Scaled rows also exist with `enemyScaling: "vanilla"`
+  (drop, team and tangibility overrides), so the list is not gated on the
+  scaling option.
+- `baseDirectory`: holds the pristine copy of every `combinedFiles` path,
+  which is the three-way merge base.
+
+### Staging (per attempt)
+
+`planFogStaging` builds `<attempt>/game`, which is FogMod's `gameDir`:
+
+- the FogMod read set (`fogReadSet`), copied from verified pristine data:
+  GameParam, `msg/<lang>/menu.msgbnd.dcx`, every `dist/DS1R/event` file
+  and every annotated MSB;
+- overlaid with `mod/<path>` for each combined file. Combined shared files
+  outside the read set are staged too;
+- an empty `game/script/talk`.
+
+It also plans `<attempt>/base/<path>`, a pristine copy of each combined
+file. The attempt directory must not overlap the pristine directory or the
+combined package. The copying itself and the retry loop belong to Task 12.
+
+### Host rules
+
+The host validates inputs first, and fails with `FOG_REQUEST_INVALID` if:
+
+- a `combinedFiles` path does not hash to `combinedSha256` in staging or to
+  `baseSha256` in `baseDirectory`;
+- a `baseId` is not a vanilla NpcParam row.
+
+**EMEVD: three-way merge.** It applies only to event files listed in
+`combinedFiles`; other files keep stock FogMod behavior. Let B be the base,
+C the combined file in staging, and T FogMod's output for that file after
+its stock carry-over. Events are compared by ID and full content
+(instructions, parameters, rest behavior).
+
+1. **Custom event** (in C, not in B, e.g. `11019900…`): append it to T in
+   C's order. If T already has that ID with different content, fail with
+   `FOG_MERGE_CONFLICT`.
+2. **Deleted event** (in B, not in C): `FOG_MERGE_CONFLICT`. The combined
+   engine never deletes events, so anything else is unsupported.
+3. **Edited vanilla event** (in both, C ≠ B):
+   - T's copy equals B's (FogMod did not change it): T takes C's event.
+   - T's copy equals C's: keep it.
+   - Otherwise: `FOG_MERGE_CONFLICT`. No per-event winner table exists yet;
+     `11810310` (Asylum Demon) is the known instance (open item 5).
+4. **Event 0**: every instruction in C₀ that is not in B₀ must be a
+   `2000[00]` initialization. These are appended to T₀ in C's order,
+   skipping any already present. Any other event-0 difference is a
+   `FOG_MERGE_CONFLICT`.
+
+The merge and conflict check also run in **`dryRun`**: the host has B, C
+and FogMod's templates without writing anything. A successful `dryRun`
+therefore guarantees that `write` hits no merge conflict.
+
+**NpcParam and MSB**
+
+- FogMod's "restore base NpcParam ID" pass skips every MSB enemy whose
+  `NPCParamID` is a preserved `id`.
+- FogMod's "delete non-vanilla NpcParam rows" pass keeps every preserved
+  `id`.
+- With FogMod `scale`, each preserved row receives exactly the change
+  FogMod's scaling applies to its `baseId` row.
+
+**Key items: no patch.** `ItemReader` stays stock and finds key items
+wherever the combined engine placed them among the annotated lots. A key
+item outside those lots (shop, starting gear, gift, unannotated drop)
+raises `FOG_UPSTREAM_INCOMPATIBLE` with retry scope `combined`.
+
+**Post-write invariants** are checked in `write` mode before outputs are
+hashed. Any violation is `FOG_COMPATIBILITY_VIOLATED`:
+
+1. Every enemy part from a combined MSB that still exists in the output
+   keeps its `ModelName`, `NPCParamID` and `ThinkParamID`, and its model
+   stays declared. If FogMod removed a combined-changed enemy part, that is
+   also a violation.
+2. `ItemLotParam`, `ShopLineupParam`, `CharaInitParam` and `NpcThinkParam`
+   are identical to the staging input.
+3. Each preserved NpcParam row exists. Without `scale` it is identical to
+   the input. With `scale`, its changed cells equal the changes FogMod made
+   to its `baseId` row.
+4. Every event merged by rules 1, 3 and 4 is present and identical in the
+   written EMEVD.
+
+### Scaling rule
+
+The two scaling mechanisms compose; they do not double-scale.
+
+- In `DsrDataTool`, `area` and `progressive` behave identically. Any
+  non-`vanilla` value copies the **destination slot's vanilla** combat
+  fields and SpEffects into the scaled row (`AddScaledNpcRows`). This
+  normalizes a replacement to the strength of the enemy it replaces.
+- FogMod's `scale` then re-tiers enemies by their fog-graph position
+  relative to their vanilla area.
+- The `baseId` mapping makes FogMod treat each scaled row as the vanilla
+  row it stands in for.
+
+No option combination is rejected.
+
+### Retry and rejection
+
+`decideFogRetry` is the single retry authority. It maps host error codes
+through a backend table and ignores the host's own `retryScope` field:
+
+| Code | Action |
+|---|---|
+| `FOG_SEED_UNSOLVABLE` | retry Fog: `fogAttempt + 1`, same combined attempt |
+| `FOG_UPSTREAM_INCOMPATIBLE` | retry combined: `combinedAttempt + 1`, `fogAttempt` resets to 0 |
+| `FOG_MERGE_CONFLICT`, `FOG_COMPATIBILITY_VIOLATED`, all others | fail, no retry |
+
+Merge conflicts are not retryable. `FindFreeCustomEventRange` picks IDs
+from the base EMEVD, so every combined attempt produces the same custom
+IDs; retrying a structural conflict would only burn the retry budget.
+Bounds are passed in by the caller. The suggested default is 3 combined ×
+5 Fog attempts; Task 12 owns the final values and the manifest record.
+
+Attempt seeds come from `deriveAttemptSeeds(master, c, f)`:
+
+- attempt 0 is exactly `deriveSeeds()`;
+- attempt n > 0 uses the named streams `combined-retry:<n>` (32 hex
+  characters) and `fog-retry:<n>` (uint32 LE);
+- the Fog seed depends only on the Fog attempt.
+
+### Open items added by Task 11
+
+5. **`11810310` and other events edited on both sides** fail with
+   `FOG_MERGE_CONFLICT` until a verified per-event rule exists, which needs
+   the FogMod template diff. As a result, **boss randomization combined with
+   Fog is unproven** until the host exists and the conflict set has been
+   measured.
+6. It is unverified whether FogMod removes enemy parts from MSBs. If it
+   does, invariant 1 needs an allow-list derived from FogMod's source.
+7. The key-item retry rate is unmeasured. If combined placements often put
+   key items outside annotated lots, the combined retry budget runs out.
+   The remedy would be to constrain combined key-item locations when Fog is
+   enabled, which is a product decision.

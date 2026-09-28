@@ -1,5 +1,32 @@
 # Implementation status
 
+Task 11 defined and implemented the backend side of the Combined -> Fog
+compatibility bridge:
+
+- `apps/backend/src/adapters/fogCompatibility.ts` (pure, no I/O):
+  - `buildFogCompatibility` derives the schema-v2 `compatibility` object
+    from `patch-manifest.json` and the placements file;
+  - `fogReadSet` and `planFogStaging` plan the per-attempt staging and
+    merge-base directories;
+  - `decideFogRetry` is the bounded, deterministic retry table.
+- `seeds.ts` gained `deriveAttemptSeeds`; attempt 0 equals `deriveSeeds`.
+- `fogHostProcess.ts` moved to schema v2 and validates `compatibility`. It
+  also accepts the new codes `FOG_MERGE_CONFLICT` and
+  `FOG_COMPATIBILITY_VIOLATED`.
+
+The host-side rules are specified in `docs/FOGHOST_INTEGRATION.md`
+("Compatibility bridge"). They cover the three-way EMEVD merge, preserved
+NpcParam rows, stock key-item handling and post-write invariants. Fog
+scaling and combined scaling compose (decision in `docs/DECISIONS.md`).
+
+Verification: backend tests 83/83 pass, including the build (2026-09-28).
+`@ds1tr/backend` is 0.12.0.
+
+Still open:
+- the C# host is unbuilt, so none of the host rules is compiled or tested;
+- boss randomization together with Fog is unproven (`11810310` conflict);
+- the key-item retry rate is unmeasured.
+
 Task 10 implemented the backend FogHost process adapter in
 `apps/backend/src/adapters/fogHostProcess.ts`. It writes a typed schema-v1
 request to a fresh JSON path, launches `FogHost.exe generate`, reads the

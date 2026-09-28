@@ -2,12 +2,16 @@ import { spawn } from 'node:child_process';
 import type { ChildProcess, SpawnOptions } from 'node:child_process';
 import { readFile, stat, writeFile } from 'node:fs/promises';
 import type { FogLanguage, FogOptions } from '@ds1tr/contracts';
+import { validateFogCompatibility } from './fogCompatibility.js';
+import type { FogCompatibility } from './fogCompatibility.js';
 
 export type FogHostMode = 'dryRun' | 'write';
 export type FogHostOptions = Omit<FogOptions, 'enabled' | 'language'>;
 
+export const fogHostSchemaVersion = 2;
+
 export interface FogHostRequest {
-  schemaVersion: 1;
+  schemaVersion: 2;
   game: 'DS1R';
   mode: FogHostMode;
   seed: number;
@@ -16,12 +20,13 @@ export interface FogHostRequest {
   fogDataRoot: string;
   stagingDirectory: string;
   logPath: string;
-  compatibility: Record<string, never>;
+  compatibility: FogCompatibility;
 }
 
 export type FogHostErrorCode =
   | 'FOG_REQUEST_INVALID' | 'FOG_DATA_MISSING' | 'FOG_STAGING_UNSAFE'
   | 'FOG_UPSTREAM_INCOMPATIBLE' | 'FOG_SEED_UNSOLVABLE'
+  | 'FOG_MERGE_CONFLICT' | 'FOG_COMPATIBILITY_VIOLATED'
   | 'FOG_IO_FAILED' | 'FOG_ENGINE_FAILED'
   | 'FOG_HOST_CRASHED' | 'FOG_HOST_TIMEOUT';
 
@@ -41,7 +46,7 @@ export interface FogHostFile {
 
 export type FogHostResponse =
   | {
-    schemaVersion: 1;
+    schemaVersion: 2;
     ok: true;
     hostVersion: string;
     fogModCommit: string;
@@ -53,7 +58,7 @@ export type FogHostResponse =
     files: FogHostFile[];
     error: null;
   }
-  | { schemaVersion: 1; ok: false; error: FogHostError };
+  | { schemaVersion: 2; ok: false; error: FogHostError };
 
 export interface FogHostExecutionRequest {
   executablePath: string;
@@ -71,7 +76,8 @@ export type FogHostSpawn = (command: string, args: string[], options: SpawnOptio
 
 const hostErrors = new Set<FogHostErrorCode>([
   'FOG_REQUEST_INVALID', 'FOG_DATA_MISSING', 'FOG_STAGING_UNSAFE',
-  'FOG_UPSTREAM_INCOMPATIBLE', 'FOG_SEED_UNSOLVABLE', 'FOG_IO_FAILED',
+  'FOG_UPSTREAM_INCOMPATIBLE', 'FOG_SEED_UNSOLVABLE',
+  'FOG_MERGE_CONFLICT', 'FOG_COMPATIBILITY_VIOLATED', 'FOG_IO_FAILED',
   'FOG_ENGINE_FAILED', 'FOG_HOST_CRASHED', 'FOG_HOST_TIMEOUT',
 ]);
 const optionKeys = [
@@ -93,7 +99,7 @@ function uint32(value: unknown): value is number {
 }
 
 function parseResponse(value: unknown, request: FogHostRequest): FogHostResponse | null {
-  if (!record(value) || value.schemaVersion !== 1 || typeof value.ok !== 'boolean') return null;
+  if (!record(value) || value.schemaVersion !== fogHostSchemaVersion || typeof value.ok !== 'boolean') return null;
   if (!value.ok) {
     const error = value.error;
     if (!record(error) || !hostErrors.has(error.code as FogHostErrorCode)
@@ -118,7 +124,7 @@ function parseResponse(value: unknown, request: FogHostRequest): FogHostResponse
 }
 
 function failure(code: FogHostErrorCode, message: string): FogHostResponse {
-  return { schemaVersion: 1, ok: false, error: { code, message, retryable: false, retryScope: null } };
+  return { schemaVersion: 2, ok: false, error: { code, message, retryable: false, retryScope: null } };
 }
 
 export class FogHostProcess {
@@ -128,11 +134,10 @@ export class FogHostProcess {
     execution: FogHostExecutionRequest,
     onEvent?: (event: FogHostEvent) => void,
   ): Promise<FogHostResponse> {
-    if (!uint32(execution.request.seed) || execution.request.schemaVersion !== 1
+    if (!uint32(execution.request.seed) || execution.request.schemaVersion !== fogHostSchemaVersion
       || execution.request.game !== 'DS1R' || !['dryRun', 'write'].includes(execution.request.mode)
       || !Number.isSafeInteger(execution.timeoutMs) || execution.timeoutMs <= 0
-      || !record(execution.request.compatibility)
-      || Object.keys(execution.request.compatibility).length !== 0
+      || validateFogCompatibility(execution.request.compatibility).length !== 0
       || !record(execution.request.options)
       || Object.keys(execution.request.options).length !== optionKeys.length
       || !optionKeys.every((key) => typeof execution.request.options[key] === 'boolean')

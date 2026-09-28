@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { deriveSeeds } from '../../dist/core/seeds.js';
+import { deriveAttemptSeeds, deriveSeeds } from '../../dist/core/seeds.js';
 
 /** Seed charset the pinned upstream `validateConfig` accepts. */
 const upstreamSeedPattern = /^[\w.-]{1,64}$/;
@@ -45,4 +45,17 @@ test('always derives a combined seed the upstream engine accepts', () => {
 test('distinct master seeds derive distinct combined seeds', () => {
   assert.notEqual(deriveSeeds('abc').combined, deriveSeeds('abd').combined);
   assert.notEqual(deriveSeeds('abc').combined, deriveSeeds('ABC').combined);
+});
+
+test('retry attempt 0 equals the base derivation and later attempts are distinct and stable', () => {
+  assert.deepEqual(deriveAttemptSeeds('abc', 0, 0), deriveSeeds('abc'));
+  const retried = deriveAttemptSeeds('  abc ', 2, 3);
+  assert.deepEqual(retried, deriveAttemptSeeds('abc', 2, 3));
+  assert.match(retried.combined, /^[a-f0-9]{32}$/);
+  assert.notEqual(retried.combined, deriveSeeds('abc').combined);
+  assert.notEqual(retried.fog, deriveSeeds('abc').fog);
+  assert.equal(deriveAttemptSeeds('abc', 2, 0).fog, deriveSeeds('abc').fog);
+  assert.equal(deriveAttemptSeeds('abc', 0, 3).combined, deriveSeeds('abc').combined);
+  assert.throws(() => deriveAttemptSeeds('abc', -1, 0), RangeError);
+  assert.throws(() => deriveAttemptSeeds('abc', 0, 1.5), RangeError);
 });

@@ -14,12 +14,19 @@ const options = Object.fromEntries([
 ].map((key) => [key, false]));
 
 const request = {
-  schemaVersion: 1, game: 'DS1R', mode: 'dryRun', seed: 0xffffffff,
+  schemaVersion: 2, game: 'DS1R', mode: 'dryRun', seed: 0xffffffff,
   options, language: 'ENGLISH', fogDataRoot: 'fog-data',
-  stagingDirectory: 'attempt/game', logPath: 'attempt/foghost.log', compatibility: {},
+  stagingDirectory: 'attempt/game', logPath: 'attempt/foghost.log',
+  compatibility: {
+    baseDirectory: 'attempt/base',
+    combinedFiles: [{
+      path: 'event/m10_00_00_00.emevd.dcx', baseSha256: 'a'.repeat(64), combinedSha256: 'b'.repeat(64),
+    }],
+    preservedNpcParams: [{ id: 900000, baseId: 200000 }],
+  },
 };
 const success = {
-  schemaVersion: 1, ok: true, hostVersion: '0.1.0', fogModCommit: 'abc',
+  schemaVersion: 2, ok: true, hostVersion: '0.1.0', fogModCommit: 'abc',
   annotationSha256: 'f'.repeat(64), mode: 'dryRun', seed: request.seed,
   fogOptions: 'v5', keyItems: { randomized: true, hash: '01234' },
   files: [], error: null,
@@ -70,7 +77,7 @@ test('writes request, forwards exact command, parses progress and authoritative 
 
 test('preserves typed host failure and retry scope', async (t) => {
   const execution = await fixture(t);
-  const response = { schemaVersion: 1, ok: false, error: {
+  const response = { schemaVersion: 2, ok: false, error: {
     code: 'FOG_SEED_UNSOLVABLE', stage: 'solve-graph', retryable: true,
     retryScope: 'fog', message: 'Could not solve seed',
   } };
@@ -135,4 +142,42 @@ test('rejects omitted option keys before process launch', async (t) => {
   const process = new FogHostProcess(() => { throw new Error('must not spawn'); });
   const result = await process.execute(execution);
   assert.equal(result.error.code, 'FOG_REQUEST_INVALID');
+});
+
+test('rejects invalid compatibility inputs and schema v1 before process launch', async (t) => {
+  const invalid = [
+    { ...request, schemaVersion: 1 },
+    { ...request, compatibility: {} },
+    { ...request, compatibility: { ...request.compatibility, extra: true } },
+    { ...request, compatibility: { ...request.compatibility, combinedFiles: [
+      { path: 'script/m10.luabnd.dcx', baseSha256: 'a'.repeat(64), combinedSha256: 'b'.repeat(64) },
+    ] } },
+    { ...request, compatibility: { ...request.compatibility, preservedNpcParams: [
+      { id: 2, baseId: 1 }, { id: 2, baseId: 1 },
+    ] } },
+  ];
+  for (const candidate of invalid) {
+    const execution = { ...await fixture(t), request: candidate };
+    const process = new FogHostProcess(() => { throw new Error('must not spawn'); });
+    const result = await process.execute(execution);
+    assert.equal(result.error.code, 'FOG_REQUEST_INVALID');
+  }
+});
+
+test('accepts the Task 11 merge-conflict and post-write violation codes', async (t) => {
+  for (const code of ['FOG_MERGE_CONFLICT', 'FOG_COMPATIBILITY_VIOLATED']) {
+    const execution = await fixture(t);
+    const response = { schemaVersion: 2, ok: false, error: {
+      code, stage: 'write-game-data', retryable: false, retryScope: null, message: 'event 11810310',
+    } };
+    const process = new FogHostProcess(() => {
+      const child = new FakeChild();
+      queueMicrotask(async () => {
+        await writeFile(execution.responsePath, JSON.stringify(response));
+        child.emit('close', 0);
+      });
+      return child;
+    });
+    assert.deepEqual(await process.execute(execution), response);
+  }
 });

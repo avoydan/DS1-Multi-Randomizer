@@ -248,3 +248,54 @@ Consequences: the fog probe in `apps/backend/src/core/pipeline.ts` and
 `engines/fog/README.md` are superseded (replaced in Task 10). FogMod's
 `dist/` data is game-derived, and its distribution is an open licensing
 question. Building the host is not yet assigned to any task.
+
+## Combined -> Fog bridge: three-way EMEVD merge, preserved NpcParam rows, composed scaling, backend-owned retry table
+
+Date: 2026-09-28
+
+FogHost request/response schema is now v2. Its `compatibility` object
+carries three things:
+
+- the combined MSB/EMEVD/GameParam files with their base and output
+  hashes;
+- a pristine merge-base directory;
+- the combined engine's scaled NpcParam rows, each with the vanilla row it
+  stands in for.
+
+The host patch set (`GameDataWriter.cs` only; `ItemReader.cs` stays stock):
+
+- merges EMEVD three ways (base / combined / FogMod output): combined
+  custom events and event-0 `2000[00]` registrations are carried over, and
+  combined edits to vanilla events win where FogMod left the event
+  unchanged;
+- keeps the preserved NpcParam rows and scales them like their base row;
+- checks post-write invariants.
+
+Both-sides event edits are `FOG_MERGE_CONFLICT`. Full rules:
+`docs/FOGHOST_INTEGRATION.md` ("Compatibility bridge").
+
+The decisions:
+
+- **Scaling composes; no option combination is rejected.** This corrects
+  the Task 9 "double-scales" note. `DsrDataTool` scaling (`area` and
+  `progressive` are identical there) normalizes a replacement to the
+  destination slot's vanilla strength, which is exactly what FogMod's
+  `scale` assumes before it re-tiers by fog position.
+- **Retry scope comes from a backend table, not from the host.**
+  `FOG_SEED_UNSOLVABLE` retries Fog. `FOG_UPSTREAM_INCOMPATIBLE` retries
+  the combined stage and resets the Fog attempt. Merge conflicts and
+  invariant violations never retry: custom event IDs are chosen from the
+  base EMEVD, so a new combined seed cannot remove a structural conflict.
+- **Retry seeds**: `deriveAttemptSeeds`. Attempt 0 equals `deriveSeeds`, so
+  existing seeds are unchanged; later attempts use the named streams
+  `combined-retry:<n>` and `fog-retry:<n>`.
+
+Why not the alternatives:
+
+- Rejecting Fog scaling together with combined scaling would have broken
+  the desktop default configuration without a real conflict.
+- Letting the host decide retry scope would spread the policy across two
+  languages.
+
+Consequence: boss randomization together with Fog stays unproven until the
+host exists and the both-sides conflict set (e.g. `11810310`) is measured.
