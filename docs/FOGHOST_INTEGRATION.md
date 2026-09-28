@@ -102,7 +102,8 @@ builds touch the same MSB/EMEVD/param files:
 
 - the SoulsFormats and SoulsIds revisions used by FogHost must be pinned to
   exact commits when the host is vendored (the upstream csproj pins none);
-- SoulsIds' license is **unverified** — check it before vendoring;
+- SoulsIds is Apache-2.0 (verified 2026-09-28; pin `e31a6fd`, see
+  `docs/FOGHOST_IMPLEMENTATION_CHECKLIST.md`);
 - because MSB/param round-trips cross libraries, Task 11 must re-verify the
   combined enemy placements (MSB `ModelName`/`NPCParamID`/`ThinkParamID`,
   model declarations) after FogHost writes.
@@ -161,6 +162,11 @@ per-attempt staging directory owned by the backend:
   (`AGENTS.md` backup policy).
 
 ### Request (schema version 1)
+
+The examples below show the Task 9 v1 shape. The implemented contract is
+**schema v2** (`fogHostProcess.ts`): `schemaVersion: 2` in request and
+response, plus the `compatibility` object described under "Compatibility
+bridge (Task 11)".
 
 ```json
 {
@@ -435,8 +441,9 @@ unchanged here and replaced by Task 10.
    How users obtain them (e.g. pointing at a locally downloaded FogMod
    release) is an open packaging/licensing decision; the contract therefore
    takes `fogDataRoot` as an input path.
-3. **Dependency pins and SoulsIds license** are unresolved (see
-   Dependencies).
+3. **Dependency pins**: SoulsIds is pinned to `e31a6fd` (Apache-2.0); the
+   SoulsFormats revision is still to be chosen
+   (`docs/FOGHOST_IMPLEMENTATION_CHECKLIST.md` §3).
 4. **Legacy-modified installs** (Task 8 finding 1) also affect FogMod: its
    carry-over code actively imports legacy Enemy Randomizer events from the
    game EMEVD. Staging must be built only from verified pristine data.
@@ -611,13 +618,16 @@ Attempt seeds come from `deriveAttemptSeeds(master, c, f)`:
    the FogMod template diff. As a result, **boss randomization combined with
    Fog is unproven** until the host exists and the conflict set has been
    measured.
-6. It is unverified whether FogMod removes enemy parts from MSBs. If it
-   does, invariant 1 needs an allow-list derived from FogMod's source.
+6. ~~It is unverified whether FogMod removes enemy parts from MSBs.~~
+   Resolved: it does not (`docs/FOGHOST_IMPLEMENTATION_CHECKLIST.md` §9).
 7. The key-item retry rate is unmeasured. If combined placements often put
    key items outside annotated lots, the combined retry budget runs out.
    The remedy would be to constrain combined key-item locations when Fog is
    enabled, which is a product decision.
-8. **FogMod's `scale` mechanism is unread.** The composition rule and
+8. **Read 2026-09-28: the hypothesis below is wrong.** FogMod skips
+   non-vanilla rows and re-points `NPCParamID` to clone rows; see
+   `docs/FOGHOST_IMPLEMENTATION_CHECKLIST.md` §9 for the facts and the
+   pending decision. Original text: **FogMod's `scale` mechanism is unread.** The composition rule and
    invariants 1 and 3 assume that FogMod scales by editing NpcParam rows in
    place. If it instead creates tier rows and re-points each part's
    `NPCParamID`, invariant 1 fails on every scale-enabled run, and that is

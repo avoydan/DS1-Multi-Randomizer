@@ -1,5 +1,19 @@
 # Implementation status
 
+FogHost preparation (2026-09-28, docs only, no code): the implementation
+handoff is `docs/FOGHOST_IMPLEMENTATION_CHECKLIST.md`. It covers:
+- the exact pins: FogMod `28711c3`, SoulsIds `e31a6fd` (Apache-2.0, verified),
+  and the SoulsFormats candidates;
+- the 60-file FogMod data root;
+- the project layout, build commands and test plan;
+- the `GameDataWriter.cs` patch points.
+
+Source reading closed two open design items. FogMod never removes enemy
+parts. FogMod `scale` skips non-vanilla NpcParam rows and re-points
+`NPCParamID` to clone rows, so the Task 11 "composed scaling" rule and
+invariants 1 and 3 need a user decision before the host is built. No plan
+task builds FogHost yet.
+
 Task 16 is the final end-to-end audit. `@ds1tr/backend` is 0.15.1.
 
 Fixed:
