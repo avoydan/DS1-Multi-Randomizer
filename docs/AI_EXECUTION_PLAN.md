@@ -735,7 +735,7 @@ by the preceding task.
 
 Completion record:
 
-- Commit: recorded in a follow-up documentation commit.
+- Commit: `55d987135de7fd5672e1288449b632a9aa5f18bd` (`feat(backend): add FogHost process boundary`).
 - Verification: 7 focused FogHost process tests passed; backend build and typecheck passed (2026-09-28).
 - Result: Typed schema-v1 JSON request/response boundary, process timeout and crash handling, progress/log forwarding, and corrected FogHost availability probe. Backend version 0.11.0.
 - Blockers: None for the process adapter. The C# host itself remains unbuilt and unassigned (Task 9 open item).
