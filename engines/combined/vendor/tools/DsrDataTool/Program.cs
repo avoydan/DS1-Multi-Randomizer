@@ -1,3 +1,9 @@
+// Modified by ds1-triple-randomizer, 2026-09-28 (GPL-3.0 section 5(a) notice).
+// Original: kellernz1/ds-randomizer@f120efe0e95b957b7e76109868c3c9966e22720c tools/DsrDataTool/Program.cs.
+// Change: InsertEventInstruction/RemoveEventInstruction now keep DS1 "skip N lines" counts
+// consistent (EventSkipRanges.cs); insertions state their anchor. See
+// engines/combined/vendor/UPSTREAM_PIN.md ("Local modifications").
+
 using System.Security.Cryptography;
 using System.Diagnostics;
 using System.Text;
@@ -1949,8 +1955,10 @@ static List<PatchedFile> PatchLuaAiBundles(
 static void InsertEventInstruction(
     EMEVD.Event entry,
     int index,
-    EMEVD.Instruction instruction)
+    EMEVD.Instruction instruction,
+    InsertAnchor anchor)
 {
+    EventSkipRanges.BeforeInsert(entry, index, anchor);
     foreach (var parameter in entry.Parameters.Where(parameter =>
                  parameter.InstructionIndex >= index))
         parameter.InstructionIndex++;
@@ -1989,6 +1997,7 @@ static void RemoveEventInstruction(
         throw new InvalidDataException(
             $"Cannot remove parameterized instruction {index} from event {entry.ID}.");
     }
+    EventSkipRanges.BeforeRemove(entry, index);
     foreach (var parameter in attachedParameters)
         entry.Parameters.Remove(parameter);
     foreach (var parameter in entry.Parameters.Where(parameter =>
@@ -2525,7 +2534,8 @@ static List<PatchedFile> PatchBossNames(
                 new EMEVD.Instruction(
                     2004,
                     1,
-                    new object[] { 1810800, 1 }));
+                    new object[] { 1810800, 1 }),
+                InsertAnchor.Before);
             changed++;
         }
         if (passiveMapPlacements.Count > 0 ||
@@ -2995,28 +3005,32 @@ static List<PatchedFile> PatchBossNames(
                         new EMEVD.Instruction(
                             2004,
                             1,
-                            new object[] { entityId, 0 }));
+                            new object[] { entityId, 0 }),
+                        InsertAnchor.After);
                     InsertEventInstruction(
                         entry,
                         index + 2,
                         ForceAnimationInstruction(
                             entityId,
                             3020,
-                            true));
+                            true),
+                        InsertAnchor.After);
                     InsertEventInstruction(
                         entry,
                         index + 3,
                         new EMEVD.Instruction(
                             2004,
                             1,
-                            new object[] { entityId, 1 }));
+                            new object[] { entityId, 1 }),
+                        InsertAnchor.After);
                     InsertEventInstruction(
                         entry,
                         index + 4,
                         new EMEVD.Instruction(
                             2004,
                             20,
-                            new object[] { entityId }));
+                            new object[] { entityId }),
+                        InsertAnchor.After);
                     index += 4;
                     changed += 4;
                     continue;
@@ -3038,7 +3052,8 @@ static List<PatchedFile> PatchBossNames(
                         new EMEVD.Instruction(
                             2004,
                             1,
-                            new object[] { entityId, 1 }));
+                            new object[] { entityId, 1 }),
+                        InsertAnchor.After);
                     changed++;
                 }
                 InsertEventInstruction(
@@ -3047,7 +3062,8 @@ static List<PatchedFile> PatchBossNames(
                     new EMEVD.Instruction(
                         2004,
                         20,
-                        new object[] { entityId }));
+                        new object[] { entityId }),
+                    InsertAnchor.After);
                 index += 2;
                 changed++;
             }

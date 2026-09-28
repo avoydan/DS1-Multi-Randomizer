@@ -14,7 +14,7 @@ game-derived `dist/` data is not included; the user supplies it.
 
 | Component | Upstream | License | Distribution policy |
 | --- | --- | --- | --- |
-| DSR Randomizer | kellernz1/ds-randomizer | GPL-3.0-only | Selectively vendored at a pinned commit under `engines/combined/vendor/`; preserve source, history where practical, license, and notices. A public fork with a source tag matching each distributed binary is still required before distribution (see `docs/LICENSING.md`). |
+| DSR Randomizer | kellernz1/ds-randomizer | GPL-3.0-only | Selectively vendored at a pinned commit under `engines/combined/vendor/`; `tools/DsrDataTool/Program.cs` carries a documented local modification (skip-count fix, GPL-3.0 §5(a) notice, `vendor/patches/`); preserve source, history where practical, license, and notices. A public fork with a source tag matching each distributed binary is still required before distribution (see `docs/LICENSING.md`). |
 | SoulsFormats (via `JuicerMV.SoulsFormats` 0.1.3 NuGet package, used by `DsrDataTool` and FogHost) | JKAnderson/SoulsFormats (distributed as JuicerMV/SoulsFormats) | GPL-3.0-only | Not vendored; restored from NuGet at build time. Dependency notices and license terms must accompany distributed binaries. |
 | FogMod | thefifthmatt/FogMod | Apache-2.0 | Engine sources vendored at `6e6dc78` under `tools/fog-host/vendor/FogMod/` with its LICENSE; `GameDataWriter.cs` is modified and carries an Apache-2.0 §4(b) change notice. `dist/` data (FromSoftware-derived) is not vendored or distributed. |
 | SoulsIds | thefifthmatt/SoulsIds | Apache-2.0 | Sources vendored unmodified at `e31a6fd` under `tools/fog-host/vendor/SoulsIds/` with its LICENSE. |

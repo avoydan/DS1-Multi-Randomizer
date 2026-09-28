@@ -17,10 +17,15 @@
 //   DS1TR_E2E_ENEMIES=0 runs Items + Fog only; DS1TR_E2E_SEED sets the master seed.
 //   DS1TR_E2E_SWEEP=<n> runs <n> seeds (`<DS1TR_E2E_SEED>-<i>`) generation-only and prints
 //   per-attempt statistics, merge conflicts and instruction-level merges instead of the full proof.
+//   DS1TR_E2E_FOG=0 disables Fog (combined-only regression sweep).
+//   DS1TR_E2E_BOSSES=1 enables boss randomization (only valid with DS1TR_E2E_FOG=0).
+//   DS1TR_E2E_VERIFY_SKIPS=<DsrDataTool.Tests.exe> checks every combined package's EMEVD skip ranges
+//   against the pristine snapshot (`verify-skips`, engines/combined/tests/DsrDataTool.Tests).
 
 import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { cp, mkdtemp, readFile, readdir, rename, rm } from 'node:fs/promises';
+import { spawnSync } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -81,9 +86,9 @@ const config = (gamePath, masterSeed = process.env.DS1TR_E2E_SEED ?? 'foghost-e2
     guaranteedEnemyDrops: false, randomizeShops: false,
   },
   // DS1TR_E2E_ENEMIES=0 runs Items + Fog only.
-  enemies: { enabled: process.env.DS1TR_E2E_ENEMIES !== '0', randomizeRegularEnemies: true, randomizeBosses: false, scaling: 'area' },
+  enemies: { enabled: process.env.DS1TR_E2E_ENEMIES !== '0', randomizeRegularEnemies: true, randomizeBosses: process.env.DS1TR_E2E_BOSSES === '1', scaling: 'area' },
   fog: {
-    enabled: true, traversableFogs: true, bossFogs: true, areaWarps: true, majorPvpFogs: false,
+    enabled: process.env.DS1TR_E2E_FOG !== '0', traversableFogs: true, bossFogs: true, areaWarps: true, majorPvpFogs: false,
     minorPvpFogs: false, lordvesselGates: false, randomStart: false, disconnectedFogs: false,
     noFallBedOfChaos: false, scaling: true, glitchedLogic: false, requireLordSouls: true,
     pacifistMode: false, language: 'ENGLISH',
@@ -113,6 +118,18 @@ async function sweep(count, prefix) {
       conflicts,
       merges: [...new Set(merges)],
     };
+    if (process.env.DS1TR_E2E_VERIFY_SKIPS) {
+      const pristine = (await authority.getPristineSource(game)).directory;
+      entry.skipChecks = [];
+      for (const attempt of (await readdir(workspace).catch(() => [])).filter((d) => d.startsWith('combined-')).sort()) {
+        for (const seedDir of (await readdir(path.join(workspace, attempt)).catch(() => [])).filter((d) => d.startsWith('seed_'))) {
+          const run = spawnSync(process.env.DS1TR_E2E_VERIFY_SKIPS,
+            ['verify-skips', path.join(pristine, 'event'), path.join(workspace, attempt, seedDir, 'mod', 'event')], { encoding: 'utf8' });
+          entry.skipChecks.push(`${attempt}: exit ${run.status} ${(run.stdout.match(/verify-skips: .*/) ?? ['no output'])[0]}`);
+          if (run.status !== 0) console.log(run.stdout);
+        }
+      }
+    }
     results.push(entry);
     console.log(JSON.stringify(entry));
     await rm(workspace, { recursive: true, force: true });
@@ -127,6 +144,8 @@ async function sweep(count, prefix) {
     seedsNeedingCombinedRetry: results.filter((r) => r.attempts.some((a) => a.endsWith('FOG_UPSTREAM_INCOMPATIBLE'))).length,
     conflictEvents: tally(results.flatMap((r) => r.conflicts)),
     instructionMerges: tally(results.flatMap((r) => r.merges)),
+    skipChecksFailed: results.flatMap((r) => r.skipChecks ?? []).filter((c) => !c.includes('exit 0')).length,
+    skipChecks: results.flatMap((r) => r.skipChecks ?? []).length,
   }, null, 2));
 }
 

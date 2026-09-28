@@ -94,8 +94,19 @@ equal to this repository's stored blobs):
 | `src/core/rng.js` | `e0f8dee6a7d2369040858bb9b6efebeb64e2d908` |
 | `src/data/prototype-data.js` | `992b81eb69c710749643aa0db1b38806537a0418` |
 
-Vendored files must never be edited in place. Any required change belongs in
-the public GPL fork, followed by a pin update here.
+Vendored files are not edited in place, except for the local modifications
+listed below. Until the public GPL fork exists (see "Known gap"), a required
+correctness fix may be applied here. It must carry a GPL-3.0 §5(a) notice in
+the file, be listed below, and have its diff kept under `patches/` so it can
+be applied to the fork. A modified file no longer matches its blob ID above;
+the ID records the unmodified upstream bytes.
+
+## Local modifications
+
+| File | Change | Patch | Tests |
+|---|---|---|---|
+| `tools/DsrDataTool/Program.cs` (upstream blob `0e5842a8…`) | 2026-09-28, user-authorized. `InsertEventInstruction`/`RemoveEventInstruction` keep DS1 "skip N lines" counts (`1000[01/03/05/07]`, `1003[01/03/05/07]`, `1005[01]`) consistent with instruction-count-changing edits. Insertions now state an anchor (`InsertAnchor.Before`/`After`); anchor ambiguity, removal of a skip, parameterized counts and overflow throw. Upstream deleted instructions inside skip ranges without adjusting counts, so skips covered different instructions (38 skip ranges in 21 events of one real-format package). | `patches/0001-dsrdatatool-skip-ranges.patch` | `engines/combined/tests/DsrDataTool.Tests` (unit tests and `verify-skips`) |
+| `tools/DsrDataTool/EventSkipRanges.cs` | New, repository-authored (GPL-3.0-only), holds the logic above. | same | same |
 
 ## Updating this pin
 
