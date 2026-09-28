@@ -1,14 +1,20 @@
 # Implementation status
 
-Task 5 extended the focused combined bridge tests to verify scan failure
-diagnostics and early termination, stdout/stderr log levels, config
-consistency across runs, and refusal to create packages for malformed seeds
-or workspaces inside the live game. An existing build-path assertion was made
-independent of the test runner's working directory. All 20 bridge tests and
-the backend build and typecheck passed on 2026-09-28. No production code
-changed; a real-game `scan`/`patch-enemies` round trip remains unproven.
-Task 5 is DONE; the test changes are committed as
-`abeb4c2f56ade130a39e4d42837bf333d586e3e0`.
+Task 6 resolved the remaining combined-engine blockers that had to be fixed
+before a real generation run can be attempted: the combined seed is now a
+32-hex-character SHA-256 derivation of the master seed that always satisfies
+upstream's charset (Blocker 2); `CombinedRandomizerRequest` gained
+`generateSpoilerLog`, mapped straight through instead of pinned off
+(Blocker 3); and a reused workspace catalog is verified file-by-file (size +
+SHA-256) against the game directory before generation, failing with
+`CATALOG_SOURCE_MISMATCH` and never rescanning automatically (Blocker 6).
+Backend tests 66/66 pass and the full workspace typecheck is clean
+(2026-09-28). `@ds1tr/backend` is `0.9.0`. Implementation commit:
+`e2664164d1aa1131952e1ddb1a19a87d960198af`. Still open: adapter wiring
+(Task 7), a real `DsrDataTool` run (Task 8), the public GPL fork.
+
+Task 5 extended the focused combined bridge tests (commit
+`abeb4c2f56ade130a39e4d42837bf333d586e3e0`); no production code changed.
 
 ## Backend adapters
 
@@ -79,7 +85,8 @@ Task 5 is DONE; the test changes are committed as
   (`scan` when the workspace has no catalog, then `patch-enemies`). It
   returns a typed success carrying the package directory, placements path,
   `patch-manifest.json` path, upstream version, placement hash, and seed, or
-  one of fourteen documented failure codes. Only `GENERATION_FAILED` is
+  one of fifteen documented failure codes (`CATALOG_SOURCE_MISMATCH` added
+  by Task 6). Only `GENERATION_FAILED` is
   marked retryable. See `docs/COMBINED_ENGINE_INTEGRATION.md` ("Execution
   bridge proof") for the exact data flow.
 - Generation is proven workspace-only against fixtures: 19 focused tests run
@@ -120,6 +127,6 @@ Task 5 is DONE; the test changes are committed as
   `NOT_IMPLEMENTED` — connecting it to the bridge is a separate task — and
   the bridge has never executed the real `DsrDataTool` against a real Dark
   Souls installation, so a genuine `scan`/`patch-enemies` round trip is
-  unproven. Blockers 2 (seed charset, now surfacing as `INVALID_CONFIG`),
-  3 (`generateSpoilerLog` request field), and 6 (catalog/game-directory
-  staleness) remain open, as does the public GPL fork.
+  unproven. Blockers 2, 3, and 6 were resolved by Task 6 (see
+  `docs/COMBINED_ENGINE_INTEGRATION.md`, "Blocker resolution"); the public
+  GPL fork remains open.

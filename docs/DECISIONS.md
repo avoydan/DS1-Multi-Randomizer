@@ -148,3 +148,63 @@ upstream's `/^[\w.-]{1,64}$/` charset. A non-compliant seed is reported as
 rewriting a user's seed into a different value is a product decision about
 reproducibility, and hiding it inside the execution bridge would make the
 recorded manifest seed differ from the seed the user typed.
+
+## The combined-engine seed is a named SHA-256 derivation of the master seed
+
+Date: 2026-09-28
+
+`deriveSeeds()` (`apps/backend/src/core/seeds.ts`) now derives `combined` as
+the first 32 lowercase hex characters of
+`SHA-256("ds1-triple-randomizer:v1:<trimmed master seed>:combined")` instead
+of passing the trimmed master seed through. Resolves integration Blocker 2.
+
+Why: upstream `validateConfig` accepts only `/^[\w.-]{1,64}$/`, while the
+master seed is free text at the API boundary. The two alternatives were
+tightening master-seed validation to upstream's charset, or deriving a
+compliant token. Derivation was chosen because `AGENTS.md`'s seed policy
+already prescribes stable named SHA-256 derivation per engine, it matches how
+the Fog seed was already derived, and it keeps the master seed free text
+without coupling the user-facing seed format to one engine's charset. 32 hex
+characters (128 bits) satisfy upstream for every input and keep the
+`seed_<token>` package directory short under the Windows `MAX_PATH` limit.
+
+Consequences:
+
+- The upstream `seed` recorded in a generated package's `config.json` is the
+  derived token, not the typed master seed; the run manifest must record both
+  (as `AGENTS.md` already requires). A run of standalone upstream
+  `ds-randomizer` with the same typed seed does not reproduce our layout —
+  that was never a goal.
+- No compatibility break: the combined adapter still returns
+  `NOT_IMPLEMENTED`, so no run has ever been produced with the old value.
+- The Fog derivation is byte-identical to before.
+- The execution bridge still never rewrites seeds; a non-compliant
+  `combinedSeed` handed to it directly still reports `INVALID_CONFIG`.
+
+## A reused catalog that does not match the game directory is a hard failure, never an automatic rescan
+
+Date: 2026-09-28
+
+Before generating, `executeCombinedGeneration()` verifies a **reused**
+workspace catalog against `request.gamePath`
+(`apps/backend/src/adapters/combinedRandomizerCatalog.ts`): every
+`sourceFiles` entry recorded by `DsrDataTool scan` must resolve inside the
+game directory and match by size and SHA-256. Any mismatch — or a catalog
+recording no sources at all — returns non-retryable
+`CATALOG_SOURCE_MISMATCH` with per-file `catalogProblems`. Resolves
+integration Blocker 6 at the orchestration layer.
+
+Why not rescan automatically: the most likely cause of a mismatch is a game
+directory that has since been modified (e.g. a previous randomized package is
+active). Rescanning it would silently capture modified data as the new
+baseline. The user must restore clean files, or explicitly request a rescan
+(`forceCatalogRescan`) if the directory really is the intended clean install.
+
+`lastWriteTimeUtc` is ignored because copying or restoring a clean install
+changes it without changing content. A catalog this run just scanned is not
+re-verified.
+
+Limit: this proves the catalog matches the directory, not that the directory
+is vanilla. Pristine provenance stays with the backend's pristine
+import/backup authority. `patch-enemies` independently re-checks the hashes
+of the files it touches; this check exists to fail early and explain why.

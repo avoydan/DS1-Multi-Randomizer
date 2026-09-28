@@ -477,7 +477,7 @@ Completion record:
 
 # TASK 6 — CLAUDE
 
-State: PENDING
+State: DONE
 
 ## Resolve remaining combined-engine blockers
 
@@ -503,10 +503,36 @@ Do NOT begin FogMod integration.
 
 Completion record:
 
-- Commit:
-- Verification:
+- Commit: `e2664164d1aa1131952e1ddb1a19a87d960198af`
+  (`fix(backend): resolve combined-engine seed, spoiler, and catalog blockers`);
+  task documentation committed separately.
+- Verification (2026-09-28): `npm run test -w @ds1tr/backend` — 66/66 pass;
+  root `npm run typecheck` (contracts + backend + desktop) clean. No real
+  Dark Souls installation involved.
 - Result:
+  - Reviewed blockers 1–6. Blocker 1 (silent prototype fallback) was already
+    resolved by Task 4; Blocker 4 is Task 7; Blocker 5's build half was
+    already resolved. Blockers 2, 3, and 6 were resolved here.
+  - **Blocker 2 (seed charset):** `deriveSeeds().combined` is now the first
+    32 hex characters of
+    `SHA-256("ds1-triple-randomizer:v1:<master>:combined")`, so every master
+    seed satisfies upstream's `/^[\w.-]{1,64}$/`. Fog derivation unchanged.
+    Recorded in `docs/DECISIONS.md`.
+  - **Blocker 3 (spoiler log):** `generateSpoilerLog` added to
+    `CombinedRandomizerRequest` and mapped through; the bridge no longer pins
+    it to `false`.
+  - **Blocker 6 (catalog/game coupling):** new `verifyCatalogSources`
+    checks a reused catalog's `sourceFiles` (containment, existence, size,
+    SHA-256) against `gamePath` before generation; mismatch returns
+    non-retryable `CATALOG_SOURCE_MISMATCH` with no automatic rescan.
+    Recorded in `docs/DECISIONS.md`.
+  - `@ds1tr/backend` bumped to `0.9.0`.
 - Blockers:
+  - None for this task. Remaining before real use: adapter wiring (Task 7),
+    a real `DsrDataTool` run against an installation (Task 8), and the
+    public GPL fork (external action). The catalog check proves the catalog
+    matches the directory, not that the directory is vanilla — pristine
+    provenance stays with the pristine import/backup authority.
 
 ---
 

@@ -171,8 +171,8 @@ CombinedRandomizerRequest
   enemies.enabled && enemies.randomizeRegularEnemies -> config.randomizeEnemies
   enemies.enabled && enemies.randomizeBosses         -> config.randomizeBosses
   enemies.scaling                                     -> config.enemyScaling  (enum matches exactly)
-  (not in request today)  -> config.generateSpoilerLog, config.useExtractedData=true,
-                              config.dryRun=false          (see Blockers: missing fields)
+  generateSpoilerLog -> config.generateSpoilerLog          (added by Blocker 3 resolution)
+  (not in request)   -> config.useExtractedData=true, config.dryRun=false  (pinned by the bridge)
 ```
 
 Every `items.*` sub-flag must be ANDed with `items.enabled` (and likewise
@@ -280,6 +280,12 @@ the upstream tool as written.
   control compilation.
 
 ## Blockers
+
+Status (2026-09-28): Blockers 1, 2, 3, and 6 are resolved — see "Execution
+bridge proof" (1) and "Blocker resolution" (2, 3, 6) below. Blocker 4 is
+Task 7 (adapter wiring); Blocker 5's build half is resolved, and running the
+real tool against a real game is the end-to-end proof (Task 8). The original
+text is kept for the record.
 
 1. **Prototype fallback is silent.** `generate()` never throws when
    `gameCatalog` is missing or has empty `enemySlots`/`enemyArchetypes` —
@@ -757,7 +763,7 @@ CombinedRandomizerRequest
   |      exports missing              -> JS_CORE_INCOMPLETE
   |
   |-3- { ...mapped, outputDirectory: resolve(workspacePath),
-  |      generateSpoilerLog: false, useExtractedData: true, dryRun: false }
+  |      useExtractedData: true, dryRun: false }      (spoiler flag comes from the request)
   |      core.normalizeConfig(input)                   trims/coerces seed
   |      core.validateConfig(config, { requireGame: false })
   |      non-empty error array         -> INVALID_CONFIG
@@ -773,6 +779,8 @@ CombinedRandomizerRequest
   |      still no catalog file       -> CATALOG_UNAVAILABLE
   |      unparseable                 -> CATALOG_UNREADABLE
   |      schemaVersion !== 17        -> CATALOG_STALE
+  |      reused catalog's sourceFiles differ from gamePath
+  |                                  -> CATALOG_SOURCE_MISMATCH  (no rescan)
   |
   |-6- core.generate(config, { gameCatalog })          pure, synchronous
   |      throws                      -> GENERATION_FAILED (retryable)
@@ -820,6 +828,10 @@ the backend's own single backup authority, in a later stage.
    without having scanned a game directory.
 
 ### Three config keys the bridge pins rather than inherits
+
+(Superseded for `generateSpoilerLog` by "Blocker resolution" below: it is now
+a request field and is no longer pinned. `useExtractedData`/`dryRun` are
+still pinned exactly as described.)
 
 `CombinedRandomizerRequest` carries none of them, so upstream `defaultConfig`
 would otherwise decide:
@@ -918,3 +930,68 @@ resolves its own paths.
 - **`DsrDataTool` runtime dependency** — unchanged. Nothing in this task
   executed the real tool, so a genuine `scan`/`patch-enemies` round trip
   against real game data is still unproven; that is the end-to-end task.
+
+## Blocker resolution
+
+Resolves integration Blockers 2, 3, and 6 — the remaining blockers that had
+to be fixed before a real combined-engine generation run can be attempted.
+Blocker 1 was already resolved by the execution bridge.
+
+### Blocker 2 — seed charset
+
+`deriveSeeds()` (`apps/backend/src/core/seeds.ts`) now derives `combined` as
+the first 32 hex characters of
+`SHA-256("ds1-triple-randomizer:v1:<trimmed master seed>:combined")`, the same
+named derivation scheme the Fog seed already used. Every master seed —
+unicode, emoji, spaces, path separators, 1000 characters — now yields a token
+matching upstream's `/^[\w.-]{1,64}$/`, asserted by `seeds.test.mjs`. The
+master seed stays free text at the API boundary. The bridge still never
+rewrites seeds: a non-compliant `combinedSeed` handed to it directly still
+reports `INVALID_CONFIG`. Rationale in `docs/DECISIONS.md`.
+
+### Blocker 3 — spoiler-log request field
+
+`CombinedRandomizerRequest.generateSpoilerLog: boolean` was added and mapped
+straight through `mapCombinedRandomizerConfig` to upstream
+`generateSpoilerLog`. The bridge's former hard-coded `generateSpoilerLog:
+false` was removed (it sat after the spread of the mapped config and would
+have silently overridden the new field). A bridge test proves `spoiler.txt`
+is written exactly when requested, `config.json` records the flag, and the
+placement hash is identical either way. Filling the field from
+`RandomizerConfig.output.generateSpoilerLog` is pipeline wiring (Blocker 4,
+Task 7).
+
+### Blocker 6 — catalog/game-directory coupling
+
+`verifyCatalogSources(gamePath, catalog)`
+(`apps/backend/src/adapters/combinedRandomizerCatalog.ts`, an independent
+implementation — upstream's JS function of the same name is not vendored)
+checks every `sourceFiles` record `DsrDataTool scan` wrote: the relative path
+must stay inside the game directory (absolute and `..` paths are refused),
+the file must exist, and its size and SHA-256 must match. `lastWriteTimeUtc`
+is ignored. The bridge runs it after the schema check and before
+`generate()`, only when the catalog was **reused**; a failure returns
+non-retryable `CATALOG_SOURCE_MISMATCH` with per-file `catalogProblems`, with
+no process spawned, no package written, and no automatic rescan. A catalog
+recording no source files is treated as unverifiable and rejected.
+
+What it does and does not prove: it catches a catalog being reused against a
+different or since-modified installation, before generation. It does not
+prove the catalog was scanned from vanilla data — a catalog scanned from an
+already-modded installation verifies against that installation. Pristine
+provenance belongs to the backend's pristine import/backup authority.
+`patch-enemies` independently re-asserts the hashes of the files it touches.
+
+### Verification performed
+
+`npm run test -w @ds1tr/backend` — 66/66 pass (12 new or changed: 4 seed, 1
+mapper, 6 bridge/catalog, plus updated fixtures); root `npm run typecheck`
+(contracts + backend + desktop) clean (2026-09-28). No real Dark Souls
+installation was involved.
+
+### Still open
+
+- `CombinedRandomizerAdapter.generate()` still returns `NOT_IMPLEMENTED`
+  (Blocker 4 — Task 7).
+- `DsrDataTool` has never run against a real installation (Task 8).
+- No public GPL fork (external action, `docs/LICENSING.md`).
