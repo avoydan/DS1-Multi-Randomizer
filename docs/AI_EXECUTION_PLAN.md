@@ -807,7 +807,7 @@ prerequisite tasks for production generation, not part of Task 12:
 
 Completion record:
 
-- Commit: pending current task commit.
+- Commit: `a110df9` (`feat(backend): wire generation pipeline with typed prerequisite failures`).
 - Verification: 4 focused pipeline tests, backend build and typecheck passed (2026-09-28).
 - Result: Backend sequence, progress/status events, deterministic retries,
   validation and run manifest are wired. The default execution returns typed
