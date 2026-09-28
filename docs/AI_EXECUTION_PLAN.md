@@ -444,7 +444,7 @@ Completion record:
 
 # TASK 5 — CODEX
 
-State: PENDING
+State: DONE
 
 ## Combined engine integration tests and failure handling
 
@@ -468,10 +468,10 @@ Do not refactor unrelated code.
 
 Completion record:
 
-- Commit:
-- Verification:
-- Result:
-- Blockers:
+- Commit: `abeb4c2f56ade130a39e4d42837bf333d586e3e0` (`test(backend): cover combined bridge failure paths`); task documentation committed separately.
+- Verification: 20/20 focused bridge tests passed; backend build and typecheck passed (2026-09-28).
+- Result: Added scan failure and log propagation coverage, strengthened deterministic config and refusal checks, and fixed a test assertion that depended on the runner's working directory. No production code changed.
+- Blockers: None for Task 5. Real-game execution and existing integration blockers remain for later tasks.
 
 ---
 

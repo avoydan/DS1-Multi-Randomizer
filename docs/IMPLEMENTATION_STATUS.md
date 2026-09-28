@@ -1,5 +1,15 @@
 # Implementation status
 
+Task 5 extended the focused combined bridge tests to verify scan failure
+diagnostics and early termination, stdout/stderr log levels, config
+consistency across runs, and refusal to create packages for malformed seeds
+or workspaces inside the live game. An existing build-path assertion was made
+independent of the test runner's working directory. All 20 bridge tests and
+the backend build and typecheck passed on 2026-09-28. No production code
+changed; a real-game `scan`/`patch-enemies` round trip remains unproven.
+Task 5 is DONE; the test changes are committed as
+`abeb4c2f56ade130a39e4d42837bf333d586e3e0`.
+
 ## Backend adapters
 
 - The minimal `CombinedRandomizerAdapter` boundary is defined for combined item
