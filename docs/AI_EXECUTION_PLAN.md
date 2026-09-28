@@ -868,7 +868,8 @@ Do not redesign randomizer algorithms.
 
 Completion record:
 
-- Commit: see the task 14 implementation commit.
+- Commit: `bfdd4302d0a49a6c966dbbb7ec50161d9323165e`
+  (`feat(desktop): connect generation and game state actions`).
 - Verification: focused API integration 1/1 and pipeline 4/4 passed; backend
   and desktop builds and desktop typecheck passed (2026-09-28).
 - Result: Typed desktop/backend operations for state, pristine import,
