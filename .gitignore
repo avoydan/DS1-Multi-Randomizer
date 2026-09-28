@@ -13,3 +13,6 @@ engines/*/vendor/**/obj/
 # Extracted game catalogs must never be committed or distributed (docs/LICENSING.md).
 engines/*/vendor/**/data/dsr-catalog.json
 workspace/
+# FogHost build output (tools/fog-host).
+tools/fog-host/**/bin/
+tools/fog-host/**/obj/

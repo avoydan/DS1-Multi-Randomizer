@@ -1,10 +1,11 @@
 import { createHash } from 'node:crypto';
 import { access, copyFile, cp, mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { RandomizerConfig } from '@ds1tr/contracts';
+import type { FogLanguage, RandomizerConfig } from '@ds1tr/contracts';
 import { executeCombinedGeneration, type CombinedGenerationResult } from '../adapters/combinedRandomizerBridge.js';
 import { buildFogCompatibility, decideFogRetry, defaultFogRetryBounds, planFogStaging } from '../adapters/fogCompatibility.js';
 import { FogHostProcess, type FogHostResponse } from '../adapters/fogHostProcess.js';
+import { fogDataRootVariable, resolveFogPrerequisites, type FogPrerequisites } from '../adapters/fogPrerequisites.js';
 import { effectiveCombinedEnabled, validateRandomizerConfig } from './configValidation.js';
 import { validateInstallation } from './installation.js';
 import { deriveAttemptSeeds } from './seeds.js';
@@ -39,25 +40,22 @@ export type GenerationResult =
   | { ok: false; code: string; message: string; stage: string; manifest: GenerationManifest };
 
 export interface PristineSource { directory: string; snapshotId?: string }
-export interface FogPrerequisites {
-  executablePath: string;
-  dataRoot: string;
-  readSet: string[];
-}
+export type { FogPrerequisites } from '../adapters/fogPrerequisites.js';
 
 export interface GenerationDependencies {
   /** Must return an independently verified, backend-owned pristine snapshot. */
   getPristineSource: (gamePath: string) => Promise<PristineSource | null>;
-  getFogPrerequisites: () => Promise<FogPrerequisites | null>;
+  /** The read set depends on the Fog message language. */
+  getFogPrerequisites: (language: FogLanguage) => Promise<FogPrerequisites | null>;
   combined: typeof executeCombinedGeneration;
   fog: FogHostProcess;
 }
 
 const defaults: GenerationDependencies = {
-  // The pristine import/restore authority and FogHost build are separate tasks.
   // A caller-supplied directory is never accepted as proof of pristine data.
   getPristineSource: async () => null,
-  getFogPrerequisites: async () => null,
+  // FogHost from tools/fog-host plus a user-supplied FogMod data root (DS1TR_FOG_DATA_ROOT).
+  getFogPrerequisites: (language) => resolveFogPrerequisites(language),
   combined: executeCombinedGeneration,
   fog: new FogHostProcess(),
 };
@@ -86,6 +84,14 @@ async function collectFiles(root: string, directory = root): Promise<GenerationM
   return files.sort((a, b) => a.path.localeCompare(b.path, 'en'));
 }
 
+/**
+ * Boss randomization + Fog is rejected until the both-sides boss-event merge is proven
+ * (docs/DECISIONS.md, FogHost v1). It is never silently disabled.
+ */
+export function fogBossRandomizationUnsupported(config: RandomizerConfig): boolean {
+  return config.fog.enabled && config.enemies.enabled && config.enemies.randomizeBosses;
+}
+
 /** Generation never writes to the game installation or pristine source. */
 export async function generateRun(
   request: GenerationRequest,
@@ -98,7 +104,7 @@ export async function generateRun(
   const workspace = typeof request.workspacePath === 'string' && request.workspacePath
     ? path.resolve(request.workspacePath) : '';
   const manifest: GenerationManifest = {
-    schemaVersion: 1, appVersion: '0.15.1', game: 'DSR', masterSeed: config.masterSeed,
+    schemaVersion: 1, appVersion: '0.16.0', game: 'DSR', masterSeed: config.masterSeed,
     pristineSnapshotId: null, gameTreeRoot: '',
     options: { items: config.items, enemies: config.enemies, fog: config.fog, output: config.output },
     attempts: [], engines: {}, validation: [], files: [],
@@ -110,6 +116,11 @@ export async function generateRun(
   const progress = (stage: string, value: number, message: string): void =>
     onEvent({ type: 'progress', stage, progress: value, message });
 
+  if (fogBossRandomizationUnsupported(config)) {
+    return fail('verify', 'FOG_BOSS_RANDOMIZATION_UNSUPPORTED',
+      'Boss randomization together with Fog gate randomization is not supported yet: both engines edit boss events '
+      + '(for example the Asylum Demon event 11810310) and that merge is unproven. Disable boss randomization or Fog.');
+  }
   if (!workspace || contained(config.gamePath, workspace)) {
     return fail('verify', 'WORKSPACE_UNSAFE', 'Choose a workspace outside the game installation.');
   }
@@ -129,9 +140,10 @@ export async function generateRun(
   manifest.pristineSnapshotId = pristine.snapshotId ?? null;
   progress('import', 0.1, 'Verified pristine source available.');
 
-  const fogReady = config.fog.enabled ? await services.getFogPrerequisites() : null;
+  const fogReady = config.fog.enabled ? await services.getFogPrerequisites(config.fog.language) : null;
   if (config.fog.enabled && !fogReady) return fail('fog', 'FOG_PREREQUISITES_MISSING',
-    'Build FogHost and provide its verified FogMod data root and read set before Fog generation.');
+    `Fog generation needs the built FogHost (tools/fog-host) and ${fogDataRootVariable} set to a folder containing `
+    + 'the `dist` folder of FogMod commit 6e6dc78; FogHost verifies that data on every run.');
   if (fogReady) {
     try { await requireFile(fogReady.executablePath); await access(fogReady.dataRoot); }
     catch { return fail('fog', 'FOG_PREREQUISITES_MISSING', 'FogHost executable or FogMod data root is unavailable.'); }

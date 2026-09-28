@@ -76,6 +76,7 @@ test('reports absent FogHost prerequisites before combined generation', async ()
   let called = false;
   const result = await generateRun({ config: config(game, true), workspacePath: workspace }, () => {}, {
     getPristineSource: async () => ({ directory: pristine }),
+    getFogPrerequisites: async () => null,
     combined: async () => { called = true; throw new Error('unexpected'); },
   });
   assert.equal(result.ok, false);
@@ -130,4 +131,33 @@ test('retries a Fog seed and retains combined files outside the Fog read set', a
   assert.equal(result.manifest.gameTreeRoot, '');
   assert.equal(await readFile(path.join(result.packagePath, 'items.bin'), 'utf8'), 'combined');
   assert.equal(await readFile(path.join(result.packagePath, 'param/GameParam/GameParam.parambnd.dcx'), 'utf8'), 'fogged');
+}));
+
+test('rejects boss randomization together with Fog before any engine runs', async () => fixture(async ({ game, pristine, workspace }) => {
+  const bossesAndFog = config(game, true);
+  bossesAndFog.enemies = { enabled: true, randomizeRegularEnemies: false, randomizeBosses: true, scaling: 'vanilla' };
+  let called = false;
+  const result = await generateRun({ config: bossesAndFog, workspacePath: workspace }, () => {}, {
+    getPristineSource: async () => { called = true; return { directory: pristine }; },
+    getFogPrerequisites: async () => { called = true; return null; },
+    combined: async () => { called = true; throw new Error('unexpected'); },
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.code, 'FOG_BOSS_RANDOMIZATION_UNSUPPORTED');
+  assert.equal(called, false);
+  // Boss randomization is not silently disabled: the config is returned unchanged.
+  assert.equal(result.manifest.options.enemies.randomizeBosses, true);
+}));
+
+test('passes the Fog message language to the prerequisite provider', async () => fixture(async ({ game, pristine, workspace }) => {
+  const polish = config(game, true);
+  polish.fog.language = 'POLISH';
+  let requested = null;
+  const result = await generateRun({ config: polish, workspacePath: workspace }, () => {}, {
+    getPristineSource: async () => ({ directory: pristine }),
+    getFogPrerequisites: async (language) => { requested = language; return null; },
+    combined: async () => { throw new Error('unexpected'); },
+  });
+  assert.equal(result.code, 'FOG_PREREQUISITES_MISSING');
+  assert.equal(requested, 'POLISH');
 }));

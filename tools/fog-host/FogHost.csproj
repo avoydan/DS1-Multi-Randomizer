@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    FogHost: headless DS1R host around pinned FogMod engine sources.
+    Contract: docs/FOGHOST_INTEGRATION.md; build notes: docs/FOGHOST_IMPLEMENTATION_CHECKLIST.md.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <AssemblyName>FogHost</AssemblyName>
+    <RootNamespace>FogHost</RootNamespace>
+    <Version>0.1.0</Version>
+    <Nullable>disable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Deterministic>true</Deterministic>
+    <!-- FogMod relies on unchecked `Seed - 1` and `Seed + tries`. -->
+    <CheckForOverflowUnderflow>false</CheckForOverflowUnderflow>
+    <!-- Vendored sources live under vendor/; never glob WinForms resources or anything else. -->
+    <EnableDefaultItems>false</EnableDefaultItems>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- Vendored upstream code: obsolete PARAM.Layout API, unused variables, etc. -->
+    <NoWarn>$(NoWarn);CS0612;CS0618;CS0168;CS0219;CS0162;CS0414;CS0649;CS0169;CS8632</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="src\**\*.cs" />
+    <Compile Include="vendor\FogMod\*.cs" />
+    <Compile Include="vendor\SoulsIds\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="JuicerMV.SoulsFormats" Version="0.1.3" />
+    <PackageReference Include="YamlDotNet" Version="7.0.0" />
+    <!-- SoulsIds pins 12.0.3, which has advisory GHSA-5crp-9r3c-p9vr; 13.0.3 is API-compatible. -->
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+</Project>
