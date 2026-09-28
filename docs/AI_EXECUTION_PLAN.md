@@ -654,7 +654,7 @@ Completion record:
 
 # TASK 9 — CLAUDE
 
-State: PENDING
+State: DONE
 
 ## FogHost integration design
 
@@ -679,10 +679,42 @@ Do not implement broad UI work.
 
 Completion record:
 
-- Commit:
-- Verification:
-- Result:
-- Blockers:
+- Commit: COMMIT_PLACEHOLDER
+  (`docs: design FogHost integration and combined/Fog overlap`). Docs only;
+  no application code changed and no version bump.
+- Verification (2026-09-28): source audit only. FogMod at
+  `28711c3f8b1f7f8c1f329ef9a7f4d9c1e55ce526` (`Program.cs`, `Randomizer.cs`,
+  `RandomizerOptions.cs`, `GameDataWriter.cs`, `ItemReader.cs`,
+  `GraphConnector.cs`, `FogMod.csproj`, `dist/DS1R` listing) against the
+  vendored `DsrDataTool/Program.cs` (`PatchBossNames`, `PatchGameParam`,
+  `AddScaledNpcRows`). No build or test was run, because no code changed.
+- Result: `docs/FOGHOST_INTEGRATION.md` covers:
+  - the host project: compiles the pinned FogMod engine sources and excludes
+    the CLI and WinForms;
+  - the `FogHost.exe generate --request --response` JSON contract, which
+    forces DS1R and supports `dryRun`/`write`, a uint32 seed and a
+    contract-to-flag option mapping;
+  - per-attempt staging directories, because DS1 `Write()` writes in place;
+  - `.bak` cleanup, console redirection, host-authored progress lines, and
+    typed retry-scoped errors (`combined` vs `fog`);
+  - determinism checks.
+
+  The overlap analysis finds three hard incompatibilities that make stock
+  FogMod lossy on combined output:
+  - EMEVD: combined custom events and vanilla-event edits are dropped;
+  - NpcParam: combined scaled rows are deleted;
+  - key items: FogMod looks only in annotated lots.
+
+  The doc also lists the safe pass-through classes and the final-package
+  rule. Decision recorded: FogHost carries a minimal patch set in
+  `GameDataWriter.cs`/`ItemReader.cs`, and Task 11 defines its inputs.
+- Blockers: none for Task 9. Open items:
+  1. no task builds or vendors the C# host (Task 10 is only the backend
+     adapter);
+  2. FogMod `dist/` is game-derived data and its distribution is unresolved
+     under `docs/LICENSING.md`;
+  3. SoulsFormats/SoulsIds revisions are unpinned and the SoulsIds license
+     is unverified.
 
 ---
 

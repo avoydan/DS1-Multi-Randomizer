@@ -1,5 +1,24 @@
 # Implementation status
 
+Task 9 designed the FogHost integration (`docs/FOGHOST_INTEGRATION.md`;
+decision in `docs/DECISIONS.md`). It is docs only: no code changed and there
+is no version bump. The design is a console host that compiles FogMod's
+engine sources at the audited commit `28711c3`, never FogMod's CLI (which
+forces DS3) or WinForms. It forces DS1R and exchanges JSON request/response
+files. FogMod writes DS1 output in place, so each attempt gets a fresh staging
+directory, and the host cleans up FogMod's `.bak` files. Errors are typed and
+retry-scoped (`combined` vs `fog`). The overlap analysis shows stock FogMod is
+lossy on combined output:
+- it replaces EMEVD and keeps only legacy-enemy-randomizer event IDs;
+- it deletes the combined engine's scaled `NpcParam` rows;
+- it finds key items only in annotated item lots.
+
+FogHost therefore carries a minimal patch set in `GameDataWriter.cs` and
+`ItemReader.cs`, and Task 11 defines the bridge inputs. Open items:
+- no task builds or vendors the C# host yet;
+- FogMod's `dist/` data is game-derived and its distribution is unresolved;
+- the SoulsFormats/SoulsIds pins and SoulsIds' license are still to be checked.
+
 Task 8 ran the combined Items + Enemies engine end to end for the first time:
 typed request → config → vendored JS generator → real `DsrDataTool`
 `scan`/`patch-enemies` → workspace package, via

@@ -214,3 +214,37 @@ Limit: this proves the catalog matches the directory, not that the directory
 is vanilla. Pristine provenance stays with the backend's pristine
 import/backup authority. `patch-enemies` independently re-checks the hashes
 of the files it touches; this check exists to fail early and explain why.
+
+## FogHost compiles pinned FogMod engine sources with a minimal patch set, behind a file-based JSON boundary
+
+Date: 2026-09-28
+
+Fog runs in a dedicated console host, `tools/fog-host` (`FogHost.exe
+generate --request <json> --response <json>`). The host compiles FogMod's
+engine sources at the audited commit `28711c3f…e526` directly. It never
+uses `Program.cs` (its CLI path forces `FromGame.DS3`), `MainForm*` or
+WinForms. It forces `FromGame.DS1R`, sets the CWD to a supplied FogMod data
+root, points FogMod's `gameDir` at a fresh per-attempt staging directory
+(DS1 `Write()` ignores `outDir` and writes in place), redirects FogMod's
+console output to a log, and returns typed, retry-scoped errors. Full
+contract: `docs/FOGHOST_INTEGRATION.md`.
+
+Stock FogMod is lossy on combined output. It replaces EMEVD with its own
+templates and carries over only hardcoded legacy-Enemy-Randomizer event IDs,
+it deletes non-vanilla `NpcParam` rows (the combined engine's scaled rows),
+and it finds key items only in annotated item lots. FogHost therefore
+carries a patch set **confined to `GameDataWriter.cs` and `ItemReader.cs`**,
+driven by the request's `compatibility` object. Task 11 defines the exact
+inputs and rules. Modified files carry Apache-2.0 §4(b) change notices.
+
+Why: the alternatives were running Fog before the combined engine (the
+combined key-item logic would ignore the fog graph, which breaks progression
+safety) and reconstructing combined changes after an unmodified Fog run (a
+3-way merge on binary formats outside any engine, which is more fragile than
+a small patch at the exact carry-over points). `AGENTS.md` already forbids
+rewriting FogMod and prefers a small dedicated C# host.
+
+Consequences: the fog probe in `apps/backend/src/core/pipeline.ts` and
+`engines/fog/README.md` are superseded (replaced in Task 10). FogMod's
+`dist/` data is game-derived, and its distribution is an open licensing
+question. Building the host is not yet assigned to any task.
