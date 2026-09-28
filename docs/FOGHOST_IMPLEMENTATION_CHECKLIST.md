@@ -1,420 +1,468 @@
 # FogHost implementation checklist
 
 Prepared 2026-09-28 as the handoff for the task that builds the C# FogHost.
-The design is in `docs/FOGHOST_INTEGRATION.md`, the backend contract is in
-`apps/backend/src/adapters/fogHostProcess.ts` (schema v2) and
-`fogCompatibility.ts`. This document adds the source-verified facts that the
-design left open, and the exact build and test steps. Nothing in it is
-implemented yet.
+
+- Design: `docs/FOGHOST_INTEGRATION.md`.
+- Backend contract: `apps/backend/src/adapters/fogHostProcess.ts` (schema v2)
+  and `fogCompatibility.ts`.
+
+This document adds the facts that the design left open. They were verified
+against the source and **by a throwaway build and run outside the
+repository**. It also gives the exact build and test steps. No host code is
+in the repository yet.
 
 Read before starting: `AGENTS.md`, this file, `docs/FOGHOST_INTEGRATION.md`
 ("Host design", "Compatibility bridge (Task 11)"), `docs/LICENSING.md`.
+
+## 0. Headline findings
+
+1. **The audited FogMod pin `28711c3` cannot generate DS1R.** Its "DS3
+   update" broke the DS1 path in two places:
+   - `Entrance.FullName` became `Area + "_" + ID`, while DS1 annotations
+     and the DS1 writer look entrances up by name (`o2920_0000`,
+     `o5869_0000`, `1702901`). The result is a `KeyNotFoundException` in
+     `Graph.Construct`.
+   - Even with that patched, `GraphConnector.Connect` only exits its loop
+     inside a DS3-only branch (`g.Areas.ContainsKey("firelink_cemetery")`),
+     so every DS1 seed throws `Could not find edge into unreachable areas []`.
+
+   Both failures were observed at runtime on 10 seeds. The DS1 path is
+   already broken at `76ab1ef` (2020-07, first DS3 commit).
+2. **Use FogMod `6e6dc78` instead** (2020-01-21, "Enemy randomizer
+   support"), the last DS1-only commit. Its `dist/DS1R` tree is identical to
+   `28711c3`'s, and its `GameDataWriter.cs` has the same logic. Only
+   identifier renames and 6 SoulsFormats API names differ, and the line
+   numbers are the same. So the Task 9/11 findings (event carry-over,
+   NpcParam passes, scaling) and the line numbers below hold for `6e6dc78`.
+3. **Build proven:**
+   - `6e6dc78` + SoulsIds `e31a6fd` + NuGet `JuicerMV.SoulsFormats`
+     0.1.3 (the same package `DsrDataTool` uses) + a 6-rule API port of
+     `GameDataWriter.cs` builds on **net8.0**.
+   - It runs a full DS1R `dryrun` and `write`.
+   - Two separate processes give byte-identical output.
+   - See §12.
+4. FogMod `scale` does not compose with the combined engine's scaled rows as
+   Task 11 assumed. That needs a user decision (§9).
 
 ## 1. Pinned sources
 
 | Component | Repository | Commit | License |
 |---|---|---|---|
-| FogMod engine + data | `https://github.com/thefifthmatt/FogMod` | `28711c3f8b1f7f8c1f329ef9a7f4d9c1e55ce526` (2022-02-15, "DS3 update") | Apache-2.0, file `FogMod/LICENSE` (blob `e454a525…`). No NOTICE file. |
-| SoulsIds | `https://github.com/thefifthmatt/SoulsIds` | `e31a6fdb516491b6c731cb2847f22faaabbcf925` (2022-02-15, "Update for mods") | Apache-2.0 (root `LICENSE`). **Verified**; this closes the "SoulsIds license unverified" item. |
-| SoulsFormats | see §3 | see §3 | GPL-3.0, with a caveat (§3) |
+| FogMod engine + data | `https://github.com/thefifthmatt/FogMod` | **`6e6dc7886d0f8bcc53c1800d95c9e859d1f2f87f`** (2020-01-21) | Apache-2.0, root `LICENSE` at that commit (blob `e454a525…`, same text later moved to `FogMod/LICENSE`). No NOTICE file. |
+| SoulsIds | `https://github.com/thefifthmatt/SoulsIds` | `e31a6fdb516491b6c731cb2847f22faaabbcf925` (2022-02-15) | Apache-2.0 (root `LICENSE`), verified |
+| SoulsFormats | NuGet `JuicerMV.SoulsFormats` | `0.1.3` (nuspec: source `juicermv/SoulsFormats@c3f100941fa67756407e08b2793381edaabd466f`) | `GPL-3.0-only` (nuspec license expression). Already listed in `THIRD_PARTY_NOTICES.md`. |
 | YamlDotNet | NuGet | `7.0.0` (FogMod `packages.config`) | MIT |
-| Newtonsoft.Json | NuGet | `12.0.3` (SoulsIds at the pin) | MIT |
+| Newtonsoft.Json | NuGet | SoulsIds pins `12.0.3`, which has advisory GHSA-5crp-9r3c-p9vr (High). Use **`13.0.3`** (API-compatible) and confirm that it builds. | MIT |
 
-Why `e31a6fd`: it has the same date as the FogMod commit and is the commit
-that adds the `GameEditor`/`Events` APIs FogMod calls. Later SoulsIds commits
-(2022-04 onward) target net6.0 and `SoulsFormatsNEXT`, which is a different
-library line. **Do not use SoulsIds `master`.**
+- **SoulsIds `e31a6fd`:** SoulsIds had no commit contemporaneous with
+  `6e6dc78` that compiles against the modern SoulsFormats. `e31a6fd` compiles
+  with both FogMod commits and JuicerMV. Later SoulsIds commits target
+  `SoulsFormatsNEXT`; do not use SoulsIds `master`.
+- **SoulsFormats rejected alternatives:** thefifthmatt's fork `106e54a` has
+  no license text. JKAnderson's repository had only a joke license
+  (`44ffed4`) until the GPL-3.0 `LICENSE` in `9c0da6b` (2025). JuicerMV
+  avoids both problems.
+- **FogMod `28711c3`** may still be kept for reference only; do not vendor
+  it.
 
 Local research clones (temporary; re-create them if they are gone):
 
 ```sh
 T="$LOCALAPPDATA/Temp"
-git clone https://github.com/thefifthmatt/FogMod "$T/fogmod-src" && git -C "$T/fogmod-src" checkout 28711c3f8b1f7f8c1f329ef9a7f4d9c1e55ce526
+git clone https://github.com/thefifthmatt/FogMod "$T/fogmod-src"        # use: git -C ... archive 6e6dc78
 git clone https://github.com/thefifthmatt/SoulsIds "$T/foghost-deps/SoulsIds"
-git clone https://github.com/thefifthmatt/SoulsFormats "$T/foghost-deps/SoulsFormats"
-git clone https://github.com/JKAnderson/SoulsFormats "$T/foghost-deps/jk-SoulsFormats"
 ```
 
-## 2. Files the host needs from each source
+The probe projects from this session are `$T/fhp2` (working, `6e6dc78`) and
+`$T/fhp` (`28711c3`, fails at runtime). They are scratch, not deliverables.
 
-**FogMod, compiled into the host** (from `FogMod/`): `AnnotationData.cs`,
-`EventConfig.cs`, `GameDataWriter.cs`, `GameDataWriter3.cs`,
-`GenerateConfig.cs`, `Graph.cs`, `GraphChecker.cs`, `GraphConnector.cs`,
-`ItemReader.cs`, `Randomizer.cs`, `RandomizerOptions.cs`, `Util.cs`, plus
-`LICENSE`. None of these reference WinForms (verified by grep).
+## 2. Files the host needs
 
-- `GameDataWriter3.cs` and `GenerateConfig.cs` are DS3-only. `Randomizer.cs`
-  references `GameDataWriter3` and `GenerateConfig`, so either compile them or
-  do not compile `Randomizer.cs` (see §6: the host reimplements the DS1 branch
-  of `Randomize`, so `Randomizer.cs` can be dropped). Prefer the smallest set
-  that compiles, and record it in `UPSTREAM_PIN.md`.
+**FogMod at `6e6dc78`**, compiled into the host (`git archive 6e6dc78 FogMod LICENSE`):
+
+- Files: `AnnotationData.cs`, `GameDataWriter.cs` (API-ported, §5),
+  `Graph.cs`, `GraphChecker.cs`, `GraphConnector.cs`, `ItemReader.cs`,
+  `Randomizer.cs`, `RandomizerOptions.cs`, `Util.cs`, plus the root `LICENSE`.
+  This commit has no DS3 files. None of these reference WinForms.
 - Excluded: `Program.cs`, `MainForm*.cs`, `*.resx`, `Properties/**`,
-  `App.config`, `packages.config`, `foggate.ico`.
+  `App.config`, `packages.config`, `FogMod.csproj`, `foggate.ico`.
+- API at this commit, which differs from `28711c3`:
+  - the annotation class is `Annotations`;
+  - `RandomizerOptions` has no `Game` property, and its default flag is
+    **`v4`** (not `v5` as `FOGHOST_INTEGRATION.md` says);
+  - `Randomizer.Randomize(opt, game, gameDir)` takes three arguments;
+  - `ItemReader.FindItems(opt, ann, g, gameDir, game)`;
+  - `GameDataWriter.Write(opt, ann, g, gameDir, game)`;
+  - `fog.txt` is read as `"dist/fog.txt"` relative to the CWD.
 
 **SoulsIds at `e31a6fd`** (`SoulsIds/`): `EMEDF.cs`, `Events.cs`,
-`GameEditor.cs`, `GameSpec.cs`, `Scraper.cs`, `Universe.cs`, `LICENSE`.
-FogMod uses `GameEditor`, `GameSpec`/`FromGame`, `Universe.LotTypes`, and
-`Events` (DS3 path only). The upstream csproj is an old-style net461 project
-with a WinForms reference and a Newtonsoft `HintPath` into a sibling repo.
-Do not use it. Compile the `.cs` files directly into the host, or give them
-a new SDK-style project.
+`GameEditor.cs`, `GameSpec.cs`, `Scraper.cs`, `Universe.cs`, plus the root
+`LICENSE`. Compile the sources directly. The upstream csproj is old-style
+net461 with a WinForms reference; do not use it. They built unchanged in the
+probe.
 
-**SoulsFormats**: the host needs `MSB1`, `EMEVD`, `PARAM` (both the
-deprecated `PARAM.Layout` and `PARAMDEF`/`AppliedParamdef`), `FMG`, `BND3`,
-`DCX`, and `SFUtil`. SoulsIds at the pin calls both `LoadLayouts()`
-(`PARAM.Layout`, file `Formats/PARAM/Deprecated/Layout.cs`), and the
-`PARAMDEF` overloads. FogMod's DS1 writer uses `AppliedParamdef`.
+## 3. Option flags (`6e6dc78`)
 
-## 3. SoulsFormats choice (decide from the build probe)
-
-| Candidate | Has `PARAM.Layout` | LICENSE in tree | Notes |
-|---|---|---|---|
-| (a) NuGet `JuicerMV.SoulsFormats` 0.1.3 (already used by `DsrDataTool`) | unknown | per package | If it compiles SoulsIds + FogMod, one SoulsFormats line for both tools. Listed as GPL-3.0-only in `THIRD_PARTY_NOTICES.md`. |
-| (b) JKAnderson `9c0da6b` (HEAD, 2025-05-26) | yes | **GPL-3.0** | Targets `net462;netstandard2.1`, adds Zstd. API drift since 2021 is possible. |
-| (c) thefifthmatt fork `master` = JKAnderson `106e54a` (2021-11-21) | yes | **none** | The contemporaneous revision for FogMod. It is also a commit in JKAnderson's repository. |
-
-**License caveat:** JKAnderson's repository had no license until 2023. Commit
-`44ffed4` ("license") added a joke `LICENSE.md` plus an image, not a real
-license. The GPL-3.0 `LICENSE` was added in `9c0da6b` (2025-05-26). Using (c)
-means distributing a 2021 tree that has no license text, on the strength of
-the author's later GPL grant for the repository. Prefer (a) or (b). If only
-(c) compiles, record why in `DECISIONS.md` and flag it for the user before
-anything is distributed.
-
-The probe result is recorded in §12.
+All 13 contract flags exist as option names at this commit: `world boss warp
+major minor lordvessel start unconnected bboc scale hard lords pacifist`. The
+mapping table in `FOGHOST_INTEGRATION.md` holds. Keep the default `v4`. The
+response `fogOptions` string will contain `v4`.
 
 ## 4. FogMod data root
 
 `Randomizer`/`GameDataWriter` read paths relative to the **process working
 directory**:
 
-- `dist\fog.txt` (annotations; blob `d1ae0175dbeef25e4da73a910c3ff80323f7563c`);
-- `dist\DS1R\**`: 59 files, tree `bc86fb5aee292c653bbddce26bdfc003182ed1f0`:
-  - `event\*.emevd.dcx`: 18 (`common` plus 17 maps);
-  - `map\MapStudio\*.msb`: 18 (m10_00, m10_01, m10_02, m11_00, m12_00,
+- `dist/fog.txt`: at `6e6dc78` this is blob
+  **`83beace06434ce98e33eaeecde86f17c810dd096`**. It differs from `28711c3`
+  by one line (`kiln_gwyn` `Tags: boss` vs `boss end`). Use the `6e6dc78`
+  version with the `6e6dc78` code.
+- `dist/DS1R/**`: 59 files, tree **`bc86fb5aee292c653bbddce26bdfc003182ed1f0`**
+  (identical at both commits):
+  - `event/*.emevd.dcx`: 18 (`common` plus 17 maps);
+  - `map/MapStudio/*.msb`: 18 (m10_00, m10_01, m10_02, m11_00, m12_00,
     m12_00_00_01, m12_01, m13_00, m13_01, m13_02, m14_00, m14_01, m15_00,
     m15_01, m16_00, m17_00, m18_00, m18_01);
-  - `script\talk\*.talkesdbnd.dcx`: 17;
-  - `Layouts\*.xml`: 4 (GAME_AREA, ITEMLOT, NPC, SP_EFFECT);
-  - `param\GameParam\GameParam.parambnd.dcx`: 1;
-  - `msg\ENGLISH\menu.msgbnd.dcx`: 1 (used only by FogMod's `.bak` loop).
-- 60 files in total, about 5.1 MB. `fogdist\` is DS3-only, and `dist\DS1\`
-  is PTDE-only. Neither is needed.
-- `SoulsIds.GameSpec` DS1R `LayoutDir` is `dist\DS1R\Layouts`
-  (CWD-relative), so `ItemReader`'s `LoadLayouts()` reads the data root, not
-  staging. `NameDir` (`dist\DS1R\Names`) is only used by the debug
-  `dumpcols` flag and is not required.
+  - `script/talk/*.talkesdbnd.dcx`: 17;
+  - `Layouts/*.xml`: 4;
+  - `param/GameParam/GameParam.parambnd.dcx`: 1;
+  - `msg/ENGLISH/menu.msgbnd.dcx`: 1 (only used by FogMod's `.bak` loop).
+- 60 files in total, about 5.1 MB. `dist/DS1/` (PTDE) and `dist/Names/` are
+  not needed.
+- SoulsIds' DS1R `LayoutDir` is `dist\DS1R\Layouts` (CWD-relative), so
+  `LoadLayouts()` reads the data root, never staging.
 
-The data root must be **version-locked to the engine commit**. `fog.txt`
-annotations and `dist\DS1R` templates must match the compiled code. A FogMod
-Nexus release is not a substitute unless its files hash-match the pin.
-Pin evidence (Git blob IDs, same method as `engines/combined/vendor/UPSTREAM_PIN.md`):
+The data root must be **version-locked** to the engine commit. A FogMod
+Nexus download is acceptable only if its files hash-match. Pin evidence uses
+Git blob IDs, the same method as `engines/combined/vendor/UPSTREAM_PIN.md`:
 
 ```sh
-git -C "$LOCALAPPDATA/Temp/fogmod-src" ls-files -s dist/fog.txt dist/DS1R
+git -C "$LOCALAPPDATA/Temp/fogmod-src" ls-tree -r 6e6dc78 dist/fog.txt dist/DS1R
 ```
 
-**Open user decision (licensing, `docs/LICENSING.md`):** `dist\DS1R` is
+**Open user decision (licensing, `docs/LICENSING.md`):** `dist/DS1R` is
 FromSoftware-derived data (MSB/EMEVD/param/ESD/FMG with FogMod edits).
-Apache-2.0 covers FogMod's code, not that data. The options are:
+Apache-2.0 covers the code, not that data. The options are:
 
-1. commit it into the repo and bundle it;
-2. have the user provision it: the app verifies a user-supplied FogMod
-   download against the pinned hash manifest;
-3. fetch it at the pinned commit on first use and verify the hashes.
+1. commit and bundle it;
+2. have the user provision it, and the app verifies it against the pinned
+   blob/SHA-256 manifest;
+3. fetch it at the pinned commit on first use and verify it.
 
-The host implementation does not depend on this choice: `fogDataRoot` is an
-input. For local development and tests, use the temp clone above; do not
-commit `dist\DS1R` until the user decides.
+The host does not depend on the choice (`fogDataRoot` is an input). For
+development and tests, use the temp clone. Do not commit `dist/DS1R` before
+the user decides.
 
 ## 5. Repository layout to create
 
 ```text
 tools/fog-host/
-  FogHost.csproj                     # SDK-style console, net8.0 (see §7)
-  FogHost.sln                        # optional
+  FogHost.csproj                     # SDK-style console, net8.0
   src/
     Program.cs                       # entry: `generate --request --response`
     HostRequest.cs / HostResponse.cs # schema-v2 DTOs
     HostErrors.cs                    # code table, message-prefix classifier
-    HostRunner.cs                    # DS1-only reimplementation of Randomize (§6)
-    Staging.cs                       # safety checks, .bak cleanup, output hashing
+    HostRunner.cs                    # DS1 reimplementation of Randomize (§6)
+    Staging.cs                       # safety checks, .bak cleanup, hashing
     EmevdMerge.cs                    # three-way merge (FOGHOST_INTEGRATION.md rules 1–4)
-    Invariants.cs                    # post-write invariants 1–4
+    Invariants.cs                    # post-write invariants
   vendor/
     UPSTREAM_PIN.md                  # commits, blob IDs, file list, patch list
-    FogMod/                          # the §2 files at 28711c3, plus LICENSE
-    SoulsIds/                        # the §2 files at e31a6fd, plus LICENSE
-    SoulsFormats/                    # only if candidate (b) or (c); plus LICENSE
-tools/fog-host.tests/                # xUnit, or a console self-test; see §10
+    FogMod/                          # §2 files at 6e6dc78, plus LICENSE
+    SoulsIds/                        # §2 files at e31a6fd, plus LICENSE
+tools/fog-host.tests/                # xUnit (or a console self-test), §10
 ```
 
-- `.gitignore` gotchas:
-  - The root rule `dist/` ignores **every** directory named `dist`. Do not
-    put FogMod data under a path segment named `dist` inside the repo
-    without a negation rule. The data root itself must contain `dist\` (§4),
-    so a committed data root would need `!tools/fog-host/data/dist/`.
+**Mandatory API port of `GameDataWriter.cs`** (this is what made the probe
+build). Every rule is an exact textual replacement:
+
+| From (`6e6dc78`, 2019 SoulsFormats API) | To (JuicerMV 0.1.3) |
+|---|---|
+| `layouts["SP_EFFECT_PARAM_ST"]` | `Params["SpEffectParam"].AppliedParamdef` |
+| `layouts["NPC_PARAM_ST"]` | `Params["NpcParam"].AppliedParamdef` |
+| `cell.Name` | `cell.Def.InternalName` |
+| `MSB1.Shape.` | `MSB.Shape.` |
+| `.UnkT0C = ` | `.InitAnimID = ` |
+| `con.Placeholder = null;` | removed. Upstream `28711c3` does the same: "No longer valid after SoulsFormat update". |
+
+These are the same replacements upstream made in `28711c3`. The build emits
+28 × CS0612 (obsolete `PARAM.Layout` in SoulsIds/ItemReader); suppress them
+in the csproj.
+
+Also required:
+
+- **Apache-2.0 §4(b):** every modified FogMod file carries a prominent change
+  notice at the top, such as
+  `// Modified by ds1-triple-randomizer: <summary>. Original: thefifthmatt/FogMod@6e6dc78.`
+  The patch set stays confined to `GameDataWriter.cs`. `ItemReader.cs` needs
+  no change under the current rules.
+- **csproj:** set `<EnableDefaultItems>false</EnableDefaultItems>`. Otherwise
+  vendored `*.resx` files are globbed in and the build fails with MSB3822.
+  Also set `<Nullable>disable</Nullable>` and `<LangVersion>latest</LangVersion>`,
+  and leave `<CheckForOverflowUnderflow>` off, because FogMod uses unchecked
+  `Seed - 1` and `Seed + tries`.
+- **`.gitignore` gotchas:**
+  - The root rule `dist/` ignores **every** directory named `dist`. A
+    committed data root would need `!tools/fog-host/data/dist/`.
   - `bin/` and `obj/` are only ignored under `engines/*/vendor/**`. Add
     `tools/fog-host/**/bin/` and `tools/fog-host/**/obj/`.
-- The backend probe (`apps/backend/src/core/pipeline.ts:25-26`) expects
+- **Backend probe:** `apps/backend/src/core/pipeline.ts:25-26` expects
   `tools/fog-host/FogHost.csproj` and
-  `tools/fog-host/bin/Release/net8.0/FogHost.exe`. If the TFM differs, update
-  both the probe and `engines/fog/README.md`.
-- Apache-2.0 §4(b): every modified FogMod file carries a prominent change
-  notice at the top, such as
-  `// Modified by ds1-triple-randomizer: <summary>. Original: thefifthmatt/FogMod@28711c3.`
-  The patch set stays confined to `GameDataWriter.cs` (and `ItemReader.cs`
-  only if ever needed; the current rules need no `ItemReader` change).
-- Update `THIRD_PARTY_NOTICES.md` (SoulsIds row, SoulsFormats revision,
-  YamlDotNet, Newtonsoft.Json) and `engines/fog/README.md`.
+  `tools/fog-host/bin/Release/net8.0/FogHost.exe`. net8.0 is confirmed, so no
+  change is needed.
+- **Docs to update:** `THIRD_PARTY_NOTICES.md` (FogMod commit, SoulsIds,
+  YamlDotNet, Newtonsoft.Json), `engines/fog/README.md`, and `DECISIONS.md`
+  (the FogMod re-pin from `28711c3` to `6e6dc78`, with the §0 evidence).
 
 ## 6. Host program flow
 
 The host does **not** call `Randomizer.Randomize`. For DS1 it returns before
 the writer when `dryrun` is set, so the dry-run merge check would be
-impossible. Instead, `HostRunner` reimplements its DS1 branch
-(`Randomizer.cs:15-66`, about 20 lines), which also yields the design's
-progress stages:
+impossible. `HostRunner` reimplements its DS1 body (`Randomizer.cs` at
+`6e6dc78`, lines 14-36, about 15 lines):
 
-1. `validate-request`: parse JSON (camelCase, reject unknown or missing
-   keys), and check the following:
+1. **`validate-request`:** parse the JSON (camelCase; reject unknown and
+   missing keys) and check the following:
    - `schemaVersion == 2` and `game == "DS1R"`;
    - `seed` fits uint32;
    - all 13 option keys are present;
    - `language` is in the `FogLanguage` set;
-   - absolute paths;
-   - `stagingDirectory` has no `DarkSoulsRemastered.exe`
-     (`FOG_STAGING_UNSAFE`);
+   - paths are absolute;
+   - staging has no `DarkSoulsRemastered.exe` (`FOG_STAGING_UNSAFE`);
    - the data-root layout from §4 is present (`FOG_DATA_MISSING`);
    - the `compatibility` hashes match (`FOG_REQUEST_INVALID`).
-2. Set `CultureInfo.DefaultThreadCurrentCulture` and the current thread
-   culture to `InvariantCulture`. Register
-   `CodePagesEncodingProvider.Instance` (on .NET Core, SoulsFormats needs
-   Shift-JIS). Save the original stdout, then redirect `Console.Out` and
-   `Console.Error` to `logPath`. Set
-   `Environment.CurrentDirectory = fogDataRoot` and restore it in `finally`.
-3. Build the options:
-   - `opt = new RandomizerOptions { Game = FromGame.DS1R, Seed = unchecked((int)seed), Language = language }`;
-   - map the 13 option flags (table in `FOGHOST_INTEGRATION.md`);
-   - keep `v5`;
-   - never set debug flags.
-4. `load-annotations`: deserialize `dist\fog.txt` with YamlDotNet into
-   `AnnotationData`, `ann.SetGame(FromGame.DS1R)`, then
-   `new Graph().Construct(opt, ann)`.
-5. `read-key-items`: `new ItemReader().FindItems(opt, ann, g, null, stagingDirectory, FromGame.DS1R)`.
-   This sets `keyItems.randomized` and `keyItems.hash` (`ItemHash`).
-6. `solve-graph`: `new GraphConnector().Connect(opt, g, ann)`.
-7. `write-game-data`: `new GameDataWriter().Write(opt, ann, g, stagingDirectory, FromGame.DS1R)`
-   with the host patch set (§8). In `dryRun`, pass a compute-only flag that
-   runs the merge and conflict checks but skips every write.
-8. Post-write invariants (`write` only), `.bak` cleanup in staging, then
-   `hash-outputs`: sort the file list ordinally, use forward slashes, and
-   include no absolute paths or timestamps. Response `fogOptions` is
-   `opt.ToString()`. `annotationSha256` is the SHA-256 of `dist\fog.txt`.
-9. Write `<response>.tmp` and rename it. Exit 0 for success **and** for a
-   typed failure. Only a crash exits non-zero.
+2. **Process setup:**
+   - `Encoding.RegisterProvider(CodePagesEncodingProvider.Instance)`;
+   - InvariantCulture for the default thread culture and the current culture;
+   - save the original stdout;
+   - `Console.SetOut`/`SetError` to `logPath`;
+   - `Environment.CurrentDirectory = fogDataRoot`, restored in `finally`.
+3. **Options:** `opt = new RandomizerOptions { Seed = unchecked((int)seed) }`
+   and `opt.Language = language`. Set the 13 flags, keep `v4`, and never
+   set debug flags.
+4. **`load-annotations`:** YamlDotNet-deserialize `dist/fog.txt` into
+   `Annotations`, then `new Graph().Construct(opt, ann)`.
+5. **`read-key-items`:** `new ItemReader().FindItems(opt, ann, g, stagingDirectory, FromGame.DS1R)`,
+   which yields `keyItems.randomized` and `keyItems.hash`.
+6. **`solve-graph`:** `new GraphConnector().Connect(opt, g, ann)`.
+7. **`write-game-data`:** `new GameDataWriter().Write(opt, ann, g, stagingDirectory, FromGame.DS1R)`
+   with the §8 patch set. In `dryRun`, pass a compute-only flag.
+8. **Finish (`write` only):**
+   - check the post-write invariants;
+   - delete the `.bak` files. The probe produced **55 `.bak`**, one per
+     written file;
+   - **`hash-outputs`:** relative paths, forward slashes, sorted
+     ordinally, no absolute paths or timestamps.
 
-Progress lines go to the saved original stdout, one JSON object per line:
+   Set `fogOptions = opt.ToString()` and
+   `annotationSha256 = SHA-256(dist/fog.txt)`.
+9. **Response:** write `<response>.tmp`, then rename it. Exit 0 for success
+   and for a typed failure; exit non-zero only on a crash.
+
+Progress lines go to the saved stdout, one JSON object per line:
 `{"type":"progress","stage":"…","message":"…"}`.
 
 ## 7. Target framework and determinism
 
-- Target **net8.0** first (one runtime with `DsrDataTool`; the backend probe
-  already expects `net8.0`). Fall back to net48 only if the SoulsFormats
-  candidate cannot build for netstandard2.1 or net8.0.
-- Keep `<CheckForOverflowUnderflow>` off. FogMod computes `opt.Seed - 1`
-  and `opt.Seed + tries` unchecked.
-- `System.Random(int)` with an explicit seed uses the same legacy algorithm
-  on .NET Framework and .NET 8.
-- String hashing is randomized per process on .NET Core. The only hash
-  override is `Graph.Connection.GetHashCode` (`Graph.cs:507`, used as a
-  `Dictionary`/`HashSet` key in `Graph.cs:395,425` and
-  `GraphConnector.cs:526`). Hash values do not change enumeration order
-  (entries are kept in insertion order), so this is low risk. The
-  two-process determinism test (§10) is still the authority.
-- Set `<Deterministic>true</Deterministic>` and `<Nullable>disable</Nullable>`
-  for vendored sources, and `<LangVersion>latest</LangVersion>`. FogMod uses
-  C# 7-era syntax.
+- **net8.0 confirmed** (§12). `System.Random(int)` is the legacy seeded
+  algorithm on .NET 8.
+- String hashes are randomized per process. At `28711c3` the only override
+  is `Graph.Connection.GetHashCode`. `Dictionary`/`HashSet` enumeration order
+  does not depend on hash values. The two-process test is the authority; it
+  passed in the probe.
 
-## 8. Patch set in `GameDataWriter.cs` (line numbers at `28711c3`)
+## 8. Patch set in `GameDataWriter.cs` (line numbers valid at `6e6dc78` and `28711c3`)
 
 | Rule (`FOGHOST_INTEGRATION.md`) | Location | Change |
 |---|---|---|
 | Compute-only for `dryRun` | 68 (`SFUtil.Backup`), 1074 (`evd.Write`), 1082 (MSB write), 1085 (param `OverrideBnd`), 1089 (ESD `File.Copy`), 1097 (msg `OverrideBnd`) | Guard each write with the host flag. |
 | NpcParam "restore base ID" skip | 165-197 | `continue` for enemies whose `NPCParamID` is a preserved `id`. |
-| NpcParam delete pass keeps preserved | 198 | Add `&& !preserved.Contains(id)` to the `RemoveAll` predicate. |
+| Keep preserved rows in the delete pass | 198 | Add `&& !preserved.Contains(id)` to the `RemoveAll` predicate. |
 | Scaling of preserved rows | 200-429 | **Decision needed; see §9.** |
-| EMEVD three-way merge | 945-1075 (per-file loop) | After FogMod's carry-over and its own edits, and before `evd.Write` (1074): apply merge rules 1–4 for files in `combinedFiles`. B comes from `compatibility.baseDirectory` and C from staging. Note that FogMod reads `gameEvd` from staging, which is already C. |
+| EMEVD three-way merge | 945-1075 (per-file loop) | After FogMod's carry-over and its own edits, and before `evd.Write` (1074), apply merge rules 1–4 to files in `combinedFiles`. B comes from `compatibility.baseDirectory` and C from staging. FogMod reads `gameEvd` from staging, so that copy is C. |
 
-Event equality for the merge compares `ID`, `RestBehavior`, and every
-instruction (`Bank`, `ID`, `Layer`, `ArgData` bytes) and parameter. Compare
-structurally, not by file bytes: C was written by `DsrDataTool`'s
-SoulsFormats line, so byte-level layout can differ.
+Event equality for the merge compares `ID`, `RestBehavior`, and each
+instruction (`Bank`, `ID`, `Layer`, `ArgData` bytes) and parameter.
+Compare structurally, not file bytes.
 
 ## 9. Findings on the design's open items
 
-**Open item 8 (FogMod `scale`): resolved as fact. The design's composition
-hypothesis is wrong as written.** Source: `GameDataWriter.cs:157-456`.
+**Open item 8 (FogMod `scale`): resolved as fact. The Task 11 composition
+hypothesis is wrong.** Source: `GameDataWriter.cs:157-456`.
 
-- FogMod does not edit combat stats. It adds SpEffect "rank" rows
-  7200–7399 (`SpEffectParam`; 5 damage tiers × 41 ratios, derived from
-  vanilla rank 7015). It then writes one rank SpEffect into the NpcParam row:
+**What FogMod's scaling does:**
+
+- It does not touch combat stats. It adds SpEffect "rank" rows 7200–7399
+  (5 damage tiers × 41 ratios, based on vanilla rank 7015). It then writes
+  one rank SpEffect into the NpcParam row:
   - `spEffectID4` if `row.ID >= 120000`;
   - otherwise the first zero `spEffectID0..7`.
-  It also rescales `getSoul`, or `GameAreaParam.bonusSoul_*` for rows with
-  `getSoul == 0`.
-- Enemies are grouped by `NPCParamID` and then by logical area
-  (`fog.txt` `Enemies` cols).
-  - Groups whose ratio is 1 are skipped.
-  - **Rows whose ID is not vanilla are skipped** (`:317-320`, "If it's not
-    from the base game, don't otherwise touch it").
-  - If an ID occurs in one area, the row is edited **in place**.
-  - If it occurs in several areas, FogMod **creates a new row**: the first
-    free ID ≥ the original, cloned from the **vanilla** row, with the
-    original ID hint-encoded in `pcAttrB/W/L/R`. It then **re-points those
-    MSB parts' `NPCParamID`** (`:363-385`).
-- Consequences:
-  1. Combined scaled rows (IDs `9_100_000+` and `9_200_000+`,
-     `generator.js:1163,1300`) are never scaled by stock FogMod, even when
-     they are preserved. The "composed scaling" rule is not what happens.
-  2. A naive `baseId` patch would hit the `row.ID >= 120000` branch for
-     every scaled row and overwrite `spEffectID4`. That slot holds the
-     destination's SpEffect, which `AddScaledNpcRows` copies. The branch
-     would have to key on `baseId`.
-  3. **Invariant 1 as written fails on almost every `scale` run.** Vanilla-ID
-     enemies in combined MSBs that span more than one area are legitimately
-     re-pointed to FogMod clone rows.
-  4. Invariant 3 ("changed cells equal the changes FogMod made to its
-     `baseId` row") has no counterpart in FogMod's model, because changes are
-     per (ID, area) group, not per row.
-  5. FogMod's clones copy the **vanilla** row, so a combined edit to a
-     vanilla NpcParam row would be lost in a clone. Check whether
-     `DsrDataTool` edits vanilla NpcParam rows in place. It adds rows, but
-     confirm it before relying on this.
-- **Recommended v1 rule (needs user approval; it changes the Task 11
-  decision in `DECISIONS.md`):**
-  - Leave preserved rows unscaled by FogMod, which is the stock skip.
-  - Narrow invariant 1: parts that reference a preserved ID must keep it.
-    Other parts may be re-pointed only to a FogMod clone row, one whose ID
-    is not in the input and whose `pcAttr` hint decodes to the part's input
-    ID.
-  - Replace invariant 3 with "preserved rows are identical to the input".
-  - Consequence: with Fog `scale` on, randomized enemies keep the combined
-    engine's destination-slot normalization but get no fog-graph tier.
-  - Alternative: a real composition patch in the scale loop. For preserved
-    rows, key the lookup on `baseId`, use the `>= 120000` branch by
-    `baseId`, and clone from the preserved row, not the vanilla one. This
-    is more code in the loop FogMod tunes by hand (Quelaag special case at
-    `:333`).
+- It rescales `getSoul`, or `GameAreaParam.bonusSoul_*` when `getSoul == 0`.
+- It groups enemies by `NPCParamID` and then by logical area (`fog.txt`
+  `Enemies`). Groups with ratio 1 are skipped.
+- It **skips rows whose ID is not vanilla** (`:316`).
+- An ID used in one area is edited **in place**.
+- An ID used in several areas gets a **new row**:
+  - the ID is the first free one ≥ the original;
+  - the row is cloned from the **vanilla** row;
+  - the original ID is stored in `pcAttrB/W/L/R`;
+  - those MSB parts' **`NPCParamID` is re-pointed** to the new row
+    (`:365-385`).
 
-**Open item 6 (does FogMod remove enemy parts?): resolved, no.** At this
-commit the writer removes only regions named `Boss start for `/`FR: `/`BR: `/
-`Region for `, player parts `c0000_0050+` (`:82-99`), and collisions
-`h9950B1`/`h7800B1` in specific maps. It adds players, objects, regions and
-connect-collisions. It never adds or removes `Parts.Enemies` and never
-changes enemy `ModelName`/`ThinkParamID`. Enemy `NPCParamID` changes only via
-the restore pass (`:165-197`) and scale clones (see above).
+**Consequences:**
+
+1. The combined scaled rows (IDs `9_100_000+`/`9_200_000+`,
+   `generator.js:1163,1300`) are never scaled by stock FogMod.
+2. A naive `baseId` patch would take the `row.ID >= 120000` branch and
+   overwrite `spEffectID4`, the destination SpEffect that
+   `AddScaledNpcRows` copies.
+3. **Invariant 1 as written fails on almost every `scale` run**, because
+   vanilla-ID enemies spanning several areas are legitimately re-pointed.
+4. Invariant 3 has no counterpart in FogMod's model.
+5. Clones copy the vanilla row, so a combined in-place edit to a vanilla
+   NpcParam row would be lost in a clone. `DsrDataTool` adds rows; confirm
+   that it never edits vanilla NpcParam rows in place.
+
+**Recommended v1 rule (needs user approval; it changes the Task 11
+decision):**
+
+- Preserved rows stay unscaled by FogMod (the stock skip).
+- Invariant 1 narrows: parts that reference a preserved ID keep it. Other
+  parts may be re-pointed only to a FogMod clone, meaning an ID that is not
+  in the input and whose `pcAttr` hint decodes to the part's input ID.
+- Invariant 3 becomes "preserved rows are identical to the input".
+- Effect: randomized enemies keep the combined destination-slot
+  normalization but get no fog-graph tier.
+
+The alternative is a real composition patch in the scale loop:
+
+- key the lookup and the `>= 120000` branch on `baseId`;
+- clone from the preserved row.
+
+**Open item 6 (enemy part removal): resolved, no.** The writer removes only:
+
+- regions named `Boss start for `/`FR: `/`BR: `/`Region for `;
+- player parts `c0000_0050+` (`:82-99`);
+- collisions `h9950B1`/`h7800B1` in specific maps.
+
+It never adds or removes `Parts.Enemies` and never changes an enemy's
+`ModelName`/`ThinkParamID`. `NPCParamID` changes only in the restore pass and
+in scale clones.
 
 **Open item 5 (`11810310`): mechanism confirmed, conflict set not measured.**
-FogMod takes `11810310` from its **template** (`dist\DS1R\event\m18_01_00_00.emevd.dcx`).
-If the staging copy lacks instruction `2003[18]`, it treats the Asylum Demon
-as randomized (`asylumDemonRandomized`, `:965-968`) and removes every
-`2003[18]` and `2004[41]` from the template's event (`:1010-1013`). With
-merge rule 3 the outcome depends on the bytes. First implementation step:
-write a small EMEVD diff tool (host test utility) that lists, for each of the
-18 event files, the event IDs where template ≠ vanilla (FogMod edits) and
-where combined ≠ vanilla (from a real package). Their intersection is the
-real both-sides conflict set. Record it in `FOGHOST_INTEGRATION.md`.
 
-**Other writer facts relevant to the bridge:**
-- `GameAreaParam` is replaced wholesale by FogMod's `dist` copy (`:164`).
-- `SpEffectParam` 7200–7399 is cleared on every run (`:157`).
+- FogMod takes `11810310` from its template (`dist/DS1R/event/m18_01_00_00.emevd.dcx`).
+- If the staging copy lacks `2003[18]`, it removes all `2003[18]` and
+  `2004[41]` from the template event (`:965-968`, `:1010-1013`).
+- **First implementation step:** a host test utility that lists, per event
+  file:
+  - template ≠ vanilla event IDs;
+  - combined ≠ vanilla event IDs (from a real package).
+
+  The intersection is the real conflict set; record it in
+  `FOGHOST_INTEGRATION.md`.
+
+**Other writer facts:**
+
+- `GameAreaParam` is replaced by FogMod's copy (`:164`).
+- SpEffect 7200–7399 is cleared every run (`:157`).
 - ESDs are plain copies.
-- Only `common.emevd` event 0 receives FogMod's own `2000[00]`
-  initializations (`:1015-1031`). In `m14_01_00_00` with `bboc`, FogMod
-  re-targets inits `11410200/201` to `+20`.
-- `copyRandoEvents` (`:928-944`) copies instructions from the staging file
-  for 8 event IDs. If the combined engine edits one of them, T == C and rule 3
-  keeps it.
+- Only `common` event 0 gets FogMod's own `2000[00]` inits (`:1015-1031`).
+- With `bboc`, the `m14_01` inits `11410200/201` are re-targeted to `+20`.
+- `copyRandoEvents` (`:928-944`) copies the staging instructions for 8 IDs.
 
 ## 10. Test plan
 
-Data needed: the temp FogMod clone (data root), a pristine DS1R read set, and
-a real combined package. The Task 8/16 harnesses show how to build those
-under the OS temp directory without touching the live install
-(`apps/backend/scripts/combinedEngineE2eProof.mjs`, `releaseAuditE2e.mjs`).
+Data needed:
+
+- the FogMod temp clone as the data root;
+- a pristine DS1R read set;
+- a real combined package.
+
+The Task 8/16 harnesses show how to build these under the OS temp directory
+without touching the live install (`apps/backend/scripts/combinedEngineE2eProof.mjs`,
+`releaseAuditE2e.mjs`).
 
 1. **Unit/fixture (no game data):**
-   - request validation: each `FOG_REQUEST_INVALID` branch, unknown and
-     missing option keys, uint32 bounds, non-`DS1R` game;
-   - `FOG_STAGING_UNSAFE` when the staging directory contains
-     `DarkSoulsRemastered.exe`;
-   - `FOG_DATA_MISSING` for each required data-root path;
-   - the error classifier maps every message prefix in the
-     `FOGHOST_INTEGRATION.md` table;
-   - atomic response write;
+   - every `FOG_REQUEST_INVALID` branch (unknown or missing keys, uint32
+     bounds, non-`DS1R`);
+   - `FOG_STAGING_UNSAFE`;
+   - `FOG_DATA_MISSING` for each required path;
+   - the error classifier for each message prefix;
+   - the atomic response write;
    - progress lines are valid JSON;
-   - the response round-trips through the backend `parseResponse`
-     (`fogHostProcess.ts:101`), for example with a Node test that spawns
-     the built host with an invalid request.
-2. **Stock parity (pristine staging, empty `compatibility`):** `write` output
-   matches upstream FogMod behavior for the same seed and options. No
-   `.bak` files are left. Nothing is written outside staging or `logPath`.
-3. **`dryRun`:** the staging tree is byte-identical before and after, and
-   `files` is empty.
-4. **Determinism:** two separate host processes with the same request and
-   identical staging produce byte-identical responses and file hashes. Seeds
-   `0`, `0x7FFFFFFF`, `0x80000000` and `0xFFFFFFFF`, with `scale` on and off.
+   - the response is accepted by the backend `parseResponse`
+     (`fogHostProcess.ts:101`), via a Node test that spawns the built host.
+2. **Stock parity (pristine staging, empty `compatibility`):**
+   - no `.bak` left;
+   - nothing written outside staging or `logPath`.
+3. **`dryRun`:** staging is byte-identical before and after, and `files` is
+   empty.
+4. **Determinism:** two separate processes give identical responses and
+   hashes for seeds `0`, `0x7FFFFFFF`, `0x80000000` and `0xFFFFFFFF`, with
+   `scale` both on and off.
 5. **Combined staging (bridge):**
    - preserved NpcParam rows survive;
-   - the merge appends custom events and event-0 inits;
-   - invariants 1–4 pass (as amended by §9);
-   - a manufactured conflict yields `FOG_MERGE_CONFLICT`;
-   - a key item moved into a shop yields `FOG_UPSTREAM_INCOMPATIBLE`;
-   - a real both-sides event (§9, `11810310`) is observed.
-6. **Backend integration:** after the host builds, the
-   `getFogPrerequisites` default in
-   `apps/backend/src/core/generationPipeline.ts:60` still returns `null`.
-   Wiring a real provider (executable, verified data root, `readSet` from
-   `fogReadSet`) is a separate step and must be in the task's scope
-   explicitly.
+   - custom events and event-0 inits are merged;
+   - the invariants hold (as amended in §9);
+   - a manufactured conflict gives `FOG_MERGE_CONFLICT`;
+   - a key item moved into a shop gives `FOG_UPSTREAM_INCOMPATIBLE`;
+   - the `11810310` measurement from §9.
+6. **Backend wiring** (a separate, explicitly scoped step): a real
+   `getFogPrerequisites` provider in
+   `apps/backend/src/core/generationPipeline.ts:60`, supplying the
+   executable, the verified data root and `readSet` from `fogReadSet`.
 
 ## 11. Build commands
 
-The .NET 8 SDK lives outside the repo at `C:\Users\Adam\dn8sdk`
-(`DECISIONS.md`, "build with a local SDK outside the repo path"). The
-machine-wide `C:\Program Files\dotnet` has runtimes only.
+The .NET 8 SDK is outside the repo at `C:\Users\Adam\dn8sdk`
+(`DECISIONS.md`). `C:\Program Files\dotnet` has runtimes only
+(`Microsoft.NETCore.App 8.0.28`).
 
 ```sh
-~/dn8sdk/dotnet restore tools/fog-host/FogHost.csproj
-~/dn8sdk/dotnet build   tools/fog-host/FogHost.csproj -c Release
-~/dn8sdk/dotnet test    tools/fog-host.tests -c Release   # if xUnit is used
+~/dn8sdk/dotnet build tools/fog-host/FogHost.csproj -c Release   # restores NuGet
+~/dn8sdk/dotnet test  tools/fog-host.tests -c Release            # if xUnit
 ```
 
-Output: `tools/fog-host/bin/Release/net8.0/FogHost.exe` (framework-dependent;
-the machine has `Microsoft.NETCore.App 8.0.28`). Do not run
-`dotnet build` from the repo root. There is no `.sln` there, and the
-`DsrDataTool` build is separate.
+The output is `tools/fog-host/bin/Release/net8.0/FogHost.exe`
+(framework-dependent). NuGet restore needs network access the first time.
 
-## 12. Build probe result
+## 12. Build probe results (2026-09-28, outside the repository)
 
-Pending. A throwaway probe outside the repo was run in the same session. Its
-result is recorded below when available.
+| Probe | Result |
+|---|---|
+| `28711c3` + SoulsIds `e31a6fd` + JuicerMV 0.1.3, net8.0 | Builds, with only CS0612/NU1903 warnings. **Runtime:** `KeyNotFoundException 'o2920_0000'` in `Graph.Construct`. With `FullName` patched to `Name ?? ID`, every one of 10 seeds fails in `GraphConnector` (§0). |
+| `6e6dc78`, unported, + the same deps | 17 compile errors, all in `GameDataWriter.cs`, all covered by the §5 port table. |
+| `6e6dc78` + §5 port + the same deps, net8.0 | Builds. |
+| `dryrun`, options `world boss warp scale lords` | Seeds 0, 1, 42, 2147483647, 2147483648, 4294967295 and 3141592653 all solve, and staging is byte-identical afterwards. |
+| `write`, seed 3141592653 | 55 files (18 event, 18 MSB, 1 GameParam, 1 msg, 17 talk) plus 55 `.bak`, in about 1.7 s. |
+| Determinism | Two separate processes produce byte-identical output hashes; seed 7 produces different output. |
+
+**Probe limitation:** the staging input was FogMod's own `dist/DS1R` files,
+not a pristine game tree, and key items came out as not randomized
+(vanilla lots). This proves the build, the runtime and determinism, not
+game-data correctness. Test-plan items 2–5 need real pristine and combined
+data.
+
+Probe driver: an SDK-style console with
+`<Compile Include>` pointing at the vendored sources and a `Main` that
+performs §6 steps 2–7 through `Randomizer.Randomize`. It is recreatable from
+this section; it is not committed.
 
 ## 13. Blockers and user decisions
 
 1. **Plan task missing.** No numbered task in `docs/AI_EXECUTION_PLAN.md`
-   builds FogHost, and Task 17 (Codex) is marked `ACTIVE` in the working
-   tree. The user must insert a FogHost task (proposed text below) and
-   decide whether Task 17 waits for it.
-2. **Scaling rule (§9)**: approve the recommended v1 rule or require a real
-   composition patch. Either way, `DECISIONS.md` and invariants 1 and 3 in
-   `FOGHOST_INTEGRATION.md` change.
-3. **FogMod data-root distribution (§4)**: bundle, user-provision, or
+   builds FogHost, and Task 17 (Codex) is `ACTIVE` in the working tree. The
+   user must insert a FogHost task (proposed text below) and decide whether
+   Task 17 waits.
+2. **FogMod re-pin to `6e6dc78`** (§0): forced by evidence. Record it in
+   `DECISIONS.md` when implementing.
+3. **Scaling rule (§9):** approve the v1 rule or require a composition
+   patch.
+4. **FogMod data-root distribution (§4):** bundle, user-provision, or
    fetch-and-verify.
-4. **SoulsFormats revision (§3)**: prefer one with GPL text in the tree.
-5. **Public GPL fork**: unchanged, required before any binary distribution.
-6. **Boss randomization + Fog**: unproven until the §9 conflict set is
+5. **Public GPL fork:** unchanged; required before any binary distribution.
+6. **Boss randomization + Fog:** unproven until the §9 conflict set is
    measured.
 
 ### Proposed plan entry (for the user to place)
@@ -424,9 +472,11 @@ result is recorded below when available.
 State: PENDING
 ## Build FogHost (C# host around pinned FogMod)
 Implement tools/fog-host per docs/FOGHOST_IMPLEMENTATION_CHECKLIST.md
-§§2–8: vendor FogMod 28711c3 engine sources, SoulsIds e31a6fd and the chosen
-SoulsFormats; the schema-v2 JSON boundary; the GameDataWriter.cs patch set
-with the approved scaling rule; .bak cleanup, invariants, output hashing.
+§§1–8: vendor FogMod 6e6dc78 engine sources (with the §5 API port) and
+SoulsIds e31a6fd, NuGet JuicerMV.SoulsFormats 0.1.3; the schema-v2 JSON
+boundary; the GameDataWriter.cs patch set with the approved scaling rule;
+.bak cleanup, invariants, output hashing. Record the FogMod re-pin in
+DECISIONS.md.
 Do NOT: commit FogMod dist data unless the user decided to bundle it; wire
 getFogPrerequisites; touch the live game; change the backend contract.
 Verification: checklist §10 items 1–5.

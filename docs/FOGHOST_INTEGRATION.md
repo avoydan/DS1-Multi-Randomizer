@@ -9,6 +9,12 @@ and the vendored `DsrDataTool` (`engines/combined/vendor/tools/DsrDataTool/Progr
 
 ## Audited source
 
+> **Superseded pin (2026-09-28):** FogMod `28711c3` cannot generate DS1R
+> (its DS3 update broke entrance keying and the DS1 connector loop; verified
+> at runtime). The host must use `6e6dc78`, whose `dist/DS1R` and
+> `GameDataWriter.cs` logic and line numbers match the audit below. See
+> `docs/FOGHOST_IMPLEMENTATION_CHECKLIST.md` §0 and §12.
+
 - FogMod: `https://github.com/thefifthmatt/FogMod`, commit
   `28711c3f8b1f7f8c1f329ef9a7f4d9c1e55ce526` ("DS3 update", current `master`
   at audit time). The DS1R path is still present and separate from the DS3
@@ -227,7 +233,8 @@ bridge (Task 11)".
   | `requireLordSouls` | `lords` |
   | `pacifistMode` | `pacifist` |
 
-  `v5` stays enabled (the `RandomizerOptions` default). Debug/diagnostic
+  `v4` stays enabled (the `RandomizerOptions` default at `6e6dc78`;
+  `28711c3` used `v5`). Debug/diagnostic
   flags (`dryrun`, `bonedryrun`, `dumpgraph`, `explain`, `debuglots`,
   `msbinfo`, `dumpcols`, …) are never settable through `options`; `dryrun`
   is set only via `mode`.

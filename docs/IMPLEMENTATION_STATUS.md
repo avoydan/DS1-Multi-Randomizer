@@ -8,7 +8,12 @@ handoff is `docs/FOGHOST_IMPLEMENTATION_CHECKLIST.md`. It covers:
 - the project layout, build commands and test plan;
 - the `GameDataWriter.cs` patch points.
 
-Source reading closed two open design items. FogMod never removes enemy
+A throwaway build probe (outside the repo) showed that the audited FogMod
+pin `28711c3` cannot generate DS1R (upstream DS3 regression). FogMod
+`6e6dc78` + SoulsIds `e31a6fd` + NuGet `JuicerMV.SoulsFormats` 0.1.3, with a
+six-rule API port of `GameDataWriter.cs`, builds on net8.0 and runs a
+deterministic DS1R dry run and write. Source reading closed two open design
+items. FogMod never removes enemy
 parts. FogMod `scale` skips non-vanilla NpcParam rows and re-points
 `NPCParamID` to clone rows, so the Task 11 "composed scaling" rule and
 invariants 1 and 3 need a user decision before the host is built. No plan
