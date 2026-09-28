@@ -679,7 +679,7 @@ Do not implement broad UI work.
 
 Completion record:
 
-- Commit: COMMIT_PLACEHOLDER
+- Commit: `819d974d0acbf23237b23bccd53f2b5f991872f1`
   (`docs: design FogHost integration and combined/Fog overlap`). Docs only;
   no application code changed and no version bump.
 - Verification (2026-09-28): source audit only. FogMod at
