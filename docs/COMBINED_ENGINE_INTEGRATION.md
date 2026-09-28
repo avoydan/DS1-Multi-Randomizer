@@ -445,7 +445,7 @@ construction, not by a runtime check.
 `gameDirectory`, and this is now enforced twice: once by upstream's own
 runtime check, and once ahead of that, in pure, unit-tested TypeScript that
 never touches the filesystem. Live-game modification only happens later,
-in the backend's own activation stage (task 8), which is intentionally a
+in the backend's own activation stage (Task 13 of `docs/AI_EXECUTION_PLAN.md`), which is intentionally a
 separate, later step outside `generate()`.
 
 This task does **not** prove that a full generation run succeeds end to
@@ -1058,6 +1058,27 @@ Live install passed as a guard directory, reconstructed copy as `--game`.
 | S2 — same stale workspace, `forceCatalogRescan` | Recovers in place; resulting package identical to A's (no stale leftovers — the partial MSB was overwritten). |
 | F — public `CombinedRandomizerAdapter.generate()` | Succeeds, returns the package directory inside the workspace. |
 | Guards | Reconstructed copy and live install both identical before/after (full SHA-256 + directory set). No stray files in the repository. |
+
+The S1/S2 stale workspace came from a separate read-only rerun of the same
+request against the live install (identical failure). That rerun was not
+inside a hash snapshot; it is covered instead by an mtime sweep
+(`find "<live install>" -newermt 2026-09-28`) that returned nothing — no file
+or directory in the live install was created or written on the day of the
+runs (the newest writes are the legacy tools' from 2026-09-26).
+
+### Reproducing
+
+```bash
+LIVE="<DSR install>"; R="$TEMP/ds1tr-e2e-reconstructed-game"
+# 1. Failed run against the live install; keep workspace A as the stale workspace.
+DS1TR_E2E_KEEP=1 node apps/backend/scripts/combinedEngineE2eProof.mjs "$LIVE"
+# 2. Reconstructed copy of the tool's read set, legacy backups restored.
+mkdir -p "$R/map" && cp "$LIVE/DarkSoulsRemastered.exe" "$R/"   && cp -r "$LIVE"/{param,paramdef,msg,event,script,sfx} "$R/"   && cp -r "$LIVE/map/MapStudio" "$R/map/"
+find "$R" -name '*.bak' | while read -r b; do mv -f "$b" "${b%.bak}"; done
+# 3. The proof run.
+DS1TR_E2E_GUARD_PATHS="$LIVE" DS1TR_E2E_STALE_WORKSPACE="<kept workspace A>"   node apps/backend/scripts/combinedEngineE2eProof.mjs "$R"
+# Delete $R and any kept workspaces afterwards (game-derived data).
+```
 
 ### Findings for later tasks (recorded, not fixed here)
 
