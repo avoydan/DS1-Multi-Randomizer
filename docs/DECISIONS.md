@@ -302,3 +302,50 @@ Why not the alternatives:
 
 Consequence: boss randomization together with Fog stays unproven until the
 host exists and the both-sides conflict set (e.g. `11810310`) is measured.
+
+## One backend-owned activation/restore authority with a hash-verified pristine snapshot and a pre-write journal
+
+Date: 2026-09-28
+
+`apps/backend/src/core/gameState.ts` (`GameStateAuthority`) is the only code
+that writes into a live DSR installation. Its state lives in a backend
+directory outside the game (`DS1TR_STATE_DIR`, default
+`%LOCALAPPDATA%\ds1-triple-randomizer\state\installs\<path hash>`):
+
+- **Pristine snapshot.** `importPristine` copies `DarkSoulsRemastered.exe`
+  and every file under the managed roots (`event`, `map/MapStudio`, `msg`,
+  `param/GameParam`, `script`, `sfx`) into `pristine/`, hash-verifying each
+  copy. `snapshot.json` is written last and commits the snapshot. Import is
+  refused when the managed roots contain `*.bak` or our temp files (legacy
+  randomizer chains). The snapshot directory is the pipeline's only trusted
+  pristine source (`getPristineSource`, wired in `server.ts`). It is
+  re-verified before every use.
+- **Package binding.** The run manifest records `pristineSnapshotId` and an
+  explicit `gameTreeRoot` (`mod` for combined-only packages, `''` for the
+  Fog game tree). Activation is driven only by `run-manifest.json` `files`,
+  never by a directory walk. It refuses packages from another snapshot. It
+  also refuses any file that fails its hash, lies outside the snapshot, or is
+  a `.bak`/temp file. Combined packages must agree exactly with
+  `patch-manifest.json` (outputs and snapshot `sourceSha256`). Every check
+  runs before the first write.
+- **State detection** (`invalid`, `no-snapshot`, `version-changed`,
+  `vanilla`, `active`, `interrupted`, `modified`) hashes the snapshot file
+  set against the game and the journal. Mutations re-detect under a PID lock
+  file and refuse unless the state allows them. Activation requires
+  `vanilla`. Restore accepts `active`/`interrupted`, is a no-op on `vanilla`,
+  and refuses `version-changed` (stale snapshot). It refuses `modified`
+  unless `overwriteUnrecordedChanges` is set. That override also removes
+  unrecorded files in managed roots. Both refuse while the game is running.
+- **Crash safety.** An `activation.json` journal (`activating` -> `active`)
+  is written atomically before the first game write. Each file is copied to
+  `<target>.ds1tr-tmp`, verified, then renamed over the target. A failed
+  activation rolls back from the snapshot. If rollback also fails, the
+  journal stays and the state reads `interrupted` until restore.
+
+Why not reuse DsrDataTool `install`/`restore` or FogMod `.bak`: they are
+independent backup authorities (`AGENTS.md` backup policy).
+
+Limit: without reference vanilla hashes, a snapshot proves only that no
+known legacy artifacts were present, not that the data is vanilla
+(`provenance.referenceHashesVerified: false`). The verifier is injectable
+(`verifyReferenceHashes`); no reference hash set exists yet.

@@ -5,9 +5,15 @@ import { validateInstallation } from './core/installation.js';
 import { createPipelinePlan } from './core/pipeline.js';
 import { generateRun, type GenerationRequest } from './core/generationPipeline.js';
 import { InvalidConfigurationError, validateRandomizerConfig } from './core/configValidation.js';
+import { GameStateAuthority, defaultStateRoot } from './core/gameState.js';
 
 const HOST = process.env.DS1TR_HOST ?? '127.0.0.1';
 const PORT = Number(process.env.DS1TR_PORT ?? 43177);
+// The single backup/restore authority is also the only trusted pristine source.
+const authority = new GameStateAuthority({ stateRoot: defaultStateRoot() });
+const generationDependencies = {
+  getPristineSource: (gamePath: string) => authority.getPristineSource(gamePath),
+};
 
 function send(res: http.ServerResponse, status: number, body: unknown): void {
   res.writeHead(status, {
@@ -59,7 +65,7 @@ const server = http.createServer(async (req, res) => {
         try {
           result = await generateRun(request, (event) => {
             res.write(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`);
-          });
+          }, generationDependencies);
         } catch (error) {
           result = { ok: false, code: 'PIPELINE_FAILED',
             message: error instanceof Error ? error.message : String(error) };
@@ -67,7 +73,7 @@ const server = http.createServer(async (req, res) => {
         res.write(`event: result\ndata: ${JSON.stringify(result)}\n\n`);
         return res.end();
       }
-      const result = await generateRun(request);
+      const result = await generateRun(request, undefined, generationDependencies);
       return send(res, result.ok ? 200 : 409, result);
     }
 

@@ -87,10 +87,12 @@ test('writes a validated combined package, manifest and progress', async () => f
   const events = [];
   const result = await generateRun({ config: config(game), workspacePath: workspace },
     (event) => events.push(event), {
-      getPristineSource: async () => ({ directory: pristine }), combined: combinedStub(),
+      getPristineSource: async () => ({ directory: pristine, snapshotId: 'snapshot-1' }), combined: combinedStub(),
     });
   assert.equal(result.ok, true);
   assert.equal(result.manifest.engines.combined, 'test-engine');
+  assert.equal(result.manifest.pristineSnapshotId, 'snapshot-1');
+  assert.equal(result.manifest.gameTreeRoot, 'mod');
   assert.equal(result.manifest.attempts[0].result, 'success');
   assert.equal(result.manifest.files.some((file) => file.path === 'mod/items.bin'), true);
   assert.equal(JSON.parse(await readFile(result.manifestPath, 'utf8')).masterSeed, 'pipeline-test');
@@ -125,6 +127,7 @@ test('retries a Fog seed and retains combined files outside the Fog read set', a
   assert.equal(calls, 2);
   assert.equal(result.manifest.attempts[0].result, 'FOG_SEED_UNSOLVABLE');
   assert.equal(result.manifest.attempts[1].result, 'success');
+  assert.equal(result.manifest.gameTreeRoot, '');
   assert.equal(await readFile(path.join(result.packagePath, 'items.bin'), 'utf8'), 'combined');
   assert.equal(await readFile(path.join(result.packagePath, 'param/GameParam/GameParam.parambnd.dcx'), 'utf8'), 'fogged');
 }));

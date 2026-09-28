@@ -1,5 +1,24 @@
 # Implementation status
 
+Task 13 adds the single activation/restore authority in
+`apps/backend/src/core/gameState.ts` (see `docs/DECISIONS.md`, "One
+backend-owned activation/restore authority"). It covers the following:
+
+- a hash-verified pristine snapshot import that refuses legacy `.bak` chains;
+- state detection;
+- journaled, atomic, verified activation of a generated package;
+- automatic rollback;
+- vanilla restore.
+
+Destructive operations refuse unknown, stale or running-game states. The
+snapshot is now the pipeline's trusted pristine source: `server.ts` injects
+`getPristineSource`. The run manifest records `pristineSnapshotId` and
+`gameTreeRoot`. No HTTP/IPC endpoints for import/activate/restore exist yet;
+that wiring is Task 14. Reference vanilla hashes do not exist, so provenance
+is "no legacy artifacts", not "proven vanilla". Backend `npm test` passed
+102/102, including 15 focused authority tests (2026-09-28). `@ds1tr/backend`
+is 0.14.0.
+
 Task 12 wires the backend generation sequence in
 `apps/backend/src/core/generationPipeline.ts`: DSR verification, a verified
 pristine-source gate, combined generation in an isolated workspace, output

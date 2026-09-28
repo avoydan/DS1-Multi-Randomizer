@@ -23,6 +23,10 @@ export interface GenerationManifest {
   appVersion: string;
   game: 'DSR';
   masterSeed: string;
+  /** Snapshot the package was generated from; activation refuses any other. */
+  pristineSnapshotId: string | null;
+  /** Package-relative directory mirroring the game root ('' = package root). */
+  gameTreeRoot: string;
   options: Omit<RandomizerConfig, 'gamePath' | 'masterSeed'>;
   attempts: Array<{ combinedAttempt: number; fogAttempt: number; combinedSeed: string; fogSeed: number; result: string }>;
   engines: { combined?: string; fog?: string };
@@ -34,7 +38,7 @@ export type GenerationResult =
   | { ok: true; packagePath: string; manifestPath: string; manifest: GenerationManifest }
   | { ok: false; code: string; message: string; stage: string; manifest: GenerationManifest };
 
-export interface PristineSource { directory: string }
+export interface PristineSource { directory: string; snapshotId?: string }
 export interface FogPrerequisites {
   executablePath: string;
   dataRoot: string;
@@ -94,7 +98,8 @@ export async function generateRun(
   const workspace = typeof request.workspacePath === 'string' && request.workspacePath
     ? path.resolve(request.workspacePath) : '';
   const manifest: GenerationManifest = {
-    schemaVersion: 1, appVersion: '0.13.0', game: 'DSR', masterSeed: config.masterSeed,
+    schemaVersion: 1, appVersion: '0.14.0', game: 'DSR', masterSeed: config.masterSeed,
+    pristineSnapshotId: null, gameTreeRoot: '',
     options: { items: config.items, enemies: config.enemies, fog: config.fog, output: config.output },
     attempts: [], engines: {}, validation: [], files: [],
   };
@@ -121,6 +126,7 @@ export async function generateRun(
   }
   const cleanInstallation = await validateInstallation(pristine.directory);
   if (!cleanInstallation.valid) return fail('import', 'PRISTINE_SOURCE_INVALID', cleanInstallation.problems.join(' '));
+  manifest.pristineSnapshotId = pristine.snapshotId ?? null;
   progress('import', 0.1, 'Verified pristine source available.');
 
   const fogReady = config.fog.enabled ? await services.getFogPrerequisites() : null;
@@ -183,6 +189,8 @@ export async function generateRun(
 
     if (!config.fog.enabled) {
       manifest.attempts.push({ combinedAttempt, fogAttempt: 0, combinedSeed: seeds.combined, fogSeed: seeds.fog, result: 'success' });
+      // Combined-only packages mirror the game root under mod/.
+      manifest.gameTreeRoot = combined?.ok ? 'mod' : '';
       return finish(packagePath, manifest, progress, fail);
     }
     let retryCombined = false;
