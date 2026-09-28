@@ -1,5 +1,24 @@
 # Implementation status
 
+Task 12 wires the backend generation sequence in
+`apps/backend/src/core/generationPipeline.ts`: DSR verification, a verified
+pristine-source gate, combined generation in an isolated workspace, output
+hash checks, Fog staging and bounded deterministic retries, final output
+checks, a package manifest, and typed progress/log events. `/api/randomize`
+accepts the generation request and can stream events with
+`Accept: text/event-stream`. It never activates files into the game.
+
+The default pristine-source and Fog-prerequisite providers intentionally
+return typed `PRISTINE_IMPORT_REQUIRED` and `FOG_PREREQUISITES_MISSING`
+failures. No backend pristine authority or built FogHost/data root exists yet;
+supplying an arbitrary path is not proof of clean game data. The pipeline can
+be exercised with trusted injected providers, but production generation
+requires the two separately recorded prerequisite tasks in
+`docs/AI_EXECUTION_PLAN.md`. Combined package checks currently cover the
+shared patched files described by the bridge; Fog output checks cover files
+declared in the host response. Focused pipeline tests and backend build and
+typecheck passed (2026-09-28). `@ds1tr/backend` is 0.13.0.
+
 Task 11 defined and implemented the backend side of the Combined -> Fog
 compatibility bridge:
 

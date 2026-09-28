@@ -3,7 +3,8 @@ import { URL } from 'node:url';
 import type { RandomizerConfig } from '@ds1tr/contracts';
 import { validateInstallation } from './core/installation.js';
 import { createPipelinePlan } from './core/pipeline.js';
-import { InvalidConfigurationError } from './core/configValidation.js';
+import { generateRun, type GenerationRequest } from './core/generationPipeline.js';
+import { InvalidConfigurationError, validateRandomizerConfig } from './core/configValidation.js';
 
 const HOST = process.env.DS1TR_HOST ?? '127.0.0.1';
 const PORT = Number(process.env.DS1TR_PORT ?? 43177);
@@ -46,11 +47,28 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === 'POST' && url.pathname === '/api/randomize') {
-      return send(res, 501, {
-        ok: false,
-        code: 'ENGINES_NOT_WIRED',
-        message: 'Pipeline shell is ready. Upstream randomizer adapters are the next implementation step.',
-      });
+      const request = await readJson<GenerationRequest>(req);
+      validateRandomizerConfig(request.config);
+      if (req.headers.accept?.includes('text/event-stream')) {
+        res.writeHead(200, {
+          'Content-Type': 'text/event-stream; charset=utf-8',
+          'Cache-Control': 'no-cache',
+          'Access-Control-Allow-Origin': '*',
+        });
+        let result;
+        try {
+          result = await generateRun(request, (event) => {
+            res.write(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`);
+          });
+        } catch (error) {
+          result = { ok: false, code: 'PIPELINE_FAILED',
+            message: error instanceof Error ? error.message : String(error) };
+        }
+        res.write(`event: result\ndata: ${JSON.stringify(result)}\n\n`);
+        return res.end();
+      }
+      const result = await generateRun(request);
+      return send(res, result.ok ? 200 : 409, result);
     }
 
     return send(res, 404, { error: 'Not found' });

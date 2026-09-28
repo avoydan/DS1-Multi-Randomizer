@@ -772,7 +772,7 @@ Completion record:
 
 # TASK 12 — CODEX
 
-State: PENDING
+State: DONE
 
 ## Full backend pipeline wiring
 
@@ -793,12 +793,27 @@ existing contracts.
 
 Add focused pipeline tests.
 
+Task 12 is limited to wiring existing backend contracts with explicit typed
+failures where required infrastructure is absent. The following are separate
+prerequisite tasks for production generation, not part of Task 12:
+
+- **Pristine import/restore authority:** implement and verify a backend-owned
+  clean-data import, provenance check and restore source. Connect its trusted
+  source provider to the pipeline. An arbitrary caller path must not count as
+  pristine proof.
+- **FogHost and data-root build:** vendor/build the pinned C# host and resolve
+  its required FogMod data-root distribution/provisioning. Connect the host
+  executable, verified data root and read set to the pipeline.
+
 Completion record:
 
-- Commit:
-- Verification:
-- Result:
-- Blockers:
+- Commit: pending current task commit.
+- Verification: 4 focused pipeline tests, backend build and typecheck passed (2026-09-28).
+- Result: Backend sequence, progress/status events, deterministic retries,
+  validation and run manifest are wired. The default execution returns typed
+  prerequisite failures before engine calls; no activation is performed.
+- Blockers: Production generation awaits the two separate prerequisite tasks
+  above. The FogHost-side implementation and pristine authority remain absent.
 
 ---
 
