@@ -552,7 +552,7 @@ Completion record:
 
 # TASK 7 — CODEX
 
-State: PENDING
+State: DONE
 
 ## Combined engine runnable adapter
 
@@ -573,10 +573,16 @@ Add focused adapter tests.
 
 Completion record:
 
-- Commit:
-- Verification:
-- Result:
-- Blockers:
+- Commit: `57d2f846ca362b91673ffcaf3ae025802e5efb64`
+  (`feat(backend): connect combined adapter to generation bridge`);
+  documentation committed separately.
+- Verification (2026-09-28): 2 focused adapter tests passed; backend build and
+  typecheck passed. No game installation was accessed.
+- Result: `CombinedRandomizerAdapter.generate()` delegates to the proven
+  workspace-only bridge, forwards typed progress/log events and the derived
+  combined seed, returns the generated package directory, and preserves
+  typed failure details including retryability. Backend version is `0.10.0`.
+- Blockers: None for Task 7. Real DsrDataTool execution remains Task 8.
 
 ---
 

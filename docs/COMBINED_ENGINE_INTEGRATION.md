@@ -991,7 +991,7 @@ installation was involved.
 
 ### Still open
 
-- `CombinedRandomizerAdapter.generate()` still returns `NOT_IMPLEMENTED`
-  (Blocker 4 — Task 7).
+- `CombinedRandomizerAdapter.generate()` now delegates to the bridge
+  (Blocker 4 resolved by Task 7); the application pipeline does not yet call it.
 - `DsrDataTool` has never run against a real installation (Task 8).
 - No public GPL fork (external action, `docs/LICENSING.md`).

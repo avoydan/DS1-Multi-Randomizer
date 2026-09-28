@@ -1,5 +1,15 @@
 # Implementation status
 
+Task 7 connected `CombinedRandomizerAdapter.generate()` to the existing
+workspace-only execution bridge. It forwards the typed request and
+progress/log events, returns the generated seed package directory on success,
+and preserves typed bridge failures including retryability. Two focused
+adapter tests passed; backend build and typecheck passed (2026-09-28).
+`@ds1tr/backend` is `0.10.0`. Implementation commit:
+`57d2f846ca362b91673ffcaf3ae025802e5efb64`. The adapter has not yet
+run `DsrDataTool` against a real DSR installation (Task 8); generation is
+not connected to activation.
+
 Task 6 resolved the remaining combined-engine blockers that had to be fixed
 before a real generation run can be attempted: the combined seed is now a
 32-hex-character SHA-256 derivation of the master seed that always satisfies
@@ -13,8 +23,8 @@ Backend tests 66/66 pass and the full workspace typecheck is clean
 `e2664164d1aa1131952e1ddb1a19a87d960198af`. The user confirmed the seed
 derivation (option A); `ARCHITECTURE.md`, `source-analysis.md`, and
 `CODEX_PROGRESS.md` now mark the earlier pass-through direction superseded.
-Still open: adapter wiring
-(Task 7), a real `DsrDataTool` run (Task 8), the public GPL fork.
+Task 7 completed adapter wiring. Still open: a real `DsrDataTool` run
+(Task 8), the public GPL fork.
 
 Task 5 extended the focused combined bridge tests (commit
 `abeb4c2f56ade130a39e4d42837bf333d586e3e0`); no production code changed.
@@ -23,10 +33,10 @@ Task 5 extended the focused combined bridge tests (commit
 
 - The minimal `CombinedRandomizerAdapter` boundary is defined for combined item
   and enemy generation requests, progress/log events, and typed results.
-- The adapter is currently a side-effect-free placeholder that returns
-  `NOT_IMPLEMENTED`.
-- The adapter is not connected to the generation pipeline and does not execute
-  an external randomizer or access game/workspace files.
+- The adapter delegates generation to the workspace-only execution bridge and
+  maps its package directory and typed failures to the public adapter result.
+- The adapter is not yet invoked by the application pipeline. When called, it
+  delegates workspace generation to the bridge; activation remains separate.
 - A pure, deterministic mapping layer converts combined requests to the
   upstream item/enemy configuration shape, applies parent `enabled` flags, and
   rejects requests with no enabled randomization category. Task 3 verified
@@ -126,10 +136,8 @@ Task 5 extended the focused combined bridge tests (commit
   `vendor/tools/DsrDataTool/bin/Release/net8.0/DsrDataTool.dll`, with a test
   asserting the combined engine reports `source` mode. The bridge itself
   never consults `ExternalAdapter`.
-- Still not done: `CombinedRandomizerAdapter.generate()` remains
-  `NOT_IMPLEMENTED` — connecting it to the bridge is a separate task — and
-  the bridge has never executed the real `DsrDataTool` against a real Dark
-  Souls installation, so a genuine `scan`/`patch-enemies` round trip is
+- Still not done: the bridge has never executed the real `DsrDataTool` against
+  a real Dark Souls installation, so a genuine `scan`/`patch-enemies` round trip is
   unproven. Blockers 2, 3, and 6 were resolved by Task 6 (see
   `docs/COMBINED_ENGINE_INTEGRATION.md`, "Blocker resolution"); the public
   GPL fork remains open.
