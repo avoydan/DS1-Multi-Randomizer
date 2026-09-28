@@ -19,6 +19,7 @@ export interface UpstreamCombinedRandomizerConfig {
   randomizeEnemies: boolean;
   randomizeBosses: boolean;
   enemyScaling: EnemyScaling;
+  generateSpoilerLog: boolean;
 }
 
 export type CombinedRandomizerConfigMappingResult =
@@ -46,6 +47,7 @@ export function mapCombinedRandomizerConfig(
     randomizeEnemies: request.enemies.enabled && request.enemies.randomizeRegularEnemies,
     randomizeBosses: request.enemies.enabled && request.enemies.randomizeBosses,
     enemyScaling: request.enemies.scaling,
+    generateSpoilerLog: request.generateSpoilerLog,
   };
 
   const hasEnabledCategory = config.randomizeItems

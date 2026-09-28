@@ -7,6 +7,8 @@ export interface CombinedRandomizerRequest {
   combinedSeed: string;
   items: ItemOptions;
   enemies: EnemyOptions;
+  /** Whether upstream writes `spoiler.txt` into the generated package. */
+  generateSpoilerLog: boolean;
 }
 
 export type CombinedRandomizerEvent =

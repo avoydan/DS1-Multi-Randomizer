@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -10,6 +11,7 @@ import {
   executeCombinedGeneration,
   supportedCatalogSchemaVersion,
 } from '../../dist/adapters/combinedRandomizerBridge.js';
+import { verifyCatalogSources } from '../../dist/adapters/combinedRandomizerCatalog.js';
 import { createPipelinePlan } from '../../dist/core/pipeline.js';
 
 /**
@@ -46,6 +48,22 @@ function enemySlot(index, modelName, paramId) {
   };
 }
 
+/** Contents of the fixture game directory `makeWorkspace` creates. */
+const fixtureGameFiles = {
+  'DarkSoulsRemastered.exe': 'fixture-executable',
+  'map/MapStudio/m10_01_00_00.msb': 'fixture-map',
+};
+
+/** `sourceFiles` exactly as `DsrDataTool scan` would record the fixture game. */
+function fixtureSourceFiles() {
+  return Object.entries(fixtureGameFiles).map(([relativePath, contents]) => ({
+    path: relativePath,
+    size: Buffer.byteLength(contents, 'utf8'),
+    lastWriteTimeUtc: '2026-01-01T00:00:00Z',
+    sha256: createHash('sha256').update(contents, 'utf8').digest('hex'),
+  }));
+}
+
 /**
  * The minimum catalog shape that makes upstream report
  * `dataStatus: "extracted"`: schema 17 plus non-empty `enemySlots` and
@@ -55,6 +73,7 @@ function enemySlot(index, modelName, paramId) {
 function extractedCatalog() {
   return {
     schemaVersion: supportedCatalogSchemaVersion,
+    sourceFiles: fixtureSourceFiles(),
     maps: [{ id: 'm10_01_00_00', name: 'Undead Burg' }],
     enemySlots: [
       enemySlot(0, 'c2240', 224000),
@@ -94,6 +113,7 @@ function request(overrides = {}) {
       randomizeBosses: true,
       scaling: 'area',
     },
+    generateSpoilerLog: false,
     ...overrides,
   };
 }
@@ -131,9 +151,10 @@ async function makeWorkspace(t, { catalog = extractedCatalog() } = {}) {
   const workspacePath = path.join(root, 'workspace');
   const gamePath = path.join(root, 'game');
   await mkdir(workspacePath, { recursive: true });
-  await mkdir(path.join(gamePath, 'map', 'MapStudio'), { recursive: true });
-  await writeFile(path.join(gamePath, 'DarkSoulsRemastered.exe'), 'fixture-executable', 'utf8');
-  await writeFile(path.join(gamePath, 'map', 'MapStudio', 'm10_01_00_00.msb'), 'fixture-map', 'utf8');
+  for (const [relativePath, contents] of Object.entries(fixtureGameFiles)) {
+    await mkdir(path.dirname(path.join(gamePath, relativePath)), { recursive: true });
+    await writeFile(path.join(gamePath, relativePath), contents, 'utf8');
+  }
   if (catalog) {
     await writeFile(
       path.join(workspacePath, 'dsr-catalog.json'),
@@ -213,8 +234,8 @@ test('generates a workspace package end to end and drives only scan/patch-enemie
   assert.equal(placements.dataStatus, 'extracted');
   assert.equal(placements.placements.enemies.length, 3);
 
-  // No spoiler file: no request field carries that option (Blocker 3), so the
-  // bridge pins it off rather than inheriting upstream's `true` default.
+  // No spoiler file: the request turned it off, overriding upstream's `true`
+  // default.
   assert.equal(await exists(path.join(expectedSeedDirectory, 'spoiler.txt')), false);
 
   // Exactly one upstream command, with the arguments the planner produced.
@@ -356,7 +377,12 @@ test('is deterministic for the same request', async (t) => {
 
 test('rejects a prototype result without writing a package or spawning the tool', async (t) => {
   const { workspacePath, gamePath } = await makeWorkspace(t, {
-    catalog: { schemaVersion: supportedCatalogSchemaVersion, enemySlots: [], enemyArchetypes: [] },
+    catalog: {
+      schemaVersion: supportedCatalogSchemaVersion,
+      sourceFiles: fixtureSourceFiles(),
+      enemySlots: [],
+      enemyArchetypes: [],
+    },
   });
   const dataTool = fakeDataTool();
 
@@ -639,6 +665,123 @@ test('reports GENERATION_FAILED as retryable when upstream gives up on a seed', 
   assert.equal(result.retryable, true);
   assert.match(result.message, /safe boss permutation/u);
   assert.deepEqual(dataTool.invocations, []);
+});
+
+test('writes spoiler.txt only when requested, without changing the placements', async (t) => {
+  const results = {};
+  for (const generateSpoilerLog of [true, false]) {
+    const { workspacePath, gamePath } = await makeWorkspace(t);
+    const result = await executeCombinedGeneration(
+      request({ gamePath, workspacePath, generateSpoilerLog }),
+      () => {},
+      { ...dataToolPaths, dependencies: { dataTool: fakeDataTool() } },
+    );
+    assert.equal(result.ok, true, result.ok ? '' : `${result.code}: ${result.message}`);
+    assert.equal(await exists(path.join(result.seedDirectory, 'spoiler.txt')), generateSpoilerLog);
+    const config = JSON.parse(await readFile(path.join(result.seedDirectory, 'config.json'), 'utf8'));
+    assert.equal(config.generateSpoilerLog, generateSpoilerLog);
+    results[generateSpoilerLog] = result;
+  }
+
+  assert.equal(results.true.placementHash, results.false.placementHash);
+});
+
+test('rejects a reused catalog whose game files changed, before generating or spawning', async (t) => {
+  const { workspacePath, gamePath } = await makeWorkspace(t);
+  // Same size, different content: only the hash can tell.
+  await writeFile(path.join(gamePath, 'DarkSoulsRemastered.exe'), 'modded--executable', 'utf8');
+  await rm(path.join(gamePath, 'map', 'MapStudio', 'm10_01_00_00.msb'));
+  const dataTool = fakeDataTool();
+
+  const result = await executeCombinedGeneration(
+    request({ gamePath, workspacePath }),
+    () => {},
+    { ...dataToolPaths, dependencies: { dataTool } },
+  );
+
+  assert.equal(result.ok, false);
+  assert.equal(result.code, 'CATALOG_SOURCE_MISMATCH');
+  assert.equal(result.retryable, false);
+  assert.deepEqual(result.catalogProblems, [
+    'DarkSoulsRemastered.exe: SHA-256 does not match the catalog.',
+    'map/MapStudio/m10_01_00_00.msb: missing.',
+  ]);
+  assert.deepEqual(dataTool.invocations, [], 'no automatic rescan and no patch');
+  assert.equal(await exists(path.join(workspacePath, 'seed_fixture-seed-1')), false);
+});
+
+test('rejects a reused catalog that records no source files', async (t) => {
+  const { sourceFiles: _omitted, ...catalog } = extractedCatalog();
+  const { workspacePath, gamePath } = await makeWorkspace(t, { catalog });
+  const dataTool = fakeDataTool();
+
+  const result = await executeCombinedGeneration(
+    request({ gamePath, workspacePath }),
+    () => {},
+    { ...dataToolPaths, dependencies: { dataTool } },
+  );
+
+  assert.equal(result.ok, false);
+  assert.equal(result.code, 'CATALOG_SOURCE_MISMATCH');
+  assert.deepEqual(dataTool.invocations, []);
+});
+
+test('does not verify a catalog this run has just scanned', async (t) => {
+  const { workspacePath, gamePath } = await makeWorkspace(t, { catalog: null });
+  const catalogPath = path.join(workspacePath, 'dsr-catalog.json');
+  let verifications = 0;
+
+  const result = await executeCombinedGeneration(
+    request({ gamePath, workspacePath }),
+    () => {},
+    {
+      ...dataToolPaths,
+      dependencies: {
+        dataTool: fakeDataTool({
+          async onInvoke(command) {
+            if (command === 'scan') await writeFile(catalogPath, JSON.stringify(extractedCatalog()), 'utf8');
+          },
+        }),
+        verifyCatalogSources: async () => {
+          verifications += 1;
+          return { ok: false, problems: ['must not be called'] };
+        },
+      },
+    },
+  );
+
+  assert.equal(result.ok, true, result.ok ? '' : `${result.code}: ${result.message}`);
+  assert.equal(verifications, 0);
+});
+
+test('catalog verification refuses source paths that escape the game directory', async (t) => {
+  const { gamePath, root } = await makeWorkspace(t);
+  await writeFile(path.join(root, 'outside.txt'), 'x', 'utf8');
+  const sha256 = createHash('sha256').update('x').digest('hex');
+
+  const result = await verifyCatalogSources(gamePath, {
+    sourceFiles: [
+      { path: '../outside.txt', size: 1, sha256 },
+      { path: path.join(root, 'outside.txt'), size: 1, sha256 },
+      { path: 'DarkSoulsRemastered.exe' },
+    ],
+  });
+
+  assert.equal(result.ok, false);
+  assert.deepEqual(result.problems, [
+    '../outside.txt: path is outside the game directory.',
+    `${path.join(root, 'outside.txt')}: path is outside the game directory.`,
+    'sourceFiles[2] is malformed.',
+  ]);
+});
+
+test('catalog verification accepts an unchanged game directory', async (t) => {
+  const { gamePath } = await makeWorkspace(t);
+
+  assert.deepEqual(
+    await verifyCatalogSources(gamePath, { sourceFiles: fixtureSourceFiles() }),
+    { ok: true, verifiedFiles: 2 },
+  );
 });
 
 test('the default DsrDataTool path points at the documented vendored build output', () => {

@@ -3,6 +3,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import type { CombinedRandomizerEvent, CombinedRandomizerRequest } from './combinedRandomizerAdapter.js';
+import {
+  verifyCatalogSources as defaultVerifyCatalogSources,
+  type CatalogSourceVerificationResult,
+} from './combinedRandomizerCatalog.js';
 import { mapCombinedRandomizerConfig } from './combinedRandomizerConfig.js';
 import {
   loadCombinedRandomizerCore,
@@ -79,6 +83,7 @@ export type CombinedGenerationFailureCode =
   | 'CATALOG_UNAVAILABLE'
   | 'CATALOG_UNREADABLE'
   | 'CATALOG_STALE'
+  | 'CATALOG_SOURCE_MISMATCH'
   | 'GENERATION_FAILED'
   | 'PROTOTYPE_RESULT_REJECTED'
   | 'OUTPUT_WRITE_FAILED'
@@ -113,6 +118,8 @@ export interface CombinedGenerationFailure {
   /** True only where retrying with a different derived seed can help. */
   retryable: boolean;
   validationErrors?: string[];
+  /** Per-file reasons a reused catalog no longer matches the game directory. */
+  catalogProblems?: string[];
   missingExports?: string[];
   specifier?: string;
   command?: DsrDataToolCommand;
@@ -136,6 +143,10 @@ export interface CombinedGenerationDependencies {
   dataTool?: DsrDataToolRunner;
   fileExists?: (target: string) => Promise<boolean>;
   readTextFile?: (target: string) => Promise<string>;
+  verifyCatalogSources?: (
+    gamePath: string,
+    catalog: UpstreamGameCatalog,
+  ) => Promise<CatalogSourceVerificationResult>;
 }
 
 export interface CombinedGenerationOptions {
@@ -197,6 +208,7 @@ export async function executeCombinedGeneration(
   const dataTool = dependencies.dataTool ?? new DsrDataToolExecutor();
   const fileExists = dependencies.fileExists ?? defaultFileExists;
   const readTextFile = dependencies.readTextFile ?? defaultReadTextFile;
+  const verifyCatalogSources = dependencies.verifyCatalogSources ?? defaultVerifyCatalogSources;
   const dotnetExecutablePath = options.dotnetExecutablePath
     ?? process.env[dotnetPathEnvironmentVariable]
     ?? 'dotnet';
@@ -238,20 +250,17 @@ export async function executeCombinedGeneration(
   }
   const core = coreLoad.core;
 
-  // 3. Three keys upstream defaults would otherwise decide for us. None is
-  //    carried by `CombinedRandomizerRequest` today, so they are pinned here
-  //    rather than inherited: `generateSpoilerLog` defaults to `true`
-  //    upstream and would emit a spoiler file nobody requested (integration
-  //    Blocker 3 tracks the missing request field). `useExtractedData` and
-  //    `dryRun` match the documented data flow; neither is read anywhere in
-  //    the vendored core or in `DsrDataTool`, so both are inert today and are
-  //    set only so the recorded `config.json` states them explicitly.
-  //    `outputDirectory` is resolved so the recorded config matches the
-  //    absolute workspace the planner computes below.
+  // 3. Two keys upstream defaults would otherwise decide for us, pinned here
+  //    rather than inherited. `useExtractedData` and `dryRun` match the
+  //    documented data flow; neither is read anywhere in the vendored core or
+  //    in `DsrDataTool`, so both are inert today and are set only so the
+  //    recorded `config.json` states them explicitly. `generateSpoilerLog`
+  //    comes from the request through the mapper. `outputDirectory` is
+  //    resolved so the recorded config matches the absolute workspace the
+  //    planner computes below.
   const upstreamInput: UpstreamRandomizerConfig = {
     ...mapping.config,
     outputDirectory: path.resolve(request.workspacePath),
-    generateSpoilerLog: false,
     useExtractedData: true,
     dryRun: false,
   };
@@ -335,8 +344,8 @@ export async function executeCombinedGeneration(
 
   // 5. Catalog: extracted game data is a hard requirement, and `scan` is the
   //    only way to produce it. Reuse an existing catalog unless a rescan was
-  //    requested; staleness verification against the game snapshot remains
-  //    integration Blocker 6 and is not attempted here.
+  //    requested; a reused catalog is verified against the game directory
+  //    below, after its schema check.
   const catalogPresent = !options.forceCatalogRescan && await fileExists(plan.catalogPath);
   if (!catalogPresent) {
     progress(stageProgress.scanStarted, 'Scanning the game installation to build a data catalog.');
@@ -378,6 +387,29 @@ export async function executeCombinedGeneration(
         + `${supportedCatalogSchemaVersion}. Re-import the clean game data.`,
       retryable: false,
     };
+  }
+
+  // A reused catalog must still describe *this* game directory: every source
+  // file it recorded must exist with the same size and SHA-256 (integration
+  // Blocker 6). A mismatch is a hard failure, never an automatic rescan — a
+  // rescan of a modified installation would bake modified data into the
+  // catalog. A catalog scanned moments ago by this run is skipped.
+  if (catalogPresent) {
+    log('info', 'Verifying the reused data catalog against the game directory.');
+    const verification = await verifyCatalogSources(request.gamePath, catalog);
+    if (!verification.ok) {
+      return {
+        ok: false,
+        code: 'CATALOG_SOURCE_MISMATCH',
+        message:
+          `The data catalog at '${plan.catalogPath}' does not match the game directory `
+          + `'${request.gamePath}' (${verification.problems.length} problem(s), first: `
+          + `${verification.problems[0]}). Restore the clean game files, or re-import the `
+          + 'game data if this directory is the intended clean installation.',
+        retryable: false,
+        catalogProblems: verification.problems,
+      };
+    }
   }
   progress(stageProgress.catalogReady, 'Game data catalog ready.');
 

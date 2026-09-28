@@ -30,6 +30,7 @@ const request = {
     randomizeBosses: true,
     scaling: 'progressive',
   },
+  generateSpoilerLog: false,
 };
 
 test('returns NOT_IMPLEMENTED without events or filesystem I/O', async (t) => {

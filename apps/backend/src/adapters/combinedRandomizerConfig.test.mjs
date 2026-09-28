@@ -32,6 +32,7 @@ function createRequest(overrides = {}) {
     combinedSeed: 'combined-seed',
     items: { ...itemOptions },
     enemies: { ...enemyOptions },
+    generateSpoilerLog: true,
     ...overrides,
   };
 }
@@ -88,6 +89,7 @@ test('maps both enabled capabilities deterministically', () => {
       randomizeEnemies: true,
       randomizeBosses: true,
       enemyScaling: 'progressive',
+      generateSpoilerLog: true,
     },
   });
 });
@@ -148,4 +150,13 @@ test('rejects enabled parent options when only non-category safeguards are selec
 
   assert.equal(result.ok, false);
   assert.equal(result.code, 'NO_RANDOMIZATION_FEATURES_ENABLED');
+});
+
+test('passes the spoiler-log flag through independently of the categories', () => {
+  for (const generateSpoilerLog of [true, false]) {
+    const result = mapCombinedRandomizerConfig(createRequest({ generateSpoilerLog }));
+
+    assert.equal(result.ok, true);
+    assert.equal(result.config.generateSpoilerLog, generateSpoilerLog);
+  }
 });
