@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 import {
   defaultDataToolDllPath,
@@ -339,6 +340,18 @@ test('is deterministic for the same request', async (t) => {
     JSON.parse(await readFile(runOne.placementsPath, 'utf8')).placements,
     JSON.parse(await readFile(runTwo.placementsPath, 'utf8')).placements,
   );
+
+  const firstConfig = JSON.parse(await readFile(path.join(runOne.seedDirectory, 'config.json'), 'utf8'));
+  const secondConfig = JSON.parse(await readFile(path.join(runTwo.seedDirectory, 'config.json'), 'utf8'));
+  assert.equal(firstConfig.seed, 'fixture-seed-1');
+  assert.equal(firstConfig.randomizeItems, true);
+  assert.equal(firstConfig.randomizeEnemies, true);
+  assert.equal(firstConfig.generateSpoilerLog, false);
+  assert.equal(firstConfig.outputDirectory, first.workspacePath);
+  assert.deepEqual(
+    { ...firstConfig, gameDirectory: '', outputDirectory: '' },
+    { ...secondConfig, gameDirectory: '', outputDirectory: '' },
+  );
 });
 
 test('rejects a prototype result without writing a package or spawning the tool', async (t) => {
@@ -427,6 +440,7 @@ test('reports INVALID_CONFIG for a seed upstream will not accept', async (t) => 
   assert.equal(result.code, 'INVALID_CONFIG');
   assert.ok(result.validationErrors.length > 0);
   assert.deepEqual(dataTool.invocations, []);
+  assert.equal(await exists(path.join(workspacePath, 'seed_seed with spaces!')), false);
 });
 
 test('refuses a workspace inside the live game directory before running anything', async (t) => {
@@ -442,6 +456,66 @@ test('refuses a workspace inside the live game directory before running anything
   assert.equal(result.ok, false);
   assert.equal(result.code, 'WORKSPACE_INSIDE_GAME_DIRECTORY');
   assert.deepEqual(dataTool.invocations, []);
+  assert.equal(await exists(path.join(gamePath, 'randomizer-workspace')), false);
+});
+
+test('stops after scan process failure and preserves its diagnostics', async (t) => {
+  const { workspacePath, gamePath } = await makeWorkspace(t, { catalog: null });
+  const before = await snapshotDirectory(gamePath);
+  const dataTool = fakeDataTool({
+    result: (command) => {
+      assert.equal(command, 'scan');
+      return {
+        ok: false,
+        type: 'process-failure',
+        stdout: 'examined 2 maps\n',
+        stderr: 'unable to read map data\n',
+        exitCode: 7,
+      };
+    },
+  });
+
+  const result = await executeCombinedGeneration(
+    request({ gamePath, workspacePath }),
+    () => {},
+    { ...dataToolPaths, dependencies: { dataTool } },
+  );
+
+  assert.equal(result.ok, false);
+  assert.equal(result.code, 'DATA_TOOL_FAILED');
+  assert.equal(result.retryable, false);
+  assert.equal(result.command, 'scan');
+  assert.equal(result.exitCode, 7);
+  assert.equal(result.stdout, 'examined 2 maps\n');
+  assert.equal(result.stderr, 'unable to read map data\n');
+  assert.deepEqual(dataTool.invocations.map((call) => call.command), ['scan']);
+  assert.equal(await exists(path.join(workspacePath, 'seed_fixture-seed-1')), false);
+  assert.deepEqual(await snapshotDirectory(gamePath), before);
+});
+
+test('forwards DsrDataTool stdout and stderr with their log levels', async (t) => {
+  const { workspacePath, gamePath } = await makeWorkspace(t);
+  const events = [];
+  const dataTool = {
+    async execute(executionRequest, onEvent) {
+      assert.equal(executionRequest.plannedArguments[0], 'patch-enemies');
+      onEvent({ type: 'log', command: 'patch-enemies', stream: 'stdout', message: 'patched maps\n' });
+      onEvent({ type: 'log', command: 'patch-enemies', stream: 'stderr', message: 'skipped slot\n' });
+      return { ok: true, stdout: 'patched maps\n', stderr: 'skipped slot\n', exitCode: 0 };
+    },
+  };
+
+  const result = await executeCombinedGeneration(
+    request({ gamePath, workspacePath }),
+    (event) => events.push(event),
+    { ...dataToolPaths, dependencies: { dataTool } },
+  );
+
+  assert.equal(result.ok, true);
+  assert.ok(events.some((event) => event.type === 'log'
+    && event.level === 'info' && event.message === 'patched maps'));
+  assert.ok(events.some((event) => event.type === 'log'
+    && event.level === 'warning' && event.message === 'skipped slot'));
 });
 
 test('maps a spawn failure to DATA_TOOL_MISSING', async (t) => {
@@ -568,9 +642,10 @@ test('reports GENERATION_FAILED as retryable when upstream gives up on a seed', 
 });
 
 test('the default DsrDataTool path points at the documented vendored build output', () => {
+  const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../../');
   assert.equal(
-    path.relative(process.cwd(), defaultDataToolDllPath).split(path.sep).join('/'),
-    '../../engines/combined/vendor/tools/DsrDataTool/bin/Release/net8.0/DsrDataTool.dll',
+    path.relative(repositoryRoot, defaultDataToolDllPath).split(path.sep).join('/'),
+    'engines/combined/vendor/tools/DsrDataTool/bin/Release/net8.0/DsrDataTool.dll',
   );
 });
 
