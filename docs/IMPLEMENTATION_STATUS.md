@@ -1,5 +1,25 @@
 # Implementation status
 
+Task 8 ran the combined Items + Enemies engine end to end for the first time:
+typed request → config → vendored JS generator → real `DsrDataTool`
+`scan`/`patch-enemies` → workspace package, via
+`apps/backend/scripts/combinedEngineE2eProof.mjs` (harness commit
+`75c214dc2656693b49c2861c39f3f2a7e6b8e7a8`; not part of `npm test`). The live Steam install is
+legacy-modified (legacy item/enemy randomizers and FogMod applied in place);
+against it `patch-enemies` correctly refuses (`DATA_TOOL_FAILED`, enemy model
+declaration pruning), and the install stayed byte-identical. On a temp copy
+of the tool's read set with the legacy `.bak` files restored, all 47 checks
+passed (2026-09-28): generation completes, the package's 54 patched files
+match `patch-manifest.json`, reruns are byte-identical apart from embedded
+workspace paths and timestamps, real catalogs verify and reuse, failures are
+typed and recoverable in the same workspace, and neither game directory
+changed. This proves the pipeline on real-format data, not on verified
+vanilla data. Findings handed to later tasks (up-front detection of
+legacy-modified installs, partial seed directories after a failed patch,
+missing dll reported as `DATA_TOOL_FAILED`, volatile JSON fields) are in
+`docs/COMBINED_ENGINE_INTEGRATION.md` ("End-to-end generation proof").
+No application code changed; `@ds1tr/backend` stays `0.10.0`.
+
 Task 7 connected `CombinedRandomizerAdapter.generate()` to the existing
 workspace-only execution bridge. It forwards the typed request and
 progress/log events, returns the generated seed package directory on success,

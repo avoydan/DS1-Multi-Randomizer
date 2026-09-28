@@ -993,5 +993,92 @@ installation was involved.
 
 - `CombinedRandomizerAdapter.generate()` now delegates to the bridge
   (Blocker 4 resolved by Task 7); the application pipeline does not yet call it.
-- `DsrDataTool` has never run against a real installation (Task 8).
+- ~~`DsrDataTool` has never run against a real installation (Task 8).~~
+  Resolved by Task 8 — see "End-to-end generation proof".
 - No public GPL fork (external action, `docs/LICENSING.md`).
+
+## End-to-end generation proof
+
+Task 8. First real run of the whole Items + Enemies path — typed request →
+config mapping → vendored JS `generate()`/`writeOutput()` → real
+`DsrDataTool scan`/`patch-enemies` (.NET 8.0.28 runtime, `DsrDataTool.dll`
+SHA-256 `eb6e9b24…8376`, built 2026-09-27 after the last `Program.cs`
+change) → workspace package. Harness:
+`apps/backend/scripts/combinedEngineE2eProof.mjs` (not part of `npm test`;
+needs a real game directory, the built tool, and a .NET 8 runtime). All
+workspaces live in the OS temp directory and were deleted afterwards —
+extracted catalogs and patched game files never enter the repository
+(`docs/LICENSING.md`).
+
+### Test data: the live install is legacy-modified
+
+The only installation on the machine (Steam `DARK SOULS REMASTERED`) had
+already been modified in place by the legacy Item Randomizer, the legacy
+Enemy Randomizer, and FogMod (`.bak` chains in `map/MapStudio`, `event`,
+`script`, `param/GameParam`, `sfx`; `random-seed-*` directories). Its MSBs
+carry the legacy enemy randomizer's extra model declarations — e.g.
+`m10_00_00_00.msb` declares 146 enemy models (26 duplicate names that
+SoulsFormats disambiguates as `c1200 {2}`) against 15 in its `.bak`.
+
+**Run against the live install (read-only):** `scan` and `generate()`
+accepted it (`dataStatus: "extracted"`, catalog schema 17, 56 source files),
+then `patch-enemies` refused with its own post-write verification:
+`Enemy model declaration pruning did not persist: m10_00_00_00`
+(`DATA_TOOL_FAILED`, `retryable: false`). A full before/after snapshot of the
+install (6,658 files, path + size + SHA-256, plus the directory set) was
+identical.
+
+**Proof data:** a reconstructed copy in the temp directory — plain copy (no
+hardlinks) of exactly the read set of `scan` and `patch-enemies`
+(`DarkSoulsRemastered.exe`, `param/`, `paramdef/`, `msg/`, `event/`,
+`script/`, `sfx/`, `map/MapStudio/`; 210 files, 146 MB), with every legacy
+`X.bak` moved over `X`. All reconstructed MSBs read back with zero
+duplicate model names. Provenance limit: the `.bak` files date from the
+last legacy run (2026-09-26), so vanilla status cannot be asserted, and any
+file a legacy tool changed without leaving a `.bak` stays modified. The
+claim is therefore **"pipeline proven on real-format game data"**, not
+"proven on vanilla data". Reconstruction was a one-off test-data step, not
+product behaviour.
+
+### Results (all 47 checks pass)
+
+Live install passed as a guard directory, reconstructed copy as `--game`.
+
+| Run | Proves |
+|---|---|
+| A — fresh workspace | `scan` → `generate` → `patch-enemies` succeed (~12 s). `catalogScanned: true`, seed = derived 32-hex combined seed, `dataStatus: "extracted"`, upstream `validation.valid: true`, `finalBossReachable: true`. Placements: 1,861 enemies, 32 bosses, 514 items, 18 gifts, 312 enemy drops, 387 shop entries; `patch-manifest.json` reports 1,831 changed slots. Package: 60 files, 54 under `mod/` (18 MSBs, 17 Lua bundles, 17 EMEVDs, `CommonEffects` FFX bundle, `GameParam`). Every manifest entry's `output` is package-relative, exists, and matches its `outputSha256`; every `mod/` file is listed; none is empty; every `source` is game-relative. Progress and log events reach the callback. |
+| B — second fresh workspace, same master seed | Catalog identical except `generatedAt`; same `placementHash`; **every package file byte-identical**, including all 54 patched binaries. The only differences anywhere are `outputDirectory` (absolute workspace path) and `generatedAt` in the JSON files. |
+| C — workspace seeded with A's catalog | `verifyCatalogSources` accepts a real catalog (57 source files) — first run against real `sourceFiles` data, no false mismatch; `catalogScanned: false`; same `placementHash`. |
+| D — different master seed | Different `placementHash`. |
+| E1 — nonexistent game directory | Real process failure → `DATA_TOOL_FAILED`, non-retryable, tool stderr captured (`Directory not found: …`). |
+| E2 — nonexistent `DsrDataTool.dll` | `DATA_TOOL_FAILED` (see findings). |
+| E3 — catalog with one tampered source hash | `CATALOG_SOURCE_MISMATCH`, one precise problem. |
+| E4 — same workspace, `forceCatalogRescan` | Recovers after E1–E3; same `placementHash` as A. |
+| S1 — workspace left by the failed live-install run (foreign catalog, partial seed directory without `patch-manifest.json`) | `CATALOG_SOURCE_MISMATCH` (52 problems); no automatic rescan. |
+| S2 — same stale workspace, `forceCatalogRescan` | Recovers in place; resulting package identical to A's (no stale leftovers — the partial MSB was overwritten). |
+| F — public `CombinedRandomizerAdapter.generate()` | Succeeds, returns the package directory inside the workspace. |
+| Guards | Reconstructed copy and live install both identical before/after (full SHA-256 + directory set). No stray files in the repository. |
+
+### Findings for later tasks (recorded, not fixed here)
+
+1. **Legacy-modified installs are detected late and opaquely.** `scan` and
+   `generate()` accept them as `extracted` data; only `patch-enemies`'
+   post-write verification rejects them, with a message that does not
+   mention legacy mods. Any user who ran the legacy Enemy Randomizer in
+   place hits this. Pristine import/verification (Task 13 / the backup
+   authority) must detect non-vanilla game data up front — e.g. against known
+   vanilla hashes — and say so.
+2. **A failed `patch-enemies` leaves a partial seed directory** (upstream
+   output files plus some `mod/` files, no `patch-manifest.json`).
+   Activation must require `patch-manifest.json` and consume only the files it
+   lists (with `outputSha256` checks). Seed-changing retries will leave such
+   partial directories behind in the workspace; the pipeline should clean or
+   ignore them.
+3. **A missing `DsrDataTool.dll` reports `DATA_TOOL_FAILED`, not
+   `DATA_TOOL_MISSING`.** `dotnet <missing.dll>` spawns successfully and
+   exits non-zero, so the "build the tool" hint is never shown. The bridge or
+   packaging checks (Task 17) should test the dll's existence before spawning.
+4. **Output JSON embeds absolute workspace paths and timestamps**
+   (`outputDirectory`, `generatedAt`). Determinism comparisons and the run
+   manifest must exclude them; the patched game files themselves are fully
+   deterministic.

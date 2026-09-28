@@ -588,7 +588,7 @@ Completion record:
 
 # TASK 8 — CLAUDE
 
-State: PENDING
+State: DONE
 
 ## Combined engine end-to-end generation proof
 
@@ -618,10 +618,37 @@ Document results thoroughly.
 
 Completion record:
 
-- Commit:
-- Verification:
+- Commit: `75c214dc2656693b49c2861c39f3f2a7e6b8e7a8`
+  (`test(backend): add combined-engine end-to-end generation proof harness`);
+  documentation committed separately.
+- Verification (2026-09-28): `node apps/backend/scripts/combinedEngineE2eProof.mjs`
+  — 47/47 checks pass against real-format game data with the live
+  installation as a byte-level guard directory. No application code changed;
+  no version bump.
 - Result:
-- Blockers:
+  - The live Steam install is legacy-modified (legacy item/enemy randomizers
+    and FogMod applied in place). Against it, `scan` and `generate()`
+    succeed but `patch-enemies` refuses (`Enemy model declaration pruning did
+    not persist: m10_00_00_00`, `DATA_TOOL_FAILED`, non-retryable). The
+    install (6,658 files) was byte-identical before and after.
+  - Proof data: a temp copy of exactly the tool's read set (210 files) with
+    the legacy `.bak` files restored. Proven there: generation completes
+    (~12 s); `patch-manifest.json` lists all 54 patched files with matching
+    hashes; a second fresh run is byte-identical apart from `outputDirectory`
+    and `generatedAt`; a reused real catalog verifies; a different seed gives
+    a different placement hash; nonexistent game dir, missing dll, tampered
+    catalog and a stale workspace from the failed live run all fail typed
+    and recover in the same workspace; neither game directory changed.
+  - Real-format data, not verified-vanilla data: `.bak` provenance is
+    unverifiable. Details in `docs/COMBINED_ENGINE_INTEGRATION.md`
+    ("End-to-end generation proof").
+- Blockers: none for Task 8. Findings for later tasks: legacy-modified
+  installs are detected only by `patch-enemies` (pristine verification must
+  catch them up front); a failed patch leaves a partial seed directory
+  without `patch-manifest.json` (activation must require the manifest); a
+  missing `DsrDataTool.dll` reports `DATA_TOOL_FAILED`, not
+  `DATA_TOOL_MISSING`; output JSON embeds absolute paths and timestamps.
+  No public GPL fork yet (unchanged).
 
 ---
 
