@@ -942,7 +942,7 @@ Fix only issues required for correctness/release readiness.
 
 Completion record:
 
-- Commit: recorded in the follow-up docs commit (`fix(backend): snapshot paramdef for generation; release audit`).
+- Commit: `63d46b8` (`fix(backend): snapshot paramdef for generation; release audit`).
 - Verification: backend `npm test` 103/103; real-data harness
   `apps/backend/scripts/releaseAuditE2e.mjs` 18/18 on a temp reconstruction
   of the live install (import -> generate -> deterministic rerun -> activate ->
