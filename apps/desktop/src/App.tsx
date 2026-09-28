@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { FogLanguage, InstallationValidation, PipelinePlan, RandomizerConfig } from '@ds1tr/contracts';
+import type { FogLanguage, GameStateReport, GenerationResult, InstallationValidation, PipelinePlan, RandomizerConfig } from '@ds1tr/contracts';
 import { api } from './api';
 
 const initialConfig: RandomizerConfig = {
@@ -85,6 +85,10 @@ export function App() {
   const [plan, setPlan] = useState<PipelinePlan | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('Ready to configure.');
+  const [gameState, setGameState] = useState<GameStateReport | null>(null);
+  const [generation, setGeneration] = useState<GenerationResult | null>(null);
+  const [progress, setProgress] = useState(0);
+  const [logs, setLogs] = useState<string[]>([]);
 
   useEffect(() => {
     api.health().then(setBackendOnline);
@@ -108,6 +112,8 @@ export function App() {
       setConfig((current) => ({ ...current, gamePath: selected }));
       setValidation(null);
       setPlan(null);
+      setGameState(null);
+      setGeneration(null);
     }
   };
 
@@ -116,12 +122,60 @@ export function App() {
     try {
       const result = await api.validateInstallation(config.gamePath);
       setValidation(result);
+      setGameState(await api.state(config.gamePath));
       setMessage(result.valid ? 'Dark Souls Remastered installation looks valid.' : 'Installation needs attention.');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : String(error));
     } finally {
       setBusy(false);
     }
+  };
+
+  const importPristine = async () => {
+    setBusy(true);
+    try {
+      const result = await api.importPristine(config.gamePath);
+      setMessage(result.ok ? 'Pristine snapshot imported.' : `${result.code}: ${result.message}`);
+      setGameState(await api.state(config.gamePath));
+    } catch (error) { setMessage(String(error)); }
+    finally { setBusy(false); }
+  };
+
+  const generateRun = async () => {
+    setBusy(true);
+    setProgress(0);
+    setLogs([]);
+    setGeneration(null);
+    try {
+      const result = await api.generate(config, (event) => {
+        if (event.type === 'progress') { setProgress(event.progress); setMessage(event.message); }
+        else setLogs((current) => [...current, `[${event.stage}] ${event.level}: ${event.message}`]);
+      });
+      setGeneration(result);
+      setMessage(result.ok ? `Package generated: ${result.packagePath}` : `${result.code}: ${result.message}`);
+    } catch (error) { setMessage(String(error)); }
+    finally { setBusy(false); }
+  };
+
+  const activate = async () => {
+    if (!generation?.ok) return;
+    setBusy(true);
+    try {
+      const result = await api.activate(config.gamePath, generation.packagePath);
+      setMessage(result.ok ? 'Generated package activated.' : `${result.code}: ${result.message}`);
+      setGameState(await api.state(config.gamePath));
+    } catch (error) { setMessage(String(error)); }
+    finally { setBusy(false); }
+  };
+
+  const restore = async () => {
+    setBusy(true);
+    try {
+      const result = await api.restore(config.gamePath);
+      setMessage(result.ok ? `Vanilla files restored (${result.restored}).` : `${result.code}: ${result.message}`);
+      setGameState(await api.state(config.gamePath));
+    } catch (error) { setMessage(String(error)); }
+    finally { setBusy(false); }
   };
 
   const previewPlan = async () => {
@@ -148,7 +202,7 @@ export function App() {
           <div className="section-title"><span>01</span><h2>Game, seed & output</h2></div>
           <label className="field-label">Dark Souls Remastered directory</label>
           <div className="path-row">
-            <input value={config.gamePath} onChange={(event) => setConfig({ ...config, gamePath: event.target.value })} placeholder="C:\\Program Files (x86)\\Steam\\steamapps\\common\\DARK SOULS REMASTERED" />
+            <input value={config.gamePath} onChange={(event) => { setConfig({ ...config, gamePath: event.target.value }); setGameState(null); setGeneration(null); setValidation(null); }} placeholder="C:\\Program Files (x86)\\Steam\\steamapps\\common\\DARK SOULS REMASTERED" />
             <button className="secondary" onClick={selectGame}>Browse</button>
             <button className="secondary" onClick={validate} disabled={busy || !config.gamePath}>Validate</button>
           </div>
@@ -236,6 +290,20 @@ export function App() {
         </div>
 
         <section className="card action-card"><div><div className="eyebrow">PIPELINE</div><h2>{enabledCount} engines enabled</h2><p>{message}</p></div><button className="primary" onClick={previewPlan} disabled={busy || !config.masterSeed}>Preview randomization plan</button></section>
+
+        <section className="card run-card">
+          <div className="section-title"><span>02</span><h2>Run and game state</h2></div>
+          <p>Installation: {gameState?.state ?? 'not checked'}{gameState?.problems.length ? ` — ${gameState.problems.join(' ')}` : ''}</p>
+          <div className="run-actions">
+            <button className="secondary" onClick={importPristine} disabled={busy || !config.gamePath || gameState?.state !== 'no-snapshot'}>Import pristine data</button>
+            <button className="primary" onClick={generateRun} disabled={busy || !config.gamePath || !config.masterSeed || gameState?.state !== 'vanilla'}>Generate run</button>
+            <button className="secondary" onClick={activate} disabled={busy || !generation?.ok || gameState?.state !== 'vanilla'}>Activate generated run</button>
+            <button className="secondary" onClick={restore} disabled={busy || !gameState || !['active', 'interrupted'].includes(gameState.state)}>Restore vanilla</button>
+          </div>
+          {busy && <progress value={progress} max={1} aria-label="Generation progress" />}
+          {generation?.ok && <p>Generated {generation.manifest.files.length} files for seed {generation.manifest.masterSeed}.</p>}
+          {logs.length > 0 && <pre className="run-logs" aria-label="Generation logs">{logs.join('\n')}</pre>}
+        </section>
 
         {plan && <section className="card plan-card"><div className="section-title"><span>02</span><h2>Pipeline preview</h2></div><div className="seed-grid">{plan.stages.map((stage) => <div key={stage.engine}><span>{stage.engine}</span><strong>{stage.enabled ? stage.seed : 'disabled'}</strong></div>)}</div><div className="engine-status-list">{plan.engineStatus.map((status) => <div key={status.name} className="engine-status"><strong>{status.name}</strong><span className={`pill ${status.ready ? 'ready' : ''}`}>{status.mode}</span><p>{status.detail}</p></div>)}</div></section>}
 

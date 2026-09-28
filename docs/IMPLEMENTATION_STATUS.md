@@ -1,5 +1,18 @@
 # Implementation status
 
+Task 14 connects the existing backend pipeline and game-state authority to
+the desktop application. The backend exposes state, pristine import, streamed
+generation, activation, and vanilla restore endpoints. The desktop sends the
+typed configuration, displays progress/logs/errors and the generated package,
+and enables activation or restore according to the reported game state. A
+backend-owned run directory keeps workspace paths out of the renderer. The
+new mutation routes reject ordinary foreign browser origins; packaged file
+origin remains accepted. Backend 0.15.0, desktop and contracts 0.3.0.
+Focused API integration (1/1), pipeline (4/4), backend/desktop builds and
+desktop typecheck passed (2026-09-28). FogHost is still unbuilt, so Fog-enabled
+generation reports `FOG_PREREQUISITES_MISSING` until that prerequisite exists.
+Desktop packaging/startup and full UI polish remain later tasks.
+
 Task 13 adds the single activation/restore authority in
 `apps/backend/src/core/gameState.ts` (see `docs/DECISIONS.md`, "One
 backend-owned activation/restore authority"). It covers the following:

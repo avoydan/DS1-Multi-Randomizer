@@ -847,7 +847,7 @@ Completion record:
 
 # TASK 14 — CODEX
 
-State: PENDING
+State: DONE
 
 ## Desktop/backend integration
 
@@ -868,10 +868,14 @@ Do not redesign randomizer algorithms.
 
 Completion record:
 
-- Commit:
-- Verification:
-- Result:
-- Blockers:
+- Commit: see the task 14 implementation commit.
+- Verification: focused API integration 1/1 and pipeline 4/4 passed; backend
+  and desktop builds and desktop typecheck passed (2026-09-28).
+- Result: Typed desktop/backend operations for state, pristine import,
+  streamed generation, activation and restore. Backend 0.15.0; desktop and
+  contracts 0.3.0.
+- Blockers: FogHost is unbuilt, so Fog-enabled runs still return the existing
+  prerequisite failure. Desktop packaging and full UI completion are later tasks.
 
 ---
 

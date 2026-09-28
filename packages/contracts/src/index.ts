@@ -93,3 +93,26 @@ export interface PipelinePlan {
   }>;
   engineStatus: EngineStatus[];
 }
+
+export interface GameStateReport {
+  state: 'invalid' | 'no-snapshot' | 'version-changed' | 'vanilla' | 'active' | 'interrupted' | 'modified';
+  gamePath: string;
+  snapshotId: string | null;
+  activePackage: string | null;
+  problems: string[];
+}
+
+export type OperationResult<T> = ({ ok: true } & T) | {
+  ok: false;
+  code: string;
+  message: string;
+  problems: string[];
+};
+
+export type GenerationEvent =
+  | { type: 'progress'; stage: string; progress: number; message: string }
+  | { type: 'log'; stage: string; level: 'info' | 'warning' | 'error'; message: string };
+
+export type GenerationResult =
+  | { ok: true; packagePath: string; manifestPath: string; manifest: { masterSeed: string; files: Array<{ path: string }> } }
+  | { ok: false; code: string; message: string; stage: string };
