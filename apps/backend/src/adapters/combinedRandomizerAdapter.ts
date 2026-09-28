@@ -1,4 +1,8 @@
 import type { EnemyOptions, ItemOptions } from '@ds1tr/contracts';
+import {
+  executeCombinedGeneration,
+  type CombinedGenerationFailure,
+} from './combinedRandomizerBridge.js';
 
 export interface CombinedRandomizerRequest {
   gamePath: string;
@@ -19,7 +23,7 @@ export type CombinedRandomizerEventCallback = (event: CombinedRandomizerEvent) =
 
 export type CombinedRandomizerResult =
   | { ok: true; workspacePath: string }
-  | { ok: false; code: string; message: string };
+  | CombinedGenerationFailure;
 
 export interface CombinedRandomizerEngine {
   generate(
@@ -29,14 +33,13 @@ export interface CombinedRandomizerEngine {
 }
 
 export class CombinedRandomizerAdapter implements CombinedRandomizerEngine {
+  constructor(private readonly execute: typeof executeCombinedGeneration = executeCombinedGeneration) {}
+
   async generate(
-    _request: CombinedRandomizerRequest,
-    _onEvent: CombinedRandomizerEventCallback,
+    request: CombinedRandomizerRequest,
+    onEvent: CombinedRandomizerEventCallback,
   ): Promise<CombinedRandomizerResult> {
-    return {
-      ok: false,
-      code: 'NOT_IMPLEMENTED',
-      message: 'Combined items and enemies randomizer integration is not implemented.',
-    };
+    const result = await this.execute(request, onEvent);
+    return result.ok ? { ok: true, workspacePath: result.seedDirectory } : result;
   }
 }

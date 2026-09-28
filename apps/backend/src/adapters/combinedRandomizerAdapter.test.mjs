@@ -1,65 +1,67 @@
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import fsPromises from 'node:fs/promises';
-import { syncBuiltinESMExports } from 'node:module';
 import test from 'node:test';
 import { CombinedRandomizerAdapter } from '../../dist/adapters/combinedRandomizerAdapter.js';
 
 const request = {
-  gamePath: 'C:\\nonexistent\\Dark Souls Remastered',
-  workspacePath: 'C:\\nonexistent\\workspace',
+  gamePath: 'C:\\fixture\\Dark Souls Remastered',
+  workspacePath: 'C:\\fixture\\workspace',
   masterSeed: 'master-seed',
-  combinedSeed: 'combined-seed',
-  items: {
-    enabled: true,
-    randomizeWorldItems: true,
-    randomizeProtectedItems: false,
-    progressionLogic: true,
-    guaranteeEarlyWeapon: true,
-    balancedEarlyLoot: true,
-    randomizeStartingClass: true,
-    randomizeStartingEquipment: true,
-    randomizeGifts: true,
-    randomizeEnemyDrops: true,
-    guaranteedEnemyDrops: false,
-    randomizeShops: true,
-  },
-  enemies: {
-    enabled: true,
-    randomizeRegularEnemies: true,
-    randomizeBosses: true,
-    scaling: 'progressive',
-  },
+  combinedSeed: 'derived-seed',
+  items: { enabled: true, randomizeWorldItems: true },
+  enemies: { enabled: false, randomizeRegularEnemies: false, randomizeBosses: false },
   generateSpoilerLog: false,
 };
 
-test('returns NOT_IMPLEMENTED without events or filesystem I/O', async (t) => {
-  const adapter = new CombinedRandomizerAdapter();
+test('forwards the request and progress/log events, then returns the package directory', async () => {
+  const progress = { type: 'progress', progress: 0.5, message: 'Generating.' };
+  const log = { type: 'log', level: 'info', message: 'Scanning.' };
   const events = [];
-
-  for (const api of [fs, fsPromises]) {
-    for (const key of Object.keys(api)) {
-      if (/^[a-z]/.test(key) && typeof api[key] === 'function') {
-        t.mock.method(api, key, () => {
-          assert.fail(`Unexpected filesystem call: ${key}`);
-        });
-      }
-    }
-  }
-  syncBuiltinESMExports();
-
-  let result;
-  try {
-    result = await adapter.generate(request, (event) => events.push(event));
-  } finally {
-    t.mock.restoreAll();
-    syncBuiltinESMExports();
-  }
-
-  assert.deepEqual(result, {
-    ok: false,
-    code: 'NOT_IMPLEMENTED',
-    message: 'Combined items and enemies randomizer integration is not implemented.',
+  let receivedRequest;
+  const adapter = new CombinedRandomizerAdapter(async (input, onEvent) => {
+    receivedRequest = input;
+    onEvent(progress);
+    onEvent(log);
+    return {
+      ok: true,
+      seedDirectory: 'C:\\fixture\\workspace\\seed_derived-seed',
+      workspaceDirectory: input.workspacePath,
+      catalogPath: 'catalog',
+      placementsPath: 'placements',
+      patchManifestPath: 'manifest',
+      randomizerVersion: '0.5.66',
+      placementHash: 'hash',
+      seed: input.combinedSeed,
+      catalogScanned: true,
+    };
   });
-  assert.deepEqual(events, []);
+
+  const result = await adapter.generate(request, (event) => events.push(event));
+
+  assert.strictEqual(receivedRequest, request);
+  assert.equal(receivedRequest.combinedSeed, 'derived-seed');
+  assert.deepEqual(events, [progress, log]);
+  assert.deepEqual(result, {
+    ok: true,
+    workspacePath: 'C:\\fixture\\workspace\\seed_derived-seed',
+  });
+});
+
+test('preserves typed bridge failures and emitted events', async () => {
+  const failure = {
+    ok: false,
+    code: 'GENERATION_FAILED',
+    message: 'No safe boss permutation.',
+    retryable: true,
+    validationErrors: ['fixture detail'],
+  };
+  const events = [];
+  const adapter = new CombinedRandomizerAdapter(async (_input, onEvent) => {
+    onEvent({ type: 'log', level: 'error', message: failure.message });
+    return failure;
+  });
+
+  const result = await adapter.generate(request, (event) => events.push(event));
+
+  assert.strictEqual(result, failure);
+  assert.deepEqual(events, [{ type: 'log', level: 'error', message: failure.message }]);
 });
