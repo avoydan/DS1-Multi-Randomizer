@@ -314,12 +314,13 @@ directory outside the game (`DS1TR_STATE_DIR`, default
 
 - **Pristine snapshot.** `importPristine` copies `DarkSoulsRemastered.exe`
   and every file under the managed roots (`event`, `map/MapStudio`, `msg`,
-  `param/GameParam`, `script`, `sfx`) into `pristine/`, hash-verifying each
+  `param/GameParam`, `paramdef`, `script`, `sfx`) into `pristine/`, hash-verifying each
   copy. `snapshot.json` is written last and commits the snapshot. Import is
   refused when the managed roots contain `*.bak` or our temp files (legacy
   randomizer chains). The snapshot directory is the pipeline's only trusted
   pristine source (`getPristineSource`, wired in `server.ts`). It is
-  re-verified before every use.
+  re-verified before every use. Because it is the generation source, the
+  roots must cover DsrDataTool's whole read set (`paramdef` added by Task 16).
 - **Package binding.** The run manifest records `pristineSnapshotId` and an
   explicit `gameTreeRoot` (`mod` for combined-only packages, `''` for the
   Fog game tree). Activation is driven only by `run-manifest.json` `files`,

@@ -11,6 +11,7 @@ const sha = (value) => createHash('sha256').update(value).digest('hex');
 const vanilla = {
   'DarkSoulsRemastered.exe': 'exe-v1',
   'param/GameParam/GameParam.parambnd.dcx': 'param',
+  'paramdef/paramdef.paramdefbnd.dcx': 'paramdef',
   'map/MapStudio/m10_00_00_00.msb': 'msb-a',
   'map/MapStudio/m12_00_00_00.msb': 'msb-b',
   'event/m10_00_00_00.emevd.dcx': 'event-a',
@@ -101,6 +102,11 @@ test('import snapshots managed data without touching the game and becomes the pr
   const snapshot = await imported(authority, game);
   assert.deepEqual(await snapshotTree(game), vanilla);
   assert.equal(snapshot.files.length, Object.keys(vanilla).length - 1);
+  // The snapshot is DsrDataTool's generation source and must cover its read set.
+  for (const root of ['event', 'map/MapStudio', 'msg', 'param/GameParam', 'paramdef', 'script', 'sfx']) {
+    assert.ok(snapshot.roots.includes(root), `snapshot roots must include ${root}`);
+  }
+  assert.ok(snapshot.files.some((file) => file.path === 'paramdef/paramdef.paramdefbnd.dcx'));
   assert.equal(snapshot.provenance.referenceHashesVerified, false);
   assert.equal((await authority.detectState(game)).state, 'vanilla');
   const source = await authority.getPristineSource(game);

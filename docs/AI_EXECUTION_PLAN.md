@@ -918,7 +918,7 @@ Completion record:
 
 # TASK 16 — CLAUDE
 
-State: PENDING
+State: DONE
 
 ## Final end-to-end audit
 
@@ -942,10 +942,21 @@ Fix only issues required for correctness/release readiness.
 
 Completion record:
 
-- Commit:
-- Verification:
-- Result:
-- Blockers:
+- Commit: recorded in the follow-up docs commit (`fix(backend): snapshot paramdef for generation; release audit`).
+- Verification: backend `npm test` 103/103; real-data harness
+  `apps/backend/scripts/releaseAuditE2e.mjs` 18/18 on a temp reconstruction
+  of the live install (import -> generate -> deterministic rerun -> activate ->
+  restore; live install byte-identical) (2026-09-28).
+- Result: Fixed a release-blocking bug: the pristine snapshot omitted
+  `paramdef/`, so DsrDataTool running from the snapshot would silently drop
+  item-lot/starting data in `scan` and fail in `patch-enemies`. Fixed
+  `npm test` failing when run from `apps/backend` (integration test cwd).
+  Manifest `appVersion` matches backend 0.15.1. Full findings in
+  `docs/IMPLEMENTATION_STATUS.md` (Task 16).
+- Blockers: FogHost is unbuilt, so Fog/world randomization cannot run at all
+  and the desktop default (Fog enabled) always fails generation. No in-app
+  recovery from `modified` or `version-changed` states. The public GPL fork
+  and FogMod `dist/` data distribution are unresolved. See the status doc.
 
 ---
 

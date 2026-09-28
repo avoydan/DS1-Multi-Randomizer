@@ -1,5 +1,70 @@
 # Implementation status
 
+Task 16 is the final end-to-end audit. `@ds1tr/backend` is 0.15.1.
+
+Fixed:
+- **Pristine snapshot omitted `paramdef/`.** The snapshot is the only
+  generation source, but `managedRoots` lacked `paramdef`. Without
+  `paramdef/paramdef.paramdefbnd.dcx`, DsrDataTool `scan` silently produces
+  a catalog with no gifts, drop lots, world lots, starting classes or enemy
+  metadata. `patch-enemies` then fails reading it. Task 8 missed this because
+  its hand-built copy included `paramdef/`. `paramdef` is now a managed root,
+  and a gameState test pins the read-set roots. No snapshots existed yet, so
+  no migration is needed.
+- `npm test` failed when run from `apps/backend` (npm's cwd). The API
+  integration test resolved `apps/backend` from cwd, and Node 24 crashed
+  natively on the failed spawn. It now resolves relative to the test file.
+- Manifest `appVersion` and `/api/health` report 0.15.1.
+
+Verified (2026-09-28):
+- Backend `npm test`: 103/103.
+- `apps/backend/scripts/releaseAuditE2e.mjs` (not part of `npm test`; needs
+  the live install, built DsrDataTool and .NET 8) passed 18/18. The live
+  install was only read. A temp reconstruction of its managed roots (legacy
+  `.bak` moved over originals, as in Task 8) went through the production
+  path with a temp state root:
+  - `importPristine`: 198 files, including paramdef;
+  - `generateRun`: combined Items + Enemies with all item options, bosses and
+    area scaling, Fog off, 54 patched files including GameParam;
+  - a second run with the same seed is byte-identical in `mod/`;
+  - no write into the game during generation;
+  - `activate`: state `active`, and a second activation is refused;
+  - `restore`: the game matches the reconstruction and the pristine store
+    still verifies;
+  - the live install is byte-identical afterwards.
+- Manifest: records the master seed, per-attempt derived seeds and results,
+  combined engine version, validation, file hashes, snapshot binding and
+  appVersion.
+- Licensing: no legacy Python engine code and no FogMod sources are
+  tracked. The only vendored code is `kellernz1/ds-randomizer`
+  (GPL-3.0-only) with notices. SoulsFormats (GPL-3.0-only, NuGet) is noted in
+  both notice files. No game data is tracked.
+- Retries are bounded and deterministic, and are recorded per attempt (unit
+  tests). Combined retries are exercised only on `GENERATION_FAILED`.
+
+Not verified / release blockers (not fixed here; outside a correctness fix):
+- **Fog is not functional.** FogHost is unbuilt and no data root exists.
+  Fog-enabled generation always returns `FOG_PREREQUISITES_MISSING`. The
+  combined -> Fog bridge, Fog retries, the Fog package layout
+  (`gameTreeRoot: ''`) and Fog activation have never run. When FogHost is
+  built, its read set must fall within the snapshot roots, or staging fails
+  closed. The desktop default config enables Fog, so a default run fails
+  until then.
+- **No in-app recovery from `modified`.** `/api/game/restore` does not expose
+  `overwriteUnrecordedChanges`, and the desktop enables restore only for
+  `active`/`interrupted`. A Steam file verification leaves stray files in
+  managed roots, so the state stays `modified`.
+- **No re-import after a game update.** `version-changed` refuses restore,
+  and `importPristine` refuses with `SNAPSHOT_EXISTS`. The only way out is
+  deleting the state directory by hand.
+- Provenance remains "no legacy artifacts", not "proven vanilla" (no
+  reference hashes). The real-data proof used reconstructed, not
+  verified-vanilla, data.
+- Distribution: a public GPL fork with source tags, and FogMod `dist/` data
+  licensing, are unresolved (`docs/LICENSING.md`).
+- `engines/item/README.md` and `engines/enemy/README.md` still describe
+  legacy vendor probes that the backend no longer uses. These are docs only.
+
 Task 15 completes the desktop controls for the supported combined and Fog
 options. The run panel now shows the active game package, generation stage and
 percentage, logs, failures, and a persistent generated-package summary. A

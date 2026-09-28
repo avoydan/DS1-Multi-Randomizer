@@ -13,8 +13,12 @@ import { validateInstallation } from './installation.js';
  * ever consulted or created.
  */
 
-/** Game-relative directories covered by the pristine snapshot. */
-export const managedRoots = ['event', 'map/MapStudio', 'msg', 'param/GameParam', 'script', 'sfx'] as const;
+/**
+ * Game-relative directories covered by the pristine snapshot. The snapshot is
+ * the generation source, so this must include DsrDataTool's whole read set:
+ * without `paramdef` its `scan` silently omits item lots and starting data.
+ */
+export const managedRoots = ['event', 'map/MapStudio', 'msg', 'param/GameParam', 'paramdef', 'script', 'sfx'] as const;
 export const executableName = 'DarkSoulsRemastered.exe';
 /** Suffix of in-flight atomic copies inside the game directory. */
 export const tempSuffix = '.ds1tr-tmp';

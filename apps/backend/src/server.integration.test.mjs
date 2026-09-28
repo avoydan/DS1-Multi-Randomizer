@@ -4,12 +4,16 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
+import { fileURLToPath } from 'node:url';
+
+// Independent of the caller's cwd: `npm test` runs from apps/backend.
+const backendRoot = fileURLToPath(new URL('..', import.meta.url));
 
 test('desktop API exposes typed state and generation failure without touching a game', async (t) => {
   const stateRoot = await mkdtemp(path.join(os.tmpdir(), 'ds1tr-api-'));
   const port = 45000 + Math.floor(Math.random() * 10000);
   const child = spawn(process.execPath, ['dist/server.js'], {
-    cwd: path.resolve('apps/backend'),
+    cwd: backendRoot,
     env: { ...process.env, DS1TR_PORT: String(port), DS1TR_STATE_DIR: stateRoot },
     stdio: 'ignore',
   });
