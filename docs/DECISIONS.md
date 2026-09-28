@@ -349,3 +349,9 @@ Limit: without reference vanilla hashes, a snapshot proves only that no
 known legacy artifacts were present, not that the data is vanilla
 (`provenance.referenceHashesVerified: false`). The verifier is injectable
 (`verifyReferenceHashes`); no reference hash set exists yet.
+
+Limit: state is keyed by the game path hash, and activation leaves no marker
+in the game. If the library moves or the state directory is lost, an
+installation with an active package reads `no-snapshot`. `importPristine`
+would then accept the modded files as pristine. Reference hashes (or an
+in-game marker) are needed to close this.

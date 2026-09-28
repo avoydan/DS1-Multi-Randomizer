@@ -841,7 +841,7 @@ Completion record:
 - Commit: `1368fe6f5248aebb20e99e390c4986adf77314f9` (`feat(backend): add single activation/restore authority`).
 - Verification: backend `npm test` 102/102 passed, including the build and 15 focused `gameState` tests (2026-09-28).
 - Result: `GameStateAuthority` (`apps/backend/src/core/gameState.ts`) owns the pristine snapshot, state detection, journaled atomic activation with rollback, and guarded vanilla restore. The snapshot is wired into the pipeline as the trusted pristine source. Run manifests record `pristineSnapshotId` and `gameTreeRoot`. Backend version 0.14.0.
-- Blockers: no reference vanilla hash set exists, so a snapshot proves only the absence of legacy artifacts (`referenceHashesVerified: false`). Import/activate/restore are not yet exposed over HTTP/IPC (Task 14). Not exercised against a real DSR installation.
+- Blockers: no reference vanilla hash set exists, so a snapshot proves only the absence of legacy artifacts (`referenceHashesVerified: false`). Import/activate/restore are not yet exposed over HTTP/IPC (Task 14). Not exercised against a real DSR installation. State is keyed by game path and activation leaves no in-game marker, so a moved library or lost state directory lets an active package be re-imported as pristine.
 
 ---
 
