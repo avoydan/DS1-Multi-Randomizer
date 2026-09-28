@@ -905,7 +905,7 @@ Use the existing React/TypeScript architecture.
 
 Completion record:
 
-- Commit: See task 15 result record.
+- Commit: `281d2a4` (`feat(desktop): complete generation run controls`).
 - Verification: Desktop build and typecheck passed (2026-09-28).
 - Result: Supported item, enemy, and Fog controls are paired with visible
   generation progress, logs/errors, generated-package and game-state status,
