@@ -14,10 +14,13 @@
 // Usage (after `npm run build -w @ds1tr/backend` and building tools/fog-host in Release):
 //   DS1TR_FOG_DATA_ROOT=<fog data> node apps/backend/scripts/fogHostE2e.mjs "<live DSR directory>"
 //   DS1TR_E2E_KEEP=1 keeps the temp directory.
+//   DS1TR_E2E_ENEMIES=0 runs Items + Fog only; DS1TR_E2E_SEED sets the master seed.
+//   DS1TR_E2E_SWEEP=<n> runs <n> seeds (`<DS1TR_E2E_SEED>-<i>`) generation-only and prints
+//   per-attempt statistics, merge conflicts and instruction-level merges instead of the full proof.
 
 import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
-import { cp, mkdtemp, readdir, rename, rm } from 'node:fs/promises';
+import { cp, mkdtemp, readFile, readdir, rename, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -68,9 +71,9 @@ function sameMap(a, b) {
   return true;
 }
 
-const config = (gamePath) => ({
+const config = (gamePath, masterSeed = process.env.DS1TR_E2E_SEED ?? 'foghost-e2e-1') => ({
   gamePath,
-  masterSeed: process.env.DS1TR_E2E_SEED ?? 'foghost-e2e-1',
+  masterSeed,
   items: {
     enabled: true, randomizeWorldItems: true, randomizeProtectedItems: false, progressionLogic: true,
     guaranteeEarlyWeapon: true, balancedEarlyLoot: true, randomizeStartingClass: false,
@@ -87,6 +90,45 @@ const config = (gamePath) => ({
   },
   output: { includeDlc: true, generateSpoilerLog: false },
 });
+
+class SweepDone extends Error {}
+
+/** Generation-only statistics over many seeds (one reconstruction and snapshot). */
+async function sweep(count, prefix) {
+  const results = [];
+  for (let i = 1; i <= count; i++) {
+    const seed = `${prefix}-${i}`;
+    const workspace = path.join(temp, `sweep-${i}`);
+    const result = await generateRun({ config: config(game, seed), workspacePath: workspace }, () => {}, deps);
+    const merges = [];
+    for (const directory of await readdir(workspace).catch(() => [])) {
+      const log = await readFile(path.join(workspace, directory, 'foghost.log'), 'utf8').catch(() => '');
+      for (const match of log.matchAll(/merged (event\/\S+) event (\d+) at instruction level/g)) merges.push(`${match[1]}:${match[2]}`);
+    }
+    const conflicts = result.ok || result.code !== 'FOG_MERGE_CONFLICT' ? []
+      : [...result.message.matchAll(/event\/(\S+?): event (\d+)[^(;]*\(([^)]*)\)/g)].map((m) => `${m[1]}:${m[2]} (${m[3]})`);
+    const entry = {
+      seed, ok: result.ok, code: result.ok ? 'success' : result.code,
+      attempts: result.manifest.attempts.map((a) => `${a.combinedAttempt}/${a.fogAttempt}:${a.result}`),
+      conflicts,
+      merges: [...new Set(merges)],
+    };
+    results.push(entry);
+    console.log(JSON.stringify(entry));
+    await rm(workspace, { recursive: true, force: true });
+  }
+  const attempts = results.flatMap((r) => r.attempts);
+  const tally = (list) => list.reduce((acc, key) => ({ ...acc, [key]: (acc[key] ?? 0) + 1 }), {});
+  console.log(JSON.stringify({
+    seeds: results.length,
+    success: results.filter((r) => r.ok).length,
+    finalCodes: tally(results.map((r) => r.code)),
+    attemptResults: tally(attempts.map((a) => a.split(':')[1])),
+    seedsNeedingCombinedRetry: results.filter((r) => r.attempts.some((a) => a.endsWith('FOG_UPSTREAM_INCOMPATIBLE'))).length,
+    conflictEvents: tally(results.flatMap((r) => r.conflicts)),
+    instructionMerges: tally(results.flatMap((r) => r.merges)),
+  }, null, 2));
+}
 
 const temp = await mkdtemp(path.join(os.tmpdir(), 'ds1tr-fog-e2e-'));
 const game = path.join(temp, 'game');
@@ -111,6 +153,12 @@ try {
 
   const imported = await authority.importPristine(game);
   check('pristine import', imported.ok, imported.ok ? `${imported.snapshot.files.length} files` : imported.code);
+
+  if (process.env.DS1TR_E2E_SWEEP) {
+    await sweep(Number(process.env.DS1TR_E2E_SWEEP), process.env.DS1TR_E2E_SEED ?? 'sweep');
+    check('live installation unchanged', sameMap(await hashRoots(livePath), liveBefore));
+    throw new SweepDone();
+  }
 
   const logs = [];
   const started = Date.now();
@@ -140,7 +188,7 @@ try {
 
   check('live installation unchanged', sameMap(await hashRoots(livePath), liveBefore));
 } catch (error) {
-  check('proof completed', false, String(error));
+  if (!(error instanceof SweepDone)) check('proof completed', false, String(error));
 } finally {
   if (process.env.DS1TR_E2E_KEEP === '1') console.log(`kept ${temp}`);
   else await rm(temp, { recursive: true, force: true });

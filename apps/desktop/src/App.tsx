@@ -22,7 +22,10 @@ const initialConfig: RandomizerConfig = {
   enemies: {
     enabled: true,
     randomizeRegularEnemies: true,
-    randomizeBosses: true,
+    // Off by default: Fog is on by default, and boss randomization + Fog is rejected
+    // (FOG_BOSS_RANDOMIZATION_UNSUPPORTED) until that merge is proven. A user who turns
+    // Bosses on together with Fog gets that explicit error; nothing is disabled silently.
+    randomizeBosses: false,
     scaling: 'area',
   },
   fog: {

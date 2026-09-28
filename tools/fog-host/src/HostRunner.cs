@@ -139,6 +139,7 @@ namespace FogHost
             var hooks = new FogHostHooks { EventMerger = merge.Merge };
             hooks.PreservedNpcParams.UnionWith(preserved);
             new GameDataWriter { Hooks = hooks }.Write(opt, ann, graph, staging, FromGame.DS1R);
+            merge.ThrowIfConflicts();
             var unmerged = mergeInputs.Keys.Where(name => !merge.Merged.Contains(name)).ToList();
             if (unmerged.Count > 0) throw Invalid($"FogMod did not process combined event files: {string.Join(", ", unmerged)}");
 

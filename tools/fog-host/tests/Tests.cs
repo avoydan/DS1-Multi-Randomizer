@@ -46,6 +46,21 @@ namespace FogHost.Tests
                 Test("merge conflict when both sides edit an event", MergeBothEdited);
                 Test("merge conflict when combined deletes an event", MergeDeleted);
                 Test("merge conflict on non-init event-0 addition", MergeEvent0NonInit);
+                Test("11505392 pattern: combined deletion inside SKIP IF Event Flag range is refused", Event11505392Refused);
+                Test("11505392 pattern: combined deletion outside the skip range merges with FogMod's trigger rewrite", Event11505392OutsideSkipMerges);
+                Test("instruction merge: independent edits in one event succeed", IndependentEdits);
+                Test("instruction merge: deletion plus unrelated edit succeeds", DeletionPlusUnrelatedEdit);
+                Test("instruction merge: same-instruction edit is refused", SameInstructionRefused);
+                Test("instruction merge: adjacent edits are refused", AdjacentEditsRefused);
+                Test("instruction merge: skip-count change is refused", SkipCountChangeRefused);
+                Test("instruction merge: inserted END/WAIT is refused", InsertedControlFlowRefused);
+                Test("instruction merge: insertion inside a skip range is refused", InsertionInSkipRangeRefused);
+                Test("instruction merge: edit at the skip-range boundary is refused", SkipBoundaryRefused);
+                Test("instruction merge: count-preserving replacement inside a skip range merges", ReplacementInSkipRangeMerges);
+                Test("instruction merge: both sides changing conditions is refused", BothConditionsRefused);
+                Test("instruction merge: ambiguous alignment is refused", AmbiguousAlignmentRefused);
+                Test("instruction merge: parameters are re-indexed", ParametersReindexed);
+                Test("instruction merge: deleting a parameterized instruction is refused", ParameterizedDeletionRefused);
                 DataTest("altered or extended data root is FOG_DATA_MISSING", AlteredDataRoot);
                 DataTest("CRLF text files in data root still verify", CrlfDataRoot);
                 DataTest("staging with DarkSoulsRemastered.exe is FOG_STAGING_UNSAFE", UnsafeStaging);
@@ -338,21 +353,243 @@ namespace FogHost.Tests
             var (b, c, t) = Trio();
             c.Events[1].Instructions.Add(Ins(1000, 9, 9));
             t.Events[1].Instructions.Add(Ins(1000, 8, 8));
-            ExpectConflict(() => new EmevdMerge(new() { ["m"] = (b, c) }).Merge("m", t));
+            ExpectConflict(() => { var merge = new EmevdMerge(new() { ["m"] = (b, c) }); merge.Merge("m", t); merge.ThrowIfConflicts(); });
         }
 
         private static void MergeDeleted()
         {
             var (b, c, t) = Trio();
             c.Events.RemoveAt(2);
-            ExpectConflict(() => new EmevdMerge(new() { ["m"] = (b, c) }).Merge("m", t));
+            ExpectConflict(() => { var merge = new EmevdMerge(new() { ["m"] = (b, c) }); merge.Merge("m", t); merge.ThrowIfConflicts(); });
         }
 
         private static void MergeEvent0NonInit()
         {
             var (b, c, t) = Trio();
             c.Events[0].Instructions.Add(Ins(2003, 66, 1));
-            ExpectConflict(() => new EmevdMerge(new() { ["m"] = (b, c) }).Merge("m", t));
+            ExpectConflict(() => { var merge = new EmevdMerge(new() { ["m"] = (b, c) }); merge.Merge("m", t); merge.ThrowIfConflicts(); });
+        }
+
+        // ---------------------------------------------------------------- instruction-level merge tests
+
+        // Opcode structure of m15_00_00_00 event 11505392 as found in the real-format runs, with
+        // placeholder entity IDs (no game data): instruction 0 is SKIP 7 lines IF event flag.
+        private const int E1 = 111, E2 = 222, Area = 333;
+
+        private static List<EMEVD.Instruction> Event11505392Base() => new List<EMEVD.Instruction>
+        {
+            Ins(1003, 1, 7, 11),          // 0  SKIP 7 IF Event Flag 11 OFF
+            Ins(2004, 5, E1, 0),          // 1  Change Character Enable State
+            Ins(2004, 37, E1),            // 2  Force Character Treasure
+            Ins(2004, 29, E1, 1),         // 3  Set Character Backread State
+            Ins(4, 7, 0, E2, 1),          // 4  IF Character Backread Status
+            Ins(2004, 17, E2, 10, 0),     // 5  Request Character AI Command (combined deletes this)
+            Ins(2004, 20, E2),            // 6  Request Character AI Re-plan
+            Ins(1000, 4, 0),              // 7  END Unconditionally
+            Ins(2004, 1, E1, 0),          // 8  Set Character AI State
+            Ins(2004, 9, E1, 9000),       // 9  Set Special Animation(s)
+            Ins(2000, 0, 0, 5000, 0),     // 10 Initialize Event
+            Ins(2000, 0, 0, 5001, 0),     // 11 Initialize Event
+            Ins(3, 0, 1, 1, 0, 777),      // 12 IF Event Flag
+            Ins(3, 2, 1, 1, 10000, Area), // 13 IF In/Outside Area (FogMod rewrites this)
+            Ins(0, 0, 0, 1, 1),           // 14 IF Condition Group
+            Ins(2004, 1, E1, 1),          // 15 Set Character AI State
+            Ins(2003, 11, 1, E1, 0, 44),  // 16 Display Boss Health Bar
+        };
+
+        /// <summary>FogMod GameDataWriter.cs:1061-1071 boss-trigger rewrite of the IF In/Outside Area at 13.</summary>
+        private static List<EMEVD.Instruction> FogModTriggerRewrite(List<EMEVD.Instruction> instructions)
+        {
+            var result = instructions.ToList();
+            int index = result.FindIndex(i => i.Bank == 3 && i.ID == 2);
+            result.RemoveAt(index);
+            result.Insert(index, Ins(0, 0, 1, 1, -7));
+            foreach (int alt in new[] { Area, Area + 1 }) result.Insert(index, Ins(3, 2, -7, 1, 10000, alt));
+            return result;
+        }
+
+        private static EMEVD.Event EventOf(long id, IEnumerable<EMEVD.Instruction> instructions) => Evt(id, instructions.ToArray());
+
+        private static EMEVD.Event MergeOrNull(List<EMEVD.Instruction> b, List<EMEVD.Instruction> c, List<EMEVD.Instruction> t, out string reason) =>
+            InstructionMerge.Merge(EventOf(1, b), EventOf(1, c), EventOf(1, t), out reason);
+
+        private static void ExpectRefused(List<EMEVD.Instruction> b, List<EMEVD.Instruction> c, List<EMEVD.Instruction> t, string contains)
+        {
+            EMEVD.Event merged = MergeOrNull(b, c, t, out string reason);
+            Check(merged == null, "merge unexpectedly succeeded");
+            Check(reason.Contains(contains, StringComparison.Ordinal), $"reason \"{reason}\" lacks \"{contains}\"");
+        }
+
+        private static void ExpectSequence(EMEVD.Event merged, List<EMEVD.Instruction> expected, string reason)
+        {
+            Check(merged != null, $"merge refused: {reason}");
+            Check(merged.Instructions.Count == expected.Count && merged.Instructions.Zip(expected).All(p => EmevdMerge.SameInstruction(p.First, p.Second)),
+                "merged instruction sequence differs from the expected one");
+        }
+
+        private static void Event11505392Refused()
+        {
+            List<EMEVD.Instruction> b = Event11505392Base();
+            List<EMEVD.Instruction> c = b.Where((_, i) => i != 5).ToList();
+            List<EMEVD.Instruction> t = FogModTriggerRewrite(b);
+            // Through the file-level merge, exactly as FogHost runs it.
+            EMEVD.Event e0 = Evt(0, Ins(2000, 0, 0, 11505392, 0));
+            EMEVD baseEvd = Evd(e0, EventOf(11505392, b));
+            EMEVD combinedEvd = Evd(Copy(e0), EventOf(11505392, c));
+            EMEVD output = Evd(Copy(e0), EventOf(11505392, t));
+            try
+            {
+                var merge = new EmevdMerge(new() { ["m15_00_00_00.emevd.dcx"] = (baseEvd, combinedEvd) });
+                merge.Merge("m15_00_00_00.emevd.dcx", output);
+                merge.ThrowIfConflicts();
+            }
+            catch (FogHostException e) when (e.Code == "FOG_MERGE_CONFLICT")
+            {
+                Check(e.Message.Contains("event 11505392") && e.Message.Contains("inside the 7-line range of 1003[01] at base 0"), e.Message);
+                return;
+            }
+            throw new Exception("expected FOG_MERGE_CONFLICT");
+        }
+
+        private static void Event11505392OutsideSkipMerges()
+        {
+            List<EMEVD.Instruction> b = Event11505392Base();
+            List<EMEVD.Instruction> c = b.Where((_, i) => i != 9).ToList(); // outside SKIP 7 (1..7) and its boundary (8)
+            List<EMEVD.Instruction> t = FogModTriggerRewrite(b);
+            EMEVD.Event merged = MergeOrNull(b, c, t, out string reason);
+            ExpectSequence(merged, FogModTriggerRewrite(c), reason);
+        }
+
+        private static List<EMEVD.Instruction> Commands(int count) =>
+            Enumerable.Range(0, count).Select(i => Ins(2004, 1, 1000 + i, 0)).ToList();
+
+        private static void IndependentEdits()
+        {
+            List<EMEVD.Instruction> b = Commands(10);
+            var c = b.ToList(); c.Insert(2, Ins(2004, 9, 1, 2));
+            var t = b.ToList(); t[7] = Ins(2004, 1, 1007, 1);
+            var expected = b.ToList(); expected[7] = Ins(2004, 1, 1007, 1); expected.Insert(2, Ins(2004, 9, 1, 2));
+            ExpectSequence(MergeOrNull(b, c, t, out string reason), expected, reason);
+        }
+
+        private static void DeletionPlusUnrelatedEdit()
+        {
+            List<EMEVD.Instruction> b = Commands(10);
+            var c = b.Where((_, i) => i != 3).ToList();
+            var t = b.ToList(); t.Insert(8, Ins(2003, 66, 1, 2));
+            var expected = b.ToList(); expected.Insert(8, Ins(2003, 66, 1, 2)); expected.RemoveAt(3);
+            ExpectSequence(MergeOrNull(b, c, t, out string reason), expected, reason);
+        }
+
+        private static void SameInstructionRefused()
+        {
+            List<EMEVD.Instruction> b = Commands(6);
+            var c = b.ToList(); c[3] = Ins(2004, 1, 1003, 1);
+            var t = b.ToList(); t[3] = Ins(2004, 1, 1003, 2);
+            ExpectRefused(b, c, t, "both sides change");
+        }
+
+        private static void AdjacentEditsRefused()
+        {
+            List<EMEVD.Instruction> b = Commands(6);
+            var c = b.Where((_, i) => i != 3).ToList();
+            var t = b.ToList(); t.Insert(4, Ins(2003, 66, 1, 2));
+            ExpectRefused(b, c, t, "both sides change");
+        }
+
+        private static List<EMEVD.Instruction> WithSkip()
+        {
+            var b = Commands(12);
+            b[2] = Ins(1000, 3, 3); // SKIP 3 lines unconditionally: covers 3..5
+            return b;
+        }
+
+        private static void SkipCountChangeRefused()
+        {
+            List<EMEVD.Instruction> b = WithSkip();
+            var c = b.ToList(); c[2] = Ins(1000, 3, 2);
+            var t = b.ToList(); t[10] = Ins(2004, 1, 1010, 1);
+            ExpectRefused(b, c, t, "changes control-flow instruction 1000[03]");
+        }
+
+        private static void InsertedControlFlowRefused()
+        {
+            List<EMEVD.Instruction> b = Commands(10);
+            var c = b.ToList(); c.Insert(8, Ins(1000, 4, 0));
+            var t = b.ToList(); t[1] = Ins(2004, 1, 1001, 1);
+            ExpectRefused(b, c, t, "changes control-flow instruction 1000[04]");
+            var t2 = b.ToList(); t2.Insert(5, Ins(1001, 0, 1));
+            var c2 = b.ToList(); c2[9] = Ins(2004, 1, 1009, 1);
+            ExpectRefused(b, c2, t2, "changes control-flow instruction 1001[00]");
+        }
+
+        private static void InsertionInSkipRangeRefused()
+        {
+            List<EMEVD.Instruction> b = WithSkip();
+            var c = b.ToList(); c[10] = Ins(2004, 1, 1010, 1);
+            var t = b.ToList(); t.Insert(4, Ins(2004, 9, 1, 2));
+            ExpectRefused(b, c, t, "FogMod edit at base 4 is inside the 3-line range of 1000[03] at base 2");
+        }
+
+        private static void SkipBoundaryRefused()
+        {
+            List<EMEVD.Instruction> b = WithSkip();
+            var c = b.ToList(); c.Insert(6, Ins(2004, 9, 1, 2)); // right after the covered lines 3..5
+            var t = b.ToList(); t[10] = Ins(2004, 1, 1010, 1);
+            ExpectRefused(b, c, t, "inside the 3-line range");
+        }
+
+        private static void ReplacementInSkipRangeMerges()
+        {
+            List<EMEVD.Instruction> b = WithSkip();
+            var c = b.ToList(); c[4] = Ins(2004, 1, 1004, 1); // argument change inside SKIP 3 (3..5)
+            var t = b.ToList(); t.Insert(10, Ins(2004, 9, 1, 2)); // insertion far outside the range
+            var expected = b.ToList(); expected.Insert(10, Ins(2004, 9, 1, 2)); expected[4] = Ins(2004, 1, 1004, 1);
+            ExpectSequence(MergeOrNull(b, c, t, out string reason), expected, reason);
+        }
+
+        private static void BothConditionsRefused()
+        {
+            List<EMEVD.Instruction> b = Commands(10);
+            b[5] = Ins(3, 0, 1, 1, 0, 777);
+            var c = b.ToList(); c.Insert(1, Ins(3, 0, 2, 1, 0, 778));
+            var t = b.ToList(); t[5] = Ins(3, 0, 1, 0, 0, 777);
+            ExpectRefused(b, c, t, "both sides change condition-group instructions");
+        }
+
+        private static void AmbiguousAlignmentRefused()
+        {
+            var x = Ins(2004, 1, 5, 0);
+            var b = new List<EMEVD.Instruction> { x, x, Ins(2004, 2, 1), Ins(2004, 3, 1), Ins(2004, 4, 1) };
+            var c = new List<EMEVD.Instruction> { x, Ins(2004, 2, 1), Ins(2004, 3, 1), Ins(2004, 4, 1) };
+            var t = b.ToList(); t[4] = Ins(2004, 4, 2);
+            ExpectRefused(b, c, t, "ambiguous alignment");
+        }
+
+        private static EMEVD.Event WithParameter(List<EMEVD.Instruction> instructions, int index)
+        {
+            EMEVD.Event e = EventOf(1, instructions);
+            e.Parameters.Add(new EMEVD.Parameter(index, 4, 0, 4));
+            return e;
+        }
+
+        private static void ParametersReindexed()
+        {
+            List<EMEVD.Instruction> b = Commands(10);
+            var c = b.Where((_, i) => i != 1).ToList();
+            var t = b.ToList(); t[8] = Ins(2004, 1, 1008, 1);
+            EMEVD.Event merged = InstructionMerge.Merge(WithParameter(b, 4), WithParameter(c, 3), WithParameter(t, 4), out string reason);
+            Check(merged != null, $"merge refused: {reason}");
+            Check(merged.Parameters.Count == 1 && merged.Parameters[0].InstructionIndex == 3, "parameter not re-indexed to 3");
+        }
+
+        private static void ParameterizedDeletionRefused()
+        {
+            List<EMEVD.Instruction> b = Commands(10);
+            var c = b.Where((_, i) => i != 4).ToList();
+            var t = b.ToList(); t[8] = Ins(2004, 1, 1008, 1);
+            EMEVD.Event merged = InstructionMerge.Merge(WithParameter(b, 4), EventOf(1, c), WithParameter(t, 4), out string reason);
+            Check(merged == null && reason != null && reason.Contains("parameterized", StringComparison.Ordinal), $"expected refusal, got {reason ?? "success"}");
         }
 
         // ---------------------------------------------------------------- data tests
@@ -484,6 +721,12 @@ namespace FogHost.Tests
             MSB1.Part.Enemy enemy = msb.Parts.Enemies.First(e => e.NPCParamID > 1000 && e.CollisionName != null && e.ModelName != "c1000");
             int baseId = enemy.NPCParamID;
             enemy.NPCParamID = ScaledId;
+            // A randomized placement on a collision FogMod has no area annotation for (seen on real
+            // data): FogMod's scaling pass must not crash on it.
+            var annotated = new HashSet<string>(System.Text.RegularExpressions.Regex.Matches(
+                File.ReadAllText(Path.Combine(dataRoot, "dist", "fog.txt")), @"Col:\s*\S+\s+(\S+)").Select(m => m.Groups[1].Value));
+            string unannotated = msb.Parts.Collisions.Select(c => c.Name).First(name => !annotated.Contains(name));
+            msb.Parts.Enemies.First(e => e != enemy && e.NPCParamID > 1000 && e.CollisionName != null && e.ModelName != "c1000").CollisionName = unannotated;
             msb.Write(msbFile);
 
             string paramFile = Path.Combine(game, ParamPath.Replace('/', Path.DirectorySeparatorChar));

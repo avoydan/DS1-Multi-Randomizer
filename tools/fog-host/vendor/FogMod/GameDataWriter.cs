@@ -8,6 +8,9 @@
 //     conflicts are raised before any file is touched. Directory enumerations are ordinal-sorted.
 //  4. NpcParam rows preserved for the combined engine are neither restored, deleted, nor scaled.
 //  5. Combined EMEVD edits are three-way merged into FogMod's output before it is written.
+//  6. Scaling: an enemy on a collision with no annotated area is grouped under a sentinel
+//     instead of a null Dictionary key (which threw); the sentinel has no area ratio, so the
+//     group stays unscaled exactly as FogMod's own null-area handling intended.
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -29,6 +32,8 @@ namespace FogMod
     {
         // FogHost: host-supplied compatibility hooks.
         public FogHost.FogHostHooks Hooks { get; set; } = new FogHost.FogHostHooks();
+        // FogHost: Dictionary keys cannot be null; this key is never an area in g.AreaRatios.
+        private const string UnscaledArea = "\0FogHost:unscaled";
         private int tempColEventBase = 5350; // or 5900 might also work
         // These events are automatically (and manually, in the case of the last 4) added by enemy randomizer, so preserve them.
         private HashSet<int> enemyRandoEvents = new HashSet<int>(new[] {
@@ -288,7 +293,7 @@ namespace FogMod
                         else if (rankDefaults.TryGetValue(map, out string defaultArea)) area = defaultArea;
                         else area = null;
                         if (!npcs.ContainsKey(e.NPCParamID)) npcs[e.NPCParamID] = new Dictionary<string, List<MSB1.Part.Enemy>>();
-                        AddMulti(npcs[e.NPCParamID], area, e);
+                        AddMulti(npcs[e.NPCParamID], area ?? UnscaledArea, e);
                     }
                 }
                 void setScalingSp(PARAM.Row row, int sp)

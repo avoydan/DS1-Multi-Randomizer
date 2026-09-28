@@ -60,6 +60,12 @@ CRLF after patching.
    scaled. This is the v1 scaling rule.
 5. **EMEVD merge hook.** `Hooks.MergeEvents` runs after FogMod's per-file
    edits and before the file is written.
+6. **Unannotated-collision scaling fix** (FogHost 0.2.0). In the scale pass,
+   an enemy whose collision has no area annotation got `area = null`, which
+   upstream then used as a `Dictionary` key (`ArgumentNullException`). The
+   group is now keyed by a sentinel that is never in `g.AreaRatios`, so it
+   stays unscaled, as upstream's own null-area handling intended.
+   Randomized enemy placements exposed this in 11 of 40 real-format seeds.
 
 ## SoulsIds
 
