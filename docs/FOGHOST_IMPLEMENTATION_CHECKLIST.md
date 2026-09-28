@@ -52,7 +52,7 @@ Read before starting: `AGENTS.md`, this file, `docs/FOGHOST_INTEGRATION.md`
 | SoulsIds | `https://github.com/thefifthmatt/SoulsIds` | `e31a6fdb516491b6c731cb2847f22faaabbcf925` (2022-02-15) | Apache-2.0 (root `LICENSE`), verified |
 | SoulsFormats | NuGet `JuicerMV.SoulsFormats` | `0.1.3` (nuspec: source `juicermv/SoulsFormats@c3f100941fa67756407e08b2793381edaabd466f`) | `GPL-3.0-only` (nuspec license expression). Already listed in `THIRD_PARTY_NOTICES.md`. |
 | YamlDotNet | NuGet | `7.0.0` (FogMod `packages.config`) | MIT |
-| Newtonsoft.Json | NuGet | SoulsIds pins `12.0.3`, which has advisory GHSA-5crp-9r3c-p9vr (High). Use **`13.0.3`** (API-compatible) and confirm that it builds. | MIT |
+| Newtonsoft.Json | NuGet | **`13.0.3`**. SoulsIds pins `12.0.3`, which has advisory GHSA-5crp-9r3c-p9vr (High). 13.0.3 builds and runs in the probe, with no NU1903. | MIT |
 
 - **SoulsIds `e31a6fd`:** SoulsIds had no commit contemporaneous with
   `6e6dc78` that compiles against the modern SoulsFormats. `e31a6fd` compiles
@@ -139,6 +139,12 @@ Git blob IDs, the same method as `engines/combined/vendor/UPSTREAM_PIN.md`:
 ```sh
 git -C "$LOCALAPPDATA/Temp/fogmod-src" ls-tree -r 6e6dc78 dist/fog.txt dist/DS1R
 ```
+
+When verifying files on disk against those IDs, use
+`git hash-object --no-filters <file>` or a raw SHA-256. The machine's global
+`core.autocrlf=true` makes a plain `git hash-object` rewrite line endings in
+the `Layouts/*.xml` and `fog.txt` input, which produces false mismatches.
+`git archive 6e6dc78 dist/fog.txt dist/DS1R` extracts byte-identical files.
 
 **Open user decision (licensing, `docs/LICENSING.md`):** `dist/DS1R` is
 FromSoftware-derived data (MSB/EMEVD/param/ESD/FMG with FogMod edits).
@@ -261,6 +267,22 @@ impossible. `HostRunner` reimplements its DS1 body (`Randomizer.cs` at
 
 Progress lines go to the saved stdout, one JSON object per line:
 `{"type":"progress","stage":"…","message":"…"}`.
+
+### Error classifier at `6e6dc78`
+
+The error table in `FOGHOST_INTEGRATION.md` was read at `28711c3`. The
+`throw` sites at `6e6dc78` are:
+
+| Message prefix | File | Code |
+|---|---|---|
+| `Couldn't find … in item lots`, `Item … found in both …` | `ItemReader.cs:72,43` | `FOG_UPSTREAM_INCOMPATIBLE` (`combined`) |
+| `Couldn't solve seed …`, `Ran out of eligible edges`, `Could not find edge into unreachable areas …`, **`Bad seed: Can't find edge to self-link …`** (new here) | `GraphConnector.cs:249,58,141,225,240` | `FOG_SEED_UNSOLVABLE` (`fog`) |
+| `Internal error…`, `Connected edge still left…`, `No outgoing edge found to change` | `GraphConnector.cs` | `FOG_ENGINE_FAILED` |
+
+`No swappable edge found to inaccessible areas…` does **not** exist at
+`6e6dc78`; drop it from the classifier. The key-item rule is unchanged:
+`ItemReader` scans only `ann.LotLocations` (`:24`), and `randomonly` and
+`hard` (without `opt["hard"]`) are exempt (`:64-72`).
 
 ## 7. Target framework and determinism
 
@@ -433,8 +455,9 @@ The output is `tools/fog-host/bin/Release/net8.0/FogHost.exe`
 |---|---|
 | `28711c3` + SoulsIds `e31a6fd` + JuicerMV 0.1.3, net8.0 | Builds, with only CS0612/NU1903 warnings. **Runtime:** `KeyNotFoundException 'o2920_0000'` in `Graph.Construct`. With `FullName` patched to `Name ?? ID`, every one of 10 seeds fails in `GraphConnector` (§0). |
 | `6e6dc78`, unported, + the same deps | 17 compile errors, all in `GameDataWriter.cs`, all covered by the §5 port table. |
-| `6e6dc78` + §5 port + the same deps, net8.0 | Builds. |
+| `6e6dc78` + §5 port + the same deps, net8.0 | Builds, also with Newtonsoft.Json 13.0.3. |
 | `dryrun`, options `world boss warp scale lords` | Seeds 0, 1, 42, 2147483647, 2147483648, 4294967295 and 3141592653 all solve, and staging is byte-identical afterwards. |
+| Data root | `git archive 6e6dc78 dist/fog.txt dist/DS1R` (60 files, byte-identical to the §4 blobs). All runs below were repeated with this exact pinned root. |
 | `write`, seed 3141592653 | 55 files (18 event, 18 MSB, 1 GameParam, 1 msg, 17 talk) plus 55 `.bak`, in about 1.7 s. |
 | Determinism | Two separate processes produce byte-identical output hashes; seed 7 produces different output. |
 

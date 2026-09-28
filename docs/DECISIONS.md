@@ -221,7 +221,10 @@ Date: 2026-09-28
 
 Fog runs in a dedicated console host, `tools/fog-host` (`FogHost.exe
 generate --request <json> --response <json>`). The host compiles FogMod's
-engine sources at the audited commit `28711c3f…e526` directly. It never
+engine sources at the audited commit `28711c3f…e526` directly.
+(**Superseded pin, 2026-09-28:** `28711c3` cannot generate DS1R; use
+`6e6dc78`. See `docs/FOGHOST_IMPLEMENTATION_CHECKLIST.md` §0. The
+implementing task records the full decision.) It never
 uses `Program.cs` (its CLI path forces `FromGame.DS3`), `MainForm*` or
 WinForms. It forces `FromGame.DS1R`, sets the CWD to a supplied FogMod data
 root, points FogMod's `gameDir` at a fresh per-attempt staging directory
