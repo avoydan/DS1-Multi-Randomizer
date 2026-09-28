@@ -239,6 +239,13 @@ test('leaves the live game directory untouched', async (t) => {
   const { workspacePath, gamePath } = await makeWorkspace(t);
   const before = await snapshotDirectory(gamePath);
 
+  // Guards the guard: a `readdir` that ignored `recursive` would make the
+  // comparison below pass while comparing almost nothing.
+  assert.deepEqual(
+    before.map(([relative]) => relative.split(path.sep).join('/')),
+    ['DarkSoulsRemastered.exe', 'map/MapStudio/m10_01_00_00.msb'],
+  );
+
   const result = await executeCombinedGeneration(
     request({ gamePath, workspacePath }),
     () => {},
