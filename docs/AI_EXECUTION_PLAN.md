@@ -882,7 +882,7 @@ Completion record:
 
 # TASK 15 — CODEX
 
-State: PENDING
+State: DONE
 
 ## User interface completion
 
@@ -905,10 +905,14 @@ Use the existing React/TypeScript architecture.
 
 Completion record:
 
-- Commit:
-- Verification:
-- Result:
-- Blockers:
+- Commit: See task 15 result record.
+- Verification: Desktop build and typecheck passed (2026-09-28).
+- Result: Supported item, enemy, and Fog controls are paired with visible
+  generation progress, logs/errors, generated-package and game-state status,
+  activation, and restore. Activation refuses a package after settings change.
+  Desktop version 0.4.0.
+- Blockers: FogHost is still unbuilt; Fog-enabled runs remain a prerequisite
+  failure. Task 16 owns the end-to-end audit.
 
 ---
 

@@ -1,5 +1,15 @@
 # Implementation status
 
+Task 15 completes the desktop controls for the supported combined and Fog
+options. The run panel now shows the active game package, generation stage and
+percentage, logs, failures, and a persistent generated-package summary. A
+generated package can be activated only while the current settings still match
+the settings used to generate it; changing options also clears a stale plan
+preview. Empty seeds and a configuration with no enabled engine cannot start
+generation. Desktop version 0.4.0. Desktop build and typecheck passed
+(2026-09-28). Fog-enabled generation remains dependent on an unbuilt FogHost;
+Task 16 owns the final end-to-end audit.
+
 Task 14 connects the existing backend pipeline and game-state authority to
 the desktop application. The backend exposes state, pristine import, streamed
 generation, activation, and vanilla restore endpoints. The desktop sends the

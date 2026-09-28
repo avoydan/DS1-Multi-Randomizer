@@ -53,6 +53,13 @@ input:focus, select:focus { border-color: #8e7043; box-shadow: 0 0 0 3px #8e7043
 .action-card { display: flex; justify-content: space-between; align-items: center; gap: 24px; }
 .run-actions { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 16px; }
 .run-card progress { width: 100%; margin-top: 16px; accent-color: #d0a05b; }
+.progress-status { margin-top: 18px; color: #d4ad76; font-size: 12px; }
+.progress-status progress { display: block; margin-top: 8px; }
+.generated-status { display: grid; gap: 5px; margin-top: 18px; padding: 13px; border: 1px solid #28583a; border-radius: 9px; background: #14251c; color: #a4d9b5; font-size: 12px; }
+.generated-status code { overflow-wrap: anywhere; color: #d9e8dc; }
+.stale-warning { color: #e4b978; }
+.log-panel { margin-top: 16px; color: #c7cdd6; font-size: 12px; }
+.log-panel summary { cursor: pointer; }
 .run-logs { max-height: 220px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; background: #10141b; color: #c7cdd6; padding: 12px; border-radius: 9px; font-size: 12px; }
 .primary { border: 0; background: linear-gradient(135deg, #d0a05b, #a87839); color: #111419; font-weight: 850; padding: 13px 21px; border-radius: 10px; box-shadow: 0 9px 25px #b47e3540; }
 .primary:hover { filter: brightness(1.07); }

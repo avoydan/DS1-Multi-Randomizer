@@ -88,16 +88,30 @@ export function App() {
   const [gameState, setGameState] = useState<GameStateReport | null>(null);
   const [generation, setGeneration] = useState<GenerationResult | null>(null);
   const [progress, setProgress] = useState(0);
+  const [progressStage, setProgressStage] = useState('');
   const [logs, setLogs] = useState<string[]>([]);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [generatedConfig, setGeneratedConfig] = useState<string | null>(null);
 
   useEffect(() => {
     api.health().then(setBackendOnline);
   }, []);
 
+  useEffect(() => {
+    setPlan(null);
+  }, [config]);
+
   const enabledCount = useMemo(
     () => Number(config.items.enabled || config.enemies.enabled) + Number(config.fog.enabled),
     [config],
   );
+  const generationMatchesConfig = generatedConfig === JSON.stringify(config);
+
+  const reportError = (error: unknown) => {
+    const detail = error instanceof Error ? error.message : String(error);
+    setErrorMessage(detail);
+    setMessage(detail);
+  };
 
   const setItem = <K extends keyof RandomizerConfig['items']>(key: K, value: RandomizerConfig['items'][K]) =>
     setConfig((current) => ({ ...current, items: { ...current.items, [key]: value } }));
@@ -114,18 +128,22 @@ export function App() {
       setPlan(null);
       setGameState(null);
       setGeneration(null);
+      setGeneratedConfig(null);
+      setErrorMessage(null);
     }
   };
 
   const validate = async () => {
     setBusy(true);
+    setProgressStage('');
+    setErrorMessage(null);
     try {
       const result = await api.validateInstallation(config.gamePath);
       setValidation(result);
       setGameState(await api.state(config.gamePath));
       setMessage(result.valid ? 'Dark Souls Remastered installation looks valid.' : 'Installation needs attention.');
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : String(error));
+      reportError(error);
     } finally {
       setBusy(false);
     }
@@ -133,58 +151,75 @@ export function App() {
 
   const importPristine = async () => {
     setBusy(true);
+    setProgressStage('');
+    setErrorMessage(null);
     try {
       const result = await api.importPristine(config.gamePath);
       setMessage(result.ok ? 'Pristine snapshot imported.' : `${result.code}: ${result.message}`);
+      if (!result.ok) setErrorMessage(`${result.code}: ${result.message}${result.problems.length ? ` ${result.problems.join(' ')}` : ''}`);
       setGameState(await api.state(config.gamePath));
-    } catch (error) { setMessage(String(error)); }
+    } catch (error) { reportError(error); }
     finally { setBusy(false); }
   };
 
   const generateRun = async () => {
     setBusy(true);
     setProgress(0);
+    setProgressStage('Preparing generation');
     setLogs([]);
     setGeneration(null);
+    setGeneratedConfig(null);
+    setErrorMessage(null);
+    const submittedConfig = JSON.stringify(config);
     try {
       const result = await api.generate(config, (event) => {
-        if (event.type === 'progress') { setProgress(event.progress); setMessage(event.message); }
+        if (event.type === 'progress') { setProgress(event.progress); setProgressStage(event.stage); setMessage(event.message); }
         else setLogs((current) => [...current, `[${event.stage}] ${event.level}: ${event.message}`]);
       });
       setGeneration(result);
+      if (result.ok) setGeneratedConfig(submittedConfig);
+      else setErrorMessage(`Generation failed at ${result.stage}: ${result.code}: ${result.message}`);
       setMessage(result.ok ? `Package generated: ${result.packagePath}` : `${result.code}: ${result.message}`);
-    } catch (error) { setMessage(String(error)); }
+    } catch (error) { reportError(error); }
     finally { setBusy(false); }
   };
 
   const activate = async () => {
-    if (!generation?.ok) return;
+    if (!generation?.ok || !generationMatchesConfig) return;
     setBusy(true);
+    setProgressStage('');
+    setErrorMessage(null);
     try {
       const result = await api.activate(config.gamePath, generation.packagePath);
       setMessage(result.ok ? 'Generated package activated.' : `${result.code}: ${result.message}`);
+      if (!result.ok) setErrorMessage(`${result.code}: ${result.message}${result.problems.length ? ` ${result.problems.join(' ')}` : ''}`);
       setGameState(await api.state(config.gamePath));
-    } catch (error) { setMessage(String(error)); }
+    } catch (error) { reportError(error); }
     finally { setBusy(false); }
   };
 
   const restore = async () => {
     setBusy(true);
+    setProgressStage('');
+    setErrorMessage(null);
     try {
       const result = await api.restore(config.gamePath);
       setMessage(result.ok ? `Vanilla files restored (${result.restored}).` : `${result.code}: ${result.message}`);
+      if (!result.ok) setErrorMessage(`${result.code}: ${result.message}${result.problems.length ? ` ${result.problems.join(' ')}` : ''}`);
       setGameState(await api.state(config.gamePath));
-    } catch (error) { setMessage(String(error)); }
+    } catch (error) { reportError(error); }
     finally { setBusy(false); }
   };
 
   const previewPlan = async () => {
     setBusy(true);
+    setProgressStage('');
+    setErrorMessage(null);
     try {
       setPlan(await api.plan(config));
       setMessage('Pipeline plan generated. Planned extensions remain disabled until implemented.');
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : String(error));
+      reportError(error);
     } finally {
       setBusy(false);
     }
@@ -202,7 +237,7 @@ export function App() {
           <div className="section-title"><span>01</span><h2>Game, seed & output</h2></div>
           <label className="field-label">Dark Souls Remastered directory</label>
           <div className="path-row">
-            <input value={config.gamePath} onChange={(event) => { setConfig({ ...config, gamePath: event.target.value }); setGameState(null); setGeneration(null); setValidation(null); }} placeholder="C:\\Program Files (x86)\\Steam\\steamapps\\common\\DARK SOULS REMASTERED" />
+            <input value={config.gamePath} onChange={(event) => { setConfig({ ...config, gamePath: event.target.value }); setGameState(null); setGeneration(null); setGeneratedConfig(null); setValidation(null); }} placeholder="C:\\Program Files (x86)\\Steam\\steamapps\\common\\DARK SOULS REMASTERED" />
             <button className="secondary" onClick={selectGame}>Browse</button>
             <button className="secondary" onClick={validate} disabled={busy || !config.gamePath}>Validate</button>
           </div>
@@ -289,20 +324,21 @@ export function App() {
           </section>
         </div>
 
-        <section className="card action-card"><div><div className="eyebrow">PIPELINE</div><h2>{enabledCount} engines enabled</h2><p>{message}</p></div><button className="primary" onClick={previewPlan} disabled={busy || !config.masterSeed}>Preview randomization plan</button></section>
+        <section className="card action-card"><div><div className="eyebrow">PIPELINE</div><h2>{enabledCount} engines enabled</h2><p role="status">{message}</p>{errorMessage && <div className="notice error" role="alert">{errorMessage}</div>}</div><button className="primary" onClick={previewPlan} disabled={busy || !config.masterSeed.trim()}>Preview randomization plan</button></section>
 
         <section className="card run-card">
           <div className="section-title"><span>02</span><h2>Run and game state</h2></div>
-          <p>Installation: {gameState?.state ?? 'not checked'}{gameState?.problems.length ? ` — ${gameState.problems.join(' ')}` : ''}</p>
+          <p>Installation: <strong>{gameState?.state ?? 'not checked'}</strong>{gameState?.problems.length ? ` — ${gameState.problems.join(' ')}` : ''}</p>
+          {gameState?.activePackage && <p>Active package: {gameState.activePackage}</p>}
           <div className="run-actions">
             <button className="secondary" onClick={importPristine} disabled={busy || !config.gamePath || gameState?.state !== 'no-snapshot'}>Import pristine data</button>
-            <button className="primary" onClick={generateRun} disabled={busy || !config.gamePath || !config.masterSeed || gameState?.state !== 'vanilla'}>Generate run</button>
-            <button className="secondary" onClick={activate} disabled={busy || !generation?.ok || gameState?.state !== 'vanilla'}>Activate generated run</button>
+            <button className="primary" onClick={generateRun} disabled={busy || !config.gamePath || !config.masterSeed.trim() || gameState?.state !== 'vanilla' || enabledCount === 0}>Generate run</button>
+            <button className="secondary" onClick={activate} disabled={busy || !generation?.ok || !generationMatchesConfig || gameState?.state !== 'vanilla'}>Activate generated run</button>
             <button className="secondary" onClick={restore} disabled={busy || !gameState || !['active', 'interrupted'].includes(gameState.state)}>Restore vanilla</button>
           </div>
-          {busy && <progress value={progress} max={1} aria-label="Generation progress" />}
-          {generation?.ok && <p>Generated {generation.manifest.files.length} files for seed {generation.manifest.masterSeed}.</p>}
-          {logs.length > 0 && <pre className="run-logs" aria-label="Generation logs">{logs.join('\n')}</pre>}
+          {busy && progressStage && <div className="progress-status"><span>{progressStage}: {Math.round(progress * 100)}%</span><progress value={progress} max={1} aria-label="Generation progress" /></div>}
+          {generation?.ok && <div className="generated-status" role="status"><strong>Generated run ready</strong><span>Seed: {generation.manifest.masterSeed} · {generation.manifest.files.length} files</span><code>{generation.packagePath}</code>{!generationMatchesConfig && <span className="stale-warning">Settings changed since generation. Regenerate to activate these settings.</span>}</div>}
+          <details className="log-panel" open={logs.length > 0}><summary>Generation logs ({logs.length})</summary><pre className="run-logs" aria-label="Generation logs">{logs.length ? logs.join('\n') : 'No generation logs yet.'}</pre></details>
         </section>
 
         {plan && <section className="card plan-card"><div className="section-title"><span>02</span><h2>Pipeline preview</h2></div><div className="seed-grid">{plan.stages.map((stage) => <div key={stage.engine}><span>{stage.engine}</span><strong>{stage.enabled ? stage.seed : 'disabled'}</strong></div>)}</div><div className="engine-status-list">{plan.engineStatus.map((status) => <div key={status.name} className="engine-status"><strong>{status.name}</strong><span className={`pill ${status.ready ? 'ready' : ''}`}>{status.mode}</span><p>{status.detail}</p></div>)}</div></section>}
