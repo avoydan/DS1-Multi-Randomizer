@@ -18,7 +18,7 @@
 //   DS1TR_E2E_SWEEP=<n> runs <n> seeds (`<DS1TR_E2E_SEED>-<i>`) generation-only and prints
 //   per-attempt statistics, merge conflicts and instruction-level merges instead of the full proof.
 //   DS1TR_E2E_FOG=0 disables Fog (combined-only regression sweep).
-//   DS1TR_E2E_BOSSES=1 enables boss randomization (only valid with DS1TR_E2E_FOG=0).
+//   DS1TR_E2E_BOSSES=1 enables boss randomization.
 //   DS1TR_E2E_VERIFY_SKIPS=<DsrDataTool.Tests.exe> checks every combined package's EMEVD skip ranges
 //   against the pristine snapshot (`verify-skips`, engines/combined/tests/DsrDataTool.Tests).
 
@@ -106,9 +106,11 @@ async function sweep(count, prefix) {
     const workspace = path.join(temp, `sweep-${i}`);
     const result = await generateRun({ config: config(game, seed), workspacePath: workspace }, () => {}, deps);
     const merges = [];
+    const overlays = [];
     for (const directory of await readdir(workspace).catch(() => [])) {
       const log = await readFile(path.join(workspace, directory, 'foghost.log'), 'utf8').catch(() => '');
       for (const match of log.matchAll(/merged (event\/\S+) event (\d+) at instruction level/g)) merges.push(`${match[1]}:${match[2]}`);
+      for (const match of log.matchAll(/boss overlay applied to (event\/\S+) event (\d+)/g)) overlays.push(`${match[1]}:${match[2]}`);
     }
     const conflicts = result.ok || result.code !== 'FOG_MERGE_CONFLICT' ? []
       : [...result.message.matchAll(/event\/(\S+?): event (\d+)[^(;]*\(([^)]*)\)/g)].map((m) => `${m[1]}:${m[2]} (${m[3]})`);
@@ -117,7 +119,8 @@ async function sweep(count, prefix) {
       attempts: result.manifest.attempts.map((a) => `${a.combinedAttempt}/${a.fogAttempt}:${a.result}`),
       conflicts,
       merges: [...new Set(merges)],
-      ...(result.ok || result.code === 'FOG_MERGE_CONFLICT' ? {} : { message: result.message.slice(0, 3000) }),
+      overlays: [...new Set(overlays)],
+      ...(result.ok ? {} : { message: result.message.slice(0, 6000) }),
     };
     let combinedEdited = new Set();
     if (process.env.DS1TR_E2E_VERIFY_SKIPS) {
@@ -161,6 +164,7 @@ async function sweep(count, prefix) {
     seedsNeedingCombinedRetry: results.filter((r) => r.attempts.some((a) => a.endsWith('FOG_UPSTREAM_INCOMPATIBLE'))).length,
     conflictEvents: tally(results.flatMap((r) => r.conflicts)),
     instructionMerges: tally(results.flatMap((r) => r.merges)),
+    bossOverlays: tally(results.flatMap((r) => r.overlays)),
     skipChecksFailed: results.flatMap((r) => r.skipChecks ?? []).filter((c) => !c.includes('exit 0')).length,
     skipChecks: results.flatMap((r) => r.skipChecks ?? []).length,
     fogCombinedEventMismatches: tally(results.flatMap((r) => r.fogCombinedEventMismatches ?? [])),
@@ -173,8 +177,6 @@ const game = path.join(temp, 'game');
 const authority = new GameStateAuthority({ stateRoot: path.join(temp, 'state'), isGameRunning: async () => false });
 const deps = {
   getPristineSource: (gamePath) => authority.getPristineSource(gamePath),
-  // DS1TR_E2E_BOSS_FOG_MEASURE=1 runs bosses + Fog while the product still rejects it.
-  measureBossRandomizationWithFog: process.env.DS1TR_E2E_BOSS_FOG_MEASURE === '1',
 };
 
 try {
