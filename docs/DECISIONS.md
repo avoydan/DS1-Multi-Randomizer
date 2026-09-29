@@ -498,3 +498,47 @@ Allowing a skip-count change that is exactly explained by the same side's own
 count-changing edits in its range would be a change to rule 4. That is an open user
 decision; the rules were not changed.
 
+## FogHost 0.3.0: derived SKIP-count adjustments are not control-flow edits; bridge reads nested placements
+
+Date: 2026-09-29. User-approved narrowing of merge rules 3 (overlap/adjacency) and 4
+(control flow). Details: `docs/FOGHOST_INTEGRATION.md`, "Derived skip-count adjustment".
+
+- **Alignment.** Skips are aligned ignoring only their line-count byte.
+- **When a count change is accepted.** A skip whose count changed is a derived
+  structural adjustment only if all of these hold:
+  - opcode, other arguments and layer are unchanged;
+  - every same-side edit touching the range lies wholly inside it;
+  - the adjusted skip covers exactly the surviving base lines plus the side's own
+    inserted lines, which also proves the count delta;
+  - the other side does not edit `[p+1, p+n+1]` or the skip;
+  - the alignment is unambiguous;
+  - the count is not taken from an event parameter.
+- **What the exception covers.** Only the hunks accounted for by such an adjustment are
+  exempt from rules 3 and 6. Every other skip change, and every other control-flow edit,
+  is still `FOG_MERGE_CONFLICT`.
+- **Bridge bug fixed (backend 0.16.2).** `buildFogCompatibility` read `enemies`/`bosses`
+  at the top level of `randomizer.json`, but they live under `placements`. So
+  `preservedNpcParams` was always empty in production, and FogMod restored vanilla
+  NpcParam IDs over the combined engine's scaled rows. Top-level lists are now rejected
+  rather than silently yielding nothing.
+- **Invariant 1 false positive fixed.** DS1 human enemies use `c0000`, declared as a
+  Player model; the check only looked at Enemy models, which also fails on vanilla data.
+  A model must now keep every declaration category it had in the input, and must be
+  declared somewhere.
+
+**Result on real-format data** (40 seeds, Items + Enemies + Fog):
+
+- 40/40 succeed, with post-write invariants passing on all;
+- `11505392` and `11500001` merge at instruction level in 40 seeds, `11600400` in 39;
+- no conflicts remain;
+- combined packages pass `verify-skips` 47/47;
+- final Fog packages, checked against FogMod's own templates, have 0 skip mismatches in
+  any event the combined engine or the merge touched.
+
+**Upstream FogMod observation (not fixed; outside this scope).** In every seed, 11
+boss-trigger events that only FogMod edits end up with skip ranges covering different
+instructions: `11015393`, `11205383`, `11215002/3/12/13`, `11405393`, `11415343/383`,
+`11505393`, `11515393`. This comes from FogMod's runtime boss-trigger rewrite, which
+replaces a `3[02]` with several instructions without adjusting the enclosing skip.
+Stock FogMod does the same, so it is pre-existing FogMod behavior.
+

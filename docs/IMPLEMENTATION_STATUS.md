@@ -1,5 +1,32 @@
 # Implementation status
 
+FogHost 0.3.0 and backend 0.16.2 (2026-09-29). **Items + Enemies + Fog works on real-format
+data: 40/40 seeds.**
+
+- **Changes:**
+  - derived SKIP-count adjustments are accepted by the merge under strict conditions;
+  - the Fog bridge now reads `randomizer.json` `placements` (the preserved-row list had
+    been empty in production);
+  - the model-declaration invariant false positive is fixed.
+- **Verification:**
+  - FogHost self-tests 47/47;
+  - DsrDataTool tests 14/14;
+  - backend 109/109 with the data root;
+  - typecheck clean.
+- **Sweep** (`fogHostE2e.mjs`, 40 seeds; live install unchanged):
+  - 40/40 succeed, with post-write invariants passing;
+  - 0 merge conflicts;
+  - combined `verify-skips` 47/47;
+  - final Fog packages have 0 skip mismatches in combined or merged events;
+  - key items fell outside annotated lots on 7 of 47 attempts (5 seeds retried, none
+    exhausted).
+- **Remaining:**
+  - 11 FogMod-only boss-trigger events have skip ranges broken by stock FogMod's own
+    runtime rewrite. This is an upstream observation, not fixed here.
+  - Bosses + Fog is still rejected.
+  - The FogHost and DsrDataTool test consoles run outside `npm test`.
+  - There is no public GPL fork yet.
+
 DsrDataTool skip-count fix (2026-09-28; backend 0.16.1; user-authorized local vendored
 modification). The combined engine now keeps DS1 "skip N lines" counts consistent when it
 removes or inserts event instructions. Details: `docs/DECISIONS.md`.

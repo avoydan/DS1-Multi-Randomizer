@@ -571,6 +571,25 @@ its stock carry-over. Events are compared by ID and full content
         no parameterized instruction is deleted. Merged parameters are B's,
         re-indexed.
 
+     **Derived skip-count adjustment (FogHost 0.3.0).** Skips are aligned
+     while ignoring only their line-count byte. A skip whose count changed is
+     accepted as a mechanical consequence of that side's own edits, not as a
+     control-flow edit, only when all of these hold:
+     - the opcode, the other arguments and the layer are unchanged;
+     - every one of the side's hunks that touches the base range
+       `[p+1, p+n]` lies wholly inside it. A pure insertion right after the
+       last covered line counts as inside only if the new count covers it.
+     - the adjusted skip covers exactly the surviving base lines of the range
+       plus the side's own inserted lines, which also proves the count delta;
+     - the other side has no edit in `[p+1, p+n+1]` and does not change that
+       skip's count;
+     - the alignment is unambiguous;
+     - the count is not taken from an event parameter.
+
+     The merged event takes the adjusted skip. Rules 3 and 6 then ignore only
+     the hunks accounted for by that validated adjustment. Any other change to
+     a skip, and every other control-flow edit, is still refused (rule 4).
+
      The merged event is B with both hunk sets applied, in base order.
      Invariant 4 then requires it to be written exactly. All files are
      examined before failing, so the error lists every conflicting event.
@@ -784,11 +803,24 @@ live install only read and unchanged)
   - `m16_00_00_00:11600400` (39 seeds), by rule 3: the corrected skip at base 2
     is adjacent to FogMod's edits at 0–1.
 
+**FogHost 0.3.0** (derived skip adjustments, bridge placements fix; 40 seeds)
+
+- Items + Enemies + Fog: **40/40**, with post-write invariants passing on
+  all seeds.
+- Instruction-level merges: `11505392` and `11500001` in 40 seeds,
+  `11600400` in 39. No conflicts remain.
+- Skip verification:
+  - combined packages: 47/47;
+  - final Fog packages against FogMod's templates: 0 mismatches in combined
+    or merged events.
+- 11 FogMod-only boss-trigger events have skip ranges changed by FogMod's
+  own runtime rewrite. That is stock FogMod behavior, recorded in
+  `docs/DECISIONS.md`.
+
 **Open**
 
-- Enemies + Fog needs a user decision on whether rule 4 may accept a
-  skip-count change that exactly matches the same side's own count-changing
-  edits inside that skip's range.
+- Boss randomization + Fog is still rejected (its conflict set is
+  unmeasured).
 - The key-item retry budget is too small for enemies + Fog on some seeds.
 - The boss conflict set (`11810310` and others) is still unmeasured, because
   boss randomization + Fog is rejected.
