@@ -574,3 +574,60 @@ workaround.
 - **Documentation.** `tools/fog-host/vendor/UPSTREAM_PIN.md` (patch 7), with the
   change notice in `GameDataWriter.cs`.
 
+## Boss randomization + Fog: a whitelisted boss-event overlay on FogMod's event (FogHost 0.5.0)
+
+Date: 2026-09-29. User-approved. Boss randomization + Fog is now supported; the
+`FOG_BOSS_RANDOMIZATION_UNSUPPORTED` rejection is removed (backend 0.17.0), and the
+desktop default for bosses is on again (desktop 0.5.0).
+
+Measured (Items + Enemies + Bosses + Fog, real-format data): 15 boss events are edited by
+both engines in every seed, and the normal instruction merge cannot combine them. FogMod
+changes their control flow: it removes host-only gates (`4[03]` ×2 + `1000[02]`), shortens
+WAITs, and disables vanilla events with END. Its edits are also adjacent to or overlap the
+combined engine's.
+
+**Decision.** For those events only (explicit ID whitelist in
+`tools/fog-host/src/BossOverlay.cs`), and only after the normal merge refuses, FogMod's
+event is the control-flow and world-logic base. The combined engine's boss mutations are
+re-applied by content, and only these operations are allowed:
+
+1. replace a boss health bar (`2003[11]`, same enable/entity/slot, new name) whose
+   original instruction is uniquely present;
+2. remove an instruction kind the combined engine removes for replaced enemies (its
+   model-specific, portable-boss and static-lifecycle lists: `2003[18]`, `2004[1,5,8,9,10,12,
+   13,15,17,21,22,26,27,28,29,30,31,32,35,36,40,41,42]`), matched exactly. If the base had
+   several identical copies, all of them must be removed;
+3. insert boss-support instructions (`2004[01]` AI state, `2004[20]` AI re-plan, `2003[18]`
+   force animation) after a unique content anchor: the nearest preceding combined-side
+   instruction present once in FogMod's event. Anything skipped on the way must be an
+   absent command, never control flow or a condition;
+4. a mutation FogMod already made (same instruction removed, same instruction present at
+   the insertion point) is satisfied, never applied twice.
+
+**Guards.**
+
+- An interpretation of the combined edit is valid only if its operations, applied to the
+  base event, reproduce the combined event exactly, skip counts included.
+- All valid interpretations must give the identical result.
+- Every insertion and deletion adjusts enclosing skips and event parameters
+  (`SkipRanges`).
+- The overlay fails with `FOG_MERGE_CONFLICT` if:
+  - any other mutation is needed;
+  - an anchor or health bar is missing or ambiguous;
+  - FogMod has extra copies of a removed instruction;
+  - an inserted or replaced instruction would be unreachable (static control-flow check);
+  - a support instruction would be duplicated;
+  - FogMod's control-flow and condition skeleton would change.
+- The overlaid event must then be written exactly (invariant 4).
+
+The normal instruction merge is unchanged for every other event.
+
+Why: FogMod's boss-event rewrites are deliberate world logic (who can start a fight, and
+which events FogMod replaces). The combined engine's boss edits are a small, known set of
+command-level mutations. Re-applying those by content keeps both intents without
+position-based merging across FogMod's control-flow changes.
+
+Also: the Asylum Demon `RemoveAll` in FogMod goes through `SkipRanges.Remove` (patch 8).
+Merge refinements, each provable: ambiguous alignments with an identical result, the skip
+range defined as `[p+1, p+n]`, and event-0 initialization removal.
+

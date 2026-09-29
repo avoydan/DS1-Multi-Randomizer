@@ -1,28 +1,34 @@
 # Implementation status
 
-Bosses + Fog work in progress (FogHost 0.4.0, backend 0.16.3, 2026-09-29). The product still
-rejects boss randomization + Fog (`FOG_BOSS_RANDOMIZATION_UNSUPPORTED`). The real-format
-harness can measure it via `DS1TR_E2E_BOSS_FOG_MEASURE=1`, a measurement-only pipeline option.
+**Boss randomization + Fog works (FogHost 0.5.0, backend 0.17.0, desktop 0.5.0,
+2026-09-29).** The `FOG_BOSS_RANDOMIZATION_UNSUPPORTED` rejection is removed, and bosses
+are on by default again.
 
-- **Done:**
+- **Mechanism.** A whitelisted boss-event overlay: FogMod's event is the control-flow base,
+  and the combined engine's known boss mutations are re-applied by content. It covers the
+  15 boss events both engines edit. Details: `docs/FOGHOST_INTEGRATION.md`,
+  `docs/DECISIONS.md`.
+- **Also:**
   - FogMod patch 8 (Asylum Demon removal keeps skips consistent);
   - merge refinements: unambiguous-result alignments, skip range = covered lines, and
     event-0 initialization removal;
-  - conflict dumps (B/C/T per refused event) in the FogHost log.
+  - refused events log their base, combined and FogMod versions.
 - **Verification:**
-  - FogHost 59/59;
+  - FogHost 68/68;
   - backend 109/109;
-  - no regressions: Items + Enemies + Fog 10/10 and Items + Fog 10/10 (clean skips);
-  - measured Items + Enemies + Bosses + Fog: 0/10. The events that now merge are
-    `11215003`, `11215013`, `11505392` and `m14_01` event 0.
-- **Remaining refusals** (15 events, every seed):
-  - FogMod control-flow edits to WAIT/END/END IF: `11005392`, `11010000`, `11405392`,
-    `11415373`, `11415382`, `11515392`, `11600001`, `11810000`, `11815390`;
-  - adjacent or overlapping edits: `11700000`, `11810310`, `11815382`, `11815394`;
-  - both sides editing inside one skip range: `11210001`, `11415342`.
-
-  These need rule extensions that go beyond the user's earlier constraints (control flow
-  and adjacency), so they await a user decision.
+  - typecheck clean;
+  - Items + Enemies + Bosses + Fog 40/40 (no conflicts, invariants pass, all skip checks
+    clean);
+  - 3 full proofs with byte-identical rerun and activation/restore;
+  - regressions: Items + Enemies + Fog 5/5 and Items + Fog 5/5.
+- **Remaining:**
+  - the key-item combined-retry rate with bosses + Fog is 10 of 50 attempts, and no seed
+    has exhausted the budget, so the budget is unchanged;
+  - the overlay whitelist is fixed to the 15 measured events, so any other boss event
+    edited by both engines stays a `FOG_MERGE_CONFLICT`;
+  - the FogHost and DsrDataTool test consoles run outside `npm test`;
+  - there is no public GPL fork yet;
+  - desktop packaging has not started.
 
 FogHost 0.3.1 (2026-09-29): FogMod's boss-trigger rewrite now keeps enclosing DS1 SKIP
 counts consistent (vendored patch 7, `tools/fog-host/src/SkipRanges.cs`).

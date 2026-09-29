@@ -857,3 +857,40 @@ live install only read and unchanged)
 - The boss conflict set (`11810310` and others) is still unmeasured, because
   boss randomization + Fog is rejected.
 
+## Boss randomization + Fog (FogHost 0.5.0)
+
+Supported since backend 0.17.0. Decision and exact rules: `docs/DECISIONS.md`, "Boss
+randomization + Fog: a whitelisted boss-event overlay". Code:
+`tools/fog-host/src/BossOverlay.cs`.
+
+The 15 boss events edited by both engines, and how each is handled:
+
+| Event | FogMod (control-flow base) | Combined mutations re-applied |
+|---|---|---|
+| `11005392`, `11415382` | host gate removed; boss trigger rewritten | health-bar name; AI on + re-plan after the bar |
+| `11405392` | host gate removed; trigger rewritten | backread removal (skip 3 to 2); bar name; AI off, force animation, AI on, re-plan |
+| `11515392` | host gate removed | backread removal; two bar names, each followed by AI on + re-plan |
+| `11415342` | removes a whole conditional block (skip 8 to 3); trigger rewritten | backread removal inside the skip (3 to 2); bar name; AI on + re-plan |
+| `11815382` | adds a start condition; removes object/SFX | `2004[30]` removal; bar name; AI on + re-plan |
+| `11815394` | adds AI on after the bar | bar name; re-plan. **AI on already provided, not duplicated.** |
+| `11810310` | removes objects/SFX, warp and force animation | 5 model-specific removals; warp + force animation **already removed by FogMod**; AI on after `Set Character Home`. The anchor moved past a FogMod-removed object command. |
+| `11010000` | host gate removed | removal of `2004[05]`/`2004[01]`/`2004[09]`/`2004[15]` (skip 2 to 1) |
+| `11210001` | disables two entities inside the skip | removal of both identical `2004[29]` backread lines |
+| `11415373` | WAIT 1 frame inserted | `2004[28]` removal inside `1003[05]` (skip 2 to 1) |
+| `11600001` | fade-outs removed; WAIT 10 to 1 frame | four `2004[05]` removals |
+| `11700000`, `11815390`, `11810000` | event disabled or replaced with END / END IF | model-specific removals (in FogMod's dead code; nothing inserted) |
+
+**Real-format verification** (Items + Enemies + Bosses + Fog, 40 seeds, live install
+unchanged):
+
+- 40/40 succeed, with the overlay applied to all 15 events in every seed;
+- no merge conflicts;
+- post-write invariants pass;
+- skip checks: combined packages 50/50, final Fog packages 0 mismatches;
+- key items fell outside annotated lots on 10 of 50 combined attempts: 9 seeds needed a
+  combined retry, and none exhausted the budget.
+
+Full proofs for seeds `bossfog-2`, `-17` and `-33` (manifest, hashes, byte-identical rerun,
+activation and restore on a temp copy) all pass. Regressions: Items + Enemies + Fog 5/5 and
+Items + Fog 5/5, clean.
+
