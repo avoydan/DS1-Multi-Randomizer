@@ -89,7 +89,7 @@ namespace FogHost
         }
 
         /// <summary>Earliest alignment, plus the latest one when it differs (ambiguous edit script).</summary>
-        private static List<List<Hunk>> Alignments(IReadOnlyList<EMEVD.Instruction> from, IReadOnlyList<EMEVD.Instruction> to)
+        internal static List<List<Hunk>> Alignments(IReadOnlyList<EMEVD.Instruction> from, IReadOnlyList<EMEVD.Instruction> to)
         {
             Func<EMEVD.Instruction, EMEVD.Instruction, bool> same = SameIgnoringSkipCount;
             List<Hunk> forward = Align(from, to, same);

@@ -78,6 +78,15 @@ namespace FogHost.Tests
                 Test("event 0: combined removal of an initialization FogMod keeps merges", Event0InitRemovalMerges);
                 Test("event 0: combined removal of an initialization FogMod changed is refused", Event0InitRemovalChangedRefused);
                 Test("FogMod Asylum Demon removal keeps skips and parameters consistent", AsylumRemovalKeepsSkips);
+                Test("boss overlay: health-bar swap + AI companions on FogMod's gate-removed event (11005392 pattern)", OverlayHealthBarCompanions);
+                Test("boss overlay: removals on an event FogMod disabled with END (11815390 pattern)", OverlayRemovalInDisabledEvent);
+                Test("boss overlay: both sides delete the same instructions; anchor moves past a FogMod-deleted command (11810310 pattern)", OverlayBothDeleteSame);
+                Test("boss overlay: FogMod already inserts AI enable; no duplicate (11815394 pattern)", OverlayNoDuplicateAiEnable);
+                Test("boss overlay: all identical copies removed (11210001 pattern)", OverlayIdenticalCopiesRemoved);
+                Test("boss overlay: removal inside a FogMod skip adjusts FogMod's count (11415342 pattern)", OverlayRemovalInsideFogSkip);
+                Test("boss overlay refuses mutations outside the allowed operations", OverlayRefusesOtherMutations);
+                Test("boss overlay refuses ambiguous anchors, missing health bars and dead code", OverlayRefusesUnsafe);
+                Test("boss overlay applies only to whitelisted events, after the normal merge refuses", OverlayOnlyWhitelisted);
                 Test("instruction merge: count-preserving replacement inside a skip range merges", ReplacementInSkipRangeMerges);
                 Test("instruction merge: both sides changing conditions is refused", BothConditionsRefused);
                 Test("instruction merge: ambiguous alignment whose span the other side edits is refused", AmbiguousAlignmentRefused);
@@ -666,6 +675,154 @@ namespace FogHost.Tests
             Expect(() => SkipRanges.BeforeReplace(full, 1, 3), "257 lines");
             var flow = Evt(1, Ins(1000, 3, 1), Ins(1000, 4, 0));
             Expect(() => SkipRanges.BeforeReplace(flow, 1, 3), "control flow");
+        }
+
+        private const int Boss = 4242;
+
+        private static EMEVD.Instruction Bar(int name) => new EMEVD.Instruction(2003, 11, new byte[] { 1, 0, 0, 0 }.Concat(BitConverter.GetBytes(Boss)).Concat(new byte[] { 0, 0 }).Concat(BitConverter.GetBytes((short)name)).ToArray());
+        private static EMEVD.Instruction AiOn() => Ins(2004, 1, Boss, 1);
+        private static EMEVD.Instruction AiOff() => Ins(2004, 1, Boss, 0);
+        private static EMEVD.Instruction Replan() => Ins(2004, 20, Boss);
+        private static EMEVD.Instruction HostGateA() => Ins(4, 3, 0xFF, 10000, 2);
+        private static EMEVD.Instruction HostGateB() => Ins(4, 3, 0xFF, 10000, 12);
+        private static EMEVD.Instruction EndIfGate() => Ins(1000, 2, 0x00FF0100);
+
+        private static EMEVD.Event Overlay(long id, List<EMEVD.Instruction> b, List<EMEVD.Instruction> c, List<EMEVD.Instruction> t, out string reason) =>
+            BossOverlay.Apply(EventOf(id, b), EventOf(id, c), EventOf(id, t), out reason);
+
+        private static void ExpectOverlay(long id, List<EMEVD.Instruction> b, List<EMEVD.Instruction> c, List<EMEVD.Instruction> t, List<EMEVD.Instruction> expected)
+        {
+            EMEVD.Event result = Overlay(id, b, c, t, out string reason);
+            Check(result != null, $"overlay refused: {reason}");
+            string Show(IEnumerable<EMEVD.Instruction> list) => string.Join(" ", list.Select(i => $"{i.Bank}[{i.ID}]"));
+            Check(result.Instructions.Count == expected.Count && result.Instructions.Zip(expected).All(p => EmevdMerge.SameInstruction(p.First, p.Second)),
+                $"overlay result differs: {Show(result.Instructions)} vs {Show(expected)}");
+        }
+
+        private static void ExpectOverlayRefused(long id, List<EMEVD.Instruction> b, List<EMEVD.Instruction> c, List<EMEVD.Instruction> t, string contains)
+        {
+            EMEVD.Event result = Overlay(id, b, c, t, out string reason);
+            Check(result == null, "overlay unexpectedly succeeded");
+            Check(reason.Contains(contains, StringComparison.Ordinal), $"reason \"{reason}\" lacks \"{contains}\"");
+        }
+
+        /// <summary>11005392 shape: trigger, host gate, activation, AI on, health bar.</summary>
+        private static List<EMEVD.Instruction> BossStartBase() => new List<EMEVD.Instruction>
+        {
+            Ins(1003, 1, 0x00010101, 11), Ins(2004, 5, Boss, 0), AiOff(), Ins(3, 0, 1, 1, 0, 777), Ins(3, 2, 1, 1, 10000, Area), Ins(0, 0, 0x00010100),
+            HostGateA(), HostGateB(), EndIfGate(), Ins(2004, 5, Boss, 1), Ins(2003, 2, 777, 1), AiOn(), Bar(100),
+        };
+
+        private static void OverlayHealthBarCompanions()
+        {
+            var b = BossStartBase();
+            var c = b.Take(12).Concat(new[] { Bar(200), AiOn(), Replan() }).ToList(); // combined: new name + companions
+            var t = b.Where((_, i) => i < 6 || i > 8).ToList();                          // FogMod: host gate removed
+            var expected = t.Take(t.Count - 1).Concat(new[] { Bar(200), AiOn(), Replan() }).ToList();
+            ExpectOverlay(11005392, b, c, t, expected);
+        }
+
+        private static void OverlayRemovalInDisabledEvent()
+        {
+            var warp = Ins(2004, 41, Boss, 1, 5555, -1);
+            var b = new List<EMEVD.Instruction> { Ins(3, 0, 1, 0, 0, 16), Ins(3, 18, 1, 1, 7, 0), Ins(0, 0, 0x00010100), warp, Ins(2004, 14, 10000, 7), Ins(1000, 4, 1) };
+            var c = b.Where((_, i) => i != 3).ToList();
+            var t = new[] { Ins(3, 2, 0x00000100, 10000, 7), Ins(1000, 4, 0) }.Concat(b).ToList(); // FogMod disables the event
+            var expected = t.Where(i => !EmevdMerge.SameInstruction(i, warp)).ToList();
+            ExpectOverlay(11815390, b, c, t, expected);
+        }
+
+        private static void OverlayBothDeleteSame()
+        {
+            // 11810310 shape: END IFs, objects, model-specific lines, trigger, flag, home, objects.
+            var endIf = Ins(1003, 2, 0x00010000, 11);
+            var obj0 = Ins(2005, 3, 7, 0); var sfx0 = Ins(2006, 1, 8, 0);
+            var anim = Ins(2004, 9, Boss, 9000); var warp = Ins(2004, 41, Boss, 1, 5555, -1); var force = Ins(2003, 18, Boss, 9060, 0);
+            var home = Ins(2004, 13, Boss, 5556);
+            var obj1 = Ins(2005, 3, 7, 1); var sfx1 = Ins(2006, 2, 8);
+            var b = new List<EMEVD.Instruction> { endIf, obj0, sfx0, AiOff(), anim, warp, Ins(3, 2, 0x00000100, 10000, 9), Ins(2003, 2, 11, 1), force, home, obj1, sfx1 };
+            // Combined: removes anim, warp, force; re-enables AI right before the terminal instruction.
+            var c = new List<EMEVD.Instruction> { endIf, obj0, sfx0, AiOff(), Ins(3, 2, 0x00000100, 10000, 9), Ins(2003, 2, 11, 1), home, obj1, AiOn(), sfx1 };
+            // FogMod: removes the objects/SFX and (its own Asylum edit) warp + force animation.
+            var t = new List<EMEVD.Instruction> { endIf, AiOff(), anim, Ins(3, 2, 0x00000100, 10000, 9), Ins(2003, 2, 11, 1), home };
+            var expected = new List<EMEVD.Instruction> { endIf, AiOff(), Ins(3, 2, 0x00000100, 10000, 9), Ins(2003, 2, 11, 1), home, AiOn() };
+            ExpectOverlay(11810310, b, c, t, expected);
+            Check(BossOverlay.Notes.Any(n => n.Contains("already removed by FogMod")), "both-sides removal not reported as satisfied");
+        }
+
+        private static void OverlayNoDuplicateAiEnable()
+        {
+            var b = new List<EMEVD.Instruction> { Ins(3, 0, 0, 0, 0, 1), Ins(0, 0, 0x00010100), Ins(2003, 2, 12, 1), Bar(100), Ins(1000, 4, 1) };
+            var c = new List<EMEVD.Instruction> { b[0], b[1], b[2], Bar(200), AiOn(), Replan(), b[4] };
+            var t = new List<EMEVD.Instruction> { b[0], b[1], b[2], Bar(100), AiOn(), b[4] }; // FogMod adds AI enable itself
+            var expected = new List<EMEVD.Instruction> { b[0], b[1], b[2], Bar(200), AiOn(), Replan(), b[4] };
+            ExpectOverlay(11815394, b, c, t, expected);
+            EMEVD.Event result = Overlay(11815394, b, c, t, out _);
+            Check(result.Instructions.Count(i => EmevdMerge.SameInstruction(i, AiOn())) == 1, "AI enable duplicated");
+        }
+
+        private static void OverlayIdenticalCopiesRemoved()
+        {
+            var backread = Ins(2004, 29, Boss, 1);
+            var b = new List<EMEVD.Instruction> { Ins(1003, 1, 0x00010003, 0), Ins(2004, 5, Boss, 0), backread, Ins(1000, 4, 0), Ins(4, 0, 0, Boss, 1), Ins(2003, 12, Boss), backread, Ins(2004, 5, 5, 1) };
+            var c = new List<EMEVD.Instruction> { Ins(1003, 1, 0x00010002, 0), b[1], b[3], b[4], b[5], b[7] };
+            var t = b.ToList(); t.Insert(4, Ins(3, 0, 0, 1, 0, 99)); // FogMod adds a condition after the END
+            var expected = new List<EMEVD.Instruction> { Ins(1003, 1, 0x00010002, 0), b[1], b[3], Ins(3, 0, 0, 1, 0, 99), b[4], b[5], b[7] };
+            ExpectOverlay(11210001, b, c, t, expected);
+        }
+
+        private static void OverlayRemovalInsideFogSkip()
+        {
+            // FogMod deletes a whole conditional block and shrinks SKIP 8 -> 3; combined removes a backread inside.
+            var backread = Ins(2004, 29, Boss, 1);
+            var b = new List<EMEVD.Instruction> { Ins(1003, 1, 8, 16), Ins(1003, 5, 0x00000104), Ins(2005, 3, 1, 0), Ins(2006, 1, 2, 0), Ins(2005, 3, 3, 0), Ins(2006, 1, 4, 0), Ins(2004, 5, Boss, 0), backread, Ins(1000, 4, 0), AiOff(), Bar(100) };
+            var c = new List<EMEVD.Instruction> { Ins(1003, 1, 7, 16) }.Concat(b.Skip(1).Take(6)).Concat(new[] { b[8], b[9], Bar(200), AiOn(), Replan() }).ToList();
+            var t = new List<EMEVD.Instruction> { Ins(1003, 1, 3, 16), b[6], backread, b[8], b[9], b[10] };
+            var expected = new List<EMEVD.Instruction> { Ins(1003, 1, 2, 16), b[6], b[8], b[9], Bar(200), AiOn(), Replan() };
+            ExpectOverlay(11415342, b, c, t, expected);
+        }
+
+        private static void OverlayRefusesOtherMutations()
+        {
+            var b = BossStartBase();
+            var t = b.Where((_, i) => i < 6 || i > 8).ToList();
+            var c1 = b.Where((_, i) => i != 10).ToList();                         // removes Set Event Flag
+            ExpectOverlayRefused(11005392, b, c1, t, "not an allowed boss mutation");
+            var c2 = b.ToList(); c2.Insert(12, Ins(2003, 2, 999, 1));               // inserts Set Event Flag
+            ExpectOverlayRefused(11005392, b, c2, t, "not an allowed boss mutation");
+            var c3 = b.ToList(); c3[3] = Ins(3, 0, 1, 1, 0, 778);                   // edits a condition
+            ExpectOverlayRefused(11005392, b, c3, t, "not an allowed boss mutation");
+        }
+
+        private static void OverlayRefusesUnsafe()
+        {
+            var b = BossStartBase();
+            var c = b.Take(12).Concat(new[] { Bar(200), AiOn(), Replan() }).ToList();
+            var noBar = b.Take(12).ToList();                                        // FogMod no longer shows the bar
+            ExpectOverlayRefused(11005392, b, c, noBar, "no longer exists");
+            var twoBars = b.Concat(new[] { Bar(100) }).ToList();                    // ambiguous health bar
+            ExpectOverlayRefused(11005392, b, c, twoBars, "ambiguous");
+            var ended = b.Take(12).Concat(new[] { Ins(1000, 4, 0), Bar(100) }).ToList(); // bar is dead code under FogMod
+            ExpectOverlayRefused(11005392, b, c, ended, "unreachable");
+        }
+
+        private static void OverlayOnlyWhitelisted()
+        {
+            var b = BossStartBase();
+            var c = b.Take(12).Concat(new[] { Bar(200), AiOn(), Replan() }).ToList();
+            var t = b.Where((_, i) => i < 6 || i > 8).ToList();
+            ExpectOverlayRefused(12345678, b, c, t, "not a whitelisted boss event");
+            // Through the file-level merge: the normal merge refuses (FogMod control-flow edit), the overlay applies.
+            var e0 = Evt(0, Ins(2000, 0, 0, 11005392, 0));
+            var merge = new EmevdMerge(new() { ["m10_00_00_00.emevd.dcx"] = (Evd(e0, EventOf(11005392, b)), Evd(Copy(e0), EventOf(11005392, c))) });
+            EMEVD output = Evd(Copy(e0), EventOf(11005392, t));
+            merge.Merge("m10_00_00_00.emevd.dcx", output);
+            merge.ThrowIfConflicts();
+            Check(merge.BossOverlays.Count == 1 && merge.InstructionMerges.Count == 0, "overlay not used as the fallback");
+            // A non-whitelisted event with the same edits stays a conflict.
+            var merge2 = new EmevdMerge(new() { ["m"] = (Evd(e0, EventOf(12345678, b)), Evd(Copy(e0), EventOf(12345678, c))) });
+            merge2.Merge("m", Evd(Copy(e0), EventOf(12345678, t)));
+            Check(merge2.Conflicts.Count == 1, "non-whitelisted event was overlaid");
         }
 
         private static void Event11505392OutsideSkipMerges()

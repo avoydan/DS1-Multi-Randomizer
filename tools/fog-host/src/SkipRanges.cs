@@ -59,6 +59,33 @@ namespace FogHost
             evt.Instructions.RemoveAt(index);
         }
 
+        /// <summary>
+        /// Inserts <paramref name="instruction"/> at <paramref name="index"/>, right after the anchor at
+        /// index - 1: every skip covering the anchor grows by one so the new instruction shares its
+        /// coverage, and event parameters at or after the index are re-indexed. Inserting right after a
+        /// skip instruction is ambiguous and refused.
+        /// </summary>
+        public static void InsertAfter(EMEVD.Event evt, int index, EMEVD.Instruction instruction)
+        {
+            int anchor = index - 1;
+            if (anchor < 0 || anchor >= evt.Instructions.Count) throw Refuse(evt, $"no anchor instruction before {index}");
+            if (InstructionMerge.IsSkip(evt.Instructions[anchor]))
+                throw Refuse(evt, $"inserting right after skip instruction {anchor} is ambiguous");
+            for (int position = 0; position < anchor; position++)
+            {
+                EMEVD.Instruction skip = evt.Instructions[position];
+                if (!InstructionMerge.IsSkip(skip) || position + InstructionMerge.Lines(skip) < anchor) continue;
+                if (evt.Parameters.Any(p => p.InstructionIndex == position && p.TargetStartByte <= 0 && p.TargetStartByte + p.ByteCount > 0))
+                    throw Refuse(evt, $"skip {position} takes its line count from an event parameter");
+                int lines = InstructionMerge.Lines(skip) + 1;
+                if (lines > byte.MaxValue) throw Refuse(evt, $"skip {position} would cover {lines} lines");
+                skip.ArgData[0] = (byte)lines;
+            }
+            foreach (EMEVD.Parameter parameter in evt.Parameters.Where(p => p.InstructionIndex >= index))
+                parameter.InstructionIndex++;
+            evt.Instructions.Insert(index, instruction);
+        }
+
         private static FogHostException Refuse(EMEVD.Event evt, string detail) =>
             new FogHostException(HostErrors.EngineFailed,
                 $"Cannot keep skip ranges consistent in event {evt.ID} for a FogMod instruction edit: {detail}.")

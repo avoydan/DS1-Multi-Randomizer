@@ -13,7 +13,7 @@ namespace FogHost
     /// </summary>
     public static class Program
     {
-        public const string HostVersion = "0.4.0";
+        public const string HostVersion = "0.5.0";
 
         public static int Main(string[] args)
         {

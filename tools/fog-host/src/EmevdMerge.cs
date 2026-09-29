@@ -28,6 +28,9 @@ namespace FogHost
         /// <summary>Events merged at instruction level (`file:eventId`), for the log and tests.</summary>
         public List<string> InstructionMerges { get; } = new List<string>();
 
+        /// <summary>Boss events resolved by the boss overlay (`file:eventId`), for the log and tests.</summary>
+        public List<string> BossOverlays { get; } = new List<string>();
+
         /// <summary>Every conflict found; all files are examined before <see cref="ThrowIfConflicts"/> fails.</summary>
         public List<string> Conflicts { get; } = new List<string>();
 
@@ -99,6 +102,23 @@ namespace FogHost
                     {
                         // Both sides edited the event: merge instruction by instruction when provably independent.
                         EMEVD.Event merged = InstructionMerge.Merge(baseEvent, combined, fog, out string reason);
+                        if (merged == null && BossOverlay.BossEvents.Contains(combined.ID))
+                        {
+                            // Boss-event compatibility layer: FogMod's event is the control-flow base and only the
+                            // combined engine's known boss mutations are re-applied by content.
+                            merged = BossOverlay.Apply(baseEvent, combined, fog, out string overlayReason);
+                            if (merged == null) reason = $"{reason}; boss overlay refused: {overlayReason}";
+                            else
+                            {
+                                output.Events[output.Events.IndexOf(fog)] = merged;
+                                outputById[combined.ID] = merged;
+                                BossOverlays.Add($"{fileName}:{combined.ID}");
+                                Console.WriteLine($"FogHost: boss overlay applied to event/{fileName} event {combined.ID}"
+                                    + (BossOverlay.Notes.Count > 0 ? $" ({string.Join("; ", BossOverlay.Notes)})" : ""));
+                                expectedEvents.Add(merged);
+                                continue;
+                            }
+                        }
                         if (merged == null)
                         {
                             Record(fileName, $"event {combined.ID} was edited by both the combined engine and FogMod ({reason})");
