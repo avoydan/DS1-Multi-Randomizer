@@ -41,12 +41,22 @@ namespace FogHost.Tests
                 Test("missing option key is FOG_REQUEST_INVALID", MissingOption);
                 Test("missing data root is FOG_DATA_MISSING", MissingDataRoot);
                 Test("error classifier maps FogMod throw sites", Classifier);
+                Test("invariant: a model declared as a Player model (c0000) stays valid; losing it is a violation", ModelDeclarationInvariant);
                 Test("merge appends custom events and event-0 inits", MergeCustom);
                 Test("merge takes combined edit of an event FogMod left alone", MergeEdited);
                 Test("merge conflict when both sides edit an event", MergeBothEdited);
                 Test("merge conflict when combined deletes an event", MergeDeleted);
                 Test("merge conflict on non-init event-0 addition", MergeEvent0NonInit);
-                Test("11505392 pattern: combined deletion inside SKIP IF Event Flag range is refused", Event11505392Refused);
+                Test("11505392 pattern: unadjusted combined deletion inside SKIP IF Event Flag range is refused", Event11505392Refused);
+                Test("derived skip: count reduction from a deletion inside the range merges", DerivedReductionMerges);
+                Test("derived skip: count increase from an insertion inside the range merges", DerivedIncreaseMerges);
+                Test("derived skip: other side editing inside the range is refused", DerivedOtherSideInsideRefused);
+                Test("derived skip: incorrect count delta is refused", DerivedWrongDeltaRefused);
+                Test("derived skip: changed skip opcode or condition is refused", DerivedChangedSkipRefused);
+                Test("derived skip: ambiguous range mapping is refused", DerivedAmbiguousRefused);
+                Test("derived skip: both sides adjusting the same skip is refused", DerivedBothSidesRefused);
+                Test("real 11505392 case with the fixed combined engine merges", Event11505392DerivedMerges);
+                Test("real 11600400 case with the fixed combined engine merges", Event11600400DerivedMerges);
                 Test("11505392 pattern: combined deletion outside the skip range merges with FogMod's trigger rewrite", Event11505392OutsideSkipMerges);
                 Test("instruction merge: independent edits in one event succeed", IndependentEdits);
                 Test("instruction merge: deletion plus unrelated edit succeeds", DeletionPlusUnrelatedEdit);
@@ -290,6 +300,27 @@ namespace FogHost.Tests
             Check(HostErrors.Classify(new IOException("disk"), "x").Code == "FOG_IO_FAILED", "IOException");
         }
 
+        private static MSB1 MsbWithHuman(bool declareAsPlayer)
+        {
+            var msb = new MSB1();
+            if (declareAsPlayer) msb.Models.Players.Add(new MSB1.Model.Player { Name = "c0000" });
+            msb.Parts.Enemies.Add(new MSB1.Part.Enemy { Name = "c0000_0002", ModelName = "c0000", NPCParamID = 0, ThinkParamID = 0 });
+            return msb;
+        }
+
+        private static void ModelDeclarationInvariant()
+        {
+            var npcs = new PARAM { Rows = new List<PARAM.Row>() };
+            var ok = new List<string>();
+            Invariants.CheckMsbs(new Dictionary<string, MSB1> { ["m"] = MsbWithHuman(true) }, new Dictionary<string, MSB1> { ["m"] = MsbWithHuman(true) },
+                npcs, npcs, new HashSet<int>(), ok);
+            Check(ok.Count == 0, "Player-declared c0000 flagged: " + string.Join("; ", ok));
+            var lost = new List<string>();
+            Invariants.CheckMsbs(new Dictionary<string, MSB1> { ["m"] = MsbWithHuman(true) }, new Dictionary<string, MSB1> { ["m"] = MsbWithHuman(false) },
+                npcs, npcs, new HashSet<int>(), lost);
+            Check(lost.Count == 1 && lost[0].Contains("is not declared"), "lost declaration not flagged");
+        }
+
         // ---------------------------------------------------------------- merge unit tests
 
         private static EMEVD.Event Evt(long id, params EMEVD.Instruction[] instructions)
@@ -449,6 +480,113 @@ namespace FogHost.Tests
                 return;
             }
             throw new Exception("expected FOG_MERGE_CONFLICT");
+        }
+
+        /// <summary>Base with SKIP 3 at 2 (covers 3..5) and plain commands elsewhere.</summary>
+        private static List<EMEVD.Instruction> DerivedBase() => WithSkip();
+
+        private static void DerivedReductionMerges()
+        {
+            List<EMEVD.Instruction> b = DerivedBase();
+            var c = b.ToList(); c.RemoveAt(4); c[2] = Ins(1000, 3, 2);
+            var t = b.ToList(); t[10] = Ins(2004, 1, 1010, 1);
+            var expected = c.ToList(); expected[9] = Ins(2004, 1, 1010, 1);
+            ExpectSequence(MergeOrNull(b, c, t, out string reason), expected, reason);
+        }
+
+        private static void DerivedIncreaseMerges()
+        {
+            List<EMEVD.Instruction> b = DerivedBase();
+            var c = b.ToList(); c.Insert(4, Ins(2004, 9, 1, 2)); c[2] = Ins(1000, 3, 4);
+            var t = b.ToList(); t.Insert(9, Ins(2003, 66, 1, 2));
+            var expected = c.ToList(); expected.Insert(10, Ins(2003, 66, 1, 2));
+            ExpectSequence(MergeOrNull(b, c, t, out string reason), expected, reason);
+        }
+
+        private static void DerivedOtherSideInsideRefused()
+        {
+            List<EMEVD.Instruction> b = DerivedBase();
+            var c = b.ToList(); c.RemoveAt(4); c[2] = Ins(1000, 3, 2);
+            var t = b.ToList(); t[3] = Ins(2004, 1, 1003, 1); // count-preserving edit inside the same range
+            ExpectRefused(b, c, t, "the other side edits the range");
+        }
+
+        private static void DerivedWrongDeltaRefused()
+        {
+            List<EMEVD.Instruction> b = DerivedBase();
+            var c = b.ToList(); c.RemoveAt(4); c[2] = Ins(1000, 3, 1); // one deletion, count reduced by two
+            var t = b.ToList(); t[10] = Ins(2004, 1, 1010, 1);
+            ExpectRefused(b, c, t, "does not cover exactly");
+            var c2 = b.ToList(); c2[2] = Ins(1000, 3, 2); // count changed with no edit inside at all
+            ExpectRefused(b, c2, t, "changes control-flow instruction 1000[03]");
+        }
+
+        private static void DerivedChangedSkipRefused()
+        {
+            List<EMEVD.Instruction> b = DerivedBase();
+            var t = b.ToList(); t[10] = Ins(2004, 1, 1010, 1);
+            var c = b.ToList(); c.RemoveAt(4); c[2] = Ins(1000, 1, 2); // different skip opcode, adjusted count
+            ExpectRefused(b, c, t, "changes control-flow instruction");
+            b[2] = Ins(1003, 1, 3, 11);
+            t = b.ToList(); t[10] = Ins(2004, 1, 1010, 1);
+            var c2 = b.ToList(); c2.RemoveAt(4); c2[2] = Ins(1003, 1, 2, 12); // adjusted count and a different flag
+            ExpectRefused(b, c2, t, "changes control-flow instruction 1003[01]");
+        }
+
+        private static void DerivedAmbiguousRefused()
+        {
+            var x = Ins(2004, 1, 5, 0);
+            var b = new List<EMEVD.Instruction> { Ins(1000, 3, 2), x, x }.Concat(Commands(6)).ToList();
+            var c = new List<EMEVD.Instruction> { Ins(1000, 3, 1), x }.Concat(Commands(6)).ToList();
+            var t = b.ToList(); t[7] = Ins(2004, 1, 1004, 9);
+            ExpectRefused(b, c, t, "ambiguous alignment");
+        }
+
+        private static void DerivedBothSidesRefused()
+        {
+            List<EMEVD.Instruction> b = DerivedBase();
+            var c = b.ToList(); c.RemoveAt(4); c[2] = Ins(1000, 3, 2);
+            var t = b.ToList(); t.Insert(5, Ins(2004, 9, 1, 2)); t[2] = Ins(1000, 3, 4);
+            ExpectRefused(b, c, t, "the other side edits the range");
+        }
+
+        private static void Event11505392DerivedMerges()
+        {
+            List<EMEVD.Instruction> b = Event11505392Base();
+            var c = b.Where((_, i) => i != 5).ToList();
+            c[0] = Ins(1003, 1, 6, 11); // the fixed DsrDataTool shrinks SKIP 7 to 6
+            List<EMEVD.Instruction> t = FogModTriggerRewrite(b);
+            EMEVD.Event merged = MergeOrNull(b, c, t, out string reason);
+            ExpectSequence(merged, FogModTriggerRewrite(c), reason);
+            Check(merged.Instructions[0].ArgData[0] == 6, "adjusted skip not taken");
+            // The SKIP 6 block is exactly the combined engine's block; the merged event keeps
+            // Set Character AI State outside it.
+            Check(EmevdMerge.SameInstruction(merged.Instructions[7], Ins(2004, 1, E1, 0)), "first unskipped line moved");
+        }
+
+        private static void Event11600400DerivedMerges()
+        {
+            const int e = 1600500;
+            var b = new List<EMEVD.Instruction>
+            {
+                Ins(2004, 31, e, 1),                   // 0
+                Ins(2004, 10, e, 0),                   // 1
+                Ins(1003, 1, 0x00010002, 0),           // 2 SKIP 2 IF event flag (covers 3..4)
+                Ins(2004, 9, e, -1, -1, 29060, -1, -1),// 3 (combined removes)
+                Ins(1000, 4, 0),                       // 4 END
+                Ins(3, 3, 0x1FF, e, 10000, 0),         // 5
+                Ins(4, 1, 0xFF, e, 10000),             // 6
+                Ins(0, 0, 0x00FF0100),                 // 7
+                Ins(2004, 9, e, -1),                   // 8 (combined removes)
+                Ins(2003, 18, e, 29060, 0),            // 9 (combined removes)
+            };
+            var c = b.Where((_, i) => i != 3 && i != 8 && i != 9).ToList();
+            c[2] = Ins(1003, 1, 0x00010001, 0);        // the fixed DsrDataTool shrinks SKIP 2 to 1
+            var t = b.ToList();                        // FogMod flips the two states before the skip
+            t[0] = Ins(2004, 31, e, 0);
+            t[1] = Ins(2004, 10, e, 1);
+            var expected = c.ToList(); expected[0] = t[0]; expected[1] = t[1];
+            ExpectSequence(MergeOrNull(b, c, t, out string reason), expected, reason);
         }
 
         private static void Event11505392OutsideSkipMerges()

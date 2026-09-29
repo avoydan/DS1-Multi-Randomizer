@@ -5,10 +5,11 @@ using SoulsFormats;
 // Unit fixtures use real DS1 opcodes with placeholder entity IDs (no game data).
 
 System.Text.Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-if (args.Length == 3 && args[0] == "verify-skips") return SkipVerifier.Run(args[1], args[2]);
+if ((args.Length == 3 || args.Length == 4 && args[3] == "--list-edited") && args[0] == "verify-skips")
+    return SkipVerifier.Run(args[1], args[2], args.Length == 4);
 if (args.Length != 0)
 {
-    Console.Error.WriteLine("Usage: DsrDataTool.Tests [verify-skips <baseEventDir> <combinedEventDir>]");
+    Console.Error.WriteLine("Usage: DsrDataTool.Tests [verify-skips <baseEventDir> <combinedEventDir> [--list-edited]]");
     return 2;
 }
 return UnitTests.Run();
@@ -251,7 +252,7 @@ internal static class UnitTests
 /// </summary>
 internal static class SkipVerifier
 {
-    public static int Run(string baseDirectory, string combinedDirectory)
+    public static int Run(string baseDirectory, string combinedDirectory, bool listEdited = false)
     {
         int events = 0, skips = 0, adjusted = 0;
         var problems = new List<string>();
@@ -267,6 +268,7 @@ internal static class SkipVerifier
                 var map = Align(original.Instructions, combined.Instructions);
                 if (map == null) continue; // identical event
                 events++;
+                if (listEdited) Console.WriteLine($"EDITED {name}:{combined.ID}");
                 for (var p = 0; p < original.Instructions.Count; p++)
                 {
                     if (!EventSkipRanges.IsSkip(original.Instructions[p])) continue;

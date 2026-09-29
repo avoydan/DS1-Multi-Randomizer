@@ -51,7 +51,10 @@ namespace FogHost
             foreach ((string path, MSB1 before) in input.OrderBy(p => p.Key, StringComparer.Ordinal))
             {
                 if (!output.TryGetValue(path, out MSB1 after)) continue; // FogMod does not touch this map.
-                var declared = new HashSet<string>(after.Models.Enemies.Select(m => m.Name), StringComparer.Ordinal);
+                // A model can be declared in several categories (DS1 human enemies use c0000, declared as
+                // a Player model). The output must keep every declaration the input had for the model.
+                Dictionary<string, HashSet<string>> declaredBefore = Declarations(before);
+                Dictionary<string, HashSet<string>> declaredAfter = Declarations(after);
                 var parts = after.Parts.Enemies.GroupBy(e => e.Name, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
                 foreach (MSB1.Part.Enemy enemy in before.Parts.Enemies)
                 {
@@ -59,7 +62,11 @@ namespace FogHost
                     if (!parts.TryGetValue(enemy.Name, out MSB1.Part.Enemy written)) { problems.Add($"{where} was removed"); continue; }
                     if (written.ModelName != enemy.ModelName) problems.Add($"{where} model {enemy.ModelName} -> {written.ModelName}");
                     if (written.ThinkParamID != enemy.ThinkParamID) problems.Add($"{where} ThinkParamID {enemy.ThinkParamID} -> {written.ThinkParamID}");
-                    if (!declared.Contains(written.ModelName)) problems.Add($"{where} model {written.ModelName} is not declared");
+                    declaredAfter.TryGetValue(written.ModelName, out HashSet<string> nowIn);
+                    declaredBefore.TryGetValue(enemy.ModelName, out HashSet<string> wasIn);
+                    if (nowIn == null || nowIn.Count == 0) problems.Add($"{where} model {written.ModelName} is not declared");
+                    else if (wasIn != null && !wasIn.IsSubsetOf(nowIn))
+                        problems.Add($"{where} model {written.ModelName} lost its declaration in {string.Join(",", wasIn.Except(nowIn))}");
                     if (written.NPCParamID == enemy.NPCParamID) continue;
                     // v1 rule: parts on preserved rows keep them. Other parts may move only to a FogMod
                     // scale clone: a new row whose pcAttr hint encodes the part's input row.
@@ -70,6 +77,26 @@ namespace FogHost
                     if (!clone) problems.Add($"{where} NPCParamID {enemy.NPCParamID} -> {written.NPCParamID}");
                 }
             }
+        }
+
+        /// <summary>Model name -> the MSB model categories that declare it.</summary>
+        private static Dictionary<string, HashSet<string>> Declarations(MSB1 msb)
+        {
+            var result = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+            foreach ((string category, IEnumerable<string> names) in new (string, IEnumerable<string>)[]
+            {
+                ("Enemies", msb.Models.Enemies.Select(m => m.Name)), ("Players", msb.Models.Players.Select(m => m.Name)),
+                ("Objects", msb.Models.Objects.Select(m => m.Name)), ("MapPieces", msb.Models.MapPieces.Select(m => m.Name)),
+                ("Collisions", msb.Models.Collisions.Select(m => m.Name)), ("Navmeshes", msb.Models.Navmeshes.Select(m => m.Name)),
+            })
+            {
+                foreach (string name in names)
+                {
+                    if (!result.TryGetValue(name, out HashSet<string> set)) result[name] = set = new HashSet<string>(StringComparer.Ordinal);
+                    set.Add(category);
+                }
+            }
+            return result;
         }
 
         public static void CheckParams(

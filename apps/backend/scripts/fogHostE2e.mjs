@@ -118,17 +118,33 @@ async function sweep(count, prefix) {
       conflicts,
       merges: [...new Set(merges)],
     };
+    let combinedEdited = new Set();
     if (process.env.DS1TR_E2E_VERIFY_SKIPS) {
       const pristine = (await authority.getPristineSource(game)).directory;
       entry.skipChecks = [];
       for (const attempt of (await readdir(workspace).catch(() => [])).filter((d) => d.startsWith('combined-')).sort()) {
         for (const seedDir of (await readdir(path.join(workspace, attempt)).catch(() => [])).filter((d) => d.startsWith('seed_'))) {
           const run = spawnSync(process.env.DS1TR_E2E_VERIFY_SKIPS,
-            ['verify-skips', path.join(pristine, 'event'), path.join(workspace, attempt, seedDir, 'mod', 'event')], { encoding: 'utf8' });
+            ['verify-skips', path.join(pristine, 'event'), path.join(workspace, attempt, seedDir, 'mod', 'event'), '--list-edited'],
+            { encoding: 'utf8' });
           entry.skipChecks.push(`${attempt}: exit ${run.status} ${(run.stdout.match(/verify-skips: .*/) ?? ['no output'])[0]}`);
           if (run.status !== 0) console.log(run.stdout);
+          // The last combined attempt is the one the Fog run consumed.
+          combinedEdited = new Set(run.stdout.split(/\r?\n/).filter((l) => l.startsWith('EDITED ')).map((l) => l.slice(7).trim()));
         }
       }
+    }
+    if (process.env.DS1TR_E2E_VERIFY_SKIPS && result.ok && process.env.DS1TR_E2E_FOG !== '0') {
+      // Final Fog package against FogMod's own event templates: every skip the combined engine or the
+      // merge touched must be intact. Mismatches in events the combined engine never edited are
+      // FogMod's own runtime edits (stock FogMod behavior) and are reported separately.
+      const run = spawnSync(process.env.DS1TR_E2E_VERIFY_SKIPS,
+        ['verify-skips', path.join(process.env.DS1TR_FOG_DATA_ROOT, 'dist', 'DS1R', 'event'), path.join(result.packagePath, 'event')],
+        { encoding: 'utf8' });
+      const mismatched = [...new Set(run.stdout.split(/\r?\n/).filter((l) => l.startsWith('MISMATCH '))
+        .map((l) => l.slice(9).split(' ')[0]))];
+      entry.fogCombinedEventMismatches = mismatched.filter((id) => combinedEdited.has(id));
+      entry.fogModOnlyEventMismatches = mismatched.filter((id) => !combinedEdited.has(id));
     }
     results.push(entry);
     console.log(JSON.stringify(entry));
@@ -146,6 +162,8 @@ async function sweep(count, prefix) {
     instructionMerges: tally(results.flatMap((r) => r.merges)),
     skipChecksFailed: results.flatMap((r) => r.skipChecks ?? []).filter((c) => !c.includes('exit 0')).length,
     skipChecks: results.flatMap((r) => r.skipChecks ?? []).length,
+    fogCombinedEventMismatches: tally(results.flatMap((r) => r.fogCombinedEventMismatches ?? [])),
+    fogModOnlyEventMismatches: tally(results.flatMap((r) => r.fogModOnlyEventMismatches ?? [])),
   }, null, 2));
 }
 

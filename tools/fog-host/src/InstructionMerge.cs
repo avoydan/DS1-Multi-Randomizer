@@ -48,10 +48,31 @@ namespace FogHost
             if (b.RestBehavior != c.RestBehavior || b.RestBehavior != t.RestBehavior)
                 return Refuse(out reason, "rest behavior differs between base, combined and FogMod");
 
-            List<Hunk> combined = Diff(b.Instructions, c.Instructions, out reason, "combined");
+            // Skips are aligned ignoring only their line count, so a count change is not an edit
+            // hunk; every changed count must then be validated as a derived adjustment below.
+            List<Hunk> combined = Diff(b.Instructions, c.Instructions, out reason, "combined", ignoreSkipCounts: true);
             if (combined == null) return null;
-            List<Hunk> fog = Diff(b.Instructions, t.Instructions, out reason, "FogMod");
+            List<Hunk> fog = Diff(b.Instructions, t.Instructions, out reason, "FogMod", ignoreSkipCounts: true);
             if (fog == null) return null;
+
+            // Derived skip-count adjustments: base skip index -> (side, adjusted instruction, the side's hunks inside).
+            var derived = new Dictionary<int, (string Side, EMEVD.Instruction Skip, HashSet<Hunk> Inside)>();
+            foreach ((string side, EMEVD.Event x, List<Hunk> hunks, List<Hunk> other) in new[] { ("combined", c, combined, fog), ("FogMod", t, fog, combined) })
+            {
+                int[] baseToSide = BaseToSide(b.Instructions.Count, hunks, out Dictionary<Hunk, int> addedAt);
+                for (int p = 0; p < b.Instructions.Count; p++)
+                {
+                    if (!IsSkip(b.Instructions[p]) || baseToSide[p] < 0) continue;
+                    EMEVD.Instruction adjusted = x.Instructions[baseToSide[p]];
+                    if (Lines(adjusted) == Lines(b.Instructions[p])) continue;
+                    HashSet<Hunk> inside = ValidateDerived(b, x, hunks, other, baseToSide, addedAt, p, out string why);
+                    if (inside == null)
+                        return Refuse(out reason, $"{side} changes control-flow instruction {Name(b.Instructions[p])} at base {p} (skip count {Lines(b.Instructions[p])} -> {Lines(adjusted)}: {why})");
+                    if (derived.ContainsKey(p))
+                        return Refuse(out reason, $"both sides change the count of {Name(b.Instructions[p])} at base {p}");
+                    derived[p] = (side, adjusted, inside);
+                }
+            }
 
             // Same instruction (or adjacent insertion point) changed by both sides.
             foreach (Hunk hc in combined)
@@ -89,14 +110,22 @@ namespace FogHost
                 if (!IsSkip(skip)) continue;
                 int lines = skip.ArgData.Length > 0 ? skip.ArgData[0] : 0;
                 int first = p + 1, last = p + lines + 1;
+                derived.TryGetValue(p, out var adjustment);
                 foreach ((string side, List<Hunk> hunks) in new[] { ("combined", combined), ("FogMod", fog) })
                 {
-                    Hunk inside = hunks.FirstOrDefault(h => h.Added.Count != h.End - h.Start
-                        && Math.Max(h.Start, first) <= Math.Min(h.End, last));
+                    bool adjustingSide = adjustment.Side == side;
+                    bool otherSide = adjustment.Side != null && !adjustingSide;
+                    Hunk inside = hunks.FirstOrDefault(h => Math.Max(h.Start, first) <= Math.Min(h.End, last)
+                        && (otherSide || (h.Added.Count != h.End - h.Start && !(adjustingSide && adjustment.Inside.Contains(h)))));
                     if (inside != null)
-                        return Refuse(out reason, $"{side} edit at base {inside.Start} is inside the {lines}-line range of {Name(skip)} at base {p}");
+                        return Refuse(out reason, otherSide
+                            ? $"{side} edit at base {inside.Start} is inside the {lines}-line range of {Name(skip)} at base {p}, whose count the other side adjusts"
+                            : $"{side} edit at base {inside.Start} is inside the {lines}-line range of {Name(skip)} at base {p}");
                 }
             }
+
+            if (b.Parameters.Any(prm => derived.ContainsKey((int)prm.InstructionIndex) && prm.TargetStartByte <= 0 && prm.TargetStartByte + prm.ByteCount > 0))
+                return Refuse(out reason, "an adjusted skip count comes from an event parameter");
 
             // Event parameters address instructions by index; keep them only if neither side changed them.
             var deleted = new HashSet<int>(combined.Concat(fog).SelectMany(h => Enumerable.Range(h.Start, h.End - h.Start)));
@@ -115,7 +144,7 @@ namespace FogHost
                 if (i == b.Instructions.Count) break;
                 if (deleted.Contains(i)) { baseToMerged[i] = -1; continue; }
                 baseToMerged[i] = merged.Instructions.Count;
-                merged.Instructions.Add(b.Instructions[i]);
+                merged.Instructions.Add(derived.TryGetValue(i, out var adjusted) ? adjusted.Skip : b.Instructions[i]);
             }
             foreach (EMEVD.Parameter prm in b.Parameters)
             {
@@ -129,11 +158,13 @@ namespace FogHost
         /// Minimal edit script from <paramref name="from"/> to <paramref name="to"/> (LCS). Refused as
         /// ambiguous when the earliest and latest alignments disagree (e.g. repeated instructions).
         /// </summary>
-        public static List<Hunk> Diff(IReadOnlyList<EMEVD.Instruction> from, IReadOnlyList<EMEVD.Instruction> to, out string reason, string side = "side")
+        public static List<Hunk> Diff(IReadOnlyList<EMEVD.Instruction> from, IReadOnlyList<EMEVD.Instruction> to, out string reason,
+            string side = "side", bool ignoreSkipCounts = false)
         {
             reason = null;
-            List<Hunk> forward = Align(from, to);
-            List<Hunk> backward = Mirror(Align(from.Reverse().ToList(), to.Reverse().ToList()), from.Count);
+            Func<EMEVD.Instruction, EMEVD.Instruction, bool> same = ignoreSkipCounts ? SameIgnoringSkipCount : EmevdMerge.SameInstruction;
+            List<Hunk> forward = Align(from, to, same);
+            List<Hunk> backward = Mirror(Align(from.Reverse().ToList(), to.Reverse().ToList(), same), from.Count);
             if (!SameHunks(forward, backward))
             {
                 reason = $"the {side} edit has an ambiguous alignment (repeated instructions)";
@@ -142,13 +173,14 @@ namespace FogHost
             return forward;
         }
 
-        private static List<Hunk> Align(IReadOnlyList<EMEVD.Instruction> a, IReadOnlyList<EMEVD.Instruction> b)
+        private static List<Hunk> Align(IReadOnlyList<EMEVD.Instruction> a, IReadOnlyList<EMEVD.Instruction> b,
+            Func<EMEVD.Instruction, EMEVD.Instruction, bool> same)
         {
             int n = a.Count, m = b.Count;
             var lcs = new int[n + 1, m + 1];
             for (int i = n - 1; i >= 0; i--)
                 for (int j = m - 1; j >= 0; j--)
-                    lcs[i, j] = EmevdMerge.SameInstruction(a[i], b[j]) ? lcs[i + 1, j + 1] + 1 : Math.Max(lcs[i + 1, j], lcs[i, j + 1]);
+                    lcs[i, j] = same(a[i], b[j]) ? lcs[i + 1, j + 1] + 1 : Math.Max(lcs[i + 1, j], lcs[i, j + 1]);
 
             var hunks = new List<Hunk>();
             int x = 0, y = 0, start = -1;
@@ -161,7 +193,7 @@ namespace FogHost
             }
             while (x < n || y < m)
             {
-                if (x < n && y < m && EmevdMerge.SameInstruction(a[x], b[y]) && lcs[x, y] == lcs[x + 1, y + 1] + 1)
+                if (x < n && y < m && same(a[x], b[y]) && lcs[x, y] == lcs[x + 1, y + 1] + 1)
                 {
                     Close(x);
                     x++; y++;
@@ -208,6 +240,85 @@ namespace FogHost
                 map.TryGetValue((int)p.First.InstructionIndex, out int mapped) && mapped == p.Second.InstructionIndex
                 && p.First.TargetStartByte == p.Second.TargetStartByte && p.First.SourceStartByte == p.Second.SourceStartByte
                 && p.First.ByteCount == p.Second.ByteCount && p.First.UnkID == p.Second.UnkID);
+        }
+
+        public static int Lines(EMEVD.Instruction skip) => skip.ArgData.Length > 0 ? skip.ArgData[0] : 0;
+
+        /// <summary>Equal instructions, except that two skips may differ in their line count (byte 0) only.</summary>
+        private static bool SameIgnoringSkipCount(EMEVD.Instruction a, EMEVD.Instruction b)
+        {
+            if (!IsSkip(a) || !IsSkip(b)) return EmevdMerge.SameInstruction(a, b);
+            return a.Bank == b.Bank && a.ID == b.ID && Equals(a.Layer, b.Layer)
+                && a.ArgData.Length == b.ArgData.Length && a.ArgData.Length > 0
+                && a.ArgData.AsSpan(1).SequenceEqual(b.ArgData.AsSpan(1));
+        }
+
+        /// <summary>Side index of each base instruction (-1 when deleted) and side index of each hunk's first added instruction.</summary>
+        private static int[] BaseToSide(int baseCount, List<Hunk> hunks, out Dictionary<Hunk, int> addedAt)
+        {
+            var map = new int[baseCount];
+            addedAt = new Dictionary<Hunk, int>();
+            var deleted = new HashSet<int>(hunks.SelectMany(h => Enumerable.Range(h.Start, h.End - h.Start)));
+            int position = 0;
+            for (int i = 0; i <= baseCount; i++)
+            {
+                foreach (Hunk h in hunks.Where(h => h.Start == i))
+                {
+                    addedAt[h] = position;
+                    position += h.Added.Count;
+                }
+                if (i == baseCount) break;
+                map[i] = deleted.Contains(i) ? -1 : position++;
+            }
+            return map;
+        }
+
+        /// <summary>
+        /// Validates that side <paramref name="x"/>'s change of the count of the base skip at
+        /// <paramref name="p"/> is a mechanical consequence of its own insertions/deletions inside that
+        /// skip's range: every such hunk lies wholly inside the range (or is a pure insertion at the end
+        /// of it), the other side does not edit the range, and the adjusted skip covers exactly the
+        /// surviving base lines of the range plus the side's own inserted lines. Returns the side's
+        /// hunks that are accounted for, or null with a reason.
+        /// </summary>
+        private static HashSet<Hunk> ValidateDerived(EMEVD.Event b, EMEVD.Event x, List<Hunk> hunks, List<Hunk> other,
+            int[] baseToSide, Dictionary<Hunk, int> addedAt, int p, out string why)
+        {
+            why = null;
+            int n = Lines(b.Instructions[p]);
+            int first = p + 1, lastCovered = p + n;
+            if (lastCovered >= b.Instructions.Count) { why = "the base range runs past the end of the event"; return null; }
+            Hunk otherInside = other.FirstOrDefault(h => Math.Max(h.Start, first) <= Math.Min(h.End, lastCovered + 1));
+            if (otherInside != null) { why = $"the other side edits the range at base {otherInside.Start}"; return null; }
+
+            var inside = new HashSet<Hunk>();
+            Hunk boundary = null;
+            foreach (Hunk h in hunks)
+            {
+                bool deletes = h.End > h.Start;
+                if (deletes && h.Start >= first && h.End - 1 <= lastCovered) inside.Add(h);
+                else if (deletes && Math.Max(h.Start, first) <= Math.Min(h.End - 1, lastCovered)) { why = $"the edit at base {h.Start} straddles the range boundary"; return null; }
+                else if (!deletes && h.Start >= first && h.Start <= lastCovered) inside.Add(h);
+                else if (!deletes && h.Start == lastCovered + 1) boundary = h;
+            }
+
+            int q = baseToSide[p];
+            var covered = Enumerable.Range(q + 1, Lines(x.Instructions[q])).ToHashSet();
+            var expected = Enumerable.Range(first, n).Where(i => baseToSide[i] >= 0).Select(i => baseToSide[i]).ToHashSet();
+            foreach (Hunk h in inside) expected.UnionWith(Enumerable.Range(addedAt[h], h.Added.Count));
+            if (covered.SetEquals(expected)) return inside;
+            if (boundary != null)
+            {
+                // A pure insertion right after the last covered line is inside only if the side's count includes it.
+                expected.UnionWith(Enumerable.Range(addedAt[boundary], boundary.Added.Count));
+                if (covered.SetEquals(expected))
+                {
+                    inside.Add(boundary);
+                    return inside;
+                }
+            }
+            why = "the adjusted count does not cover exactly the surviving lines plus the side's own insertions";
+            return null;
         }
 
         private static string Name(EMEVD.Instruction i) => $"{i.Bank}[{i.ID:d2}]";
