@@ -1,5 +1,35 @@
 # Implementation status
 
+**Windows desktop packaging (2026-09-29):** Electron now starts and stops the backend,
+resolves bundled runtime files, stores mutable data outside the app directory, and
+offers a FogMod data-root picker. Desktop 0.6.1 and backend 0.18.0. A portable x64
+artifact is built at `apps/desktop/release/DS1-Triple-Randomizer-0.6.1-x64.exe`.
+It bundles DsrDataTool, FogHost, the combined JS core and license notices; FogMod's
+game-derived DS1R data is excluded. See `docs/DESKTOP_PACKAGING.md` for the layout,
+build command and .NET 8 runtime prerequisite. Packaged-runtime API/tool smoke checks
+passed on staging data. The final portable executable launched outside the restricted
+sandbox: the renderer showed `Backend online` and first-run DSR/Fog guidance; health
+returned 200 with backend 0.18.0; a missing DSR path returned an explicit problem;
+the plan reported the combined engine and FogHost ready. Closing the window stopped
+the portable wrapper, Electron main process and backend child. The sandboxed preload
+had to compile as CommonJS (`preload.cts`); desktop 0.6.1 includes that fix. No public
+GPL fork or release tag exists yet.
+
+- Verification: root typecheck clean; backend tests 108 passed, 1 skipped (requires a
+  user Fog data root); desktop, backend, DsrDataTool and FogHost builds passed;
+  `package:win` completed; production-dependency audit found 0 advisories.
+- Portable smoke: 0.6.1 executable launched from `release/`, renderer preload
+  connected, backend health returned 200, missing DSR returned
+  `DarkSoulsRemastered.exe not found.`, both packaged tools were reported ready,
+  first-run DSR/Fog guidance was visible, and normal window close ended the wrapper,
+  Electron main and backend child. Bundled DsrDataTool and FogHost executables ran
+  and printed their usage messages. A staged-data run without a Fog root returned
+  `FOG_PREREQUISITES_MISSING` before randomization. No live game files were touched.
+- Release prerequisites: install .NET 8 runtime on the user machine; supply FogMod
+  DS1R data locally; create the public GPL corresponding-source fork and matching
+  release tag. Code signing and a custom icon are not configured.
+
+
 **Boss randomization + Fog works (FogHost 0.5.0, backend 0.17.0, desktop 0.5.0,
 2026-09-29).** The `FOG_BOSS_RANDOMIZATION_UNSUPPORTED` rejection is removed, and bosses
 are on by default again.

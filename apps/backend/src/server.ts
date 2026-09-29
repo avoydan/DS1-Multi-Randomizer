@@ -12,6 +12,7 @@ import { GameStateAuthority, defaultStateRoot } from './core/gameState.js';
 
 const HOST = process.env.DS1TR_HOST ?? '127.0.0.1';
 const PORT = Number(process.env.DS1TR_PORT ?? 43177);
+const TOKEN = process.env.DS1TR_API_TOKEN;
 // The single backup/restore authority is also the only trusted pristine source.
 const authority = new GameStateAuthority({ stateRoot: defaultStateRoot() });
 const generationDependencies = {
@@ -23,7 +24,7 @@ function send(res: http.ServerResponse, status: number, body: unknown): void {
   res.writeHead(status, {
     'Content-Type': 'application/json; charset=utf-8',
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Headers': 'Content-Type, X-DS1TR-Token',
     'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
   });
   res.end(JSON.stringify(body));
@@ -44,12 +45,13 @@ const server = http.createServer(async (req, res) => {
     return send(res, 403, { error: 'Origin not allowed' });
   }
   if (req.method === 'OPTIONS') return send(res, 204, null);
+  if (TOKEN && req.headers['x-ds1tr-token'] !== TOKEN) return send(res, 403, { error: 'Invalid desktop session token.' });
 
   try {
     const url = new URL(req.url ?? '/', `http://${HOST}:${PORT}`);
 
     if (req.method === 'GET' && url.pathname === '/api/health') {
-      return send(res, 200, { ok: true, service: 'ds1-triple-randomizer-backend', version: '0.17.0' });
+      return send(res, 200, { ok: true, service: 'ds1-triple-randomizer-backend', version: '0.18.0' });
     }
 
     if (req.method === 'POST' && url.pathname === '/api/installation/validate') {
@@ -95,7 +97,7 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, {
         'Content-Type': 'text/event-stream; charset=utf-8',
         'Cache-Control': 'no-cache',
-        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Origin': 'null',
       });
       try {
         const result = await generateRun({ config, workspacePath }, (event) => {
@@ -115,7 +117,7 @@ const server = http.createServer(async (req, res) => {
         res.writeHead(200, {
           'Content-Type': 'text/event-stream; charset=utf-8',
           'Cache-Control': 'no-cache',
-          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Origin': 'null',
         });
         let result;
         try {
@@ -143,5 +145,9 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, HOST, () => {
-  console.log(`[backend] http://${HOST}:${PORT}`);
+  const address = server.address();
+  console.log(`[backend] http://${HOST}:${typeof address === 'object' && address ? address.port : PORT}`);
+});
+process.on('message', (message) => {
+  if (message === 'shutdown') server.close(() => process.exit(0));
 });

@@ -1,5 +1,22 @@
 # Decisions
 
+## The Windows desktop ships a portable Electron payload with a separate packaged runtime
+
+Date: 2026-09-29
+
+The desktop package carries the compiled backend, the vendored combined JavaScript core,
+and framework-dependent .NET 8 builds of DsrDataTool and FogHost in `resources/runtime`.
+Electron launches the backend in Node mode on a random loopback port with a per-session
+token. Electron's user-data directory holds mutable state. FogMod's game-derived DS1R
+data remains outside the package and is selected by the user. See
+`docs/DESKTOP_PACKAGING.md`.
+
+Why: the desktop needs one process authority for generation and activation, while the
+renderer stays isolated from game files. A framework-dependent build can be produced
+from the available SDK and cached dependencies; self-contained Windows runtime packs
+were unavailable in this build environment. .NET 8 runtime is therefore an explicit
+installation prerequisite.
+
 Architectural decisions that are not fully derivable from reading the code
 alone. Keep entries short; link to the analysis doc that has the detail.
 
@@ -630,4 +647,3 @@ position-based merging across FogMod's control-flow changes.
 Also: the Asylum Demon `RemoveAll` in FogMod goes through `SkipRanges.Remove` (patch 8).
 Merge refinements, each provable: ambiguous alignments with an identical result, the skip
 range defined as `[p+1, p+n]`, and event-0 initialization removal.
-

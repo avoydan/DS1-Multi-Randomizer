@@ -4,13 +4,15 @@ import { fileURLToPath } from 'node:url';
 import type { FogLanguage } from '@ds1tr/contracts';
 import { fogReadSet } from './fogCompatibility.js';
 
-const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../../');
+const repoRoot = process.env.DS1TR_RUNTIME_ROOT ?? path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../../');
 
 /** Folder that contains FogMod's `dist` at commit 6e6dc78 (never bundled; supplied by the user). */
 export const fogDataRootVariable = 'DS1TR_FOG_DATA_ROOT';
 /** Optional override for the FogHost executable. */
 export const fogHostVariable = 'DS1TR_FOG_HOST';
-export const defaultFogHostExecutable = path.join(repoRoot, 'tools', 'fog-host', 'bin', 'Release', 'net8.0', 'FogHost.exe');
+export const defaultFogHostExecutable = process.env.DS1TR_RUNTIME_ROOT
+  ? path.join(repoRoot, 'tools', 'fog-host', 'FogHost.exe')
+  : path.join(repoRoot, 'tools', 'fog-host', 'bin', 'Release', 'net8.0', 'FogHost.exe');
 
 export interface FogPrerequisites {
   executablePath: string;

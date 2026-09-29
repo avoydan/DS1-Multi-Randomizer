@@ -1,0 +1,21 @@
+﻿appId: com.ds1tr.desktop
+productName: DS1 Triple Randomizer
+artifactName: DS1-Triple-Randomizer-${version}-${arch}.${ext}
+directories:
+  app: release/package-app
+  output: release
+files:
+  - dist/**
+  - dist-electron/**
+  - package.json
+extraResources:
+  - from: release/runtime
+    to: runtime
+win:
+  target:
+    - target: portable
+      arch:
+        - x64
+  signAndEditExecutable: false
+beforeBuild: ./scripts/skip-node-modules.cjs
+asar: true

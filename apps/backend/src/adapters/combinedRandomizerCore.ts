@@ -26,7 +26,7 @@ const currentDirectory = path.dirname(fileURLToPath(import.meta.url));
  * `dist/adapters` (compiled) — the same four-level pattern
  * `core/pipeline.ts` already relies on.
  */
-const repositoryRoot = path.resolve(currentDirectory, '../../../../');
+const repositoryRoot = process.env.DS1TR_RUNTIME_ROOT ?? path.resolve(currentDirectory, '../../../../');
 
 /** Vendored upstream `src/` root inside this repository. */
 export const combinedRandomizerCoreRoot = path.join(

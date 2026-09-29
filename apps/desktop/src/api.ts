@@ -1,11 +1,16 @@
 import type { GameStateReport, GenerationEvent, GenerationResult, InstallationValidation, OperationResult, PipelinePlan, RandomizerConfig } from '@ds1tr/contracts';
 
-const API = 'http://127.0.0.1:43177/api';
+async function connection(): Promise<{ apiBase: string; token: string }> {
+  const result = await window.desktop?.connection();
+  if (!result?.apiBase) throw new Error(result?.error ?? 'Backend is unavailable. Restart the desktop app.');
+  return { apiBase: result.apiBase, token: result.token };
+}
 
 async function post<T>(path: string, body: unknown, allowFailure = false): Promise<T> {
-  const response = await fetch(`${API}${path}`, {
+  const { apiBase, token } = await connection();
+  const response = await fetch(`${apiBase}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'X-DS1TR-Token': token },
     body: JSON.stringify(body),
   });
 
@@ -17,8 +22,9 @@ async function post<T>(path: string, body: unknown, allowFailure = false): Promi
 }
 
 export async function generate(config: RandomizerConfig, onEvent: (event: GenerationEvent) => void): Promise<GenerationResult> {
-  const response = await fetch(`${API}/runs/generate`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
+  const { apiBase, token } = await connection();
+  const response = await fetch(`${apiBase}/runs/generate`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream', 'X-DS1TR-Token': token },
     body: JSON.stringify(config),
   });
   if (!response.ok || !response.body) throw new Error(`${response.status}: ${await response.text()}`);
@@ -47,7 +53,8 @@ export async function generate(config: RandomizerConfig, onEvent: (event: Genera
 export const api = {
   health: async (): Promise<boolean> => {
     try {
-      return (await fetch(`${API}/health`)).ok;
+      const { apiBase, token } = await connection();
+      return (await fetch(`${apiBase}/health`, { headers: { 'X-DS1TR-Token': token } })).ok;
     } catch {
       return false;
     }

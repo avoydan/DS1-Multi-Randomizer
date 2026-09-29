@@ -96,7 +96,7 @@ export async function generateRun(
   const workspace = typeof request.workspacePath === 'string' && request.workspacePath
     ? path.resolve(request.workspacePath) : '';
   const manifest: GenerationManifest = {
-    schemaVersion: 1, appVersion: '0.17.0', game: 'DSR', masterSeed: config.masterSeed,
+    schemaVersion: 1, appVersion: '0.18.0', game: 'DSR', masterSeed: config.masterSeed,
     pristineSnapshotId: null, gameTreeRoot: '',
     options: { items: config.items, enemies: config.enemies, fog: config.fog, output: config.output },
     attempts: [], engines: {}, validation: [], files: [],
@@ -129,8 +129,9 @@ export async function generateRun(
 
   const fogReady = config.fog.enabled ? await services.getFogPrerequisites(config.fog.language) : null;
   if (config.fog.enabled && !fogReady) return fail('fog', 'FOG_PREREQUISITES_MISSING',
-    `Fog generation needs the built FogHost (tools/fog-host) and ${fogDataRootVariable} set to a folder containing `
-    + 'the `dist` folder of FogMod commit 6e6dc78; FogHost verifies that data on every run.');
+    `Fog generation needs FogHost and a user-provided FogMod data root. Select the folder containing `
+    + '`dist/DS1R` for FogMod commit 6e6dc78 in the desktop app (or set '
+    + `${fogDataRootVariable}); FogHost verifies that data on every run.`);
   if (fogReady) {
     try { await requireFile(fogReady.executablePath); await access(fogReady.dataRoot); }
     catch { return fail('fog', 'FOG_PREREQUISITES_MISSING', 'FogHost executable or FogMod data root is unavailable.'); }

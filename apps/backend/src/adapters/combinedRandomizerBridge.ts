@@ -49,7 +49,7 @@ import {
 const currentDirectory = path.dirname(fileURLToPath(import.meta.url));
 
 /** Repository root, resolved identically under `tsx` and when compiled. */
-const repositoryRoot = path.resolve(currentDirectory, '../../../../');
+const repositoryRoot = process.env.DS1TR_RUNTIME_ROOT ?? path.resolve(currentDirectory, '../../../../');
 
 /**
  * Built `DsrDataTool` artifact produced by the documented vendored build
@@ -212,7 +212,7 @@ export async function executeCombinedGeneration(
   const dotnetExecutablePath = options.dotnetExecutablePath
     ?? process.env[dotnetPathEnvironmentVariable]
     ?? 'dotnet';
-  const dataToolDllPath = options.dataToolDllPath ?? defaultDataToolDllPath;
+  const dataToolDllPath = options.dataToolDllPath ?? (process.env.DS1TR_DATA_TOOL_EXE ? '' : defaultDataToolDllPath);
 
   const progress = (value: number, message: string): void => {
     onEvent({ type: 'progress', progress: value, message });

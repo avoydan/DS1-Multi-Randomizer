@@ -63,7 +63,7 @@ export class DsrDataToolExecutor {
       try {
         child = this.spawnProcess(
           request.dotnetExecutablePath,
-          [request.dataToolDllPath, ...request.plannedArguments],
+          [...(request.dataToolDllPath ? [request.dataToolDllPath] : []), ...request.plannedArguments],
           { stdio: ['ignore', 'pipe', 'pipe'] },
         );
       } catch (error) {

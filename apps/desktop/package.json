@@ -1,14 +1,15 @@
 {
   "name": "@ds1tr/desktop",
-  "version": "0.5.0",
+  "version": "0.6.1",
   "license": "GPL-3.0-only",
   "private": true,
   "type": "module",
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "concurrently -k \"vite\" \"tsc -p electron/tsconfig.json --watch\" \"wait-on http://127.0.0.1:5173 && electron .\"",
-    "build": "vite build && tsc -p electron/tsconfig.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p electron/tsconfig.json --noEmit"
+    "build": "vite build --configLoader runner && tsc -p electron/tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p electron/tsconfig.json --noEmit",
+    "package:win": "node scripts/package-win.mjs"
   },
   "dependencies": {
     "@ds1tr/contracts": "0.3.0",
@@ -21,7 +22,8 @@
     "@types/react-dom": "^19.0.2",
     "@vitejs/plugin-react": "^4.3.4",
     "concurrently": "^9.1.2",
-    "electron": "^34.0.0",
+    "electron": "34.5.8",
+    "electron-builder": "^26.15.3",
     "typescript": "^5.7.3",
     "vite": "^6.0.7",
     "wait-on": "^8.0.1"

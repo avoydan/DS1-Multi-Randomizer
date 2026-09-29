@@ -82,6 +82,8 @@ function RangeOption({ label, value, onChange, disabled = false }: {
 export function App() {
   const [config, setConfig] = useState(initialConfig);
   const [backendOnline, setBackendOnline] = useState<boolean | null>(null);
+  const [startupError, setStartupError] = useState<string | null>(null);
+  const [fogDataRoot, setFogDataRoot] = useState('');
   const [validation, setValidation] = useState<InstallationValidation | null>(null);
   const [plan, setPlan] = useState<PipelinePlan | null>(null);
   const [busy, setBusy] = useState(false);
@@ -96,6 +98,10 @@ export function App() {
 
   useEffect(() => {
     api.health().then(setBackendOnline);
+    window.desktop?.connection().then((state) => {
+      setStartupError(state.error);
+      setFogDataRoot(state.fogDataRoot);
+    });
   }, []);
 
   useEffect(() => {
@@ -234,6 +240,8 @@ export function App() {
       </header>
 
       <main>
+        {startupError && <div className="notice error">Backend startup failed: {startupError}</div>}
+        {!config.gamePath && <div className="notice">Select your Dark Souls Remastered installation to begin. The app can start without the game installed.</div>}
         <section className="card setup-card">
           <div className="section-title"><span>01</span><h2>Game, seed & output</h2></div>
           <label className="field-label">Dark Souls Remastered directory</label>
@@ -243,6 +251,20 @@ export function App() {
             <button className="secondary" onClick={validate} disabled={busy || !config.gamePath}>Validate</button>
           </div>
           {validation && <div className={validation.valid ? 'notice success' : 'notice error'}>{validation.valid ? 'Installation validated.' : validation.problems.join(' ')}</div>}
+          <label className="field-label">FogMod data root (folder containing dist/DS1R)</label>
+          <div className="path-row">
+            <input value={fogDataRoot} readOnly placeholder="Required for Fog generation; supplied by you" />
+            <button className="secondary" disabled={busy} onClick={async () => {
+              const selected = await window.desktop?.selectFogDataRoot();
+              if (selected) {
+                setFogDataRoot(selected.path);
+                setStartupError(selected.error);
+                setBackendOnline(await api.health());
+                setPlan(null);
+              }
+            }}>Browse</button>
+          </div>
+          {!fogDataRoot && <div className="notice">Fog generation needs the FogMod 6e6dc78 data folder. Select it here before generating with Fog enabled.</div>}
           <label className="field-label">Master seed</label>
           <div className="seed-row">
             <input value={config.masterSeed} onChange={(event) => setConfig({ ...config, masterSeed: event.target.value })} />
