@@ -815,7 +815,19 @@ live install only read and unchanged)
     or merged events.
 - 11 FogMod-only boss-trigger events have skip ranges changed by FogMod's
   own runtime rewrite. That is stock FogMod behavior, recorded in
-  `docs/DECISIONS.md`.
+  `docs/DECISIONS.md`, and fixed in 0.3.1 below.
+
+**FogHost 0.3.1** (vendored FogMod patch 7; 40-seed sweeps)
+
+- Before FogMod replaces a boss-trigger `3[02]` in place with several
+  instructions, `SkipRanges.BeforeReplace` grows every enclosing skip by the
+  net line change. It refuses control-flow targets, parameterized counts and
+  overflow.
+- All 11 events (`11015393`, `11205383`, `11215002/3/12/13`, `11405393`,
+  `11415343/383`, `11505393`, `11515393`) now verify with 0 mismatches.
+- Items + Enemies + Fog: 40/40. Items + Fog: 40/40. Neither had merge
+  conflicts or skip mismatches, in combined packages or in final Fog
+  packages checked against FogMod's templates.
 
 **Open**
 

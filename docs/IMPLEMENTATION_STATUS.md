@@ -1,5 +1,27 @@
 # Implementation status
 
+FogHost 0.3.1 (2026-09-29): FogMod's boss-trigger rewrite now keeps enclosing DS1 SKIP
+counts consistent (vendored patch 7, `tools/fog-host/src/SkipRanges.cs`).
+
+- **Verification:**
+  - FogHost self-tests 52/52, including 5 new ones;
+  - each of the 11 previously broken FogMod-only events (`11015393`, `11205383`,
+    `11215002/3/12/13`, `11405393`, `11415343/383`, `11505393`, `11515393`) checked
+    explicitly: 0 mismatches.
+- **40-seed sweeps** (live install unchanged):
+  - Items + Enemies + Fog 40/40;
+  - Items + Fog 40/40.
+
+  Neither had merge conflicts or skip mismatches, in combined packages or in final Fog
+  packages (checked against FogMod's templates). Key-item retries are unchanged: 7 of 47
+  and 8 of 48 attempts, and no seed exhausted the budget.
+- **Remaining:**
+  - bosses + Fog is still rejected;
+  - the Asylum `11810310` FogMod removal is not skip-adjusted, but it runs only for
+    bosses + Fog;
+  - the FogHost and DsrDataTool test consoles run outside `npm test`;
+  - there is no public GPL fork yet.
+
 FogHost 0.3.0 and backend 0.16.2 (2026-09-29). **Items + Enemies + Fog works on real-format
 data: 40/40 seeds.**
 

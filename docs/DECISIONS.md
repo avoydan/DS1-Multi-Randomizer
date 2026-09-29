@@ -535,10 +535,42 @@ Date: 2026-09-29. User-approved narrowing of merge rules 3 (overlap/adjacency) a
 - final Fog packages, checked against FogMod's own templates, have 0 skip mismatches in
   any event the combined engine or the merge touched.
 
-**Upstream FogMod observation (not fixed; outside this scope).** In every seed, 11
+**Upstream FogMod observation (fixed by FogHost 0.3.1; see the next entry).** In every seed, 11
 boss-trigger events that only FogMod edits end up with skip ranges covering different
 instructions: `11015393`, `11205383`, `11215002/3/12/13`, `11405393`, `11415343/383`,
 `11505393`, `11515393`. This comes from FogMod's runtime boss-trigger rewrite, which
 replaces a `3[02]` with several instructions without adjusting the enclosing skip.
 Stock FogMod does the same, so it is pre-existing FogMod behavior.
+
+## FogHost 0.3.1: FogMod's boss-trigger rewrite keeps enclosing SKIP counts consistent
+
+Date: 2026-09-29. Correctness fix in the vendored FogMod engine (patch 7), not a merge
+workaround.
+
+- **Root cause.** `GameDataWriter.cs` replaces one `IF In/Outside Area` (`3[02]`) in
+  place with `1 + (1 + alternates)` instructions (region checks plus an
+  `IF Condition Group`). Enclosing DS1 "skip N lines" instructions were not adjusted, so
+  they covered different instructions.
+- **Fix.** One call, `FogHost.SkipRanges.BeforeReplace(evt, index, inserted)`, runs
+  before the rewrite. It grows every skip covering the replaced instruction by the net
+  line change, which is the same principle as the combined engine's `EventSkipRanges`.
+  The replacement sits exactly where the covered original was, so the adjustment is
+  unambiguous. It refuses, with `FOG_ENGINE_FAILED`:
+  - a control-flow target;
+  - a parameterized skip count;
+  - an overflowing count.
+- **Scope.** No other FogMod behavior changed. FogMod's other count-changing edits are
+  appends after the end of event 0 or whole-event copies. The Asylum `11810310`
+  `RemoveAll` runs only for boss randomization + Fog, which v1 rejects, and is left
+  unchanged.
+- **Verification:**
+  - 5 new focused FogHost tests (inside a range, last covered line, outside, nested,
+    refusals);
+  - each of the 11 events checked explicitly: all present, 0 mismatches;
+  - 40-seed sweeps: Items + Enemies + Fog 40/40 and Items + Fog 40/40, with no merge
+    conflicts and 0 skip mismatches in combined packages and in final Fog packages
+    (against FogMod's templates, combined-edited and FogMod-only events alike). The
+    key-item retry budget is unchanged.
+- **Documentation.** `tools/fog-host/vendor/UPSTREAM_PIN.md` (patch 7), with the
+  change notice in `GameDataWriter.cs`.
 
