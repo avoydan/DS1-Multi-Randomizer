@@ -53,7 +53,7 @@ namespace FogHost.Tests
                 Test("derived skip: other side editing inside the range is refused", DerivedOtherSideInsideRefused);
                 Test("derived skip: incorrect count delta is refused", DerivedWrongDeltaRefused);
                 Test("derived skip: changed skip opcode or condition is refused", DerivedChangedSkipRefused);
-                Test("derived skip: ambiguous range mapping is refused", DerivedAmbiguousRefused);
+                Test("derived skip: ambiguous range mapping whose span the other side edits is refused", DerivedAmbiguousRefused);
                 Test("derived skip: both sides adjusting the same skip is refused", DerivedBothSidesRefused);
                 Test("real 11505392 case with the fixed combined engine merges", Event11505392DerivedMerges);
                 Test("real 11600400 case with the fixed combined engine merges", Event11600400DerivedMerges);
@@ -70,10 +70,17 @@ namespace FogHost.Tests
                 Test("instruction merge: skip-count change is refused", SkipCountChangeRefused);
                 Test("instruction merge: inserted END/WAIT is refused", InsertedControlFlowRefused);
                 Test("instruction merge: insertion inside a skip range is refused", InsertionInSkipRangeRefused);
-                Test("instruction merge: edit at the skip-range boundary is refused", SkipBoundaryRefused);
+                Test("instruction merge: insertion right after the covered lines (unchanged count) merges", SkipBoundaryMerges);
+                Test("instruction merge: insertion right after the skip instruction is still refused", SkipFirstLineRefused);
+                Test("ambiguous alignment with an identical result merges (boss health-bar companion pattern)", AmbiguousIdenticalResultMerges);
+                Test("ambiguous alignment whose span the other side edits is refused", AmbiguousSpanTouchedRefused);
+                Test("derived FogMod skip with a combined edit right after the range merges (11215003 pattern)", DerivedWithBoundaryEditMerges);
+                Test("event 0: combined removal of an initialization FogMod keeps merges", Event0InitRemovalMerges);
+                Test("event 0: combined removal of an initialization FogMod changed is refused", Event0InitRemovalChangedRefused);
+                Test("FogMod Asylum Demon removal keeps skips and parameters consistent", AsylumRemovalKeepsSkips);
                 Test("instruction merge: count-preserving replacement inside a skip range merges", ReplacementInSkipRangeMerges);
                 Test("instruction merge: both sides changing conditions is refused", BothConditionsRefused);
-                Test("instruction merge: ambiguous alignment is refused", AmbiguousAlignmentRefused);
+                Test("instruction merge: ambiguous alignment whose span the other side edits is refused", AmbiguousAlignmentRefused);
                 Test("instruction merge: parameters are re-indexed", ParametersReindexed);
                 Test("instruction merge: deleting a parameterized instruction is refused", ParameterizedDeletionRefused);
                 DataTest("altered or extended data root is FOG_DATA_MISSING", AlteredDataRoot);
@@ -543,7 +550,7 @@ namespace FogHost.Tests
             var x = Ins(2004, 1, 5, 0);
             var b = new List<EMEVD.Instruction> { Ins(1000, 3, 2), x, x }.Concat(Commands(6)).ToList();
             var c = new List<EMEVD.Instruction> { Ins(1000, 3, 1), x }.Concat(Commands(6)).ToList();
-            var t = b.ToList(); t[7] = Ins(2004, 1, 1004, 9);
+            var t = b.ToList(); t[3] = Ins(2004, 1, 1000, 9); // right after the ambiguous span 1..3
             ExpectRefused(b, c, t, "ambiguous alignment");
         }
 
@@ -741,12 +748,117 @@ namespace FogHost.Tests
             ExpectRefused(b, c, t, "FogMod edit at base 4 is inside the 3-line range of 1000[03] at base 2");
         }
 
-        private static void SkipBoundaryRefused()
+        private static void SkipBoundaryMerges()
+        {
+            // SKIP 3 at 2 covers 3..5. An insertion before base 6 is not covered in C (count unchanged)
+            // and is not covered in the merged event either.
+            List<EMEVD.Instruction> b = WithSkip();
+            var c = b.ToList(); c.Insert(6, Ins(2004, 9, 1, 2));
+            var t = b.ToList(); t[10] = Ins(2004, 1, 1010, 1);
+            var expected = c.ToList(); expected[11] = Ins(2004, 1, 1010, 1);
+            EMEVD.Event merged = MergeOrNull(b, c, t, out string reason);
+            ExpectSequence(merged, expected, reason);
+            Check(InstructionMerge.Lines(merged.Instructions[2]) == 3, "skip count changed");
+        }
+
+        private static void SkipFirstLineRefused()
         {
             List<EMEVD.Instruction> b = WithSkip();
-            var c = b.ToList(); c.Insert(6, Ins(2004, 9, 1, 2)); // right after the covered lines 3..5
+            var c = b.ToList(); c.Insert(3, Ins(2004, 9, 1, 2)); // now covered, pushing line 5 out
             var t = b.ToList(); t[10] = Ins(2004, 1, 1010, 1);
             ExpectRefused(b, c, t, "inside the 3-line range");
+        }
+
+        private static void AmbiguousIdenticalResultMerges()
+        {
+            // Base tail: AI on (X), health bar. Combined changes the bar name and appends AI on (X) + re-plan,
+            // an instruction identical to an existing one, so earliest and latest alignments differ.
+            var aiOn = Ins(2004, 1, 111, 1);
+            var b = Commands(6).Concat(new[] { aiOn, Ins(2003, 11, 1, 111, 10) }).ToList();
+            var c = Commands(6).Concat(new[] { aiOn, Ins(2003, 11, 1, 111, 20), aiOn, Ins(2004, 20, 111) }).ToList();
+            var t = b.ToList(); t[1] = Ins(2004, 1, 1001, 9); // FogMod edits far from the ambiguous span
+            var expected = c.ToList(); expected[1] = Ins(2004, 1, 1001, 9);
+            ExpectSequence(MergeOrNull(b, c, t, out string reason), expected, reason);
+        }
+
+        private static void AmbiguousSpanTouchedRefused()
+        {
+            var aiOn = Ins(2004, 1, 111, 1);
+            var b = Commands(6).Concat(new[] { aiOn, Ins(2003, 11, 1, 111, 10) }).ToList();
+            var c = Commands(6).Concat(new[] { aiOn, Ins(2003, 11, 1, 111, 20), aiOn, Ins(2004, 20, 111) }).ToList();
+            var t = b.ToList(); t.Insert(6, Ins(2004, 9, 1, 2)); // FogMod inserts right before the ambiguous AI-on line
+            ExpectRefused(b, c, t, "ambiguous alignment");
+        }
+
+        private static void DerivedWithBoundaryEditMerges()
+        {
+            // m12_01 11215003 shape: SKIP 5 at 0 covers 1..5; FogMod rewrites the region check at 3 and
+            // grows the skip to 7; combined replaces the health bar at 6 (right after the covered lines).
+            var b = new List<EMEVD.Instruction>
+            {
+                Ins(1003, 1, 0x00010105, 0), Ins(2004, 1, 111, 0), Ins(3, 0, 1, 1, 0, 777),
+                Ins(3, 2, 1, 1, 10000, Area), Ins(0, 0, 0x00010100), Ins(2004, 1, 111, 1),
+                Ins(2003, 11, 1, 111, 10), Ins(2003, 18, 111, 3017, 0),
+            };
+            var t = b.ToList();
+            t[0] = Ins(1003, 1, 0x00010107, 0);
+            t.RemoveAt(3);
+            t.Insert(3, Ins(0, 0, 1, 1, -7));
+            t.Insert(3, Ins(3, 2, -7, 1, 10000, Area));
+            t.Insert(3, Ins(3, 2, -7, 1, 10000, Area + 1));
+            var c = b.Take(6).Concat(new[] { Ins(2003, 11, 1, 111, 20), Ins(2004, 1, 111, 1), Ins(2004, 20, 111) }).ToList();
+            var expected = t.Take(8).Concat(c.Skip(6)).ToList();
+            ExpectSequence(MergeOrNull(b, c, t, out string reason), expected, reason);
+        }
+
+        private static (EMEVD B, EMEVD C, EMEVD T) Event0Trio(bool fogKeepsInit)
+        {
+            var floorA = Ins(2000, 0, 0, 11410200, 0);
+            var floorB = Ins(2000, 0, 1, 11410201, 0);
+            var other = Ins(2000, 0, 2, 11410300, 0);
+            EMEVD b = Evd(Evt(0, other, floorA, floorB));
+            EMEVD c = Evd(Evt(0, Copy(Evt(0, other)).Instructions[0], Ins(2000, 0, 3, 11419980, 0)));
+            EMEVD t = fogKeepsInit
+                ? Evd(Evt(0, Ins(2000, 0, 2, 11410300, 0), Ins(2000, 0, 0, 11410200, 0), Ins(2000, 0, 1, 11410201, 0), Ins(2000, 0, 9, 5000, 0)))
+                : Evd(Evt(0, Ins(2000, 0, 2, 11410300, 0), Ins(2000, 0, 0, 11410220, 0), Ins(2000, 0, 1, 11410221, 0)));
+            return (b, c, t);
+        }
+
+        private static void Event0InitRemovalMerges()
+        {
+            var (b, c, t) = Event0Trio(true);
+            var merge = new EmevdMerge(new() { ["m14_01_00_00.emevd.dcx"] = (b, c) });
+            merge.Merge("m14_01_00_00.emevd.dcx", t);
+            merge.ThrowIfConflicts();
+            var inits = t.Events[0].Instructions.Select(i => BitConverter.ToInt32(i.ArgData, 4)).ToList();
+            Check(!inits.Contains(11410200) && !inits.Contains(11410201), "removed initializations still present");
+            Check(inits.Contains(11410300) && inits.Contains(5000) && inits.Contains(11419980), "kept or added initializations missing");
+        }
+
+        private static void Event0InitRemovalChangedRefused()
+        {
+            var (b, c, t) = Event0Trio(false);
+            ExpectConflict(() => { var merge = new EmevdMerge(new() { ["m"] = (b, c) }); merge.Merge("m", t); merge.ThrowIfConflicts(); });
+        }
+
+        private static void AsylumRemovalKeepsSkips()
+        {
+            // SKIP 3 at 0 covers 1..3 (2003[18] at 2); a parameter targets instruction 4.
+            var evt = Evt(11810310, Ins(1000, 3, 3), Ins(2004, 1, 5, 0), Ins(2003, 18, 5, 9000, 0), Ins(2004, 1, 5, 1), Ins(2004, 9, 5, 1), Ins(2004, 41, 5, 1, 2, -1));
+            evt.Parameters.Add(new EMEVD.Parameter(4, 4, 0, 4));
+            var covered = new[] { evt.Instructions[1], evt.Instructions[3] };
+            for (int i = evt.Instructions.Count - 1; i >= 0; i--)
+            {
+                var ins = evt.Instructions[i];
+                if ((ins.Bank == 2003 && ins.ID == 18) || (ins.Bank == 2004 && ins.ID == 41)) SkipRanges.Remove(evt, i);
+            }
+            Check(InstructionMerge.Lines(evt.Instructions[0]) == 2 && CoveredBy(evt, 0).SequenceEqual(covered), "skip does not cover the same surviving lines");
+            Check(evt.Parameters[0].InstructionIndex == 3 && evt.Instructions[3].ID == 9, "parameter not re-indexed to the same instruction");
+            var parameterized = Evt(1, Ins(2003, 18, 5, 9000, 0));
+            parameterized.Parameters.Add(new EMEVD.Parameter(0, 4, 0, 4));
+            try { SkipRanges.Remove(parameterized, 0); }
+            catch (FogHostException e) when (e.Code == "FOG_ENGINE_FAILED") { return; }
+            throw new Exception("removing a parameterized instruction was not refused");
         }
 
         private static void ReplacementInSkipRangeMerges()
@@ -772,7 +884,7 @@ namespace FogHost.Tests
             var x = Ins(2004, 1, 5, 0);
             var b = new List<EMEVD.Instruction> { x, x, Ins(2004, 2, 1), Ins(2004, 3, 1), Ins(2004, 4, 1) };
             var c = new List<EMEVD.Instruction> { x, Ins(2004, 2, 1), Ins(2004, 3, 1), Ins(2004, 4, 1) };
-            var t = b.ToList(); t[4] = Ins(2004, 4, 2);
+            var t = b.ToList(); t[2] = Ins(2004, 2, 7); // replaces the line right after the ambiguous x, x
             ExpectRefused(b, c, t, "ambiguous alignment");
         }
 

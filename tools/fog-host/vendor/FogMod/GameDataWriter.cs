@@ -14,6 +14,9 @@
 //  7. Boss-trigger rewrite: before one region check is replaced in place by several
 //     instructions, every enclosing DS1 skip grows by the net line change
 //     (FogHost.SkipRanges), so skips keep covering the same logical instructions.
+//  8. Asylum Demon (11810310): the 2003[18]/2004[41] removal goes through
+//     FogHost.SkipRanges.Remove, which also shrinks enclosing skips and re-indexes event
+//     parameters (same principle as 7).
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -1025,7 +1028,12 @@ namespace FogMod
                     }
                     if (evt.ID == 11810310 && asylumDemonRandomized)
                     {
-                        evt.Instructions.RemoveAll(instr => (instr.Bank == 2003 && instr.ID == 18) || (instr.Bank == 2004 && instr.ID == 41));
+                        // FogHost: same removals as RemoveAll, one at a time from the end, keeping skips consistent.
+                        for (int removeAt = evt.Instructions.Count - 1; removeAt >= 0; removeAt--)
+                        {
+                            EMEVD.Instruction instr = evt.Instructions[removeAt];
+                            if ((instr.Bank == 2003 && instr.ID == 18) || (instr.Bank == 2004 && instr.ID == 41)) FogHost.SkipRanges.Remove(evt, removeAt);
+                        }
                     }
                     // Add our own stuff
                     if (evt.ID == 0 && name == "common")

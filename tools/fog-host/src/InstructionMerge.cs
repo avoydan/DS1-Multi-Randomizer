@@ -41,7 +41,13 @@ namespace FogHost
 
         public static bool IsSkip(EMEVD.Instruction i) => SkipInstructions.Contains((i.Bank, i.ID));
 
-        /// <summary>Returns the merged event, or null with a reason when the edits may interact.</summary>
+        /// <summary>
+        /// Returns the merged event, or null with a reason when the edits may interact.
+        /// When a side's edit script is ambiguous (repeated instructions), the earliest and latest
+        /// alignments are both tried. The merge is accepted only if the other side does not edit the
+        /// span where they disagree (so every alignment in between yields the same interleaving) and
+        /// every combination passes all rules and produces the identical event.
+        /// </summary>
         public static EMEVD.Event Merge(EMEVD.Event b, EMEVD.Event c, EMEVD.Event t, out string reason)
         {
             reason = null;
@@ -49,11 +55,61 @@ namespace FogHost
                 return Refuse(out reason, "rest behavior differs between base, combined and FogMod");
 
             // Skips are aligned ignoring only their line count, so a count change is not an edit
-            // hunk; every changed count must then be validated as a derived adjustment below.
-            List<Hunk> combined = Diff(b.Instructions, c.Instructions, out reason, "combined", ignoreSkipCounts: true);
-            if (combined == null) return null;
-            List<Hunk> fog = Diff(b.Instructions, t.Instructions, out reason, "FogMod", ignoreSkipCounts: true);
-            if (fog == null) return null;
+            // hunk; every changed count must then be validated as a derived adjustment.
+            List<List<Hunk>> combinedAlignments = Alignments(b.Instructions, c.Instructions);
+            List<List<Hunk>> fogAlignments = Alignments(b.Instructions, t.Instructions);
+            foreach ((string side, List<List<Hunk>> own, List<List<Hunk>> other) in new[]
+                     { ("combined", combinedAlignments, fogAlignments), ("FogMod", fogAlignments, combinedAlignments) })
+            {
+                if (own.Count < 2) continue;
+                (int spanStart, int spanEnd) = DisagreementSpan(own[0], own[1]);
+                Hunk touching = other.SelectMany(h => h).FirstOrDefault(h => Math.Max(h.Start, spanStart) <= Math.Min(h.End, spanEnd));
+                if (touching != null)
+                    return Refuse(out reason, $"the {side} edit has an ambiguous alignment (repeated instructions) over base {spanStart}..{spanEnd}, which the other side edits");
+            }
+
+            // Alignment only attributes identity among identical instructions; semantics depend on
+            // content. It is enough that one interpretation passes every rule, provided every passing
+            // interpretation yields the identical merged event.
+            EMEVD.Event result = null;
+            string firstRefusal = null;
+            foreach (List<Hunk> combined in combinedAlignments)
+            {
+                foreach (List<Hunk> fog in fogAlignments)
+                {
+                    EMEVD.Event merged = MergeWith(b, c, t, combined, fog, out string why);
+                    if (merged == null) { firstRefusal ??= why; continue; }
+                    if (result == null) result = merged;
+                    else if (!EmevdMerge.SameEvent(result, merged))
+                        return Refuse(out reason, "alternative alignments of repeated instructions give different merged events");
+                }
+            }
+            if (result == null) return Refuse(out reason, firstRefusal);
+            return result;
+        }
+
+        /// <summary>Earliest alignment, plus the latest one when it differs (ambiguous edit script).</summary>
+        private static List<List<Hunk>> Alignments(IReadOnlyList<EMEVD.Instruction> from, IReadOnlyList<EMEVD.Instruction> to)
+        {
+            Func<EMEVD.Instruction, EMEVD.Instruction, bool> same = SameIgnoringSkipCount;
+            List<Hunk> forward = Align(from, to, same);
+            List<Hunk> backward = Mirror(Align(from.Reverse().ToList(), to.Reverse().ToList(), same), from.Count);
+            return SameHunks(forward, backward) ? new List<List<Hunk>> { forward } : new List<List<Hunk>> { forward, backward };
+        }
+
+        /// <summary>Base span [start, end] covered by the hunks on which two alignments disagree.</summary>
+        private static (int Start, int End) DisagreementSpan(List<Hunk> a, List<Hunk> b)
+        {
+            bool Shared(Hunk h, List<Hunk> list) => list.Any(o => o.Start == h.Start && o.End == h.End
+                && o.Added.Count == h.Added.Count && o.Added.Zip(h.Added).All(p => EmevdMerge.SameInstruction(p.First, p.Second)));
+            var differing = a.Where(h => !Shared(h, b)).Concat(b.Where(h => !Shared(h, a))).ToList();
+            return (differing.Min(h => h.Start), differing.Max(h => h.End));
+        }
+
+        /// <summary>Merges one fixed pair of edit scripts (see <see cref="Merge"/>).</summary>
+        private static EMEVD.Event MergeWith(EMEVD.Event b, EMEVD.Event c, EMEVD.Event t, List<Hunk> combined, List<Hunk> fog, out string reason)
+        {
+            reason = null;
 
             // Derived skip-count adjustments: base skip index -> (side, adjusted instruction, the side's hunks inside).
             var derived = new Dictionary<int, (string Side, EMEVD.Instruction Skip, HashSet<Hunk> Inside)>();
@@ -99,23 +155,23 @@ namespace FogHost
             bool fogConditions = fog.Any(h => h.Touched(b.Instructions).Any(IsCondition));
             if (combinedConditions && fogConditions) return Refuse(out reason, "both sides change condition-group instructions");
 
-            // Skip ranges: no edit that changes the line count may touch the lines a skip covers or
-            // the line right after them, because the unchanged skip count would then cover different
-            // lines. A count-preserving replacement (as many instructions added as deleted) keeps
-            // every position, so the skip covers the same lines; it still passes the control-flow,
+            // Skip ranges: no edit that changes the line count may touch the lines a skip covers
+            // ([p+1, p+n]), because the unchanged skip count would then cover different lines. An
+            // edit starting right after the covered lines (p+n+1) leaves the covered lines in place.
+            // A count-preserving replacement keeps every position; it still passes the control-flow,
             // condition and overlap rules above.
             for (int p = 0; p < b.Instructions.Count; p++)
             {
                 EMEVD.Instruction skip = b.Instructions[p];
                 if (!IsSkip(skip)) continue;
                 int lines = skip.ArgData.Length > 0 ? skip.ArgData[0] : 0;
-                int first = p + 1, last = p + lines + 1;
+                int first = p + 1, lastCovered = p + lines;
                 derived.TryGetValue(p, out var adjustment);
                 foreach ((string side, List<Hunk> hunks) in new[] { ("combined", combined), ("FogMod", fog) })
                 {
                     bool adjustingSide = adjustment.Side == side;
                     bool otherSide = adjustment.Side != null && !adjustingSide;
-                    Hunk inside = hunks.FirstOrDefault(h => Math.Max(h.Start, first) <= Math.Min(h.End, last)
+                    Hunk inside = hunks.FirstOrDefault(h => TouchesCovered(h, first, lastCovered)
                         && (otherSide || (h.Added.Count != h.End - h.Start && !(adjustingSide && adjustment.Inside.Contains(h)))));
                     if (inside != null)
                         return Refuse(out reason, otherSide
@@ -244,6 +300,15 @@ namespace FogHost
 
         public static int Lines(EMEVD.Instruction skip) => skip.ArgData.Length > 0 ? skip.ArgData[0] : 0;
 
+        /// <summary>
+        /// True when a hunk deletes a covered base line in [first, lastCovered], or inserts at a point
+        /// inside the covered block (right after the skip up to before its last covered line).
+        /// </summary>
+        private static bool TouchesCovered(Hunk h, int first, int lastCovered) =>
+            h.End > h.Start
+                ? h.Start <= lastCovered && h.End - 1 >= first
+                : h.Start >= first && h.Start <= lastCovered;
+
         /// <summary>Equal instructions, except that two skips may differ in their line count (byte 0) only.</summary>
         private static bool SameIgnoringSkipCount(EMEVD.Instruction a, EMEVD.Instruction b)
         {
@@ -288,7 +353,7 @@ namespace FogHost
             int n = Lines(b.Instructions[p]);
             int first = p + 1, lastCovered = p + n;
             if (lastCovered >= b.Instructions.Count) { why = "the base range runs past the end of the event"; return null; }
-            Hunk otherInside = other.FirstOrDefault(h => Math.Max(h.Start, first) <= Math.Min(h.End, lastCovered + 1));
+            Hunk otherInside = other.FirstOrDefault(h => TouchesCovered(h, first, lastCovered));
             if (otherInside != null) { why = $"the other side edits the range at base {otherInside.Start}"; return null; }
 
             var inside = new HashSet<Hunk>();

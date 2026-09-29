@@ -47,6 +47,8 @@ export interface GenerationDependencies {
   getPristineSource: (gamePath: string) => Promise<PristineSource | null>;
   /** The read set depends on the Fog message language. */
   getFogPrerequisites: (language: FogLanguage) => Promise<FogPrerequisites | null>;
+  /** MEASUREMENT ONLY (real-format harness): run boss randomization + Fog despite the rejection. */
+  measureBossRandomizationWithFog?: boolean;
   combined: typeof executeCombinedGeneration;
   fog: FogHostProcess;
 }
@@ -104,7 +106,7 @@ export async function generateRun(
   const workspace = typeof request.workspacePath === 'string' && request.workspacePath
     ? path.resolve(request.workspacePath) : '';
   const manifest: GenerationManifest = {
-    schemaVersion: 1, appVersion: '0.16.2', game: 'DSR', masterSeed: config.masterSeed,
+    schemaVersion: 1, appVersion: '0.16.3', game: 'DSR', masterSeed: config.masterSeed,
     pristineSnapshotId: null, gameTreeRoot: '',
     options: { items: config.items, enemies: config.enemies, fog: config.fog, output: config.output },
     attempts: [], engines: {}, validation: [], files: [],
@@ -116,7 +118,7 @@ export async function generateRun(
   const progress = (stage: string, value: number, message: string): void =>
     onEvent({ type: 'progress', stage, progress: value, message });
 
-  if (fogBossRandomizationUnsupported(config)) {
+  if (fogBossRandomizationUnsupported(config) && !services.measureBossRandomizationWithFog) {
     return fail('verify', 'FOG_BOSS_RANDOMIZATION_UNSUPPORTED',
       'Boss randomization together with Fog gate randomization is not supported yet: both engines edit boss events '
       + '(for example the Asylum Demon event 11810310) and that merge is unproven. Disable boss randomization or Fog.');

@@ -1,6 +1,6 @@
 {
   "name": "@ds1tr/backend",
-  "version": "0.16.2",
+  "version": "0.16.3",
   "license": "GPL-3.0-only",
   "private": true,
   "type": "module",

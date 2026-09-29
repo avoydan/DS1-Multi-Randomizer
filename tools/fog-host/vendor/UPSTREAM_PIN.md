@@ -75,8 +75,13 @@ CRLF after patching.
    enclosing skip by the net line change. It refuses a control-flow target, a
    parameterized count, or an overflow (`FOG_ENGINE_FAILED`). This is the same
    principle as the combined engine's `EventSkipRanges`.
-   Not changed: the Asylum `11810310` `RemoveAll`, which runs only for boss
-   randomization + Fog (rejected in v1).
+8. **Asylum Demon removal** (FogHost 0.4.0). In `11810310`, FogMod's
+   `RemoveAll` of `2003[18]`/`2004[41]` now removes the same instructions one at
+   a time through `FogHost.SkipRanges.Remove`. That call shrinks enclosing skips
+   and re-indexes event parameters. It refuses control-flow targets and
+   parameterized instructions. The pinned template event has no skips or
+   parameters, so the output is unchanged today; the patch keeps the same
+   principle as patch 7.
 
 ## SoulsIds
 

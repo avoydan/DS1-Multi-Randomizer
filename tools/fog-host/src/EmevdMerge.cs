@@ -102,6 +102,7 @@ namespace FogHost
                         if (merged == null)
                         {
                             Record(fileName, $"event {combined.ID} was edited by both the combined engine and FogMod ({reason})");
+                            Dump(fileName, baseEvent, combined, fog);
                             continue;
                         }
                         output.Events[output.Events.IndexOf(fog)] = merged;
@@ -128,13 +129,32 @@ namespace FogHost
                 if (match >= 0) remaining.RemoveAt(match);
                 else added.Add(instruction);
             }
-            if (remaining.Count > 0) { Record(fileName, $"event 0 (combined output removed or changed {remaining.Count} instruction(s))"); return; }
             if (!SameParameters(base0.Parameters, combined0.Parameters) || base0.RestBehavior != combined0.RestBehavior)
             {
                 Record(fileName, "event 0 (combined output changed its parameters)");
                 return;
             }
             if (!outputById.TryGetValue(0, out EMEVD.Event output0)) { Record(fileName, "event 0 (absent from FogMod's output)"); return; }
+            // The combined engine may disable vanilla events by removing their 2000[00] initializations
+            // (e.g. the Bed of Chaos floor events). The same initialization must be present, unchanged,
+            // in FogMod's event 0; it is then removed there too. Anything else stays a conflict.
+            if (remaining.Count > 0)
+            {
+                EMEVD.Instruction other = remaining.FirstOrDefault(i => i.Bank != 2000 || i.ID != 0);
+                if (other != null) { Record(fileName, $"event 0 (combined output removed or changed non-initialization instruction {other.Bank}[{other.ID:d2}])"); return; }
+                if (output0.Parameters.Count > 0) { Record(fileName, "event 0 (FogMod's event 0 has parameters; initializations cannot be removed)"); return; }
+                foreach (EMEVD.Instruction removedInit in remaining)
+                {
+                    int at = output0.Instructions.FindIndex(t => SameInstruction(t, removedInit));
+                    if (at < 0)
+                    {
+                        Record(fileName, $"event 0 (the combined engine removes an initialization FogMod changed or does not have: event {BitConverter.ToInt32(removedInit.ArgData, 4)})");
+                        return;
+                    }
+                    output0.Instructions.RemoveAt(at);
+                }
+                expectedEvents.Add(output0);
+            }
             foreach (EMEVD.Instruction instruction in added)
             {
                 if (instruction.Bank != 2000 || instruction.ID != 0)
@@ -176,6 +196,19 @@ namespace FogHost
         }
 
         private void Record(string fileName, string detail) => Conflicts.Add($"event/{fileName}: {detail}");
+
+        /// <summary>Writes a refused event's base, combined and FogMod versions to the log (diagnostics only).</summary>
+        private static void Dump(string fileName, EMEVD.Event b, EMEVD.Event c, EMEVD.Event t)
+        {
+            foreach ((string side, EMEVD.Event e) in new[] { ("B", b), ("C", c), ("T", t) })
+            {
+                Console.WriteLine($"FogHost conflict dump event/{fileName} {e.ID} {side} rest={e.RestBehavior} params={e.Parameters.Count}");
+                for (int i = 0; i < e.Instructions.Count; i++)
+                    Console.WriteLine($"  {i,3} {e.Instructions[i].Bank}[{e.Instructions[i].ID:d2}] {Convert.ToHexString(e.Instructions[i].ArgData)}");
+                foreach (EMEVD.Parameter p in e.Parameters)
+                    Console.WriteLine($"  param instr={p.InstructionIndex} target={p.TargetStartByte} source={p.SourceStartByte} bytes={p.ByteCount}");
+            }
+        }
 
         private static FogHostException Conflict(string fileName, string detail) =>
             new FogHostException(HostErrors.MergeConflict, $"EMEVD merge conflict in event/{fileName}: {detail}.") { Stage = "write-game-data" };

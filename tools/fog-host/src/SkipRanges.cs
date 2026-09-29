@@ -34,9 +34,34 @@ namespace FogHost
             }
         }
 
+        /// <summary>
+        /// Removes the instruction at <paramref name="index"/> the way FogMod's Asylum Demon edit does,
+        /// shrinking every enclosing skip and re-indexing event parameters so the same logical
+        /// instructions stay covered and parameterized.
+        /// </summary>
+        public static void Remove(EMEVD.Event evt, int index)
+        {
+            EMEVD.Instruction removed = evt.Instructions[index];
+            if (InstructionMerge.IsControlFlow(removed))
+                throw Refuse(evt, $"the removed instruction {index} is control flow");
+            if (evt.Parameters.Any(p => p.InstructionIndex == index))
+                throw Refuse(evt, $"the removed instruction {index} takes an event parameter");
+            for (int position = 0; position < index; position++)
+            {
+                EMEVD.Instruction skip = evt.Instructions[position];
+                if (!InstructionMerge.IsSkip(skip) || position + InstructionMerge.Lines(skip) < index) continue;
+                if (evt.Parameters.Any(p => p.InstructionIndex == position && p.TargetStartByte <= 0 && p.TargetStartByte + p.ByteCount > 0))
+                    throw Refuse(evt, $"skip {position} takes its line count from an event parameter");
+                skip.ArgData[0] = (byte)(InstructionMerge.Lines(skip) - 1);
+            }
+            foreach (EMEVD.Parameter parameter in evt.Parameters.Where(p => p.InstructionIndex > index))
+                parameter.InstructionIndex--;
+            evt.Instructions.RemoveAt(index);
+        }
+
         private static FogHostException Refuse(EMEVD.Event evt, string detail) =>
             new FogHostException(HostErrors.EngineFailed,
-                $"Cannot keep skip ranges consistent in event {evt.ID} for FogMod's boss-trigger rewrite: {detail}.")
+                $"Cannot keep skip ranges consistent in event {evt.ID} for a FogMod instruction edit: {detail}.")
             { Stage = "write-game-data" };
     }
 }

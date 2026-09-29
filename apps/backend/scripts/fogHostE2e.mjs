@@ -117,6 +117,7 @@ async function sweep(count, prefix) {
       attempts: result.manifest.attempts.map((a) => `${a.combinedAttempt}/${a.fogAttempt}:${a.result}`),
       conflicts,
       merges: [...new Set(merges)],
+      ...(result.ok || result.code === 'FOG_MERGE_CONFLICT' ? {} : { message: result.message.slice(0, 3000) }),
     };
     let combinedEdited = new Set();
     if (process.env.DS1TR_E2E_VERIFY_SKIPS) {
@@ -170,7 +171,11 @@ async function sweep(count, prefix) {
 const temp = await mkdtemp(path.join(os.tmpdir(), 'ds1tr-fog-e2e-'));
 const game = path.join(temp, 'game');
 const authority = new GameStateAuthority({ stateRoot: path.join(temp, 'state'), isGameRunning: async () => false });
-const deps = { getPristineSource: (gamePath) => authority.getPristineSource(gamePath) };
+const deps = {
+  getPristineSource: (gamePath) => authority.getPristineSource(gamePath),
+  // DS1TR_E2E_BOSS_FOG_MEASURE=1 runs bosses + Fog while the product still rejects it.
+  measureBossRandomizationWithFog: process.env.DS1TR_E2E_BOSS_FOG_MEASURE === '1',
+};
 
 try {
   const liveBefore = await hashRoots(livePath);
