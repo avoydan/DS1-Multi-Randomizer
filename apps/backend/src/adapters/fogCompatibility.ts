@@ -145,8 +145,24 @@ function readPatchedFiles(manifest: JsonObject, problems: string[]): FogCompatib
   return files;
 }
 
-function readPreservedNpcParams(placements: JsonObject, problems: string[]): FogPreservedNpcParam[] {
+/**
+ * `randomizer` is the combined engine's `randomizer.json`: its placement lists live under
+ * `placements` (`placements.enemies`, `placements.bosses`). A document without `placements`
+ * (Fog-only runs) has no preserved rows. Lists at the top level are rejected so a layout
+ * mismatch can never silently yield an empty list.
+ */
+function readPreservedNpcParams(randomizer: JsonObject, problems: string[]): FogPreservedNpcParam[] {
   const byId = new Map<number, number>();
+  if (randomizer.enemies !== undefined || randomizer.bosses !== undefined) {
+    problems.push('placement lists must be nested under randomizer.json "placements".');
+    return [];
+  }
+  if (randomizer.placements === undefined) return [];
+  if (!isObject(randomizer.placements)) {
+    problems.push('randomizer.json "placements" must be an object.');
+    return [];
+  }
+  const placements = randomizer.placements as JsonObject;
   for (const listName of ['enemies', 'bosses']) {
     const list = placements[listName];
     if (list === undefined) continue;

@@ -23,14 +23,16 @@ const manifest = {
   gameParam: { source: 'param/GameParam/GameParam.parambnd.dcx', output: 'mod/param/GameParam/GameParam.parambnd.dcx', sourceSha256: hash('1'), outputSha256: hash('2') },
 };
 
-const placements = {
+// The combined engine's randomizer.json: placement lists live under `placements`.
+const placements = { schemaVersion: 1, placements: {
   enemies: [
     { slot: 'b', scaledNpcParamId: 910002, sourceNpcParamId: 200000 },
     { slot: 'a', scaledNpcParamId: null, sourceNpcParamId: 200001 },
     { slot: 'c', scaledNpcParamId: 910001, sourceNpcParamId: 200002 },
   ],
   bosses: [{ slot: 'd', scaledNpcParamId: 910000, sourceNpcParamId: 223000 }],
-};
+  items: [],
+} };
 
 test('builds a sorted, volatile-free compatibility object from shared files only', () => {
   const result = buildFogCompatibility(manifest, placements, 'attempt/base');
@@ -57,11 +59,14 @@ test('rejects malformed manifests and conflicting placements', () => {
     [{ ...manifest, events: [{ ...manifest.events[0], output: 'mod/event/other.emevd.dcx' }] }, placements],
     [{ ...manifest, events: [{ ...manifest.events[0], source: '../event/m10_00_00_00.emevd.dcx' }] }, placements],
     [{ ...manifest, events: [manifest.events[0], manifest.events[0]] }, placements],
-    [manifest, { enemies: [
+    [manifest, { placements: { enemies: [
       { slot: 'x', scaledNpcParamId: 1, sourceNpcParamId: 2 },
       { slot: 'y', scaledNpcParamId: 1, sourceNpcParamId: 3 },
-    ] }],
-    [manifest, { bosses: [{ slot: 'z', scaledNpcParamId: 1.5, sourceNpcParamId: 2 }] }],
+    ] } }],
+    [manifest, { placements: { bosses: [{ slot: 'z', scaledNpcParamId: 1.5, sourceNpcParamId: 2 }] } }],
+    // Lists at the top level (the layout the bridge used to read) must not silently yield nothing.
+    [manifest, { enemies: [{ slot: 'x', scaledNpcParamId: 910000, sourceNpcParamId: 2 }] }],
+    [manifest, { placements: [] }],
   ];
   for (const [candidate, candidatePlacements] of cases) {
     const result = buildFogCompatibility(candidate, candidatePlacements, 'attempt/base');
@@ -139,3 +144,10 @@ test('retries deterministically within bounds and never retries merge conflicts'
     assert.equal(decideFogRetry({ code, message: 'x' }, { combinedAttempt: 0, fogAttempt: 0 }).action, 'fail');
   }
 });
+
+test('a document without placements (Fog-only) has no preserved rows', () => {
+  const result = buildFogCompatibility(manifest, {}, 'attempt/base');
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.value.preservedNpcParams, []);
+});
+
