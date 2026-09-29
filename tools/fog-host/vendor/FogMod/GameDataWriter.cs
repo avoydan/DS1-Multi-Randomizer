@@ -11,6 +11,9 @@
 //  6. Scaling: an enemy on a collision with no annotated area is grouped under a sentinel
 //     instead of a null Dictionary key (which threw); the sentinel has no area ratio, so the
 //     group stays unscaled exactly as FogMod's own null-area handling intended.
+//  7. Boss-trigger rewrite: before one region check is replaced in place by several
+//     instructions, every enclosing DS1 skip grows by the net line change
+//     (FogHost.SkipRanges), so skips keep covering the same logical instructions.
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -1075,6 +1078,8 @@ namespace FogMod
                     {
                         sbyte cond = (sbyte)regionArgs[0];
                         int trigger = (int)regionArgs[3];
+                        // FogHost: 1 IF Condition Group + one IF In/Outside Area per trigger area.
+                        FogHost.SkipRanges.BeforeReplace(evt, index, 1 + new[] { trigger }.Concat(bossTriggerAdd[trigger]).Count());
                         evt.Instructions.RemoveAt(index);
                         evt.Instructions.Insert(index, new EMEVD.Instruction(0, 0, new List<object> { (sbyte)cond, (byte)1, (sbyte)-7, (byte)0 /* :fatcat: */ }));
                         foreach (int alt in new[] { trigger }.Concat(bossTriggerAdd[trigger]))

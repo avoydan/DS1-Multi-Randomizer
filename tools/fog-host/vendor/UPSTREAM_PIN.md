@@ -66,6 +66,17 @@ CRLF after patching.
    group is now keyed by a sentinel that is never in `g.AreaRatios`, so it
    stays unscaled, as upstream's own null-area handling intended.
    Randomized enemy placements exposed this in 11 of 40 real-format seeds.
+7. **Boss-trigger skip fix** (FogHost 0.3.1). FogMod's boss-trigger rewrite
+   replaces one `IF In/Outside Area` (`3[02]`) in place with `1 + (1 + alternates)`
+   instructions. It did not adjust enclosing DS1 skips, so they covered different
+   instructions. On real data this hit 11 events in every seed: `11015393`,
+   `11205383`, `11215002/3/12/13`, `11405393`, `11415343/383`, `11505393`,
+   `11515393`. One call to `FogHost.SkipRanges.BeforeReplace` now grows every
+   enclosing skip by the net line change. It refuses a control-flow target, a
+   parameterized count, or an overflow (`FOG_ENGINE_FAILED`). This is the same
+   principle as the combined engine's `EventSkipRanges`.
+   Not changed: the Asylum `11810310` `RemoveAll`, which runs only for boss
+   randomization + Fog (rejected in v1).
 
 ## SoulsIds
 

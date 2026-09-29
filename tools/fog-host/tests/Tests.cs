@@ -57,6 +57,11 @@ namespace FogHost.Tests
                 Test("derived skip: both sides adjusting the same skip is refused", DerivedBothSidesRefused);
                 Test("real 11505392 case with the fixed combined engine merges", Event11505392DerivedMerges);
                 Test("real 11600400 case with the fixed combined engine merges", Event11600400DerivedMerges);
+                Test("FogMod boss-trigger rewrite inside a SKIP grows it to cover the replacements (x5393 pattern)", TriggerRewriteInsideSkip);
+                Test("FogMod boss-trigger rewrite on the last covered line grows the SKIP", TriggerRewriteLastCoveredLine);
+                Test("FogMod boss-trigger rewrite outside every SKIP leaves counts unchanged", TriggerRewriteOutsideSkip);
+                Test("FogMod boss-trigger rewrite under nested SKIPs grows each", TriggerRewriteNestedSkips);
+                Test("FogMod boss-trigger rewrite refuses parameterized, overflowing or control-flow cases", TriggerRewriteRefusals);
                 Test("11505392 pattern: combined deletion outside the skip range merges with FogMod's trigger rewrite", Event11505392OutsideSkipMerges);
                 Test("instruction merge: independent edits in one event succeed", IndependentEdits);
                 Test("instruction merge: deletion plus unrelated edit succeeds", DeletionPlusUnrelatedEdit);
@@ -587,6 +592,73 @@ namespace FogHost.Tests
             t[1] = Ins(2004, 10, e, 1);
             var expected = c.ToList(); expected[0] = t[0]; expected[1] = t[1];
             ExpectSequence(MergeOrNull(b, c, t, out string reason), expected, reason);
+        }
+
+        /// <summary>Exactly FogMod GameDataWriter.cs boss-trigger rewrite, preceded by the FogHost patch 7 call.</summary>
+        private static void ApplyTriggerRewrite(EMEVD.Event evt, int index, int[] adds)
+        {
+            int trigger = Area;
+            SkipRanges.BeforeReplace(evt, index, 1 + new[] { trigger }.Concat(adds).Count());
+            evt.Instructions.RemoveAt(index);
+            evt.Instructions.Insert(index, Ins(0, 0, 1, 1, -7));
+            foreach (int alt in new[] { trigger }.Concat(adds)) evt.Instructions.Insert(index, Ins(3, 2, -7, 1, 10000, alt));
+        }
+
+        private static List<EMEVD.Instruction> CoveredBy(EMEVD.Event evt, int position) =>
+            evt.Instructions.Skip(position + 1).Take(InstructionMerge.Lines(evt.Instructions[position])).ToList();
+
+        private static void TriggerRewriteInsideSkip()
+        {
+            // 0 SKIP 2 IF Event Flag (covers 1..2), 1 command, 2 IF In/Outside Area (boss trigger), 3 command
+            var region = Ins(3, 2, 1, 1, 10000, Area);
+            var tail = Ins(2004, 1, 7, 1);
+            var evt = Evt(11505393, Ins(1003, 1, 2, 11), Ins(2004, 5, 7, 0), region, tail);
+            var first = evt.Instructions[1];
+            ApplyTriggerRewrite(evt, 2, new[] { Area + 1 });
+            Check(InstructionMerge.Lines(evt.Instructions[0]) == 4, $"SKIP is {InstructionMerge.Lines(evt.Instructions[0])}, expected 4");
+            List<EMEVD.Instruction> covered = CoveredBy(evt, 0);
+            Check(covered[0] == first && covered.Skip(1).All(i => i.Bank == 3 && i.ID == 2 || i.Bank == 0 && i.ID == 0), "SKIP does not cover exactly the command and the replacements");
+            Check(!covered.Contains(tail), "SKIP now covers the instruction after the block");
+        }
+
+        private static void TriggerRewriteLastCoveredLine()
+        {
+            var evt = Evt(1, Ins(1000, 3, 1), Ins(3, 2, 1, 1, 10000, Area), Ins(2004, 1, 7, 1));
+            ApplyTriggerRewrite(evt, 1, Array.Empty<int>());
+            Check(InstructionMerge.Lines(evt.Instructions[0]) == 2, "SKIP not grown to 2");
+            Check(CoveredBy(evt, 0).All(i => i.Bank < 1000), "SKIP covers the following command");
+        }
+
+        private static void TriggerRewriteOutsideSkip()
+        {
+            var evt = Evt(1, Ins(1003, 1, 1, 11), Ins(2004, 5, 7, 0), Ins(3, 2, 1, 1, 10000, Area), Ins(2004, 1, 7, 1));
+            ApplyTriggerRewrite(evt, 2, new[] { Area + 1 });
+            Check(InstructionMerge.Lines(evt.Instructions[0]) == 1, "SKIP outside the rewrite changed");
+        }
+
+        private static void TriggerRewriteNestedSkips()
+        {
+            // 0 SKIP 4 (1..4), 1 command, 2 SKIP 1 IF cond (3), 3 IF In/Outside Area, 4 command
+            var evt = Evt(1, Ins(1003, 1, 4, 11), Ins(2004, 5, 7, 0), Ins(1000, 1, 0x00000101), Ins(3, 2, 1, 1, 10000, Area), Ins(2004, 1, 7, 1));
+            ApplyTriggerRewrite(evt, 3, Array.Empty<int>());
+            Check(InstructionMerge.Lines(evt.Instructions[0]) == 5 && InstructionMerge.Lines(evt.Instructions[2]) == 2, "nested SKIPs not both grown by 1");
+        }
+
+        private static void TriggerRewriteRefusals()
+        {
+            void Expect(Action action, string contains)
+            {
+                try { action(); }
+                catch (FogHostException e) when (e.Code == "FOG_ENGINE_FAILED" && e.Message.Contains(contains, StringComparison.Ordinal)) { return; }
+                throw new Exception($"expected FOG_ENGINE_FAILED containing \"{contains}\"");
+            }
+            var parameterized = Evt(1, Ins(1003, 1, 2, 11), Ins(2004, 5, 7, 0), Ins(3, 2, 1, 1, 10000, Area));
+            parameterized.Parameters.Add(new EMEVD.Parameter(0, 0, 0, 1));
+            Expect(() => SkipRanges.BeforeReplace(parameterized, 2, 3), "event parameter");
+            var full = Evt(1, Ins(1000, 3, 255), Ins(3, 2, 1, 1, 10000, Area));
+            Expect(() => SkipRanges.BeforeReplace(full, 1, 3), "257 lines");
+            var flow = Evt(1, Ins(1000, 3, 1), Ins(1000, 4, 0));
+            Expect(() => SkipRanges.BeforeReplace(flow, 1, 3), "control flow");
         }
 
         private static void Event11505392OutsideSkipMerges()
