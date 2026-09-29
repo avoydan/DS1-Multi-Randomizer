@@ -590,6 +590,26 @@ its stock carry-over. Events are compared by ID and full content
      the hunks accounted for by that validated adjustment. Any other change to
      a skip, and every other control-flow edit, is still refused (rule 4).
 
+     **FogHost 0.4.0 refinements (provable; measured on Bosses + Fog):**
+     - *Ambiguous alignments.* Earliest and latest alignments are both tried,
+       and the result is accepted when all of these hold:
+       - the other side does not edit the span where the alignments disagree,
+         so every alignment in between interleaves the same way;
+       - at least one interpretation passes every rule;
+       - every passing interpretation yields the identical merged event.
+
+       Semantics depend on content, not on which identical line is called the
+       original.
+     - *Skip range = covered lines `[p+1, p+n]`.* An edit starting at `p+n+1`
+       does not change what the skip covers, so it is no longer refused. This
+       applies to rule 6 and to the other side in derived adjustments.
+     - *Event 0 initialization removal.* The combined engine may remove
+       `2000[00]` initializations, for example the Bed of Chaos floor events,
+       when FogMod's event 0 has the identical instruction. It is removed there
+       too, and the resulting event 0 must be written exactly. If FogMod
+       changed or dropped the initialization (for example with `bboc`), or if
+       event 0 has parameters, the merge is a conflict.
+
      The merged event is B with both hunk sets applied, in base order.
      Invariant 4 then requires it to be written exactly. All files are
      examined before failing, so the error lists every conflicting event.
