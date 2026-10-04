@@ -1,5 +1,21 @@
 # Implementation status
 
+**Feature-parity audit and settings presets (2026-10-05).** `docs/FEATURE_PARITY.md` audits
+54 original options (Item 11, Enemy 27, FogMod 16) plus 16 combined-engine native options.
+FogMod parity is complete. 21 original options are FULL, 30 are UI-only placeholders that
+need new engine behavior, 1 is partial (hintsheet), 1 is intentionally unsupported (PTDE)
+and 1 is a duplicate (copy enemy placement). The vendored combined engine reads none of the
+legacy Item/Enemy options, so no `PLANNED EXTENSION` control became functional and none was
+faked.
+
+- **Newly wired:** settings preset import/export (`/api/preset/*`, backend 0.19.0, contracts
+  0.4.0, desktop 0.7.0) and a "Restore default settings" button.
+- **Verification:** root typecheck clean; backend tests 110 passed, 1 skipped (needs a user
+  Fog data root); desktop build passed. No engine or real-data sweeps were run because no
+  engine behavior changed.
+- **Remaining:** engine gaps G1-G23 in `docs/FEATURE_PARITY.md`, classed A/B/C by effort and
+  Fog risk. The portable executable has not been rebuilt for desktop 0.7.0.
+
 **Windows desktop packaging (2026-09-29):** Electron now starts and stops the backend,
 resolves bundled runtime files, stores mutable data outside the app directory, and
 offers a FogMod data-root picker. Desktop 0.6.1 and backend 0.18.0. A portable x64

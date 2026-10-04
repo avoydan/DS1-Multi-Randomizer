@@ -1,5 +1,17 @@
 # Decisions
 
+## Settings presets are a backend-validated JSON document, not the legacy config string
+
+Date: 2026-10-05
+
+DS1TR exports and imports settings as a versioned JSON document (`ds1tr-preset`, version 1)
+covering Items, Enemies, Fog and output options, without the game path. Both directions
+pass through `validateRandomizerConfig`, so a preset can never carry an unsupported or
+unsafe option. The Enemy Randomizer's `/-/` config string is not imported: its semantics
+(per-slot probabilities) do not match the combined engine, and the legacy "copy enemy
+placement" workflow is superseded by the deterministic master seed plus a preset. The
+full option audit is in `docs/FEATURE_PARITY.md`.
+
 ## The Windows desktop ships a portable Electron payload with a separate packaged runtime
 
 Date: 2026-09-29
