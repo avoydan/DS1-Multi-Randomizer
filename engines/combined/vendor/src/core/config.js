@@ -24,6 +24,12 @@ export const defaultConfig = Object.freeze({
   randomizeShops: false,
   includeDlc: true,
   generateSpoilerLog: true,
+  // DS1TR legacy-parity options (patches/0002). Defaults reproduce the
+  // unmodified upstream behavior exactly.
+  fashionSouls: true,
+  replaceMimics: true,
+  replaceRespawningMosquitoes: true,
+  preventSameEnemy: false,
   useExtractedData: true,
   dryRun: true,
 });
@@ -44,6 +50,10 @@ const booleanKeys = [
   "randomizeShops",
   "includeDlc",
   "generateSpoilerLog",
+  "fashionSouls",
+  "replaceMimics",
+  "replaceRespawningMosquitoes",
+  "preventSameEnemy",
   "useExtractedData",
   "dryRun",
 ];

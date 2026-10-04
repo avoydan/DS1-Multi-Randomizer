@@ -1,3 +1,8 @@
+// DS1 Triple Randomizer local modification (GPL-3.0-only section 5(a)):
+// legacy-parity options fashionSouls, replaceMimics,
+// replaceRespawningMosquitoes and preventSameEnemy. Modified 2026-10-05; the
+// diff is kept in patches/0002-legacy-parity-batch-1.patch. With every option
+// at its default the output is identical to the unmodified upstream core.
 import { createHash } from "node:crypto";
 import { createStream } from "./rng.js";
 import { normalizeConfig, validateConfig } from "./config.js";
@@ -48,6 +53,15 @@ const internalHelperModels = new Set([
   "c3501",
 ]);
 const MAX_ENEMY_MODELS_PER_MAP = 30;
+// Legacy Enemy Randomizer "Replace mimics": every Mimic slot (model c2780).
+const mimicModel = "c2780";
+// Legacy Enemy Randomizer "Respawning mosquito replacement": the six
+// respawning Blighttown swamp mosquitoes (c3090_0058/0059/0085/0086/0090/0091).
+const respawningMosquitoSlots = new Set(
+  ["0058", "0059", "0085", "0086", "0090", "0091"].map(
+    (index) => `m14_00_00_00:c3090_${index}`,
+  ),
+);
 const staticBridgeDragonSpawn = Object.freeze({
   x: 9.144,
   y: 9.55,
@@ -1038,6 +1052,9 @@ function randomizeExtractedEnemies(config, catalog, dragonPlan, bossPlan) {
       !dragonPlan.reservedSlotIds.has(slot.id) &&
       !massOfSoulsPlan.reservedSlotIds.has(slot.id) &&
       slot.teamType === 0 &&
+      (config.replaceMimics || slot.modelName !== mimicModel) &&
+      (config.replaceRespawningMosquitoes ||
+        !respawningMosquitoSlots.has(slot.id)) &&
       slot.modelName !== "c0000" &&
       slot.modelName.startsWith("c") &&
       slot.npcParamId > 0 &&
@@ -1079,12 +1096,21 @@ function randomizeExtractedEnemies(config, catalog, dragonPlan, bossPlan) {
     addFixedModel(placement.map, placement.targetModelName);
   }
 
-  const shuffledSources = limitUniqueEnemyModelsByMap(
+  const budgetedSources = limitUniqueEnemyModelsByMap(
     slots,
     shuffledWithoutFixedPoints(rng, slots),
     MAX_ENEMY_MODELS_PER_MAP,
     fixedModelsByMap,
   );
+  const shuffledSources = config.preventSameEnemy
+    ? separateSameModelSources(
+        createStream(config.seed, "prevent-same-enemy", config.version),
+        slots,
+        budgetedSources,
+        MAX_ENEMY_MODELS_PER_MAP,
+        fixedModelsByMap,
+      )
+    : budgetedSources;
   const assignment = new Map(
     slots.map((target, index) => [target.id, shuffledSources[index]]),
   );
@@ -1570,12 +1596,17 @@ function randomizeExtractedItemLots(config, catalog) {
     progression: false,
   }));
   const shopOnlyTargets = shopTargets.filter(isBulkShopConsumable);
+  // Legacy "Fashion Souls" off: world armor sets move as whole sets.
+  const armorSetHomes = config.fashionSouls ? [] : findArmorSetHomes(lotTargets);
+  const armorSetTargets = new Set(armorSetHomes.flat());
   const globalTargets = [
-    ...lotTargets,
+    ...lotTargets.filter((entry) => !armorSetTargets.has(entry)),
     ...shopTargets.filter((entry) => !isBulkShopConsumable(entry)),
   ];
   const result = { items: [], gifts: [], enemyDrops: [], shops: [] };
-  if (globalTargets.length + shopOnlyTargets.length < 2) return result;
+  if (globalTargets.length + shopOnlyTargets.length < 2 && armorSetHomes.length === 0) {
+    return result;
+  }
 
   const areaNames = new Map(
     (catalog.maps || []).map((map) => [map.id, map.name]),
@@ -1662,7 +1693,64 @@ function randomizeExtractedItemLots(config, catalog) {
     }
     targets.forEach((target, index) => addPlacement(target, sources[index]));
   }
+  if (armorSetHomes.length > 0) {
+    const rng = createStream(config.seed, "armor-sets", config.version);
+    for (const [home, sourceSet] of permutedArmorSets(rng, armorSetHomes)) {
+      home.forEach((target, index) => addPlacement(target, sourceSet[index]));
+    }
+  }
   return result;
+}
+
+// Vanilla world armor sets are runs of consecutive item-lot rows in one map,
+// one single-entry lot per piece, all pieces sharing the set number
+// floor(itemId / 10000). Only complete runs qualify; irregular sets (for
+// example the Guardian set, scattered over unrelated rows) stay ordinary
+// pieces in the global pool.
+function findArmorSetHomes(lotTargets) {
+  const groups = new Map();
+  for (const target of lotTargets) {
+    if (
+      target.pool !== "world" ||
+      target.equipType !== 1 ||
+      target.progression ||
+      target.slot !== 1
+    ) {
+      continue;
+    }
+    const key = `${target.mapId}:${Math.floor(target.itemId / 10000)}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(target);
+  }
+  const homes = [];
+  for (const group of groups.values()) {
+    const pieces = [...group].sort((left, right) => left.rowId - right.rowId);
+    const consecutive = pieces.every(
+      (piece, index) => index === 0 || piece.rowId === pieces[index - 1].rowId + 1,
+    );
+    const ordered = [...pieces].sort((left, right) => left.itemId - right.itemId);
+    const inSlotOrder = pieces.every((piece, index) => piece === ordered[index]);
+    if (pieces.length >= 2 && consecutive && inSlotOrder) homes.push(pieces);
+  }
+  return homes.sort((left, right) => left[0].rowId - right[0].rowId);
+}
+
+// Whole sets are exchanged between set homes with the same piece count, never
+// leaving a home with its own set when an exchange is possible. A size class
+// with a single home keeps its vanilla set.
+function permutedArmorSets(rng, homes) {
+  const bySize = new Map();
+  for (const home of homes) {
+    if (!bySize.has(home.length)) bySize.set(home.length, []);
+    bySize.get(home.length).push(home);
+  }
+  const pairs = [];
+  for (const size of [...bySize.keys()].sort((left, right) => left - right)) {
+    const sizeHomes = bySize.get(size);
+    const sets = shuffledWithoutFixedPoints(rng, sizeHomes);
+    sizeHomes.forEach((home, index) => pairs.push([home, sets[index]]));
+  }
+  return pairs;
 }
 
 function keepConsumableSoulsInFiniteShops(targets, initialSources) {
@@ -1758,6 +1846,108 @@ function shuffledWithoutFixedPoints(rng, values) {
     if (shuffled.every((value, index) => value !== values[index])) return shuffled;
   }
   return [...values.slice(1), values[0]];
+}
+
+// Legacy "Prevent same enemy": no slot may receive a source of its own
+// model. Runs after the per-map model budget has been satisfied and only
+// swaps sources, so the count-preserving property holds. Swaps keep every
+// map within the budget. The search is bounded (a fixed number of passes, one
+// swap per offending slot per pass) and deterministic for a given stream.
+function separateSameModelSources(
+  rng,
+  targets,
+  initialSources,
+  maximumUnique,
+  fixedModelsByMap,
+) {
+  const sources = [...initialSources];
+  const total = targets.length;
+  const modelTotals = new Map();
+  for (const source of sources) {
+    modelTotals.set(source.modelName, (modelTotals.get(source.modelName) || 0) + 1);
+  }
+  for (const [modelName, count] of modelTotals) {
+    if (count * 2 > total) {
+      throw new Error(
+        `PREVENT_SAME_ENEMY_INFEASIBLE: model ${modelName} fills ${count} of ` +
+          `${total} randomized enemy slots, so it cannot avoid replacing itself.`,
+      );
+    }
+  }
+
+  const sourceCounts = new Map();
+  const sourceCount = (mapId) => {
+    if (!sourceCounts.has(mapId)) sourceCounts.set(mapId, new Map());
+    return sourceCounts.get(mapId);
+  };
+  targets.forEach((target, index) => {
+    const counts = sourceCount(target.mapId);
+    counts.set(sources[index].modelName, (counts.get(sources[index].modelName) || 0) + 1);
+  });
+  const uniqueAfter = (mapId, lost, gained) => {
+    const counts = sourceCount(mapId);
+    const fixed = fixedModelsByMap.get(mapId);
+    const models = new Set(counts.keys());
+    if (counts.get(lost) === 1) models.delete(lost);
+    models.add(gained);
+    for (const modelName of fixed ?? []) models.add(modelName);
+    return models.size;
+  };
+  const move = (mapId, lost, gained) => {
+    const counts = sourceCount(mapId);
+    counts.set(lost, counts.get(lost) - 1);
+    if (counts.get(lost) === 0) counts.delete(lost);
+    counts.set(gained, (counts.get(gained) || 0) + 1);
+  };
+  const isSame = (index) => sources[index].modelName === targets[index].modelName;
+
+  for (let pass = 0; pass < 8; pass += 1) {
+    const offending = [];
+    for (let index = 0; index < total; index += 1) {
+      if (isSame(index)) offending.push(index);
+    }
+    if (offending.length === 0) return sources;
+    for (const index of offending) {
+      if (!isSame(index)) continue;
+      const start = rng.int(total);
+      for (let step = 0; step < total; step += 1) {
+        const partner = (start + step) % total;
+        if (partner === index) continue;
+        const own = sources[index];
+        const other = sources[partner];
+        if (
+          other.modelName === targets[index].modelName ||
+          own.modelName === targets[partner].modelName ||
+          other.id === targets[index].id ||
+          own.id === targets[partner].id
+        ) {
+          continue;
+        }
+        const mapId = targets[index].mapId;
+        const partnerMapId = targets[partner].mapId;
+        if (
+          mapId !== partnerMapId &&
+          (uniqueAfter(mapId, own.modelName, other.modelName) > maximumUnique ||
+            uniqueAfter(partnerMapId, other.modelName, own.modelName) > maximumUnique)
+        ) {
+          continue;
+        }
+        if (mapId !== partnerMapId) {
+          move(mapId, own.modelName, other.modelName);
+          move(partnerMapId, other.modelName, own.modelName);
+        }
+        [sources[index], sources[partner]] = [sources[partner], sources[index]];
+        break;
+      }
+    }
+  }
+  if (targets.some((_, index) => isSame(index))) {
+    throw new Error(
+      "PREVENT_SAME_ENEMY_UNRESOLVED: the bounded repair could not separate every " +
+        "enemy from its own model within the per-map model budget.",
+    );
+  }
+  return sources;
 }
 
 function limitUniqueEnemyModelsByMap(
@@ -2294,6 +2484,18 @@ export function generate(inputConfig, { gameCatalog = null } = {}) {
                 ? "Shop inventory joined the enabled global item pool; arrows, bolts, and throwable stock stayed shop-only, selected event-bound goods were randomized, and the remaining progression stock stayed protected."
                 : "Shop inventory joined the enabled global item pool; arrows, bolts, and throwable stock stayed shop-only."
               : "Shops were preserved.",
+            ...(config.fashionSouls
+              ? []
+              : ["Fashion Souls off: complete world armor sets were exchanged between set locations instead of splitting into single pieces."]),
+            ...(config.replaceMimics
+              ? []
+              : ["Mimics were left in place and kept out of the enemy pool."]),
+            ...(config.replaceRespawningMosquitoes
+              ? []
+              : ["The six respawning Blighttown mosquitoes were left in place and kept out of the enemy pool."]),
+            ...(config.preventSameEnemy
+              ? ["Prevent same enemy: no regular enemy slot received its own model (bosses never receive the same boss)."]
+              : []),
           ]
         : config.randomizeProtectedItems
           ? ["Prototype progression was validated through the opening sphere; full graph validation remains pending."]
