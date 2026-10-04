@@ -1,5 +1,35 @@
 # Implementation status
 
+**Legacy parity Batch 1 (2026-10-05; backend 0.20.0, contracts 0.5.0, desktop 0.8.0).**
+Four legacy options are now functional end to end, each with its original legacy default:
+Fashion Souls (on), Replace mimics (on), Replace respawning mosquitoes (on) and Prevent same
+enemy (off). The vendored core was extended (`patches/0002-legacy-parity-batch-1.patch`);
+semantics, deviations and the legacy source references are in `docs/FEATURE_PARITY.md`
+section 6a. Presets are now version 2; version 1 presets migrate with the legacy defaults.
+
+- **Not implemented:** Replace second Gargoyle (stop condition: it would edit events
+  `11015382` and `11015396`, which FogMod rewrites and which are outside the 15-event boss
+  overlay whitelist) and the hintsheet (it reports shuffled key locations, which DS1TR does
+  not produce). Both remain documented as UI-only / partial. The portable EXE was not rebuilt.
+- **Default output unchanged:** 24 placement hashes (three configurations x eight seeds) from
+  the real-format catalog are identical before and after the change.
+- **Real-catalog checks (in-process, 60 seeds):** prevent-same left 0 same-model regular
+  placements (about 47 per seed before) with at most 30 models per map and deterministic
+  output; excluded mimic and mosquito slots were never placed; with Fashion Souls off, all 31
+  regular armor homes held a complete, distinct vanilla set in each of 40 seeds.
+- **Targeted Bosses + Fog sweep** (5 seeds, mimics off, mosquitoes off, prevent-same on,
+  Fashion Souls off): 5/5 succeeded; 0 merge conflicts; boss overlays applied only to the 15
+  whitelisted events; 9 combined-package skip checks, 0 mismatches; no Fog/combined event
+  mismatches; live installation unchanged. 3 of 5 seeds needed a combined key-item retry
+  (4 of 9 attempts), within the range recorded earlier (10 of 50); none exhausted the budget.
+  No full 40-seed sweep was run because defaults are unchanged.
+- **Tests:** backend 124 passed, 0 failed, 1 skipped (needs a user Fog data root); new
+  `combinedLegacyParity.test.mjs` covers the engine on synthetic catalogs (no game data is
+  committed); root typecheck clean; desktop build passed. Two runs immediately after the
+  sweep hit the integration test's 10 s server-start timeout; four later runs were clean.
+- **Remaining:** see the engine gaps in `docs/FEATURE_PARITY.md` section 6; the next batch
+  should be the A-B items (Soul items, Starting items, Pinwheel Chaos, Gwyn nerf).
+
 **Feature-parity audit and settings presets (2026-10-05).** `docs/FEATURE_PARITY.md` audits
 54 original options (Item 11, Enemy 27, FogMod 16) plus 16 combined-engine native options.
 FogMod parity is complete. 21 original options are FULL, 30 are UI-only placeholders that

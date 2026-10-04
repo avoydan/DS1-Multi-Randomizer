@@ -1,5 +1,38 @@
 # Decisions
 
+## Legacy-parity Batch 1 extends the vendored core, with legacy defaults and a stop at the Gargoyle
+
+Date: 2026-10-05
+
+Fashion Souls, Replace mimics, Replace respawning mosquitoes and Prevent same enemy are
+implemented inside the vendored combined core (`patches/0002-legacy-parity-batch-1.patch`,
+`UPSTREAM_PIN.md` "Local modifications"). They cannot be built from outside: the enemy slot
+filter, the per-map model budget and the item permutation are internal to the unmodified
+`generator.js`, and AGENTS.md requires missing legacy behavior to be implemented in the GPL
+combined fork. The earlier policy allowed only "required correctness fixes"; this extends it
+to parity features and is recorded here.
+
+- **Defaults are the legacy defaults, which equal the old engine behavior.** Fashion Souls
+  on, mimics on, mosquitoes on, prevent-same off. With every option at its default, placement
+  hashes were identical over 24 seeds in three configurations, so earlier sweep evidence
+  still applies. New code consumes no rng and reorders nothing at the defaults.
+- **`RANDOMIZER_VERSION` stays `0.5.66`.** It salts every seed stream; changing it would
+  reshuffle every seed and fail the pin assertion.
+- **Presets move to version 2.** Strict validation makes the new keys required. Version 1
+  presets are migrated with the legacy defaults, which reproduce their output.
+- **Pool coupling for mimics and mosquitoes.** The combined engine permutes sources among
+  slots, so a slot left in place is also a source left out of the pool. The legacy tool
+  chooses replacements from its own catalog. We keep the permutation model and document the
+  difference.
+- **Fashion Souls off exchanges whole sets between set locations** (runs of consecutive
+  item-lot rows in one map) instead of placing a set at any location with spare capacity.
+  Expressing "together" at an arbitrary location would need multi-entry lots in DsrDataTool.
+- **Replace second Gargoyle is not implemented.** Legacy mode 1 replaces events `11015382`
+  and `11015396`, which FogMod also rewrites and which are outside the 15-event overlay
+  whitelist. The engine's linked-unit design matches neither legacy value, and the legacy
+  default would change default Bosses + Fog output. A product decision and event measurement
+  are needed first (`docs/FEATURE_PARITY.md`, section 6a). The whitelist was not broadened.
+
 ## Settings presets are a backend-validated JSON document, not the legacy config string
 
 Date: 2026-10-05
