@@ -8,6 +8,7 @@ import { validateInstallation } from './core/installation.js';
 import { createPipelinePlan } from './core/pipeline.js';
 import { generateRun, type GenerationRequest } from './core/generationPipeline.js';
 import { InvalidConfigurationError, validateRandomizerConfig } from './core/configValidation.js';
+import { exportPreset, importPreset } from './core/preset.js';
 import { GameStateAuthority, defaultStateRoot } from './core/gameState.js';
 
 const HOST = process.env.DS1TR_HOST ?? '127.0.0.1';
@@ -51,7 +52,7 @@ const server = http.createServer(async (req, res) => {
     const url = new URL(req.url ?? '/', `http://${HOST}:${PORT}`);
 
     if (req.method === 'GET' && url.pathname === '/api/health') {
-      return send(res, 200, { ok: true, service: 'ds1-triple-randomizer-backend', version: '0.18.0' });
+      return send(res, 200, { ok: true, service: 'ds1-triple-randomizer-backend', version: '0.19.0' });
     }
 
     if (req.method === 'POST' && url.pathname === '/api/installation/validate') {
@@ -62,6 +63,18 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'POST' && url.pathname === '/api/pipeline/plan') {
       const config = await readJson<RandomizerConfig>(req);
       return send(res, 200, await createPipelinePlan(config));
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/preset/export') {
+      const config = await readJson<RandomizerConfig>(req);
+      validateRandomizerConfig(config);
+      return send(res, 200, exportPreset(config));
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/preset/import') {
+      const body = await readJson<{ text?: string }>(req);
+      const result = importPreset(typeof body.text === 'string' ? body.text : '');
+      return send(res, result.ok ? 200 : 400, result);
     }
 
     if (req.method === 'POST' && url.pathname === '/api/game/state') {

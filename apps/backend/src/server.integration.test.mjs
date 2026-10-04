@@ -43,4 +43,7 @@ test('desktop API exposes typed state and generation failure without touching a 
   const generation = await post('/runs/generate', { gamePath, masterSeed: '' });
   assert.equal(generation.status, 400);
   assert.equal((await generation.json()).error, 'Invalid configuration');
+  const badPreset = await post('/preset/import', { text: '{}' });
+  assert.equal(badPreset.status, 400);
+  assert.equal((await badPreset.json()).ok, false);
 });

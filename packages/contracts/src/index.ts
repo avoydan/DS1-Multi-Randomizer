@@ -116,3 +116,21 @@ export type GenerationEvent =
 export type GenerationResult =
   | { ok: true; packagePath: string; manifestPath: string; manifest: { masterSeed: string; files: Array<{ path: string }> } }
   | { ok: false; code: string; message: string; stage: string };
+
+export const PRESET_FORMAT = 'ds1tr-preset';
+export const PRESET_VERSION = 1;
+
+/** Shareable settings: everything in RandomizerConfig except the machine-specific game path. */
+export interface PresetDocument {
+  format: typeof PRESET_FORMAT;
+  presetVersion: typeof PRESET_VERSION;
+  masterSeed: string;
+  items: ItemOptions;
+  enemies: EnemyOptions;
+  fog: FogOptions;
+  output: OutputOptions;
+}
+
+export type PresetImportResult =
+  | { ok: true; preset: PresetDocument }
+  | { ok: false; problems: string[] };

@@ -95,6 +95,8 @@ export function App() {
   const [logs, setLogs] = useState<string[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [generatedConfig, setGeneratedConfig] = useState<string | null>(null);
+  const [presetText, setPresetText] = useState('');
+  const [presetProblems, setPresetProblems] = useState<string[]>([]);
 
   useEffect(() => {
     api.health().then(setBackendOnline);
@@ -218,6 +220,31 @@ export function App() {
     finally { setBusy(false); }
   };
 
+  const exportPreset = async () => {
+    setPresetProblems([]);
+    try {
+      setPresetText(JSON.stringify(await api.exportPreset(config), null, 2));
+      setMessage('Preset exported. Copy the text to share these settings.');
+    } catch (error) { reportError(error); }
+  };
+
+  const importPreset = async () => {
+    setPresetProblems([]);
+    try {
+      const result = await api.importPreset(presetText);
+      if (!result.ok) { setPresetProblems(result.problems); return; }
+      const { format: _format, presetVersion: _version, ...settings } = result.preset;
+      setConfig((current) => ({ ...current, ...settings }));
+      setMessage('Preset applied. Review the settings, then regenerate.');
+    } catch (error) { reportError(error); }
+  };
+
+  const resetSettings = () => {
+    setConfig((current) => ({ ...initialConfig, gamePath: current.gamePath, masterSeed: current.masterSeed }));
+    setPresetProblems([]);
+    setMessage('Settings restored to defaults (game path and master seed kept).');
+  };
+
   const previewPlan = async () => {
     setBusy(true);
     setProgressStage('');
@@ -274,6 +301,11 @@ export function App() {
             <Toggle label="Include DLC" checked={config.output.includeDlc} onChange={(value) => setConfig({ ...config, output: { ...config.output, includeDlc: value } })} />
             <Toggle label="Generate spoiler log" checked={config.output.generateSpoilerLog} onChange={(value) => setConfig({ ...config, output: { ...config.output, generateSpoilerLog: value } })} />
           </div>
+          <details className="log-panel"><summary>Settings preset (import / export)</summary>
+            <textarea className="run-logs" aria-label="Settings preset" rows={8} value={presetText} onChange={(event) => setPresetText(event.target.value)} placeholder="Paste a DS1TR preset here, or export the current settings." />
+            <div className="run-actions"><button className="secondary" onClick={exportPreset}>Export current settings</button><button className="secondary" onClick={importPreset} disabled={!presetText.trim()}>Apply preset</button><button className="secondary" onClick={resetSettings}>Restore default settings</button></div>
+            {presetProblems.length > 0 && <div className="notice error" role="alert">{presetProblems.join(' ')}</div>}
+          </details>
         </section>
 
         <div className="grid-3">
