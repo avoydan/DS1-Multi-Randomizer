@@ -114,8 +114,9 @@ function makeRequest(masterSeed, workspacePath) {
       randomizeEnemyDrops: true,
       guaranteedEnemyDrops: false,
       randomizeShops: true,
+      fashionSouls: true,
     },
-    enemies: { enabled: true, randomizeRegularEnemies: true, randomizeBosses: true, scaling: 'area' },
+    enemies: { enabled: true, randomizeRegularEnemies: true, randomizeBosses: true, scaling: 'area', replaceMimics: true, replaceRespawningMosquitoes: true, preventSameEnemy: false },
     generateSpoilerLog: true,
   };
 }

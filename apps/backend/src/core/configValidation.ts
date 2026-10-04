@@ -5,9 +5,12 @@ const itemKeys = [
   'enabled', 'randomizeWorldItems', 'randomizeProtectedItems', 'progressionLogic',
   'guaranteeEarlyWeapon', 'balancedEarlyLoot', 'randomizeStartingClass',
   'randomizeStartingEquipment', 'randomizeGifts', 'randomizeEnemyDrops',
-  'guaranteedEnemyDrops', 'randomizeShops',
+  'guaranteedEnemyDrops', 'randomizeShops', 'fashionSouls',
 ] as const;
-const enemyKeys = ['enabled', 'randomizeRegularEnemies', 'randomizeBosses', 'scaling'] as const;
+const enemyKeys = [
+  'enabled', 'randomizeRegularEnemies', 'randomizeBosses', 'scaling',
+  'replaceMimics', 'replaceRespawningMosquitoes', 'preventSameEnemy',
+] as const;
 const fogKeys = [
   'enabled', 'traversableFogs', 'bossFogs', 'areaWarps', 'majorPvpFogs',
   'minorPvpFogs', 'lordvesselGates', 'randomStart', 'disconnectedFogs',

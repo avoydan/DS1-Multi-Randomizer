@@ -15,6 +15,7 @@ const itemOptions = {
   randomizeEnemyDrops: true,
   guaranteedEnemyDrops: true,
   randomizeShops: true,
+  fashionSouls: false,
 };
 
 const enemyOptions = {
@@ -22,6 +23,9 @@ const enemyOptions = {
   randomizeRegularEnemies: true,
   randomizeBosses: true,
   scaling: 'progressive',
+  replaceMimics: false,
+  replaceRespawningMosquitoes: false,
+  preventSameEnemy: true,
 };
 
 function createRequest(overrides = {}) {
@@ -89,6 +93,10 @@ test('maps both enabled capabilities deterministically', () => {
       randomizeEnemies: true,
       randomizeBosses: true,
       enemyScaling: 'progressive',
+      fashionSouls: false,
+      replaceMimics: false,
+      replaceRespawningMosquitoes: false,
+      preventSameEnemy: true,
       generateSpoilerLog: true,
     },
   });
@@ -140,6 +148,7 @@ test('rejects enabled parent options when only non-category safeguards are selec
       randomizeGifts: false,
       randomizeEnemyDrops: false,
       randomizeShops: false,
+      fashionSouls: true,
     },
     enemies: {
       ...enemyOptions,
@@ -159,4 +168,38 @@ test('passes the spoiler-log flag through independently of the categories', () =
     assert.equal(result.ok, true);
     assert.equal(result.config.generateSpoilerLog, generateSpoilerLog);
   }
+});
+
+test('legacy-parity options fall back to the legacy defaults when their parent is off', () => {
+  const noWorldItems = mapCombinedRandomizerConfig(createRequest({
+    items: { ...itemOptions, randomizeWorldItems: false },
+  }));
+  assert.equal(noWorldItems.ok, true);
+  assert.equal(noWorldItems.config.fashionSouls, true);
+
+  const noItems = mapCombinedRandomizerConfig(createRequest({ items: { ...itemOptions, enabled: false } }));
+  assert.equal(noItems.config.fashionSouls, true);
+
+  const noRegular = mapCombinedRandomizerConfig(createRequest({
+    enemies: { ...enemyOptions, randomizeRegularEnemies: false },
+  }));
+  assert.equal(noRegular.ok, true);
+  assert.equal(noRegular.config.replaceMimics, true);
+  assert.equal(noRegular.config.replaceRespawningMosquitoes, true);
+  assert.equal(noRegular.config.preventSameEnemy, false);
+
+  const noEnemies = mapCombinedRandomizerConfig(createRequest({ enemies: { ...enemyOptions, enabled: false } }));
+  assert.equal(noEnemies.config.preventSameEnemy, false);
+  assert.equal(noEnemies.config.replaceMimics, true);
+});
+
+test('legacy-parity options are forwarded when their parents are on', () => {
+  const result = mapCombinedRandomizerConfig(createRequest({
+    items: { ...itemOptions, fashionSouls: true },
+    enemies: { ...enemyOptions, replaceMimics: true, replaceRespawningMosquitoes: true, preventSameEnemy: false },
+  }));
+  assert.equal(result.config.fashionSouls, true);
+  assert.equal(result.config.replaceMimics, true);
+  assert.equal(result.config.replaceRespawningMosquitoes, true);
+  assert.equal(result.config.preventSameEnemy, false);
 });

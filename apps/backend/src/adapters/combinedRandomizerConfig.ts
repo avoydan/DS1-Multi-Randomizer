@@ -19,6 +19,10 @@ export interface UpstreamCombinedRandomizerConfig {
   randomizeEnemies: boolean;
   randomizeBosses: boolean;
   enemyScaling: EnemyScaling;
+  fashionSouls: boolean;
+  replaceMimics: boolean;
+  replaceRespawningMosquitoes: boolean;
+  preventSameEnemy: boolean;
   generateSpoilerLog: boolean;
 }
 
@@ -29,6 +33,7 @@ export type CombinedRandomizerConfigMappingResult =
 export function mapCombinedRandomizerConfig(
   request: CombinedRandomizerRequest,
 ): CombinedRandomizerConfigMappingResult {
+  const regularEnemies = request.enemies.enabled && request.enemies.randomizeRegularEnemies;
   const config: UpstreamCombinedRandomizerConfig = {
     seed: request.combinedSeed,
     gameDirectory: request.gamePath,
@@ -47,6 +52,12 @@ export function mapCombinedRandomizerConfig(
     randomizeEnemies: request.enemies.enabled && request.enemies.randomizeRegularEnemies,
     randomizeBosses: request.enemies.enabled && request.enemies.randomizeBosses,
     enemyScaling: request.enemies.scaling,
+    // Legacy-parity options only act when their parent category is on; otherwise they
+    // carry the legacy defaults, which are the unmodified engine behavior.
+    fashionSouls: !(request.items.enabled && request.items.randomizeWorldItems) || request.items.fashionSouls,
+    replaceMimics: !regularEnemies || request.enemies.replaceMimics,
+    replaceRespawningMosquitoes: !regularEnemies || request.enemies.replaceRespawningMosquitoes,
+    preventSameEnemy: regularEnemies && request.enemies.preventSameEnemy,
     generateSpoilerLog: request.generateSpoilerLog,
   };
 

@@ -18,6 +18,8 @@ const initialConfig: RandomizerConfig = {
     randomizeEnemyDrops: false,
     guaranteedEnemyDrops: false,
     randomizeShops: false,
+    // Legacy Item Randomizer default: armor pieces are shuffled individually.
+    fashionSouls: true,
   },
   enemies: {
     enabled: true,
@@ -25,6 +27,10 @@ const initialConfig: RandomizerConfig = {
     // Boss randomization + Fog is supported since FogHost 0.5.0 (boss-event overlay).
     randomizeBosses: true,
     scaling: 'area',
+    // Legacy Enemy Randomizer defaults.
+    replaceMimics: true,
+    replaceRespawningMosquitoes: true,
+    preventSameEnemy: false,
   },
   fog: {
     enabled: true,
@@ -53,14 +59,18 @@ interface ToggleProps {
   checked: boolean;
   label: string;
   onChange: (value: boolean) => void;
+  /** A planned extension: not implemented yet, shown with a badge. */
   disabled?: boolean;
+  /** Implemented, but unavailable while its parent category is off. */
+  inactive?: boolean;
+  hint?: string;
 }
 
-function Toggle({ checked, onChange, label, disabled = false }: ToggleProps) {
+function Toggle({ checked, onChange, label, disabled = false, inactive = false, hint }: ToggleProps) {
   return (
-    <label className={`toggle-row ${disabled ? 'planned-option' : ''}`}>
+    <label className={`toggle-row ${disabled ? 'planned-option' : ''}`} title={hint}>
       <span>{label}{disabled && <small>Planned extension</small>}</span>
-      <input type="checkbox" checked={checked} disabled={disabled} onChange={(event) => onChange(event.target.checked)} />
+      <input type="checkbox" checked={checked} disabled={disabled || inactive} onChange={(event) => onChange(event.target.checked)} />
     </label>
   );
 }
@@ -324,12 +334,15 @@ export function App() {
               <Toggle label="Guaranteed enemy drops" checked={config.items.guaranteedEnemyDrops} onChange={(value) => setItem('guaranteedEnemyDrops', value)} />
               <Toggle label="Shops" checked={config.items.randomizeShops} onChange={(value) => setItem('randomizeShops', value)} />
             </div>
+            <div className="option-group"><h3>Legacy options</h3>
+              <Toggle inactive={!config.items.randomizeWorldItems} label="Fashion Souls" hint="On: armor pieces are shuffled individually. Off: complete armor sets stay together and are exchanged between set locations." checked={config.items.fashionSouls} onChange={(value) => setItem('fashionSouls', value)} />
+            </div>
             <div className="option-group planned-group"><h3>Legacy parity <span>planned</span></h3>
               <label className="field-label">Difficulty</label><select defaultValue="fair" disabled><option value="fair">Fair</option><option value="unfair">Unfair</option><option value="very-unfair">Very Unfair</option></select>
               <label className="field-label">Key placement</label><select defaultValue="shuffled" disabled><option value="vanilla">Not Shuffled</option><option value="shuffled">Shuffled</option><option value="race">Race Mode</option><option value="race-plus">Race Mode+</option></select>
               <label className="field-label">Soul items</label><select defaultValue="shuffled" disabled><option value="shuffled">Shuffled</option><option value="replaced">Replaced</option><option value="transposed">Transposed</option></select>
               <label className="field-label">Starting items</label><select defaultValue="shield-1h" disabled><option value="shield-1h">Shield + 1H weapon</option><option value="shield-1h-2h">Shield + 1H/2H weapon</option><option value="mixed-pool">Shield/weapon + weapon</option></select>
-              {['Fashion Souls', 'Laundromat Mixup', 'Randomize Lordvessel', 'Randomize Lord Souls'].map((label) => <Toggle key={label} disabled label={label} checked={false} onChange={() => undefined} />)}
+              {['Laundromat Mixup', 'Randomize Lordvessel', 'Randomize Lord Souls'].map((label) => <Toggle key={label} disabled label={label} checked={false} onChange={() => undefined} />)}
             </div>
           </section>
 
@@ -340,6 +353,11 @@ export function App() {
               <Toggle label="Bosses" checked={config.enemies.randomizeBosses} onChange={(value) => setEnemy('randomizeBosses', value)} />
               <label className="field-label">Scaling</label><select value={config.enemies.scaling} onChange={(event) => setEnemy('scaling', event.target.value as RandomizerConfig['enemies']['scaling'])}><option value="vanilla">Vanilla</option><option value="area">Area</option><option value="progressive">Progressive</option></select>
             </div>
+            <div className="option-group"><h3>Legacy options</h3>
+              <Toggle inactive={!config.enemies.randomizeRegularEnemies} label="Replace mimics" hint="Off: Mimics stay in place and are kept out of the enemy pool." checked={config.enemies.replaceMimics} onChange={(value) => setEnemy('replaceMimics', value)} />
+              <Toggle inactive={!config.enemies.randomizeRegularEnemies} label="Replace respawning mosquitoes" hint="Off: the six respawning Blighttown swamp mosquitoes stay in place." checked={config.enemies.replaceRespawningMosquitoes} onChange={(value) => setEnemy('replaceRespawningMosquitoes', value)} />
+              <Toggle inactive={!config.enemies.randomizeRegularEnemies} label="Prevent same enemy" hint="On: no regular enemy is replaced by an enemy of its own kind (a Hollow never becomes a Hollow). Bosses are never replaced by the same boss." checked={config.enemies.preventSameEnemy} onChange={(value) => setEnemy('preventSameEnemy', value)} />
+            </div>
             <div className="option-group planned-group"><h3>Legacy parity <span>planned</span></h3>
               {['Boss replacement', 'Normal enemy replacement', 'NPC replacement'].map((label) => <div key={label}><label className="field-label">{label}</label><select defaultValue="disabled" disabled><option value="disabled">Disabled</option><option value="bosses">Only bosses</option><option value="enemies">Only normal enemies</option><option value="all">Bosses or normal enemies</option></select></div>)}
               <label className="field-label">Placement</label><select defaultValue="fit" disabled><option value="fit">Only where they fit</option><option value="anywhere">Anywhere</option><option value="fit-npcs">Anywhere, fit NPCs</option></select>
@@ -348,7 +366,7 @@ export function App() {
               <RangeOption disabled label="Boss chance: normal slots" value={10} onChange={() => undefined} />
               <RangeOption disabled label="Boss chance: boss slots" value={90} onChange={() => undefined} />
               <RangeOption disabled label="Roaming boss souls" value={100} onChange={() => undefined} />
-              {['Replace mimics', 'Replace second Gargoyle', 'Allow T-pose behavior', 'Pinwheel Chaos', 'Prevent same enemy', 'Unique bosses', 'Respawning roaming bosses', 'Hostile NPCs', 'Replace respawning mosquitoes'].map((label) => <Toggle key={label} disabled label={label} checked={false} onChange={() => undefined} />)}
+              {['Replace second Gargoyle', 'Allow T-pose behavior', 'Pinwheel Chaos', 'Unique bosses', 'Respawning roaming bosses', 'Hostile NPCs'].map((label) => <Toggle key={label} disabled label={label} checked={label === 'Replace second Gargoyle'} onChange={() => undefined} />)}
               <label className="field-label">Difficulty strictness</label><select defaultValue="loose" disabled><option value="strict">Strict</option><option value="loose">A bit loose</option><option value="very-loose">Very loose</option></select>
               <label className="field-label">Type replacement</label><select defaultValue="disabled" disabled><option value="enabled">Enabled</option><option value="exclude-roaming-bosses">Except roaming bosses</option><option value="disabled">Disabled</option></select>
               <label className="field-label">Gwyn spawn nerf</label><select defaultValue="medium" disabled><option value="strong">Strong</option><option value="medium">Medium</option><option value="none">None</option></select>

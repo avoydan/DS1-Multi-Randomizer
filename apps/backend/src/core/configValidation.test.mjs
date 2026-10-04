@@ -23,12 +23,16 @@ function validConfig() {
       randomizeEnemyDrops: false,
       guaranteedEnemyDrops: false,
       randomizeShops: false,
+      fashionSouls: true,
     },
     enemies: {
       enabled: true,
       randomizeRegularEnemies: true,
       randomizeBosses: true,
       scaling: 'area',
+      replaceMimics: true,
+      replaceRespawningMosquitoes: true,
+      preventSameEnemy: false,
     },
     fog: {
       enabled: true,
@@ -96,4 +100,24 @@ test('rejects wrong primitive types, missing fields, and unknown options', () =>
     assert.ok(error.problems.some((problem) => problem.includes('generateSpoilerLog is required')));
     return true;
   });
+});
+
+test('requires the Batch 1 legacy-parity options as booleans', () => {
+  for (const [section, key] of [
+    ['items', 'fashionSouls'], ['enemies', 'replaceMimics'],
+    ['enemies', 'replaceRespawningMosquitoes'], ['enemies', 'preventSameEnemy'],
+  ]) {
+    const missing = validConfig();
+    delete missing[section][key];
+    assert.throws(() => validateRandomizerConfig(missing), new RegExp(`config\.${section}\.${key} is required`));
+    const wrongType = validConfig();
+    wrongType[section][key] = 'yes';
+    assert.throws(() => validateRandomizerConfig(wrongType), new RegExp(`config\.${section}\.${key} must be a boolean`));
+  }
+  const nonDefault = validConfig();
+  nonDefault.items.fashionSouls = false;
+  nonDefault.enemies.replaceMimics = false;
+  nonDefault.enemies.replaceRespawningMosquitoes = false;
+  nonDefault.enemies.preventSameEnemy = true;
+  assert.doesNotThrow(() => validateRandomizerConfig(nonDefault));
 });

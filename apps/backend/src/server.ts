@@ -52,7 +52,7 @@ const server = http.createServer(async (req, res) => {
     const url = new URL(req.url ?? '/', `http://${HOST}:${PORT}`);
 
     if (req.method === 'GET' && url.pathname === '/api/health') {
-      return send(res, 200, { ok: true, service: 'ds1-triple-randomizer-backend', version: '0.19.0' });
+      return send(res, 200, { ok: true, service: 'ds1-triple-randomizer-backend', version: '0.20.0' });
     }
 
     if (req.method === 'POST' && url.pathname === '/api/installation/validate') {

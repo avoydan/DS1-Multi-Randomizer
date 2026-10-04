@@ -79,9 +79,9 @@ const config = (gamePath) => ({
     enabled: true, randomizeWorldItems: true, randomizeProtectedItems: false, progressionLogic: true,
     guaranteeEarlyWeapon: true, balancedEarlyLoot: true, randomizeStartingClass: true,
     randomizeStartingEquipment: true, randomizeGifts: true, randomizeEnemyDrops: true,
-    guaranteedEnemyDrops: true, randomizeShops: true,
+    guaranteedEnemyDrops: true, randomizeShops: true, fashionSouls: true,
   },
-  enemies: { enabled: true, randomizeRegularEnemies: true, randomizeBosses: true, scaling: 'area' },
+  enemies: { enabled: true, randomizeRegularEnemies: true, randomizeBosses: true, scaling: 'area', replaceMimics: true, replaceRespawningMosquitoes: true, preventSameEnemy: false },
   fog: {
     enabled: false, traversableFogs: true, bossFogs: true, areaWarps: true, majorPvpFogs: false,
     minorPvpFogs: false, lordvesselGates: false, randomStart: false, disconnectedFogs: false,

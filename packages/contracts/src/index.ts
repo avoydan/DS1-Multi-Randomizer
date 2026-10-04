@@ -13,6 +13,11 @@ export interface ItemOptions {
   randomizeEnemyDrops: boolean;
   guaranteedEnemyDrops: boolean;
   randomizeShops: boolean;
+  /**
+   * Legacy "Fashion Souls". On (legacy default) shuffles armor pieces
+   * individually; off exchanges complete world armor sets between set locations.
+   */
+  fashionSouls: boolean;
 }
 
 export type EnemyScaling = 'vanilla' | 'area' | 'progressive';
@@ -22,6 +27,12 @@ export interface EnemyOptions {
   randomizeRegularEnemies: boolean;
   randomizeBosses: boolean;
   scaling: EnemyScaling;
+  /** Legacy "Replace mimics" (default on). Off leaves every Mimic in place. */
+  replaceMimics: boolean;
+  /** Legacy "Respawning mosquito replacement" (default on). Off leaves the six Blighttown swamp mosquitoes. */
+  replaceRespawningMosquitoes: boolean;
+  /** Legacy "Prevent same enemy" (default off). On: no regular enemy slot receives its own model. */
+  preventSameEnemy: boolean;
 }
 
 export type FogLanguage =
@@ -118,7 +129,7 @@ export type GenerationResult =
   | { ok: false; code: string; message: string; stage: string };
 
 export const PRESET_FORMAT = 'ds1tr-preset';
-export const PRESET_VERSION = 1;
+export const PRESET_VERSION = 2;
 
 /** Shareable settings: everything in RandomizerConfig except the machine-specific game path. */
 export interface PresetDocument {
