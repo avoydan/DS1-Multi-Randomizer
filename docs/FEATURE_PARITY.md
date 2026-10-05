@@ -1,8 +1,8 @@
 # Feature parity matrix
 
 Audit date: 2026-10-05. Scope: every user-visible option of the supported original
-applications, for Dark Souls Remastered. Updated for Batch 1 (backend 0.20.0, desktop
-0.8.0, contracts 0.5.0).
+applications, for Dark Souls Remastered. Updated for Batch 2 (backend 0.21.0, desktop
+0.9.0, contracts 0.6.0).
 
 ## Sources audited
 
@@ -34,13 +34,14 @@ a scratch directory for this audit only. The commit ids above are the revisions 
 | | Count |
 |---|---|
 | Original options audited (Item 11 + Enemy 27 + FogMod 16) | **54** |
-| FULL | 25 (21 + 4 in Batch 1) |
-| UI_ONLY (engine gap) | 26 (one of them, E10, is blocked rather than merely unbuilt) |
-| PARTIAL | 1 |
+| FULL | 28 (21 + 4 in Batch 1 + 3 in Batch 2) |
+| UI_ONLY (engine gap) | 22 (one of them, E10, is blocked rather than merely unbuilt) |
+| PARTIAL | 2 (I11 hintsheet; I5 Soul items, where Transposed is unavailable) |
 | INTENTIONALLY_UNSUPPORTED | 1 |
 | DUPLICATE | 1 |
 | Newly wired in the audit task | 2 (settings preset import/export; restore default settings) |
 | Newly wired in Batch 1 | 4 (Fashion Souls, Replace mimics, Replace respawning mosquitoes, Prevent same enemy) |
+| Newly wired in Batch 2 | 4 (Soul items: Shuffled and Replaced; Starting items; Pinwheel Chaos; Gwyn nerf) |
 | Combined-engine native options audited (separate table) | 16 (15 FULL, 1 INTENTIONALLY_UNSUPPORTED) |
 
 Every `UI_ONLY` option is an engine-level gap. The vendored combined engine had no
@@ -57,8 +58,8 @@ full chain UI -> contract -> backend -> engine -> tests.
 | I2 | Game version | PTDE or Remastered | no | no | no | n/a | INTENTIONALLY_UNSUPPORTED | none | PTDE is out of scope for the first release (AGENTS.md). |
 | I3 | Difficulty | Fair / Unfair / Very Unfair; controls how far key and progression items are pushed from vanilla placement | placeholder | no | no | no | UI_ONLY | select, default Fair | See gap G1. |
 | I4 | Key placement | Not Shuffled / Shuffled / Race Mode / Race Mode+ | placeholder | no | no | no | UI_ONLY | select, default Shuffled | The combined engine has its own progression logic (`progressionLogic`). See G2. |
-| I5 | Soul items | Shuffled / Replaced (turned into consumables) / Transposed | placeholder | no | no | no | UI_ONLY | select, default Shuffled | The combined engine already has `isConsumableSoul` handling for shops only. See G3. |
-| I6 | Starting items | Shield + 1H, Shield + 1H/2H, shield/weapon pool + weapon | placeholder | no | no | no | UI_ONLY | select, default Shield + 1H | Relates to `randomizeStartingEquipment`, whose semantics differ. See G4. |
+| I5 | Soul items | Shuffled / Replaced (turned into consumables) / Transposed | yes (Transposed shown, disabled) | `items.soulItems`: `shuffled`, `replaced` | yes | yes for two of three (Batch 2) | PARTIAL | select, default **Shuffled** (legacy default) | Shuffled and Replaced work. Transposed (boss souls 700-711 become boss weapons 75% of the time) cannot change anything: the catalog holds no boss souls in any pool. See 6b and G3. |
+| I6 | Starting items | Shield + 1H, Shield + 1H/2H, shield/weapon pool + weapon | yes | `items.startingItems` | yes | yes (Batch 2) | FULL | select, default **Shield + 1H/2H** (legacy default) | Acts only with Starting equipment on. Semantics and the mixed-pool deviation in 6b. |
 | I7 | Fashion Souls | Legacy GUI default **on**. On: armor pieces are shuffled individually. Off: armor sets stay together, so a whole set is found at once. | yes | `items.fashionSouls` | yes | yes (Batch 1) | FULL | toggle, default **on** (legacy default) | Semantics in section 6a. The earlier audit listed the default as off and the class as A; both were wrong. |
 | I8 | Laundromat Mixup | Randomizes NPC armor appearance (`randomize_npc_armor`) | placeholder | no | no | no | UI_ONLY | toggle, default off | Touches NPC equipment params. See G6. |
 | I9 | Senile Gwynevere (randomize Lordvessel) | Lordvessel item may be placed in the world | placeholder | no | no | no | UI_ONLY | toggle, default off | The original label is "Senile Gwynevere". Interacts with Fog `lordvesselGates`. See G7. |
@@ -86,9 +87,9 @@ All 21 configuration fields map to one position in the original config string. T
 | E11 | Difficulty strictness | 0 strict, 1 a bit loose, 2 very loose | select, `1` | placeholder | no | no | no | UI_ONLY |
 | E12 | T-pose behavior | 0 enabled, 1 disabled | toggle, enabled | placeholder | no | no | no | UI_ONLY |
 | E13 | Roaming boss soul percentage | 0-100 % | slider, 50 | placeholder | no | no | no | UI_ONLY |
-| E14 | Pinwheel Chaos | 0 enabled, 1 disabled | toggle, disabled | placeholder | no | no | no | UI_ONLY |
+| E14 | Pinwheel Chaos | 0 enabled, 1 disabled | toggle, disabled (default off) | yes (`enemies.pinwheelChaos`) | yes | yes | yes (Batch 2) | FULL |
 | E15 | Type replacement | 0 enabled, 2 enabled except roaming bosses, 1 disabled | select, disabled | placeholder | no | no | no | UI_ONLY |
-| E16 | Gwyn spawn nerf | 0 strong, 1 medium, 2 none | select, medium | placeholder | no | no | no | UI_ONLY |
+| E16 | Gwyn spawn nerf | 0 strong, 1 medium, 2 none | select, medium (legacy default) | yes (`enemies.gwynNerf`) | yes | yes | yes (Batch 2) | FULL |
 | E17 | Prevent replacement by the same enemy | 0 enabled, 1 disabled | toggle, disabled (default off) | yes (`enemies.preventSameEnemy`) | yes | yes | yes (Batch 1) | FULL |
 | E18 | Unique bosses | 1 enabled, 0 disabled | toggle, off | placeholder | no | no | no | UI_ONLY |
 | E19 | Roaming boss respawn | 0 enabled, 1 disabled | toggle, enabled | placeholder | no | no | no | UI_ONLY |
@@ -168,7 +169,7 @@ traversable fog gates; DS1TR enforces the same rule in `configValidation.ts`.
 | Regular enemies | `enemies.randomizeRegularEnemies` | FULL |
 | Bosses | `enemies.randomizeBosses` | FULL |
 | Enemy scaling (vanilla / area / progressive) | `enemies.scaling` | FULL |
-| Include DLC | `output.includeDlc` | FULL |
+| Include DLC | `output.includeDlc` | **UI_ONLY**: nothing reads it. Found in Batch 2 and made honest: the backend rejects `false`, and the control is a disabled planned extension that always includes the DLC. |
 | Spoiler log | `output.generateSpoilerLog` | FULL |
 
 Note: `output.includeDlc` is carried in the contract. Whether the combined engine honors
@@ -201,8 +202,8 @@ seed stream.
 |---|---|---|---|---|---|
 | G1 | Difficulty (I3) | Biases how far items and keys can land from vanilla locations/areas. | A tiering model over item lots in `randomizeExtractedItemLots`. The combined engine already has `balancedEarlyLoot` and annotated areas, so this is a weighting parameter on existing shuffles, but "Unfair/Very Unfair" semantics are not specified in the sources read here. | B | Low-medium (item lots only) |
 | G2 | Key placement (I4) | Not Shuffled / Shuffled / Race (keys confined to a set of locations) / Race+ | Per-mode candidate-location sets for key items, feeding `progressionLogic`. Already interacts with the key-item retry loop. | B | **High**: key placement drives the combined-stage key-item retry (7-10 of ~50 attempts in the recorded sweeps). |
-| G3 | Soul items (I5) | Soul items shuffled, replaced by consumables, or transposed among souls. | Item-class filter in the lot shuffle, plus a value-matching transposition. `isConsumableSoul` and `keepConsumableSoulsInFiniteShops` exist as seams. | A-B | Low |
-| G4 | Starting items (I6) | Chooses the starting shield/weapon rules. | Extend `randomizeStartingClasses`. Existing `randomizeStartingEquipment` has different semantics, so the two must be reconciled (gating). | A-B | Low |
+| G3 | Soul items (I5), **Replaced done in Batch 2; Transposed open** | Soul items shuffled, replaced by consumables, or transposed among souls. | Item-class filter in the lot shuffle, plus a value-matching transposition. `isConsumableSoul` and `keepConsumableSoulsInFiniteShops` exist as seams. | A-B | Low |
+| G4 | Starting items (I6) | Chooses the starting shield/weapon rules. | **Done in Batch 2.** | done | none measured |
 | G5 | Fashion Souls (I7) | **Done in Batch 1.** | See 6a. | done | none measured |
 | G6 | Laundromat Mixup (I8) | Randomizes NPC armor appearance. | Needs NPC equipment params (NpcParam / ChrInit). `DsrDataTool` already preserves NpcParam rows for Fog, so conflicts must be checked. | B | Medium (NpcParam rows are preserved across the merge) |
 | G7 | Randomize Lordvessel / Lord Souls (I9, I10) | Treat those items as ordinary shuffle candidates. | Remove them from the protected list and adjust the key-item logic. **Must be coupled with Fog**: `lordvesselGates` and `requireLordSouls` assume vanilla delivery. Needs explicit incompatibility rules. | B | **High** |
@@ -226,7 +227,7 @@ mapped one-to-one.
 | G13 | Mimics, second Gargoyle, mosquitoes (E4, E10, E21) | done (mimics, mosquitoes) / blocked (Gargoyle) | See 6a. |
 | G14 | T-pose behavior (E12) | B | Relates to Anor Londo / New Londo event scripts. It needs an event-level change and interacts with the Fog EMEVD merge. |
 | G15 | Roaming boss souls % (E13) and roaming boss respawn (E19) | B | Edit NpcParam/ItemLot soul values and event flags. NpcParam is preserved across Fog, so the merge must be checked. |
-| G16 | Pinwheel Chaos, Gwyn nerf (E14, E16) | A-B | Each is a single-boss special-case. Gwyn is a boss fight with scripted spawns. Both interact with the boss-event overlay whitelist. |
+| G16 | Pinwheel Chaos, Gwyn nerf (E14, E16) | done | See 6b. |
 | G17 | Type replacement (E15) | B | Sub-mode of G9. |
 | G18 | Prevent same enemy (E17) | done | See 6a. |
 | G19 | Unique bosses (E18) | B | Each boss at most once. Boss planning currently uses `shuffledPortableBosses`, so this needs a no-duplicate constraint. |
@@ -272,6 +273,44 @@ Not implemented, by the Batch 1 stop condition.
 - **What it needs:** a product decision on the target behavior (legacy "two independent
   replacements" vs. the engine's single boss), then measuring `11015382`/`11015396` the way
   the 15 whitelisted events were measured.
+
+### 6b. Batch 2 (implemented)
+
+The vendored core was extended again (`patches/0003-legacy-parity-batch-2.patch`, recorded in
+`UPSTREAM_PIN.md`). The engine's own defaults reproduce the unmodified behavior (the 24
+placement hashes from Batch 1 are still identical). The **product** defaults in the contract and
+the UI are the legacy defaults; they differ from the engine defaults for two options, so older
+presets migrate to the behavior-preserving values (see "Defaults" below).
+
+| Option | Confirmed legacy semantics (pinned source) | DS1TR behavior | Deviation |
+|---|---|---|---|
+| **Soul items** (legacy default Shuffled) | `randomize_item_table`: *Shuffled* places soul items like any item. *Replaced* turns every item lot part classed `SMALL_SOUL` or `BIG_SOUL` (the goods 400-409 lots) into a random consumable from a fixed list, with a random count, **before** shuffling. *Transposed* gives each `BOSS_SOUL` lot (goods 700-711) a 75% chance to become a boss weapon of that boss (Sanctuary Guardian has none). Humanity is not a soul item; Fire Keeper Souls (390-396) are not touched. | *Shuffled* is today's behavior (the lesser souls are ordinary pool items). *Replaced* swaps goods 400-409 in the world, NPC-gift and enemy-drop pools for another consumable before the shuffle (own stream `soul-items`, no draws otherwise). Boss souls are not in the pool, so nothing else is touched. | The replacement pool is derived from the catalog's own unprotected world goods (with their vanilla quantities, in item-id order), not the legacy list: the legacy repository has no license, so its table is not reused. Ammunition and key items can therefore not appear. **Transposed is not available**: the catalog has no boss souls in any pool (they are granted by boss rewards that the scan does not extract), so the option could not change anything; it would need a scan/patch extension for boss reward lots. The UI shows it as a disabled choice. |
+| **Starting items** (legacy default Shield + 1H/2H) | `create_starting_class_weapon_data`: the right hand is a weapon usable at base stats, one-handed for *Shield + 1H* and with the 1.5x strength allowance for *Shield + 1H/2H* and *Shield/weapon + weapon*; the left hand is a shield in the first two modes and, in the third, any weapon from an expanded left-hand pool. Hunter/Sorcerer extras (arrows, spells, a second weapon) do not depend on the mode. | Acts only with Starting equipment on. `shield-1h`: primary weapon strength <= base strength, left hand a shield. `shield-2h` (product default): primary <= floor(1.5 x base strength), left hand a shield. `mixed-pool`: today's behavior. Shields are EquipParamWeapon ids 1,400,000-1,599,999 (checked against the real pool: every shield-named weapon is in the range and every item in it is a shield). Pickups stay unique and class stat requirements are still enforced. | `mixed-pool` is the closest match to *Shield/weapon + weapon* but not identical: the engine applies the 1.5x allowance to every primary weapon (legacy only to two-handable ones) and its left-hand pool is every usable one-handed weapon. Starting equipment is Asylum pickups; no key or progression item is involved, so there is no boundary with the protected-item model. |
+| **Pinwheel Chaos** (legacy default off) | The Catacombs fight has the damageable main Pinwheel `c3320_0000` and 14 one-hit clones. Off: the main Pinwheel is replaced like any boss and the clones are skipped. On: the main Pinwheel is skipped and the clones are replaced as normal enemies, with normal HP instead of the clone's 1 HP. MSB (parts) and the usual per-entity event edits; no dedicated event. | On: the main boss slot leaves the boss shuffle (it stays vanilla and Pinwheel is not offered elsewhere as a boss) and the 14 clones (`m13_00_00_00:c3320_0001`-`0014`) join the regular pool as targets. Their sources are drawn independently from the regular permutation (a source can feed several clones; model budget kept at 30 for the Catacombs; prevent-same honored). Their placements use scaling `vanilla`, so the replacement keeps its own combat stats while drops and team still follow the slot. Needs regular enemies on. | The clones' sources are drawn with repetition, as in the legacy tool, instead of being part of the count-preserving permutation. The main Pinwheel is not offered as a boss elsewhere while the option is on. |
+| **Gwyn nerf** (legacy default Medium) | `isCombinationInvalid`: when the candidate replacement is `c5370` (Lord Gwyn), it is rejected with probability 85% (Strong) or 60% (Medium) and another candidate is drawn; None never rejects. It changes **no** stats, AI, event or equipment: it only changes how often Gwyn is chosen. (A separate, unlabelled 65% rejection for `c2510` exists in the legacy tool and is not part of this option.) | With the legacy probability, Lord Gwyn is removed from the boss candidates for the seed, **including at the Kiln**; another boss fills the gap, so one boss may appear in two places. One draw from its own stream (`gwyn-nerf`); the note in the spoiler says whether it applied. Needs boss randomization on. | Gwyn appears once in a permutation, never several times, so the nerf is a per-seed probability rather than a per-slot one. Expected Gwyn appearances fall by the same factor (about 15% / 40% of seeds keep Gwyn in play). Duplicated bosses had never been generated before; real `patch-enemies` and the Fog sweeps below accept them. No NpcParam is touched, so there is no scaling interaction. |
+
+Fog and event surfaces:
+
+- **Soul items, Starting items:** ItemLotParam / starting pickups only (GameParam). No MSB or EMEVD.
+- **Pinwheel Chaos:** MSB parts and the per-entity event edits in `m13_00_00_00`. A real
+  `patch-enemies` run edits **fewer** events than the default: `11305392`, `11305396`, `11305398` and
+  `11305250` are no longer touched (the boss events stop being edited because the main Pinwheel
+  stays); only event 0 and `11305045` remain in `m13_00`. `11305100` (a FogMod `copyRandoEvents`
+  event) is never edited, and none of the 15 whitelisted overlay events is involved.
+- **Gwyn nerf:** boss selection only; it reaches the same events as any other boss permutation.
+
+Defaults:
+
+| Option | Legacy default | Engine default | Product default (contract, UI) | Older presets migrate to |
+|---|---|---|---|---|
+| Soul items | Shuffled | shuffled | shuffled | shuffled |
+| Starting items | Shield + 1H/2H | mixed-pool | shield-2h | mixed-pool |
+| Pinwheel Chaos | off | off | off | off |
+| Gwyn nerf | Medium | none | medium | none |
+
+The product defaults for Starting items and Gwyn nerf change the output of otherwise unchanged
+configurations that use those features (starting equipment on; bosses on), so version 1 and 2
+presets migrate to the values that reproduce their old output.
 
 ### Cross-cutting
 

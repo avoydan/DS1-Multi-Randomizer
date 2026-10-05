@@ -1,5 +1,39 @@
 # Decisions
 
+## Legacy-parity Batch 2: legacy product defaults, behavior-preserving engine defaults, honest scope
+
+Date: 2026-10-05
+
+Soul items (Shuffled and Replaced), Starting items, Pinwheel Chaos and Gwyn nerf are implemented in
+the vendored core (`patches/0003-legacy-parity-batch-2.patch`, same policy as Batch 1).
+
+- **Two sets of defaults.** The contract and the UI use the legacy defaults (soul items shuffled,
+  starting items Shield + 1H/2H, Pinwheel Chaos off, Gwyn nerf Medium). The vendored engine's own
+  defaults keep the old behavior (`mixed-pool`, Gwyn `none`), so the engine stays byte-identical
+  without the options and the Batch 1 hash lock still holds. The backend always sends explicit
+  values, so the product default wins. Consequence: with Starting equipment on, the default now
+  gives shields in the left hand, and with bosses on, Lord Gwyn is withheld from the boss pool in
+  60% of seeds. Presets of version 1 and 2 migrate to the old-behavior values, so they reproduce
+  their old output; presets are now version 3.
+- **Soul items "Transposed" is not offered.** It acts on boss souls (goods 700-711), which are in
+  none of the catalog's pools (boss rewards are not extracted), so it could not change anything. It
+  stays a disabled choice until the scan/patch can see boss reward lots.
+- **Replaced souls use a catalog-derived pool, not the legacy list.** Reusing the unlicensed legacy
+  table is excluded by project policy. The pool is the unprotected world goods that already occur in
+  at least two lots. The two-lot rule exists because FogMod tracks 27 key items by id and rejects a
+  second copy (`Item peculiar_doll found in both ...`); a first version of the rule without it broke
+  every Fog run.
+- **Gwyn nerf is a boss-candidate exclusion, not a pin.** Pinning Gwyn in place would make "Gwyn at
+  the Kiln" common, the opposite of the legacy rejection. With the legacy probability Gwyn is
+  removed from the candidates (the Kiln included) and another boss may appear twice.
+- **Pinwheel Chaos draws clone sources with repetition**, as the legacy tool does, and replaced
+  clones keep their own stats (scaling `vanilla` for those 14 placements) so they do not inherit the
+  clone's 1 HP.
+- **Include DLC was a dead control** (nothing reads `output.includeDlc`, and FogMod has no matching
+  switch). It is now a disabled planned control and the backend rejects `false` instead of
+  ignoring it. Importing a preset with `includeDlc: false` therefore fails. A real implementation
+  is medium work and cannot cover Fog.
+
 ## Legacy-parity Batch 1 extends the vendored core, with legacy defaults and a stop at the Gargoyle
 
 Date: 2026-10-05

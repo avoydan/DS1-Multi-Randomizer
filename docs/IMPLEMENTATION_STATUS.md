@@ -1,5 +1,39 @@
 # Implementation status
 
+**Legacy parity Batch 2 (2026-10-05; backend 0.21.0, contracts 0.6.0, desktop 0.9.0).**
+Soul items (Shuffled and Replaced), Starting items, Pinwheel Chaos and Gwyn nerf are functional end
+to end with their legacy defaults (soul items shuffled, starting items Shield + 1H/2H, Pinwheel Chaos
+off, Gwyn nerf Medium). Semantics, deviations and legacy references: `docs/FEATURE_PARITY.md` 6b;
+policy: `docs/DECISIONS.md`; patch: `engines/combined/vendor/patches/0003-legacy-parity-batch-2.patch`.
+Presets are now version 3 (versions 1 and 2 migrate to the behavior-preserving values).
+
+- **Not implemented:** Soul items *Transposed* (boss souls are in none of the catalog's pools; shown
+  as a disabled choice), Replace second Gargoyle (still blocked, see Batch 1) and the hintsheet.
+- **Include DLC was a dead control** (found by the trace: no backend mapping, no engine reader, no
+  FogMod switch). The backend now rejects `includeDlc: false`; the UI shows it as a disabled planned
+  control. A real implementation is medium work and cannot cover Fog.
+- **A bug the Fog sweep caught:** a first version of the Replaced-souls pool included the unique
+  Peculiar Doll, producing `Item peculiar_doll found in both ...` (FogMod tracks 27 key items by id)
+  in 10 of 10 seeds. The pool now only holds goods that occur in at least two lots; none of the
+  pool's 31 goods is among FogMod's key items.
+- **Engine defaults unchanged:** the 24 Batch 1 placement hashes are still identical.
+- **Real-catalog checks (in-process):** Replaced souls removed all 3380 lesser souls over the runs and
+  kept Fire Keeper Souls; shield starting modes gave shields in every class with unique pickups and
+  no assignment failures over 180 seeds per mode; Gwyn appears in about 18% (strong) and 40%
+  (medium) of 100 seeds; Pinwheel Chaos replaced exactly the 14 clones with the Catacombs model count
+  at most 30 and the main Pinwheel untouched.
+- **Real `patch-enemies` / `verify-skips`** (live install, scratch output): all options accepted,
+  0 skip mismatches. Pinwheel Chaos edits fewer events in `m13_00` than the default
+  (`11305392/396/398/250` are no longer edited); `11305100` is never edited.
+- **Fog sweeps** (live install unchanged): product defaults 20/20 (0 conflicts, 21 skip checks, 0
+  mismatches, 1 retry in 21 attempts); every Batch 1 and Batch 2 option non-default 12/12 (0
+  conflicts, 15 skip checks, 0 mismatches, 2 seeds needed a combined retry). Boss overlays stayed on
+  the 15 whitelisted events.
+- **Tests:** backend 144 passed, 0 failed, 1 skipped (needs a user Fog data root); new engine tests
+  cover every option on synthetic catalogs; root typecheck clean; desktop build passed. The portable
+  EXE was not rebuilt.
+- **Remaining:** see the gaps in `docs/FEATURE_PARITY.md` section 6.
+
 **Legacy parity Batch 1 (2026-10-05; backend 0.20.0, contracts 0.5.0, desktop 0.8.0).**
 Four legacy options are now functional end to end, each with its original legacy default:
 Fashion Souls (on), Replace mimics (on), Replace respawning mosquitoes (on) and Prevent same
