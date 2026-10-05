@@ -9,7 +9,7 @@ const itemKeys = [
 ] as const;
 const enemyKeys = [
   'enabled', 'randomizeRegularEnemies', 'randomizeBosses', 'scaling',
-  'replaceMimics', 'replaceRespawningMosquitoes', 'preventSameEnemy', 'pinwheelChaos', 'gwynNerf',
+  'replaceMimics', 'replaceRespawningMosquitoes', 'preventSameEnemy', 'pinwheelChaos', 'gwynNerf', 'secondGargoyle',
 ] as const;
 const fogKeys = [
   'enabled', 'traversableFogs', 'bossFogs', 'areaWarps', 'majorPvpFogs',
@@ -21,6 +21,7 @@ const outputKeys = ['includeDlc', 'generateSpoilerLog'] as const;
 const soulItemModes = new Set(['shuffled', 'replaced']);
 const startingItemModes = new Set(['shield-1h', 'shield-2h', 'mixed-pool']);
 const gwynNerfModes = new Set(['none', 'medium', 'strong']);
+const secondGargoyleModes = new Set(['replace', 'keep', 'single-boss']);
 const fogLanguages = new Set([
   'ENGLISH', 'FRENCH', 'GERMAN', 'ITALIAN', 'JAPANESE', 'KOREAN',
   'NSPANISH', 'POLISH', 'PORTUGUESE', 'RUSSIAN', 'SCHINESE', 'SPANISH',
@@ -107,8 +108,9 @@ export function validateRandomizerConfig(input: unknown): asserts input is Rando
     if (!startingItemModes.has(String(input.items.startingItems))) problems.push('Starting items mode is invalid.');
   }
   if (isObject(input.enemies)) {
-    validateBooleans(input.enemies, enemyKeys.filter((key) => key !== 'scaling' && key !== 'gwynNerf'), 'config.enemies', problems);
+    validateBooleans(input.enemies, enemyKeys.filter((key) => key !== 'scaling' && key !== 'gwynNerf' && key !== 'secondGargoyle'), 'config.enemies', problems);
     if (!gwynNerfModes.has(String(input.enemies.gwynNerf))) problems.push('Gwyn nerf mode is invalid.');
+    if (!secondGargoyleModes.has(String(input.enemies.secondGargoyle))) problems.push('Second Gargoyle mode is invalid.');
     if (!['vanilla', 'area', 'progressive'].includes(String(input.enemies.scaling))) {
       problems.push('Enemy scaling mode is invalid.');
     }

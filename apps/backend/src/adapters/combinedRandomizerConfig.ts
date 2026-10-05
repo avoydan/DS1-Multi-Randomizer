@@ -1,4 +1,4 @@
-import type { EnemyScaling, GwynNerfMode, SoulItemsMode, StartingItemsMode } from '@ds1tr/contracts';
+import type { EnemyScaling, GwynNerfMode, SecondGargoyleMode, SoulItemsMode, StartingItemsMode } from '@ds1tr/contracts';
 import type { CombinedRandomizerRequest } from './combinedRandomizerAdapter.js';
 
 export interface UpstreamCombinedRandomizerConfig {
@@ -27,6 +27,7 @@ export interface UpstreamCombinedRandomizerConfig {
   startingItems: StartingItemsMode;
   pinwheelChaos: boolean;
   gwynNerf: GwynNerfMode;
+  secondGargoyle: SecondGargoyleMode;
   generateSpoilerLog: boolean;
 }
 
@@ -74,6 +75,8 @@ export function mapCombinedRandomizerConfig(
       : 'mixed-pool',
     pinwheelChaos: regularEnemies && request.enemies.pinwheelChaos,
     gwynNerf: request.enemies.enabled && request.enemies.randomizeBosses ? request.enemies.gwynNerf : 'none',
+    // 'single-boss' is the engine's behavior without the option and the fallback while bosses are off.
+    secondGargoyle: request.enemies.enabled && request.enemies.randomizeBosses ? request.enemies.secondGargoyle : 'single-boss',
     generateSpoilerLog: request.generateSpoilerLog,
   };
 

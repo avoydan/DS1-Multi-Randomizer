@@ -94,7 +94,8 @@ const config = (gamePath, masterSeed = process.env.DS1TR_E2E_SEED ?? 'foghost-e2
     replaceRespawningMosquitoes: process.env.DS1TR_E2E_MOSQUITOES !== '0',
     preventSameEnemy: process.env.DS1TR_E2E_PREVENT_SAME === '1',
     pinwheelChaos: process.env.DS1TR_E2E_PINWHEEL === '1',
-    gwynNerf: process.env.DS1TR_E2E_GWYN ?? 'medium' },
+    gwynNerf: process.env.DS1TR_E2E_GWYN ?? 'medium',
+    secondGargoyle: process.env.DS1TR_E2E_GARGOYLE ?? 'replace' },
   fog: {
     enabled: process.env.DS1TR_E2E_FOG !== '0', traversableFogs: true, bossFogs: true, areaWarps: true, majorPvpFogs: false,
     minorPvpFogs: false, lordvesselGates: false, randomStart: false, disconnectedFogs: false,

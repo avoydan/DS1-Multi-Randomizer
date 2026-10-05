@@ -35,6 +35,13 @@ export interface ItemOptions {
 
 export type EnemyScaling = 'vanilla' | 'area' | 'progressive';
 
+/**
+ * Legacy "Replace second Gargoyle". `replace` (legacy default) replaces the second Bell Gargoyle with an
+ * independently drawn boss; `keep` leaves it a Bell Gargoyle. `single-boss` is the earlier DS1TR behavior
+ * (the extra Bell Gargoyle bodies are disabled); it is kept so older presets reproduce their output.
+ */
+export type SecondGargoyleMode = 'replace' | 'keep' | 'single-boss';
+
 export interface EnemyOptions {
   enabled: boolean;
   randomizeRegularEnemies: boolean;
@@ -50,6 +57,8 @@ export interface EnemyOptions {
   pinwheelChaos: boolean;
   /** Legacy default: medium. Acts only with boss randomization on. */
   gwynNerf: GwynNerfMode;
+  /** Legacy default: replace. Acts only with boss randomization on. */
+  secondGargoyle: SecondGargoyleMode;
 }
 
 export type FogLanguage =
@@ -146,7 +155,7 @@ export type GenerationResult =
   | { ok: false; code: string; message: string; stage: string };
 
 export const PRESET_FORMAT = 'ds1tr-preset';
-export const PRESET_VERSION = 3;
+export const PRESET_VERSION = 4;
 
 /** Shareable settings: everything in RandomizerConfig except the machine-specific game path. */
 export interface PresetDocument {

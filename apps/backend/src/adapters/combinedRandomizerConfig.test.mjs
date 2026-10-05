@@ -30,6 +30,7 @@ const enemyOptions = {
   preventSameEnemy: true,
   pinwheelChaos: true,
   gwynNerf: 'strong',
+  secondGargoyle: 'keep',
 };
 
 function createRequest(overrides = {}) {
@@ -105,6 +106,7 @@ test('maps both enabled capabilities deterministically', () => {
       startingItems: 'shield-1h',
       pinwheelChaos: true,
       gwynNerf: 'strong',
+      secondGargoyle: 'keep',
       generateSpoilerLog: true,
     },
   });
@@ -206,7 +208,7 @@ test('legacy-parity options fall back to the legacy defaults when their parent i
 test('legacy-parity options are forwarded when their parents are on', () => {
   const result = mapCombinedRandomizerConfig(createRequest({
     items: { ...itemOptions, fashionSouls: true, soulItems: 'shuffled', startingItems: 'shield-2h' },
-    enemies: { ...enemyOptions, replaceMimics: true, replaceRespawningMosquitoes: true, preventSameEnemy: false, pinwheelChaos: false, gwynNerf: 'medium' },
+    enemies: { ...enemyOptions, replaceMimics: true, replaceRespawningMosquitoes: true, preventSameEnemy: false, pinwheelChaos: false, gwynNerf: 'medium', secondGargoyle: 'replace' },
   }));
   assert.equal(result.config.fashionSouls, true);
   assert.equal(result.config.replaceMimics, true);
@@ -255,4 +257,17 @@ test('Batch 2 options fall back to the behavior-preserving values when their par
   const noEnemies = mapCombinedRandomizerConfig(createRequest({ enemies: { ...enemyOptions, enabled: false } }));
   assert.equal(noEnemies.config.pinwheelChaos, false);
   assert.equal(noEnemies.config.gwynNerf, 'none');
+});
+
+test('the second Gargoyle mode maps through with boss randomization and falls back without it', () => {
+  const on = mapCombinedRandomizerConfig(createRequest());
+  assert.equal(on.config.secondGargoyle, 'keep');
+  for (const mode of ['replace', 'keep', 'single-boss']) {
+    const result = mapCombinedRandomizerConfig(createRequest({ enemies: { ...enemyOptions, secondGargoyle: mode } }));
+    assert.equal(result.config.secondGargoyle, mode);
+  }
+  const noBosses = mapCombinedRandomizerConfig(createRequest({ enemies: { ...enemyOptions, randomizeBosses: false } }));
+  assert.equal(noBosses.config.secondGargoyle, 'single-boss');
+  const noEnemies = mapCombinedRandomizerConfig(createRequest({ enemies: { ...enemyOptions, enabled: false } }));
+  assert.equal(noEnemies.config.secondGargoyle, 'single-boss');
 });

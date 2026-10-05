@@ -37,6 +37,7 @@ function validConfig() {
       preventSameEnemy: false,
       pinwheelChaos: false,
       gwynNerf: 'medium',
+      secondGargoyle: 'replace',
     },
     fog: {
       enabled: true,
@@ -156,4 +157,20 @@ test('refuses to silently ignore Include DLC being turned off', () => {
   const config = validConfig();
   config.output.includeDlc = false;
   assert.throws(() => validateRandomizerConfig(config), /Excluding DLC content is not supported yet/);
+});
+
+test('requires the second Gargoyle mode and validates its value', () => {
+  const missing = validConfig();
+  delete missing.enemies.secondGargoyle;
+  assert.throws(() => validateRandomizerConfig(missing), /config\.enemies\.secondGargoyle is required/);
+  for (const bad of ['replaced', 'true', 'disabled', true]) {
+    const invalid = validConfig();
+    invalid.enemies.secondGargoyle = bad;
+    assert.throws(() => validateRandomizerConfig(invalid), /Second Gargoyle mode is invalid/, String(bad));
+  }
+  for (const mode of ['replace', 'keep', 'single-boss']) {
+    const valid = validConfig();
+    valid.enemies.secondGargoyle = mode;
+    assert.doesNotThrow(() => validateRandomizerConfig(valid), mode);
+  }
 });

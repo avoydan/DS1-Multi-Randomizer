@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { FogLanguage, GameStateReport, GwynNerfMode, SoulItemsMode, StartingItemsMode, GenerationResult, InstallationValidation, PipelinePlan, RandomizerConfig } from '@ds1tr/contracts';
+import type { FogLanguage, GameStateReport, GwynNerfMode, SecondGargoyleMode, SoulItemsMode, StartingItemsMode, GenerationResult, InstallationValidation, PipelinePlan, RandomizerConfig } from '@ds1tr/contracts';
 import { api } from './api';
 
 const initialConfig: RandomizerConfig = {
@@ -35,6 +35,8 @@ const initialConfig: RandomizerConfig = {
     preventSameEnemy: false,
     pinwheelChaos: false,
     gwynNerf: 'medium',
+    // Legacy Enemy Randomizer default: the second Bell Gargoyle is replaced.
+    secondGargoyle: 'replace',
   },
   fog: {
     enabled: true,
@@ -364,6 +366,8 @@ export function App() {
               <Toggle inactive={!config.enemies.randomizeRegularEnemies} label="Replace respawning mosquitoes" hint="Off: the six respawning Blighttown swamp mosquitoes stay in place." checked={config.enemies.replaceRespawningMosquitoes} onChange={(value) => setEnemy('replaceRespawningMosquitoes', value)} />
               <Toggle inactive={!config.enemies.randomizeRegularEnemies} label="Prevent same enemy" hint="On: no regular enemy is replaced by an enemy of its own kind (a Hollow never becomes a Hollow). Bosses are never replaced by the same boss." checked={config.enemies.preventSameEnemy} onChange={(value) => setEnemy('preventSameEnemy', value)} />
               <Toggle inactive={!config.enemies.randomizeRegularEnemies} label="Pinwheel Chaos" hint="On: the main Pinwheel is not replaced; its clones are replaced by regular enemies with their own stats." checked={config.enemies.pinwheelChaos} onChange={(value) => setEnemy('pinwheelChaos', value)} />
+              <label className="field-label">Replace second Gargoyle</label>
+              <select value={config.enemies.secondGargoyle} disabled={!config.enemies.randomizeBosses} title="Needs boss randomization. Replace: the second Bell Gargoyle becomes an independently drawn boss. Do not replace: it stays a Bell Gargoyle. Single boss: the earlier DS1TR behavior (the extra Gargoyle is removed)." onChange={(event) => setEnemy('secondGargoyle', event.target.value as SecondGargoyleMode)}><option value="replace">Replace</option><option value="keep">Do not replace</option><option value="single-boss">Single boss (earlier DS1TR behavior)</option></select>
               <label className="field-label">Gwyn spawn nerf</label>
               <select value={config.enemies.gwynNerf} disabled={!config.enemies.randomizeBosses} title="Chance that Lord Gwyn is rejected as a boss replacement: strong 85%, medium 60%." onChange={(event) => setEnemy('gwynNerf', event.target.value as GwynNerfMode)}><option value="strong">Strong</option><option value="medium">Medium</option><option value="none">None</option></select>
             </div>
@@ -375,7 +379,7 @@ export function App() {
               <RangeOption disabled label="Boss chance: normal slots" value={10} onChange={() => undefined} />
               <RangeOption disabled label="Boss chance: boss slots" value={90} onChange={() => undefined} />
               <RangeOption disabled label="Roaming boss souls" value={100} onChange={() => undefined} />
-              {['Replace second Gargoyle', 'Allow T-pose behavior', 'Unique bosses', 'Respawning roaming bosses', 'Hostile NPCs'].map((label) => <Toggle key={label} disabled label={label} checked={label === 'Replace second Gargoyle'} onChange={() => undefined} />)}
+              {['Allow T-pose behavior', 'Unique bosses', 'Respawning roaming bosses', 'Hostile NPCs'].map((label) => <Toggle key={label} disabled label={label} checked={false} onChange={() => undefined} />)}
               <label className="field-label">Difficulty strictness</label><select defaultValue="loose" disabled><option value="strict">Strict</option><option value="loose">A bit loose</option><option value="very-loose">Very loose</option></select>
               <label className="field-label">Type replacement</label><select defaultValue="disabled" disabled><option value="enabled">Enabled</option><option value="exclude-roaming-bosses">Except roaming bosses</option><option value="disabled">Disabled</option></select>
               <label className="field-label">Custom enemy pool</label><input value="Default" disabled readOnly />

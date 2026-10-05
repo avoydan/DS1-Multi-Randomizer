@@ -9,7 +9,7 @@ function config() {
       guaranteeEarlyWeapon: true, balancedEarlyLoot: true, randomizeStartingClass: false,
       randomizeStartingEquipment: false, randomizeGifts: false, randomizeEnemyDrops: false,
       guaranteedEnemyDrops: false, randomizeShops: false, fashionSouls: false, soulItems: 'replaced', startingItems: 'shield-1h' },
-    enemies: { enabled: true, randomizeRegularEnemies: true, randomizeBosses: true, scaling: 'progressive', replaceMimics: false, replaceRespawningMosquitoes: true, preventSameEnemy: true, pinwheelChaos: true, gwynNerf: 'strong' },
+    enemies: { enabled: true, randomizeRegularEnemies: true, randomizeBosses: true, scaling: 'progressive', replaceMimics: false, replaceRespawningMosquitoes: true, preventSameEnemy: true, pinwheelChaos: true, gwynNerf: 'strong', secondGargoyle: 'keep' },
     fog: { enabled: true, traversableFogs: true, bossFogs: true, areaWarps: true, majorPvpFogs: true,
       minorPvpFogs: false, lordvesselGates: false, randomStart: false, disconnectedFogs: false,
       noFallBedOfChaos: false, scaling: true, glitchedLogic: false, requireLordSouls: true,
@@ -34,7 +34,7 @@ test('import rejects malformed, foreign and unsupported presets', () => {
   assert.equal(importPreset('[]').ok, false);
   const preset = exportPreset(config());
   assert.match(importPreset(JSON.stringify({ ...preset, format: 'other' })).problems.join(' '), /format/);
-  assert.match(importPreset(JSON.stringify({ ...preset, presetVersion: 4 })).problems.join(' '), /version/);
+  assert.match(importPreset(JSON.stringify({ ...preset, presetVersion: 5 })).problems.join(' '), /version/);
   assert.match(importPreset(JSON.stringify({ ...preset, gamePath: 'C:/x' })).problems.join(' '), /gamePath is not supported/);
   const unknown = { ...preset, fog: { ...preset.fog, bogus: true } };
   assert.match(importPreset(JSON.stringify(unknown)).problems.join(' '), /bogus is not supported/);
@@ -51,10 +51,10 @@ test('a version-1 preset is migrated with the legacy defaults', () => {
   delete v1.items.fashionSouls;
   for (const key of ['replaceMimics', 'replaceRespawningMosquitoes', 'preventSameEnemy']) delete v1.enemies[key];
   for (const key of ['soulItems', 'startingItems']) delete v1.items[key];
-  for (const key of ['pinwheelChaos', 'gwynNerf']) delete v1.enemies[key];
+  for (const key of ['pinwheelChaos', 'gwynNerf', 'secondGargoyle']) delete v1.enemies[key];
   const imported = importPreset(JSON.stringify(v1));
   assert.equal(imported.ok, true);
-  assert.equal(imported.preset.presetVersion, 3);
+  assert.equal(imported.preset.presetVersion, 4);
   assert.equal(imported.preset.items.fashionSouls, true);
   assert.equal(imported.preset.enemies.replaceMimics, true);
   assert.equal(imported.preset.enemies.replaceRespawningMosquitoes, true);
@@ -72,7 +72,7 @@ test('a version-1 preset is migrated with the legacy defaults', () => {
 
 test('a version-2 preset round-trips the Batch 1 options', () => {
   const preset = exportPreset(config());
-  assert.equal(preset.presetVersion, 3);
+  assert.equal(preset.presetVersion, 4);
   assert.equal(preset.items.fashionSouls, false);
   assert.equal(preset.enemies.replaceMimics, false);
   assert.equal(preset.enemies.preventSameEnemy, true);
@@ -86,10 +86,10 @@ test('a version-2 preset is migrated with the behavior-preserving Batch 2 values
   const v2 = JSON.parse(JSON.stringify(v3));
   v2.presetVersion = 2;
   for (const key of ['soulItems', 'startingItems']) delete v2.items[key];
-  for (const key of ['pinwheelChaos', 'gwynNerf']) delete v2.enemies[key];
+  for (const key of ['pinwheelChaos', 'gwynNerf', 'secondGargoyle']) delete v2.enemies[key];
   const imported = importPreset(JSON.stringify(v2));
   assert.equal(imported.ok, true);
-  assert.equal(imported.preset.presetVersion, 3);
+  assert.equal(imported.preset.presetVersion, 4);
   assert.equal(imported.preset.items.fashionSouls, false, 'version-2 keys are kept');
   assert.equal(imported.preset.items.soulItems, 'shuffled');
   assert.equal(imported.preset.items.startingItems, 'mixed-pool');
@@ -104,4 +104,30 @@ test('a preset that turns Include DLC off is rejected', () => {
   const preset = exportPreset(config());
   preset.output.includeDlc = false;
   assert.match(importPreset(JSON.stringify(preset)).problems.join(' '), /Excluding DLC content/);
+});
+
+test('presets of versions 1 to 3 migrate the second Gargoyle to the earlier single-boss behavior', () => {
+  const v4 = exportPreset(config());
+  assert.equal(v4.enemies.secondGargoyle, 'keep');
+  for (const version of [1, 2, 3]) {
+    const old = JSON.parse(JSON.stringify(v4));
+    old.presetVersion = version;
+    delete old.enemies.secondGargoyle;
+    if (version <= 2) {
+      for (const key of ['soulItems', 'startingItems']) delete old.items[key];
+      for (const key of ['pinwheelChaos', 'gwynNerf']) delete old.enemies[key];
+    }
+    if (version === 1) {
+      delete old.items.fashionSouls;
+      for (const key of ['replaceMimics', 'replaceRespawningMosquitoes', 'preventSameEnemy']) delete old.enemies[key];
+    }
+    const imported = importPreset(JSON.stringify(old));
+    assert.equal(imported.ok, true, `version ${version}`);
+    assert.equal(imported.preset.presetVersion, 4);
+    // Not the new legacy default: the old preset keeps reproducing the old Bell Gargoyle handling.
+    assert.equal(imported.preset.enemies.secondGargoyle, 'single-boss');
+    const smuggled = JSON.parse(JSON.stringify(old));
+    smuggled.enemies.secondGargoyle = 'replace';
+    assert.match(importPreset(JSON.stringify(smuggled)).problems.join(' '), new RegExp(`not supported in version ${version}`));
+  }
 });

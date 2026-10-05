@@ -14,10 +14,15 @@ const batch2Defaults: SectionDefaults = {
   items: { soulItems: 'shuffled', startingItems: 'mixed-pool' },
   enemies: { pinwheelChaos: false, gwynNerf: 'none' },
 };
+/** Batch 3: the earlier DS1TR Bell Gargoyle behavior (extra bodies disabled), not the new legacy default. */
+const batch3Defaults: SectionDefaults = {
+  enemies: { secondGargoyle: 'single-boss' },
+};
 /** What each older preset version lacks, newest additions last. */
 const missingByVersion: Record<number, SectionDefaults[]> = {
-  1: [batch1Defaults, batch2Defaults],
-  2: [batch2Defaults],
+  1: [batch1Defaults, batch2Defaults, batch3Defaults],
+  2: [batch2Defaults, batch3Defaults],
+  3: [batch3Defaults],
 };
 
 const presetKeys = ['format', 'presetVersion', 'masterSeed', 'items', 'enemies', 'fog', 'output'];
@@ -45,7 +50,7 @@ export function importPreset(text: string): PresetImportResult {
   const problems: string[] = [];
   if (record.format !== PRESET_FORMAT) problems.push(`Preset format must be "${PRESET_FORMAT}".`);
   if (record.presetVersion !== PRESET_VERSION && !(typeof record.presetVersion === 'number' && missingByVersion[record.presetVersion])) {
-    problems.push(`Preset version must be ${PRESET_VERSION} (versions 1 and 2 are migrated).`);
+    problems.push(`Preset version must be ${PRESET_VERSION} (versions 1 to 3 are migrated).`);
   }
   for (const key of Object.keys(record)) {
     if (!presetKeys.includes(key)) problems.push(`preset.${key} is not supported.`);

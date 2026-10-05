@@ -118,7 +118,7 @@ function makeRequest(masterSeed, workspacePath) {
       soulItems: 'shuffled',
       startingItems: 'shield-2h',
     },
-    enemies: { enabled: true, randomizeRegularEnemies: true, randomizeBosses: true, scaling: 'area', replaceMimics: true, replaceRespawningMosquitoes: true, preventSameEnemy: false, pinwheelChaos: false, gwynNerf: 'medium' },
+    enemies: { enabled: true, randomizeRegularEnemies: true, randomizeBosses: true, scaling: 'area', replaceMimics: true, replaceRespawningMosquitoes: true, preventSameEnemy: false, pinwheelChaos: false, gwynNerf: 'medium', secondGargoyle: 'replace' },
     generateSpoilerLog: true,
   };
 }

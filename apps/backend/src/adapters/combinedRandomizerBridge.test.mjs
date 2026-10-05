@@ -120,6 +120,7 @@ function request(overrides = {}) {
       preventSameEnemy: false,
       pinwheelChaos: false,
       gwynNerf: 'medium',
+      secondGargoyle: 'replace',
     },
     generateSpoilerLog: false,
     ...overrides,
