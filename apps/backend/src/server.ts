@@ -10,6 +10,7 @@ import { generateRun, type GenerationRequest } from './core/generationPipeline.j
 import { InvalidConfigurationError, validateRandomizerConfig } from './core/configValidation.js';
 import { exportPreset, importPreset } from './core/preset.js';
 import { GameStateAuthority, defaultStateRoot } from './core/gameState.js';
+import { describeEnemyPool } from './adapters/enemyPool.js';
 
 const HOST = process.env.DS1TR_HOST ?? '127.0.0.1';
 const PORT = Number(process.env.DS1TR_PORT ?? 43177);
@@ -52,7 +53,7 @@ const server = http.createServer(async (req, res) => {
     const url = new URL(req.url ?? '/', `http://${HOST}:${PORT}`);
 
     if (req.method === 'GET' && url.pathname === '/api/health') {
-      return send(res, 200, { ok: true, service: 'ds1-triple-randomizer-backend', version: '0.27.0' });
+      return send(res, 200, { ok: true, service: 'ds1-triple-randomizer-backend', version: '0.28.0' });
     }
 
     if (req.method === 'POST' && url.pathname === '/api/installation/validate') {
@@ -63,6 +64,13 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'POST' && url.pathname === '/api/pipeline/plan') {
       const config = await readJson<RandomizerConfig>(req);
       return send(res, 200, await createPipelinePlan(config));
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/enemy-pool') {
+      const body = await readJson<{ gamePath?: string }>(req);
+      const pristine = body.gamePath ? await authority.getPristineSource(body.gamePath) : null;
+      const result = await describeEnemyPool(pristine);
+      return send(res, result.ok ? 200 : 409, result);
     }
 
     if (req.method === 'POST' && url.pathname === '/api/preset/export') {

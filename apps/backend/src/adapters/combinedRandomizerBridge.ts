@@ -82,6 +82,7 @@ export type CombinedGenerationFailureCode =
   | 'ENEMY_PLACEMENT_BUDGET_UNSATISFIABLE'
   | 'ENEMY_PLACEMENT_CLASS_UNDERIVABLE'
   | 'ENEMY_PLACEMENT_INFEASIBLE'
+  | 'ENEMY_PLACEMENT_CUSTOM_POOL_INVALID'
   | 'JS_CORE_MISSING'
   | 'JS_CORE_INCOMPLETE'
   | 'INVALID_CONFIG'
@@ -431,7 +432,8 @@ export async function executeCombinedGeneration(
     // Deterministic structural failures: the same configuration fails the same way with any seed, so they are
     // typed and never retried. (The budget error is defensive: the non-worsening budget cannot be unsatisfiable.)
     if (errorCode === 'ENEMY_PLACEMENT_ALGORITHM_UNAVAILABLE' || errorCode === 'ENEMY_PLACEMENT_OPTIONS_INVALID'
-      || errorCode === 'ENEMY_PLACEMENT_BUDGET_UNSATISFIABLE' || errorCode === 'ENEMY_PLACEMENT_CLASS_UNDERIVABLE') {
+      || errorCode === 'ENEMY_PLACEMENT_BUDGET_UNSATISFIABLE' || errorCode === 'ENEMY_PLACEMENT_CLASS_UNDERIVABLE'
+      || errorCode === 'ENEMY_PLACEMENT_CUSTOM_POOL_INVALID') {
       return { ok: false, code: errorCode, message: messageOf(error), retryable: false };
     }
     // A slot that has no placement within the map's budget depends on the participation draws, so another

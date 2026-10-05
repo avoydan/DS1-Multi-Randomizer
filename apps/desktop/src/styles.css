@@ -23,6 +23,18 @@ main { display: grid; gap: 18px; }
 .section-title { display: flex; align-items: center; gap: 11px; margin-bottom: 18px; }
 .section-title > span { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; background: #272e39; color: #d9a95f; font-size: 11px; font-weight: 800; }
 .field-label { display: block; color: #8791a0; font-size: 12px; font-weight: 650; margin: 15px 0 7px; }
+.pool-editor { margin-top: 10px; display: grid; gap: 6px; }
+.pool-actions { display: grid; grid-template-columns: 1fr auto auto auto; gap: 6px; margin-top: 4px; }
+.pool-actions input { padding: 7px 10px; }
+.pool-actions .secondary { padding: 7px 12px; }
+.pool-list { max-height: 260px; overflow: auto; border: 1px solid #29303b; border-radius: 9px; background: #0f131a; padding: 4px 6px; }
+.pool-row { display: grid; grid-template-columns: auto 64px 1fr; align-items: center; gap: 8px; padding: 4px 2px; border-bottom: 1px solid #1b212b; color: #c7cdd6; font-size: 12px; cursor: pointer; }
+.pool-row input { width: auto; padding: 0; }
+.pool-model { color: #d4ad76; font-weight: 650; }
+.pool-meta { color: #8791a0; font-size: 11px; }
+.pool-error { color: #d98080; }
+.pool-warning { color: #d4ad76; }
+.link-button { background: none; border: 0; color: #d4ad76; padding: 0; text-decoration: underline; cursor: pointer; font-size: 11px; }
 .field-note { display: block; margin-top: 7px; color: #8791a0; font-size: 11px; line-height: 1.45; }
 input, select { width: 100%; border: 1px solid #323a47; background: #0f131a; color: #e8edf4; padding: 11px 12px; border-radius: 9px; outline: none; }
 input:focus, select:focus { border-color: #8e7043; box-shadow: 0 0 0 3px #8e70431f; }

@@ -108,6 +108,32 @@ export interface EnemyPlacementOptions {
   difficultyMode: DifficultyMode;
   difficultyStrictness: DifficultyStrictness;
   typeReplacement: TypeReplacementMode;
+  /**
+   * Custom enemy pool: the regular enemy models (stable ids such as `c2500`) the sampler may place. `null` is the full
+   * pool. The pool restricts replacement candidates only; the original enemies of a map are never removed because they
+   * are not selected. Canonical form: unique ids in ascending order (the backend sorts; duplicates are rejected).
+   */
+  customPool: string[] | null;
+}
+
+/** One enemy a custom pool can contain, described from the game data of the installation. */
+export interface EnemyPoolEntry {
+  model: string;
+  /** Size class 0-5 derived from the hit capsule. */
+  size: number;
+  /** Difficulty class 0-7 derived from the maps the enemy lives in and its HP. */
+  difficulty: number;
+  /** Regular slots of this enemy in the game. */
+  slots: number;
+  maps: string[];
+}
+
+export interface EnemyPoolDescription {
+  /** Where the data came from: the pristine snapshot or the selected game directory. */
+  source: 'pristine' | 'game';
+  classTableHash: string;
+  regularSlots: number;
+  entries: EnemyPoolEntry[];
 }
 
 /** The values under which `permutation-v1` behaves as it always did. Migrated presets and new configurations use them. */
@@ -118,6 +144,7 @@ export const NEUTRAL_ENEMY_PLACEMENT_OPTIONS: Omit<EnemyPlacementOptions, 'algor
   difficultyMode: 'random',
   difficultyStrictness: 'loose',
   typeReplacement: 'disabled',
+  customPool: null,
 };
 
 /** The legacy defaults offered when `sampling-v1` is chosen: replace always, only normal enemies, only where they fit. */
@@ -128,6 +155,7 @@ export const LEGACY_ENEMY_PLACEMENT_OPTIONS: Omit<EnemyPlacementOptions, 'algori
   difficultyMode: 'random-easy-asylum',
   difficultyStrictness: 'loose',
   typeReplacement: 'disabled',
+  customPool: null,
 };
 
 export interface EnemyOptions {
@@ -244,7 +272,7 @@ export type GenerationResult =
   | { ok: false; code: string; message: string; stage: string };
 
 export const PRESET_FORMAT = 'ds1tr-preset';
-export const PRESET_VERSION = 8;
+export const PRESET_VERSION = 9;
 
 /** Shareable settings: everything in RandomizerConfig except the machine-specific game path. */
 export interface PresetDocument {

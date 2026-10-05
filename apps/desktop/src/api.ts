@@ -1,4 +1,4 @@
-import type { GameStateReport, GenerationEvent, GenerationResult, InstallationValidation, OperationResult, PipelinePlan, PresetDocument, PresetImportResult, RandomizerConfig } from '@ds1tr/contracts';
+import type { EnemyPoolDescription, GameStateReport, GenerationEvent, GenerationResult, InstallationValidation, OperationResult, PipelinePlan, PresetDocument, PresetImportResult, RandomizerConfig } from '@ds1tr/contracts';
 
 async function connection(): Promise<{ apiBase: string; token: string }> {
   const result = await window.desktop?.connection();
@@ -65,6 +65,7 @@ export const api = {
   importPristine: (gamePath: string) => post<OperationResult<{ snapshot: { snapshotId: string } }>>('/game/import', { gamePath }, true),
   activate: (gamePath: string, packagePath: string) => post<OperationResult<object>>('/game/activate', { gamePath, packagePath }, true),
   restore: (gamePath: string) => post<OperationResult<{ restored: number; state: GameStateReport }>>('/game/restore', { gamePath }, true),
+  enemyPool: (gamePath: string) => post<{ pool: EnemyPoolDescription } | { ok: false; code: string; message: string }>('/enemy-pool', { gamePath }, true),
   exportPreset: (config: RandomizerConfig) => post<PresetDocument>('/preset/export', config),
   importPreset: (text: string) => post<PresetImportResult>('/preset/import', { text }, true),
   generate,

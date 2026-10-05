@@ -16,7 +16,7 @@ function config(gamePath, fog = false) {
       randomizeStartingClass: false, randomizeStartingEquipment: false,
       randomizeGifts: false, randomizeEnemyDrops: false, guaranteedEnemyDrops: false,
       randomizeShops: false, fashionSouls: true, soulItems: 'shuffled', startingItems: 'shield-2h' },
-    enemies: { enabled: false, randomizeRegularEnemies: false, randomizeBosses: false, scaling: 'vanilla', replaceMimics: true, replaceRespawningMosquitoes: true, preventSameEnemy: false, pinwheelChaos: false, gwynNerf: 'medium', secondGargoyle: 'replace', placement: { algorithm: 'permutation-v1', replacementChance: 100, normalReplacement: 'normals', fit: 'anywhere', difficultyMode: 'random', difficultyStrictness: 'loose', typeReplacement: 'disabled' } },
+    enemies: { enabled: false, randomizeRegularEnemies: false, randomizeBosses: false, scaling: 'vanilla', replaceMimics: true, replaceRespawningMosquitoes: true, preventSameEnemy: false, pinwheelChaos: false, gwynNerf: 'medium', secondGargoyle: 'replace', placement: { algorithm: 'permutation-v1', replacementChance: 100, normalReplacement: 'normals', fit: 'anywhere', difficultyMode: 'random', difficultyStrictness: 'loose', typeReplacement: 'disabled', customPool: null } },
     fog: { enabled: fog, traversableFogs: true, bossFogs: false, areaWarps: false,
       majorPvpFogs: false, minorPvpFogs: false, lordvesselGates: false,
       randomStart: false, disconnectedFogs: false, noFallBedOfChaos: false,
@@ -163,7 +163,7 @@ test('retries a Fog seed and retains combined files outside the Fog read set', a
 
 test('boss randomization together with Fog is supported (no rejection; proceeds to Fog prerequisites)', async () => fixture(async ({ game, pristine, workspace }) => {
   const bossesAndFog = config(game, true);
-  bossesAndFog.enemies = { enabled: true, randomizeRegularEnemies: false, randomizeBosses: true, scaling: 'vanilla', replaceMimics: true, replaceRespawningMosquitoes: true, preventSameEnemy: false, pinwheelChaos: false, gwynNerf: 'medium', secondGargoyle: 'replace', placement: { algorithm: 'permutation-v1', replacementChance: 100, normalReplacement: 'normals', fit: 'anywhere', difficultyMode: 'random', difficultyStrictness: 'loose', typeReplacement: 'disabled' } };
+  bossesAndFog.enemies = { enabled: true, randomizeRegularEnemies: false, randomizeBosses: true, scaling: 'vanilla', replaceMimics: true, replaceRespawningMosquitoes: true, preventSameEnemy: false, pinwheelChaos: false, gwynNerf: 'medium', secondGargoyle: 'replace', placement: { algorithm: 'permutation-v1', replacementChance: 100, normalReplacement: 'normals', fit: 'anywhere', difficultyMode: 'random', difficultyStrictness: 'loose', typeReplacement: 'disabled', customPool: null } };
   const result = await generateRun({ config: bossesAndFog, workspacePath: workspace }, () => {}, {
     getPristineSource: async () => ({ directory: pristine }),
     getFogPrerequisites: async () => null,

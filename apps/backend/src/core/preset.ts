@@ -41,11 +41,14 @@ const placementBatch6Defaults: Record<string, unknown> = {
 };
 /** Version 8: Type replacement; older presets migrate to `disabled`. */
 const placementBatch7Defaults: Record<string, unknown> = { typeReplacement: NEUTRAL_ENEMY_PLACEMENT_OPTIONS.typeReplacement };
+/** Version 9: the custom enemy pool; older presets migrate to the full pool (null). */
+const placementBatch8Defaults: Record<string, unknown> = { customPool: NEUTRAL_ENEMY_PLACEMENT_OPTIONS.customPool };
 /** Nested `enemies.placement` keys added by each preset version, applied to every older preset. */
 const placementKeysAddedIn: Array<{ version: number; defaults: Record<string, unknown> }> = [
   { version: 6, defaults: placementBatch5Defaults },
   { version: 7, defaults: placementBatch6Defaults },
   { version: 8, defaults: placementBatch7Defaults },
+  { version: 9, defaults: placementBatch8Defaults },
 ];
 /** What each older preset version lacks, newest additions last (the nested v6 placement keys are handled apart). */
 const missingByVersion: Record<number, SectionDefaults[]> = {
@@ -56,16 +59,24 @@ const missingByVersion: Record<number, SectionDefaults[]> = {
   5: [],
   6: [],
   7: [],
+  8: [],
 };
 
 const presetKeys = ['format', 'presetVersion', 'masterSeed', 'items', 'enemies', 'fog', 'output'];
 
 /** Validates through the same authority as a run request, so a preset can never carry unsupported options. */
+/** The custom pool is stored sorted, so equal selections export identically whatever order the UI built them in. */
+function canonicalEnemies(enemies: RandomizerConfig['enemies']): RandomizerConfig['enemies'] {
+  const pool = enemies.placement.customPool;
+  if (pool === null) return enemies;
+  return { ...enemies, placement: { ...enemies.placement, customPool: [...pool].sort() } };
+}
+
 export function exportPreset(config: RandomizerConfig): PresetDocument {
   validateRandomizerConfig(config);
   return {
     format: PRESET_FORMAT, presetVersion: PRESET_VERSION, masterSeed: config.masterSeed.trim(),
-    items: config.items, enemies: config.enemies, fog: config.fog, output: config.output,
+    items: config.items, enemies: canonicalEnemies(config.enemies), fog: config.fog, output: config.output,
   };
 }
 
@@ -83,7 +94,7 @@ export function importPreset(text: string): PresetImportResult {
   const problems: string[] = [];
   if (record.format !== PRESET_FORMAT) problems.push(`Preset format must be "${PRESET_FORMAT}".`);
   if (record.presetVersion !== PRESET_VERSION && !(typeof record.presetVersion === 'number' && missingByVersion[record.presetVersion])) {
-    problems.push(`Preset version must be ${PRESET_VERSION} (versions 1 to 7 are migrated).`);
+    problems.push(`Preset version must be ${PRESET_VERSION} (versions 1 to 8 are migrated).`);
   }
   for (const key of Object.keys(record)) {
     if (!presetKeys.includes(key)) problems.push(`preset.${key} is not supported.`);

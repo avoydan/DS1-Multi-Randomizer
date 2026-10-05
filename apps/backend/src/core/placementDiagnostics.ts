@@ -22,6 +22,8 @@ export interface PlacementDiagnosticsSummary {
   classTableHash: string | null;
   /** The effective sampling options of the run (sampling-v1 only). */
   options?: Record<string, unknown> | null;
+  /** Custom pool state and coverage (sampling-v1). */
+  customPool?: Record<string, unknown> | null;
   summary: PlacementSummary | null;
 }
 
@@ -42,6 +44,7 @@ export function summarizePlacementDiagnostics(value: unknown): PlacementDiagnost
     rngVersion: typeof input?.rngVersion === 'string' ? input.rngVersion : null,
     classTableHash: typeof input?.classTableHash === 'string' ? input.classTableHash : null,
     options: record(input?.options) ? structuredClone(record(input?.options)) as Record<string, unknown> : null,
+    customPool: record(input?.customPool) ? structuredClone(record(input?.customPool)) as Record<string, unknown> : null,
     summary: summary ? structuredClone(summary) as unknown as PlacementSummary : null,
   };
 }
@@ -55,9 +58,11 @@ export function formatPlacementDiagnostics(diagnostics: PlacementDiagnosticsSumm
   const stages = Object.entries(summary.stages).filter(([, count]) => count > 0).map(([name, count]) => `${name} ${count}`).join(', ');
   const options = diagnostics.options ?? {};
   const retried = summary.counters.mapsRetried ?? 0;
+  const pool = diagnostics.customPool;
+  const poolText = pool && pool.enabled ? `custom pool ${String(pool.selected)}/${String(pool.total)} (${String(pool.hash).slice(0, 12)}), ` : '';
   const typeMode = String(options.typeReplacement ?? 'disabled');
   const groups = typeMode === 'disabled' ? '' : `type replacement ${typeMode} (${summary.counters.typeGroupsReplaced ?? 0}/${summary.counters.typeGroups ?? 0} groups replaced), `;
-  return `Enemy placement sampling-v1 (difficulty ${String(options.difficultyMode ?? 'random')}/${String(options.difficultyStrictness ?? 'loose')}): ${groups}${summary.slots} regular slots, ${replaced} sampled, `
+  return `Enemy placement sampling-v1 (difficulty ${String(options.difficultyMode ?? 'random')}/${String(options.difficultyStrictness ?? 'loose')}): ${poolText}${groups}${summary.slots} regular slots, ${replaced} sampled, `
     + `${retried} map(s) retried, ${summary.counters.difficultyLapses ?? 0} difficulty lapses, `
     + `${summary.counters.keptByChance ?? 0} left by replacement chance, ${summary.rejections['model-budget'] ?? 0} model-budget rejections, `
     + `at most ${maxModels} models in a map, stages ${stages || 'none'}, class table ${diagnostics.classTableHash?.slice(0, 12) ?? 'n/a'}.`;

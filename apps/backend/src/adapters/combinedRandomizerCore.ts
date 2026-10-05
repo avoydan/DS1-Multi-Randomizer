@@ -94,6 +94,12 @@ export interface CombinedRandomizerCore {
     config: UpstreamRandomizerConfig,
     options?: { requireGame?: boolean },
   ): string[];
+  /** `core/generator.js` — the replacement types of a catalog for the custom-pool editor. Optional: older cores lack it. */
+  describeRegularEnemyPool?(config: UpstreamRandomizerConfig, gameCatalog: UpstreamGameCatalog): {
+    classTableHash: string;
+    regularSlots: number;
+    entries: Array<{ model: string; size: number; difficulty: number; slots: number; maps: string[] }>;
+  };
   /** `core/generator.js` — the pure generation entry point. No I/O. */
   generate(
     config: UpstreamRandomizerConfig,
@@ -208,6 +214,7 @@ export async function loadCombinedRandomizerCore(
       normalizeConfig: modules.config.normalizeConfig as CombinedRandomizerCore['normalizeConfig'],
       validateConfig: modules.config.validateConfig as CombinedRandomizerCore['validateConfig'],
       generate: modules.generator.generate as CombinedRandomizerCore['generate'],
+      describeRegularEnemyPool: modules.generator.describeRegularEnemyPool as CombinedRandomizerCore['describeRegularEnemyPool'],
       writeOutput: modules.output.writeOutput as CombinedRandomizerCore['writeOutput'],
     },
   };

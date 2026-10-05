@@ -98,7 +98,7 @@ const config = (gamePath, masterSeed = process.env.DS1TR_E2E_SEED ?? 'foghost-e2
     secondGargoyle: process.env.DS1TR_E2E_GARGOYLE ?? 'replace',
     // DS1TR_E2E_PLACEMENT='{"algorithm":"sampling-v1","replacementChance":100,"normalReplacement":"normals","fit":"fits"}'
     placement: process.env.DS1TR_E2E_PLACEMENT ? JSON.parse(process.env.DS1TR_E2E_PLACEMENT)
-      : { algorithm: 'permutation-v1', replacementChance: 100, normalReplacement: 'normals', fit: 'anywhere', difficultyMode: 'random', difficultyStrictness: 'loose', typeReplacement: 'disabled' } },
+      : { algorithm: 'permutation-v1', replacementChance: 100, normalReplacement: 'normals', fit: 'anywhere', difficultyMode: 'random', difficultyStrictness: 'loose', typeReplacement: 'disabled', customPool: null } },
   fog: {
     enabled: process.env.DS1TR_E2E_FOG !== '0', traversableFogs: true, bossFogs: true, areaWarps: true, majorPvpFogs: false,
     minorPvpFogs: false, lordvesselGates: false, randomStart: false, disconnectedFogs: false,

@@ -36,6 +36,8 @@ export interface UpstreamCombinedRandomizerConfig {
   enemyDifficultyMode: DifficultyMode;
   enemyDifficultyStrictness: DifficultyStrictness;
   enemyTypeReplacement: TypeReplacementMode;
+  /** Canonical custom pool (ascending unique model ids) or null for the full regular pool. */
+  enemyCustomPool: string[] | null;
   placementDiagnosticsLevel: 'summary' | 'detail';
   generateSpoilerLog: boolean;
 }
@@ -99,6 +101,7 @@ export function mapCombinedRandomizerConfig(
     enemyDifficultyMode: request.enemies.placement.difficultyMode,
     enemyDifficultyStrictness: request.enemies.placement.difficultyStrictness,
     enemyTypeReplacement: request.enemies.placement.typeReplacement,
+    enemyCustomPool: request.enemies.placement.customPool === null ? null : [...request.enemies.placement.customPool].sort(),
     placementDiagnosticsLevel: request.placementDiagnosticsLevel ?? 'summary',
     generateSpoilerLog: request.generateSpoilerLog,
   };

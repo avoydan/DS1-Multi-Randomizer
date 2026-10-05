@@ -27,7 +27,12 @@ export const SAMPLING_ONLY_OPTIONS: readonly SamplingOnlyOption[] = [
   { key: 'difficultyMode', neutral: NEUTRAL_ENEMY_PLACEMENT_OPTIONS.difficultyMode },
   { key: 'difficultyStrictness', neutral: NEUTRAL_ENEMY_PLACEMENT_OPTIONS.difficultyStrictness },
   { key: 'typeReplacement', neutral: NEUTRAL_ENEMY_PLACEMENT_OPTIONS.typeReplacement },
+  { key: 'customPool', neutral: NEUTRAL_ENEMY_PLACEMENT_OPTIONS.customPool },
 ];
+
+/** Model ids look like `c2500`; the engine checks them against the catalog of the run. */
+export const MAX_CUSTOM_POOL_ENTRIES = 512;
+const MODEL_ID = /^[A-Za-z][A-Za-z0-9_]{0,15}$/u;
 
 /** Value-domain checks of the sampling-only options (they apply to both algorithms: a bad value is never ignored). */
 function validateSamplingOnlyValues(value: Record<string, unknown>, path: string, problems: string[]): void {
@@ -49,6 +54,24 @@ function validateSamplingOnlyValues(value: Record<string, unknown>, path: string
   }
   if (Object.hasOwn(value, 'typeReplacement') && !(TYPE_REPLACEMENT_MODES as readonly unknown[]).includes(value.typeReplacement)) {
     problems.push(`${path}.typeReplacement must be ${TYPE_REPLACEMENT_MODES.join(', ')}.`);
+  }
+  if (Object.hasOwn(value, 'customPool')) {
+    const pool = value.customPool;
+    if (pool !== null) {
+      if (!Array.isArray(pool)) {
+        problems.push(`${path}.customPool must be null or a list of enemy model ids.`);
+      } else if (pool.length === 0) {
+        problems.push(`${path}.customPool is empty: select at least one enemy, or use the full pool (null).`);
+      } else if (pool.length > MAX_CUSTOM_POOL_ENTRIES) {
+        problems.push(`${path}.customPool lists more than ${MAX_CUSTOM_POOL_ENTRIES} enemies.`);
+      } else {
+        const bad = pool.filter((entry) => typeof entry !== 'string' || !MODEL_ID.test(entry));
+        if (bad.length > 0) problems.push(`${path}.customPool entries must be model ids such as c2500 (got ${bad.slice(0, 3).map(String).join(', ')}).`);
+        const strings = pool.filter((entry): entry is string => typeof entry === 'string');
+        const duplicates = [...new Set(strings.filter((entry, index) => strings.indexOf(entry) !== index))];
+        if (duplicates.length > 0) problems.push(`${path}.customPool lists ${duplicates.join(', ')} more than once.`);
+      }
+    }
   }
 }
 
