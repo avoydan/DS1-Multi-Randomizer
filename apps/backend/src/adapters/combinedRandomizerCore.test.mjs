@@ -25,6 +25,7 @@ const allowedSpecifiers = new Set([
   './rng.js',
   './config.js',
   './placement.js',
+  './sampling.js',
   '../data/prototype-data.js',
 ]);
 
@@ -35,6 +36,7 @@ const expectedVendoredFiles = [
   'core/output.js',
   'core/placement.js',
   'core/rng.js',
+  'core/sampling.js',
   'data/prototype-data.js',
 ];
 

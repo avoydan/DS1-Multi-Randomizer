@@ -1,4 +1,4 @@
-import type { EnemyPlacementAlgorithm, EnemyScaling, GwynNerfMode, SecondGargoyleMode, SoulItemsMode, StartingItemsMode } from '@ds1tr/contracts';
+import type { EnemyPlacementAlgorithm, NormalEnemyReplacementMode, PlacementFitMode, EnemyScaling, GwynNerfMode, SecondGargoyleMode, SoulItemsMode, StartingItemsMode } from '@ds1tr/contracts';
 import { enemyPlacementUnavailableMessage, ENEMY_PLACEMENT_UNAVAILABLE, isEnemyPlacementImplemented } from '../core/enemyPlacement.js';
 import type { CombinedRandomizerRequest } from './combinedRandomizerAdapter.js';
 
@@ -30,6 +30,10 @@ export interface UpstreamCombinedRandomizerConfig {
   gwynNerf: GwynNerfMode;
   secondGargoyle: SecondGargoyleMode;
   enemyPlacementAlgorithm: EnemyPlacementAlgorithm;
+  enemyReplacementChance: number;
+  enemyNormalReplacement: NormalEnemyReplacementMode;
+  enemyPlacementFit: PlacementFitMode;
+  placementDiagnosticsLevel: 'summary' | 'detail';
   generateSpoilerLog: boolean;
 }
 
@@ -86,6 +90,10 @@ export function mapCombinedRandomizerConfig(
     secondGargoyle: request.enemies.enabled && request.enemies.randomizeBosses ? request.enemies.secondGargoyle : 'single-boss',
     // Passed through unconditionally: the algorithm is part of the run's identity, not an enemy feature toggle.
     enemyPlacementAlgorithm: algorithm,
+    enemyReplacementChance: request.enemies.placement.replacementChance,
+    enemyNormalReplacement: request.enemies.placement.normalReplacement,
+    enemyPlacementFit: request.enemies.placement.fit,
+    placementDiagnosticsLevel: request.placementDiagnosticsLevel ?? 'summary',
     generateSpoilerLog: request.generateSpoilerLog,
   };
 

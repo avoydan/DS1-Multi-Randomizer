@@ -81,7 +81,7 @@ const config = (gamePath) => ({
     randomizeStartingEquipment: true, randomizeGifts: true, randomizeEnemyDrops: true,
     guaranteedEnemyDrops: true, randomizeShops: true, fashionSouls: true, soulItems: 'shuffled', startingItems: 'shield-2h',
   },
-  enemies: { enabled: true, randomizeRegularEnemies: true, randomizeBosses: true, scaling: 'area', replaceMimics: true, replaceRespawningMosquitoes: true, preventSameEnemy: false, pinwheelChaos: false, gwynNerf: 'medium', secondGargoyle: 'replace' },
+  enemies: { enabled: true, randomizeRegularEnemies: true, randomizeBosses: true, scaling: 'area', replaceMimics: true, replaceRespawningMosquitoes: true, preventSameEnemy: false, pinwheelChaos: false, gwynNerf: 'medium', secondGargoyle: 'replace', placement: { algorithm: 'permutation-v1', replacementChance: 100, normalReplacement: 'normals', fit: 'anywhere' } },
   fog: {
     enabled: false, traversableFogs: true, bossFogs: true, areaWarps: true, majorPvpFogs: false,
     minorPvpFogs: false, lordvesselGates: false, randomStart: false, disconnectedFogs: false,

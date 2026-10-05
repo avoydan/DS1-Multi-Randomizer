@@ -46,23 +46,57 @@ export type SecondGargoyleMode = 'replace' | 'keep' | 'single-boss';
  * Enemy placement algorithm (docs/ENEMY_PLACEMENT_MODEL.md).
  *
  * - `permutation-v1`: the count-preserving global permutation. Frozen: every existing preset and seed depends on it.
- * - `sampling-v1`: the per-slot sampler of the legacy-parity group. Typed and validated, but **not implemented**;
- *   it is not in {@link IMPLEMENTED_ENEMY_PLACEMENT_ALGORITHMS}, so a configuration that selects it is rejected.
+ * - `sampling-v1`: the per-slot sampler of the legacy-parity group. Opt-in. Part A samples regular enemy slots
+ *   only; bosses, linked units and NPCs are planned exactly as under `permutation-v1`.
  */
 export type EnemyPlacementAlgorithm = 'permutation-v1' | 'sampling-v1';
 
 export const ENEMY_PLACEMENT_ALGORITHMS: readonly EnemyPlacementAlgorithm[] = ['permutation-v1', 'sampling-v1'];
 
-/** Algorithms that can currently run. Part A of the placement work adds `sampling-v1` here, and nowhere else. */
-export const IMPLEMENTED_ENEMY_PLACEMENT_ALGORITHMS: readonly EnemyPlacementAlgorithm[] = ['permutation-v1'];
+/** Algorithms that can currently run. */
+export const IMPLEMENTED_ENEMY_PLACEMENT_ALGORITHMS: readonly EnemyPlacementAlgorithm[] = ['permutation-v1', 'sampling-v1'];
 
 /** The algorithm of every new configuration and of every migrated older preset. */
 export const DEFAULT_ENEMY_PLACEMENT_ALGORITHM: EnemyPlacementAlgorithm = 'permutation-v1';
 
-/** Placement settings. Sampling-only options are added here by later parts; none exist yet. */
+/**
+ * Legacy "Normal enemy replacement" (0 none, 1 only with bosses, 2 only with normal enemies, 3 either). Part A
+ * supports the two values that involve no boss slot or boss source; the other two need cross-class replacement.
+ */
+export type NormalEnemyReplacementMode = 'none' | 'normals';
+
+export const NORMAL_ENEMY_REPLACEMENT_MODES: readonly NormalEnemyReplacementMode[] = ['none', 'normals'];
+
+/** Legacy "Placement" (0 only where they fit, 1 anywhere, 2 anywhere except when replacing NPCs). */
+export type PlacementFitMode = 'fits' | 'anywhere' | 'anywhere-except-npcs';
+
+export const PLACEMENT_FIT_MODES: readonly PlacementFitMode[] = ['fits', 'anywhere', 'anywhere-except-npcs'];
+
+/**
+ * Placement settings. Everything except `algorithm` applies to `sampling-v1` only; under `permutation-v1` the
+ * backend requires the neutral values below and rejects any other (it never ignores a setting silently).
+ */
 export interface EnemyPlacementOptions {
   algorithm: EnemyPlacementAlgorithm;
+  /** Per-slot chance (percent, 0-100) that a regular enemy slot is replaced at all. */
+  replacementChance: number;
+  normalReplacement: NormalEnemyReplacementMode;
+  fit: PlacementFitMode;
 }
+
+/** The values under which `permutation-v1` behaves as it always did. Migrated presets and new configurations use them. */
+export const NEUTRAL_ENEMY_PLACEMENT_OPTIONS: Omit<EnemyPlacementOptions, 'algorithm'> = {
+  replacementChance: 100,
+  normalReplacement: 'normals',
+  fit: 'anywhere',
+};
+
+/** The legacy defaults offered when `sampling-v1` is chosen: replace always, only normal enemies, only where they fit. */
+export const LEGACY_ENEMY_PLACEMENT_OPTIONS: Omit<EnemyPlacementOptions, 'algorithm'> = {
+  replacementChance: 100,
+  normalReplacement: 'normals',
+  fit: 'fits',
+};
 
 export interface EnemyOptions {
   enabled: boolean;
@@ -178,7 +212,7 @@ export type GenerationResult =
   | { ok: false; code: string; message: string; stage: string };
 
 export const PRESET_FORMAT = 'ds1tr-preset';
-export const PRESET_VERSION = 5;
+export const PRESET_VERSION = 6;
 
 /** Shareable settings: everything in RandomizerConfig except the machine-specific game path. */
 export interface PresetDocument {

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { FogLanguage, GameStateReport, GwynNerfMode, SecondGargoyleMode, SoulItemsMode, StartingItemsMode, GenerationResult, InstallationValidation, PipelinePlan, RandomizerConfig } from '@ds1tr/contracts';
+import type { EnemyPlacementAlgorithm, FogLanguage, GameStateReport, GwynNerfMode, SecondGargoyleMode, SoulItemsMode, StartingItemsMode, GenerationResult, InstallationValidation, PipelinePlan, RandomizerConfig } from '@ds1tr/contracts';
 import { api } from './api';
 
 const initialConfig: RandomizerConfig = {
@@ -37,8 +37,8 @@ const initialConfig: RandomizerConfig = {
     gwynNerf: 'medium',
     // Legacy Enemy Randomizer default: the second Bell Gargoyle is replaced.
     secondGargoyle: 'replace',
-    // Production algorithm; sampling-v1 is not implemented and has no control.
-    placement: { algorithm: 'permutation-v1' },
+    // Classic permutation is the default; sampling-v1 is opt-in. The other values are the neutral ones for the classic mode.
+    placement: { algorithm: 'permutation-v1', replacementChance: 100, normalReplacement: 'normals', fit: 'anywhere' },
   },
   fog: {
     enabled: true,
@@ -83,16 +83,19 @@ function Toggle({ checked, onChange, label, disabled = false, inactive = false, 
   );
 }
 
-function RangeOption({ label, value, onChange, disabled = false }: {
+function RangeOption({ label, value, onChange, disabled = false, inactive = false, hint }: {
   label: string;
   value: number;
   onChange: (value: number) => void;
   disabled?: boolean;
+  /** Implemented, but unavailable with the current algorithm. */
+  inactive?: boolean;
+  hint?: string;
 }) {
   return (
-    <label className={`range-option ${disabled ? 'planned-option' : ''}`}>
+    <label className={`range-option ${disabled ? 'planned-option' : ''}`} title={hint}>
       <span>{label}{disabled && <small>Planned extension</small>}</span>
-      <div><input type="range" min="0" max="100" value={value} disabled={disabled} onChange={(event) => onChange(Number(event.target.value))} /><strong>{value}%</strong></div>
+      <div><input type="range" min="0" max="100" value={value} disabled={disabled || inactive} onChange={(event) => onChange(Number(event.target.value))} /><strong>{value}%</strong></div>
     </label>
   );
 }
@@ -144,6 +147,19 @@ export function App() {
     setConfig((current) => ({ ...current, items: { ...current.items, [key]: value } }));
   const setEnemy = <K extends keyof RandomizerConfig['enemies']>(key: K, value: RandomizerConfig['enemies'][K]) =>
     setConfig((current) => ({ ...current, enemies: { ...current.enemies, [key]: value } }));
+  /** Switching the algorithm moves the sampling-only settings to their legacy defaults (sampling) or neutral values (classic). */
+  const setPlacementAlgorithm = (algorithm: EnemyPlacementAlgorithm) =>
+    setConfig((current) => ({
+      ...current,
+      enemies: {
+        ...current.enemies,
+        placement: algorithm === 'sampling-v1'
+          ? { algorithm, replacementChance: 100, normalReplacement: 'normals', fit: 'fits' }
+          : { algorithm, replacementChance: 100, normalReplacement: 'normals', fit: 'anywhere' },
+      },
+    }));
+  const setPlacement = <K extends keyof RandomizerConfig['enemies']['placement']>(key: K, value: RandomizerConfig['enemies']['placement'][K]) =>
+    setConfig((current) => ({ ...current, enemies: { ...current.enemies, placement: { ...current.enemies.placement, [key]: value } } }));
   const setFog = <K extends keyof RandomizerConfig['fog']>(key: K, value: RandomizerConfig['fog'][K]) =>
     setConfig((current) => ({ ...current, fog: { ...current.fog, [key]: value } }));
 
@@ -363,6 +379,18 @@ export function App() {
               <Toggle label="Bosses" checked={config.enemies.randomizeBosses} onChange={(value) => setEnemy('randomizeBosses', value)} />
               <label className="field-label">Scaling</label><select value={config.enemies.scaling} onChange={(event) => setEnemy('scaling', event.target.value as RandomizerConfig['enemies']['scaling'])}><option value="vanilla">Vanilla</option><option value="area">Area</option><option value="progressive">Progressive</option></select>
             </div>
+            <div className="option-group"><h3>Enemy placement</h3>
+              <label className="field-label">Placement algorithm</label>
+              <select value={config.enemies.placement.algorithm} disabled={!config.enemies.randomizeRegularEnemies} title="Classic permutation keeps the DS1TR behavior and reproduces old seeds: the enemies of a run are the same enemies, shuffled. Legacy-style sampling decides every regular enemy slot on its own (chance, fit, Prevent same) and may repeat types; it changes every enemy layout. Opt-in." onChange={(event) => setPlacementAlgorithm(event.target.value as EnemyPlacementAlgorithm)}><option value="permutation-v1">Classic permutation</option><option value="sampling-v1">Legacy-style sampling</option></select>
+              <small className="field-note">{config.enemies.placement.algorithm === 'sampling-v1'
+                ? 'Per-slot legacy-style settings for regular enemies. Bosses, linked groups and NPCs are still planned the classic way; this is not yet full legacy parity.'
+                : 'Preserves existing DS1TR behavior and old seeds. The settings below need Legacy-style sampling.'}</small>
+              <RangeOption label="Replacement chance" hint="Chance that each regular enemy slot is replaced at all. Legacy-style sampling only." value={config.enemies.placement.replacementChance} inactive={!config.enemies.randomizeRegularEnemies || config.enemies.placement.algorithm !== 'sampling-v1'} onChange={(value) => setPlacement('replacementChance', value)} />
+              <label className="field-label">Normal enemy replacement</label>
+              <select value={config.enemies.placement.normalReplacement} disabled={!config.enemies.randomizeRegularEnemies || config.enemies.placement.algorithm !== 'sampling-v1'} title="Legacy-style sampling only. Replacing normal enemies with bosses needs boss replacement, which is not available yet." onChange={(event) => setPlacement('normalReplacement', event.target.value as RandomizerConfig['enemies']['placement']['normalReplacement'])}><option value="none">Disabled</option><option value="normals">Only normal enemies</option><option disabled value="bosses">Only bosses (planned)</option><option disabled value="both">Bosses or normal enemies (planned)</option></select>
+              <label className="field-label">Placement</label>
+              <select value={config.enemies.placement.fit} disabled={!config.enemies.randomizeRegularEnemies || config.enemies.placement.algorithm !== 'sampling-v1'} title="Legacy-style sampling only. Only where they fit: a replacement is never larger than the slot. Anywhere: any size. For regular enemies the last option equals Anywhere (it differs only for NPC slots)." onChange={(event) => setPlacement('fit', event.target.value as RandomizerConfig['enemies']['placement']['fit'])}><option value="fits">Only where they fit</option><option value="anywhere">Anywhere</option><option value="anywhere-except-npcs">Anywhere, fit NPCs</option></select>
+            </div>
             <div className="option-group"><h3>Legacy options</h3>
               <Toggle inactive={!config.enemies.randomizeRegularEnemies} label="Replace mimics" hint="Off: Mimics stay in place and are kept out of the enemy pool." checked={config.enemies.replaceMimics} onChange={(value) => setEnemy('replaceMimics', value)} />
               <Toggle inactive={!config.enemies.randomizeRegularEnemies} label="Replace respawning mosquitoes" hint="Off: the six respawning Blighttown swamp mosquitoes stay in place." checked={config.enemies.replaceRespawningMosquitoes} onChange={(value) => setEnemy('replaceRespawningMosquitoes', value)} />
@@ -374,10 +402,8 @@ export function App() {
               <select value={config.enemies.gwynNerf} disabled={!config.enemies.randomizeBosses} title="Chance that Lord Gwyn is rejected as a boss replacement: strong 85%, medium 60%." onChange={(event) => setEnemy('gwynNerf', event.target.value as GwynNerfMode)}><option value="strong">Strong</option><option value="medium">Medium</option><option value="none">None</option></select>
             </div>
             <div className="option-group planned-group"><h3>Legacy parity <span>planned</span></h3>
-              {['Boss replacement', 'Normal enemy replacement', 'NPC replacement'].map((label) => <div key={label}><label className="field-label">{label}</label><select defaultValue="disabled" disabled><option value="disabled">Disabled</option><option value="bosses">Only bosses</option><option value="enemies">Only normal enemies</option><option value="all">Bosses or normal enemies</option></select></div>)}
-              <label className="field-label">Placement</label><select defaultValue="fit" disabled><option value="fit">Only where they fit</option><option value="anywhere">Anywhere</option><option value="fit-npcs">Anywhere, fit NPCs</option></select>
+              {['Boss replacement', 'NPC replacement'].map((label) => <div key={label}><label className="field-label">{label}</label><select defaultValue="disabled" disabled><option value="disabled">Disabled</option><option value="bosses">Only bosses</option><option value="enemies">Only normal enemies</option><option value="all">Bosses or normal enemies</option></select></div>)}
               <label className="field-label">Difficulty mode</label><select defaultValue="random" disabled><option value="curve-easy-asylum">Curve + easy Asylum</option><option value="curve">Difficulty curve</option><option value="random-easy-asylum">Random + easy Asylum</option><option value="random">Fully random</option></select>
-              <RangeOption disabled label="Replacement chance" value={100} onChange={() => undefined} />
               <RangeOption disabled label="Boss chance: normal slots" value={10} onChange={() => undefined} />
               <RangeOption disabled label="Boss chance: boss slots" value={90} onChange={() => undefined} />
               <RangeOption disabled label="Roaming boss souls" value={100} onChange={() => undefined} />

@@ -13,6 +13,8 @@ export interface CombinedRandomizerRequest {
   enemies: EnemyOptions;
   /** Whether upstream writes `spoiler.txt` into the generated package. */
   generateSpoilerLog: boolean;
+  /** `detail` adds one record per slot to the sampling-v1 diagnostics (debugging); default `summary`. */
+  placementDiagnosticsLevel?: 'summary' | 'detail';
 }
 
 export type CombinedRandomizerEvent =

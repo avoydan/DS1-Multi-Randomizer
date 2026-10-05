@@ -8,6 +8,7 @@ import {
   type CatalogSourceVerificationResult,
 } from './combinedRandomizerCatalog.js';
 import { mapCombinedRandomizerConfig } from './combinedRandomizerConfig.js';
+import { formatPlacementDiagnostics, summarizePlacementDiagnostics, type PlacementDiagnosticsSummary } from '../core/placementDiagnostics.js';
 import {
   loadCombinedRandomizerCore,
   type CombinedRandomizerCoreLoadResult,
@@ -77,6 +78,7 @@ export const supportedCatalogSchemaVersion = 17;
 export type CombinedGenerationFailureCode =
   | 'NO_RANDOMIZATION_FEATURES_ENABLED'
   | 'ENEMY_PLACEMENT_ALGORITHM_UNAVAILABLE'
+  | 'ENEMY_PLACEMENT_OPTIONS_INVALID'
   | 'JS_CORE_MISSING'
   | 'JS_CORE_INCOMPLETE'
   | 'INVALID_CONFIG'
@@ -106,6 +108,8 @@ export interface CombinedGenerationSuccess {
   randomizerVersion: string;
   /** Upstream placement hash — the determinism fingerprint of this run. */
   placementHash: string;
+  /** Placement algorithm identity and, for sampling-v1, its summary (never the per-slot detail). */
+  placementDiagnostics: PlacementDiagnosticsSummary;
   /** The seed actually handed to upstream, after `normalizeConfig`. */
   seed: string;
   /** Whether this run had to `scan` the game directory to build a catalog. */
@@ -420,8 +424,9 @@ export async function executeCombinedGeneration(
     result = core.generate(config, { gameCatalog: catalog });
   } catch (error) {
     // The engine refuses an algorithm that is not implemented. Another seed cannot fix that.
-    if (typeof error === 'object' && error !== null && (error as { code?: unknown }).code === 'ENEMY_PLACEMENT_ALGORITHM_UNAVAILABLE') {
-      return { ok: false, code: 'ENEMY_PLACEMENT_ALGORITHM_UNAVAILABLE', message: messageOf(error), retryable: false };
+    const errorCode = typeof error === 'object' && error !== null ? (error as { code?: unknown }).code : undefined;
+    if (errorCode === 'ENEMY_PLACEMENT_ALGORITHM_UNAVAILABLE' || errorCode === 'ENEMY_PLACEMENT_OPTIONS_INVALID') {
+      return { ok: false, code: errorCode, message: messageOf(error), retryable: false };
     }
     return {
       ok: false,
@@ -447,6 +452,9 @@ export async function executeCombinedGeneration(
       retryable: false,
     };
   }
+  const placementDiagnostics = summarizePlacementDiagnostics(result.placementDiagnostics);
+  const placementLine = formatPlacementDiagnostics(placementDiagnostics);
+  if (placementLine) log('info', placementLine);
   progress(stageProgress.generated, 'Randomized layout generated from extracted game data.');
 
   // 8. Upstream owns the package layout; the planner mirrors it. Writing
@@ -493,6 +501,7 @@ export async function executeCombinedGeneration(
     patchManifestPath: path.join(plan.seedDirectory, 'patch-manifest.json'),
     randomizerVersion: result.randomizerVersion,
     placementHash: result.placementHash,
+    placementDiagnostics,
     seed: result.seed,
     catalogScanned: !catalogPresent,
   };

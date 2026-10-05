@@ -9,6 +9,10 @@ import { fogDataRootVariable, resolveFogPrerequisites, type FogPrerequisites } f
 import { effectiveCombinedEnabled, validateRandomizerConfig } from './configValidation.js';
 import { validateInstallation } from './installation.js';
 import { deriveAttemptSeeds } from './seeds.js';
+import type { PlacementSummary } from './placementDiagnostics.js';
+
+/** Set to `detail` to add one record per slot to the sampling-v1 diagnostics in randomizer.json (debugging only). */
+const placementDiagnosticsVariable = 'DS1TR_PLACEMENT_DIAGNOSTICS';
 
 export interface GenerationRequest {
   config: RandomizerConfig;
@@ -30,7 +34,14 @@ export interface GenerationManifest {
   gameTreeRoot: string;
   options: Omit<RandomizerConfig, 'gamePath' | 'masterSeed'>;
   /** Which enemy placement algorithm produced the layout, and the RNG version of its own streams (null: the frozen engine version). */
-  enemyPlacement: { algorithm: EnemyPlacementAlgorithm; rngVersion: string | null };
+  enemyPlacement: {
+    algorithm: EnemyPlacementAlgorithm;
+    rngVersion: string | null;
+    /** Hash of the derived class table the sampler used (sampling-v1 only). */
+    classTableHash: string | null;
+    /** Planner counters of the last combined attempt (sampling-v1 only). */
+    summary: PlacementSummary | null;
+  };
   attempts: Array<{ combinedAttempt: number; fogAttempt: number; combinedSeed: string; fogSeed: number; result: string }>;
   engines: { combined?: string; fog?: string };
   validation: string[];
@@ -98,12 +109,13 @@ export async function generateRun(
   const workspace = typeof request.workspacePath === 'string' && request.workspacePath
     ? path.resolve(request.workspacePath) : '';
   const manifest: GenerationManifest = {
-    schemaVersion: 1, appVersion: '0.23.0', game: 'DSR', masterSeed: config.masterSeed,
+    schemaVersion: 1, appVersion: '0.24.0', game: 'DSR', masterSeed: config.masterSeed,
     pristineSnapshotId: null, gameTreeRoot: '',
     options: { items: config.items, enemies: config.enemies, fog: config.fog, output: config.output },
     enemyPlacement: {
       algorithm: config.enemies.placement.algorithm,
       rngVersion: config.enemies.placement.algorithm === 'sampling-v1' ? 'enemy-placement-v1' : null,
+      classTableHash: null, summary: null,
     },
     attempts: [], engines: {}, validation: [], files: [],
   };
@@ -157,6 +169,7 @@ export async function generateRun(
         masterSeed: config.masterSeed, combinedSeed: seeds.combined,
         items: config.items, enemies: config.enemies,
         generateSpoilerLog: config.output.generateSpoilerLog,
+        placementDiagnosticsLevel: process.env[placementDiagnosticsVariable] === 'detail' ? 'detail' : 'summary',
       }, (event) => {
         if (event.type === 'log') onEvent({ ...event, stage: 'combined' });
         else progress('combined', 0.15 + event.progress * 0.4, event.message ?? 'Combined generation.');
@@ -170,6 +183,8 @@ export async function generateRun(
         return fail('combined', combined.code, combined.message);
       }
       manifest.engines.combined = combined.randomizerVersion;
+      manifest.enemyPlacement.classTableHash = combined.placementDiagnostics?.classTableHash ?? null;
+      manifest.enemyPlacement.summary = combined.placementDiagnostics?.summary ?? null;
     }
     const packagePath = combined?.ok ? combined.seedDirectory : path.join(attemptWorkspace, 'fog-only');
     if (combined?.ok) {

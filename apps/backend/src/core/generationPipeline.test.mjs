@@ -16,7 +16,7 @@ function config(gamePath, fog = false) {
       randomizeStartingClass: false, randomizeStartingEquipment: false,
       randomizeGifts: false, randomizeEnemyDrops: false, guaranteedEnemyDrops: false,
       randomizeShops: false, fashionSouls: true, soulItems: 'shuffled', startingItems: 'shield-2h' },
-    enemies: { enabled: false, randomizeRegularEnemies: false, randomizeBosses: false, scaling: 'vanilla', replaceMimics: true, replaceRespawningMosquitoes: true, preventSameEnemy: false, pinwheelChaos: false, gwynNerf: 'medium', secondGargoyle: 'replace', placement: { algorithm: 'permutation-v1' } },
+    enemies: { enabled: false, randomizeRegularEnemies: false, randomizeBosses: false, scaling: 'vanilla', replaceMimics: true, replaceRespawningMosquitoes: true, preventSameEnemy: false, pinwheelChaos: false, gwynNerf: 'medium', secondGargoyle: 'replace', placement: { algorithm: 'permutation-v1', replacementChance: 100, normalReplacement: 'normals', fit: 'anywhere' } },
     fog: { enabled: fog, traversableFogs: true, bossFogs: false, areaWarps: false,
       majorPvpFogs: false, minorPvpFogs: false, lordvesselGates: false,
       randomStart: false, disconnectedFogs: false, noFallBedOfChaos: false,
@@ -93,7 +93,7 @@ test('writes a validated combined package, manifest and progress', async () => f
   assert.equal(result.ok, true);
   assert.equal(result.manifest.engines.combined, 'test-engine');
   assert.equal(result.manifest.pristineSnapshotId, 'snapshot-1');
-  assert.deepEqual(result.manifest.enemyPlacement, { algorithm: 'permutation-v1', rngVersion: null });
+  assert.deepEqual(result.manifest.enemyPlacement, { algorithm: 'permutation-v1', rngVersion: null, classTableHash: null, summary: null });
   assert.equal(result.manifest.gameTreeRoot, 'mod');
   assert.equal(result.manifest.attempts[0].result, 'success');
   assert.equal(result.manifest.files.some((file) => file.path === 'mod/items.bin'), true);
@@ -136,7 +136,7 @@ test('retries a Fog seed and retains combined files outside the Fog read set', a
 
 test('boss randomization together with Fog is supported (no rejection; proceeds to Fog prerequisites)', async () => fixture(async ({ game, pristine, workspace }) => {
   const bossesAndFog = config(game, true);
-  bossesAndFog.enemies = { enabled: true, randomizeRegularEnemies: false, randomizeBosses: true, scaling: 'vanilla', replaceMimics: true, replaceRespawningMosquitoes: true, preventSameEnemy: false, pinwheelChaos: false, gwynNerf: 'medium', secondGargoyle: 'replace', placement: { algorithm: 'permutation-v1' } };
+  bossesAndFog.enemies = { enabled: true, randomizeRegularEnemies: false, randomizeBosses: true, scaling: 'vanilla', replaceMimics: true, replaceRespawningMosquitoes: true, preventSameEnemy: false, pinwheelChaos: false, gwynNerf: 'medium', secondGargoyle: 'replace', placement: { algorithm: 'permutation-v1', replacementChance: 100, normalReplacement: 'normals', fit: 'anywhere' } };
   const result = await generateRun({ config: bossesAndFog, workspacePath: workspace }, () => {}, {
     getPristineSource: async () => ({ directory: pristine }),
     getFogPrerequisites: async () => null,

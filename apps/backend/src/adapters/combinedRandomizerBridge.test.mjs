@@ -121,7 +121,7 @@ function request(overrides = {}) {
       pinwheelChaos: false,
       gwynNerf: 'medium',
       secondGargoyle: 'replace',
-      placement: { algorithm: 'permutation-v1' },
+      placement: { algorithm: 'permutation-v1', replacementChance: 100, normalReplacement: 'normals', fit: 'anywhere' },
     },
     generateSpoilerLog: false,
     ...overrides,
@@ -711,6 +711,81 @@ test('reports ENEMY_PLACEMENT_ALGORITHM_UNAVAILABLE from the engine as a non-ret
   assert.equal(result.ok, false);
   assert.equal(result.code, 'ENEMY_PLACEMENT_ALGORITHM_UNAVAILABLE');
   assert.equal(result.retryable, false);
+  assert.deepEqual(dataTool.invocations, []);
+});
+
+test('reports ENEMY_PLACEMENT_OPTIONS_INVALID from the engine as a non-retryable failure', async (t) => {
+  const { workspacePath, gamePath } = await makeWorkspace(t);
+  const dataTool = fakeDataTool();
+
+  const result = await executeCombinedGeneration(
+    request({ gamePath, workspacePath }),
+    () => {},
+    {
+      ...dataToolPaths,
+      dependencies: {
+        dataTool,
+        loadCore: async () => ({
+          ok: true,
+          coreRoot: 'fixture',
+          core: {
+            randomizerVersion: '0.5.66',
+            defaultConfig: {},
+            normalizeConfig: (input) => ({ ...input, seed: String(input.seed).trim() }),
+            validateConfig: () => [],
+            generate: () => {
+              throw Object.assign(new Error('ENEMY_PLACEMENT_OPTIONS_INVALID: bad options'), { code: 'ENEMY_PLACEMENT_OPTIONS_INVALID' });
+            },
+            writeOutput: async () => {
+              throw new Error('writeOutput must not run after a generation failure.');
+            },
+          },
+        }),
+      },
+    },
+  );
+
+  assert.equal(result.ok, false);
+  assert.equal(result.code, 'ENEMY_PLACEMENT_OPTIONS_INVALID');
+  assert.equal(result.retryable, false);
+  assert.deepEqual(dataTool.invocations, []);
+});
+
+test('reports ENEMY_PLACEMENT_INFEASIBLE from the engine as a retryable GENERATION_FAILED', async (t) => {
+  const { workspacePath, gamePath } = await makeWorkspace(t);
+  const dataTool = fakeDataTool();
+
+  const result = await executeCombinedGeneration(
+    request({ gamePath, workspacePath }),
+    () => {},
+    {
+      ...dataToolPaths,
+      dependencies: {
+        dataTool,
+        loadCore: async () => ({
+          ok: true,
+          coreRoot: 'fixture',
+          core: {
+            randomizerVersion: '0.5.66',
+            defaultConfig: {},
+            normalizeConfig: (input) => ({ ...input, seed: String(input.seed).trim() }),
+            validateConfig: () => [],
+            generate: () => {
+              throw Object.assign(new Error('ENEMY_PLACEMENT_INFEASIBLE: no placement'), { code: 'ENEMY_PLACEMENT_INFEASIBLE' });
+            },
+            writeOutput: async () => {
+              throw new Error('writeOutput must not run after a generation failure.');
+            },
+          },
+        }),
+      },
+    },
+  );
+
+  assert.equal(result.ok, false);
+  assert.equal(result.code, 'GENERATION_FAILED');
+  assert.equal(result.retryable, true);
+  assert.match(result.message, /ENEMY_PLACEMENT_INFEASIBLE/u);
   assert.deepEqual(dataTool.invocations, []);
 });
 

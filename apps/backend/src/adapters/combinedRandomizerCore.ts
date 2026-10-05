@@ -72,6 +72,8 @@ export interface UpstreamGenerationResult extends Record<string, unknown> {
   seed: string;
   config: UpstreamRandomizerConfig;
   placementHash: string;
+  /** Which planner produced the enemies (and, for sampling-v1, its summary). Not part of `placementHash`. */
+  placementDiagnostics?: unknown;
 }
 
 /** Typed view of the vendored core's callable surface. */

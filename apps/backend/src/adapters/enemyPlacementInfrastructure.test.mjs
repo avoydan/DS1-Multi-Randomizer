@@ -55,40 +55,64 @@ const config = (overrides = {}) => ({
 
 // ---- algorithm identity and gating ---------------------------------------------------------------------------------
 
-test('permutation-v1 is the engine default and the only implemented algorithm', () => {
+test('permutation-v1 is the engine default; sampling-v1 is implemented but never implied', () => {
   assert.equal(defaultConfig.enemyPlacementAlgorithm, 'permutation-v1');
   assert.equal(placement.DEFAULT_ENEMY_PLACEMENT_ALGORITHM, 'permutation-v1');
   assert.deepEqual([...placement.ENEMY_PLACEMENT_ALGORITHMS], ['permutation-v1', 'sampling-v1']);
-  assert.deepEqual([...placement.IMPLEMENTED_ENEMY_PLACEMENT_ALGORITHMS], ['permutation-v1']);
+  assert.deepEqual([...placement.IMPLEMENTED_ENEMY_PLACEMENT_ALGORITHMS], ['permutation-v1', 'sampling-v1']);
   assert.equal(RANDOMIZER_VERSION, '0.5.66', 'the shared RNG salt stays frozen');
 });
 
-test('the engine refuses sampling-v1 and unknown algorithms with a typed error and never falls back', () => {
-  for (const [algorithm, known] of [['sampling-v1', true], ['permutation-v2', false], ['', false], [undefined, false]]) {
+test('the engine refuses unknown algorithms with a typed error and never falls back', () => {
+  for (const algorithm of ['permutation-v2', 'sampling-v2', '', undefined]) {
     assert.throws(
       () => generate(config({ enemyPlacementAlgorithm: algorithm }), { gameCatalog: catalog() }),
       (error) => error.code === 'ENEMY_PLACEMENT_ALGORITHM_UNAVAILABLE'
         && error instanceof placement.EnemyPlacementUnavailableError
-        && (known ? /not implemented yet/u.test(error.message) : /unknown/u.test(error.message)),
+        && /unknown/u.test(error.message),
       String(algorithm),
     );
   }
   // The refusal does not depend on whether the enemy categories are enabled: a request is never ignored.
   assert.throws(
-    () => generate(config({ enemyPlacementAlgorithm: 'sampling-v1', randomizeEnemies: false, randomizeItems: true }), { gameCatalog: catalog() }),
+    () => generate(config({ enemyPlacementAlgorithm: 'sampling-v2', randomizeEnemies: false, randomizeItems: true }), { gameCatalog: catalog() }),
     (error) => error.code === 'ENEMY_PLACEMENT_ALGORITHM_UNAVAILABLE',
   );
   // normalizeConfig must not turn the value into the default.
-  assert.equal(loaded.core.normalizeConfig({ enemyPlacementAlgorithm: 'sampling-v1' }).enemyPlacementAlgorithm, 'sampling-v1');
+  assert.equal(loaded.core.normalizeConfig({ enemyPlacementAlgorithm: 'sampling-v2' }).enemyPlacementAlgorithm, 'sampling-v2');
 });
 
-test('validation rejects sampling-v1, unknown algorithms and non-neutral sampling-only options', () => {
+test('sampling-only options are validated in the engine and refused under permutation-v1', () => {
+  for (const overrides of [
+    { enemyReplacementChance: 50 }, { enemyNormalReplacement: 'none' }, { enemyPlacementFit: 'fits' },
+  ]) {
+    assert.throws(
+      () => generate(config(overrides), { gameCatalog: catalog() }),
+      (error) => error.code === 'ENEMY_PLACEMENT_OPTIONS_INVALID' && /only applies to sampling-v1/u.test(error.message),
+      JSON.stringify(overrides),
+    );
+  }
+  for (const overrides of [
+    { enemyReplacementChance: 101 }, { enemyReplacementChance: -1 }, { enemyReplacementChance: 1.5 }, { enemyReplacementChance: '50' },
+    { enemyNormalReplacement: 'bosses' }, { enemyNormalReplacement: 'both' }, { enemyPlacementFit: 'everywhere' },
+  ]) {
+    assert.throws(
+      () => generate(config({ enemyPlacementAlgorithm: 'sampling-v1', ...overrides }), { gameCatalog: catalog() }),
+      (error) => error.code === 'ENEMY_PLACEMENT_OPTIONS_INVALID',
+      JSON.stringify(overrides),
+    );
+  }
+});
+
+test('validation rejects an unimplemented algorithm, unknown algorithms and non-neutral sampling-only options', () => {
   const problemsOf = (value, context) => { const problems = []; validateEnemyPlacement(value, problems, context); return problems; };
-  assert.deepEqual(problemsOf({ algorithm: 'permutation-v1' }), []);
-  assert.match(problemsOf({ algorithm: 'sampling-v1' }).join(' '), /ENEMY_PLACEMENT_ALGORITHM_UNAVAILABLE/);
-  assert.match(problemsOf({ algorithm: 'bogus' }).join(' '), /invalid/);
+  const neutral = { replacementChance: 100, normalReplacement: 'normals', fit: 'anywhere' };
+  assert.deepEqual(problemsOf({ algorithm: 'permutation-v1', ...neutral }), []);
+  assert.deepEqual(problemsOf({ algorithm: 'sampling-v1', ...neutral, fit: 'fits' }), []);
+  assert.match(problemsOf({ algorithm: 'sampling-v1', ...neutral }, { implemented: ['permutation-v1'] }).join(' '), /ENEMY_PLACEMENT_ALGORITHM_UNAVAILABLE/);
+  assert.match(problemsOf({ algorithm: 'bogus', ...neutral }).join(' '), /invalid/);
   assert.match(problemsOf({}).join(' '), /algorithm is required/);
-  assert.match(problemsOf({ algorithm: 'permutation-v1', extra: 1 }).join(' '), /extra is not supported/);
+  assert.match(problemsOf({ algorithm: 'permutation-v1', ...neutral, extra: 1 }).join(' '), /extra is not supported/);
   assert.match(problemsOf('permutation-v1').join(' '), /must be an object/);
 
   // The gating mechanism, exercised with a registered sampling-only option and an implemented sampler.
@@ -105,7 +129,7 @@ test('permutation-v1 output does not depend on the algorithm key and reports onl
   const legacy = generate(config(), { gameCatalog: catalog() });
   assert.equal(explicit.placementHash, legacy.placementHash);
   assert.deepEqual(explicit.placements, legacy.placements);
-  assert.deepEqual(explicit.placementDiagnostics, { algorithm: 'permutation-v1', rngVersion: null, level: 'summary', summary: null });
+  assert.deepEqual(explicit.placementDiagnostics, { algorithm: 'permutation-v1', rngVersion: null, level: 'summary', classTableHash: null, summary: null });
   assert.equal(explicit.randomizerVersion, '0.5.66');
 });
 

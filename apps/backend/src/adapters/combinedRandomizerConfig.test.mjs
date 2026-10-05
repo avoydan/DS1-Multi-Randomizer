@@ -31,7 +31,7 @@ const enemyOptions = {
   pinwheelChaos: true,
   gwynNerf: 'strong',
   secondGargoyle: 'keep',
-  placement: { algorithm: 'permutation-v1' },
+  placement: { algorithm: 'permutation-v1', replacementChance: 100, normalReplacement: 'normals', fit: 'anywhere' },
 };
 
 function createRequest(overrides = {}) {
@@ -109,6 +109,10 @@ test('maps both enabled capabilities deterministically', () => {
       gwynNerf: 'strong',
       secondGargoyle: 'keep',
       enemyPlacementAlgorithm: 'permutation-v1',
+      enemyReplacementChance: 100,
+      enemyNormalReplacement: 'normals',
+      enemyPlacementFit: 'anywhere',
+      placementDiagnosticsLevel: 'summary',
       generateSpoilerLog: true,
     },
   });
@@ -210,7 +214,7 @@ test('legacy-parity options fall back to the legacy defaults when their parent i
 test('legacy-parity options are forwarded when their parents are on', () => {
   const result = mapCombinedRandomizerConfig(createRequest({
     items: { ...itemOptions, fashionSouls: true, soulItems: 'shuffled', startingItems: 'shield-2h' },
-    enemies: { ...enemyOptions, replaceMimics: true, replaceRespawningMosquitoes: true, preventSameEnemy: false, pinwheelChaos: false, gwynNerf: 'medium', secondGargoyle: 'replace', placement: { algorithm: 'permutation-v1' } },
+    enemies: { ...enemyOptions, replaceMimics: true, replaceRespawningMosquitoes: true, preventSameEnemy: false, pinwheelChaos: false, gwynNerf: 'medium', secondGargoyle: 'replace', placement: { algorithm: 'permutation-v1', replacementChance: 100, normalReplacement: 'normals', fit: 'anywhere' } },
   }));
   assert.equal(result.config.fashionSouls, true);
   assert.equal(result.config.replaceMimics, true);
@@ -274,11 +278,21 @@ test('the second Gargoyle mode maps through with boss randomization and falls ba
   assert.equal(noEnemies.config.secondGargoyle, 'single-boss');
 });
 
-test('the mapper passes permutation-v1 and refuses sampling-v1 before any engine call', () => {
-  const ok = mapCombinedRandomizerConfig(createRequest({ enemies: { ...enemyOptions, placement: { algorithm: 'permutation-v1' } } }));
+test('the mapper passes both algorithms and the sampling settings, and refuses an algorithm that cannot run', () => {
+  const ok = mapCombinedRandomizerConfig(createRequest({ enemies: { ...enemyOptions, placement: { algorithm: 'permutation-v1', replacementChance: 100, normalReplacement: 'normals', fit: 'anywhere' } } }));
   assert.equal(ok.ok, true);
   assert.equal(ok.config.enemyPlacementAlgorithm, 'permutation-v1');
-  const refused = mapCombinedRandomizerConfig(createRequest({ enemies: { ...enemyOptions, placement: { algorithm: 'sampling-v1' } } }));
+  const sampling = mapCombinedRandomizerConfig(createRequest({
+    enemies: { ...enemyOptions, placement: { algorithm: 'sampling-v1', replacementChance: 35, normalReplacement: 'none', fit: 'fits' } },
+    placementDiagnosticsLevel: 'detail',
+  }));
+  assert.equal(sampling.ok, true);
+  assert.equal(sampling.config.enemyPlacementAlgorithm, 'sampling-v1');
+  assert.equal(sampling.config.enemyReplacementChance, 35);
+  assert.equal(sampling.config.enemyNormalReplacement, 'none');
+  assert.equal(sampling.config.enemyPlacementFit, 'fits');
+  assert.equal(sampling.config.placementDiagnosticsLevel, 'detail');
+  const refused = mapCombinedRandomizerConfig(createRequest({ enemies: { ...enemyOptions, placement: { algorithm: 'sampling-v2', replacementChance: 100, normalReplacement: 'normals', fit: 'anywhere' } } }));
   assert.equal(refused.ok, false);
   assert.equal(refused.code, 'ENEMY_PLACEMENT_ALGORITHM_UNAVAILABLE');
   assert.match(refused.message, /not implemented yet/);

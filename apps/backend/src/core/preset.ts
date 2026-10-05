@@ -1,4 +1,4 @@
-import { DEFAULT_ENEMY_PLACEMENT_ALGORITHM, PRESET_FORMAT, PRESET_VERSION } from '@ds1tr/contracts';
+import { DEFAULT_ENEMY_PLACEMENT_ALGORITHM, NEUTRAL_ENEMY_PLACEMENT_OPTIONS, PRESET_FORMAT, PRESET_VERSION } from '@ds1tr/contracts';
 import type { PresetDocument, PresetImportResult, RandomizerConfig } from '@ds1tr/contracts';
 import { InvalidConfigurationError, validateRandomizerConfig } from './configValidation.js';
 
@@ -25,12 +25,18 @@ const batch3Defaults: SectionDefaults = {
 const batch4Defaults: SectionDefaults = {
   enemies: { placement: { algorithm: DEFAULT_ENEMY_PLACEMENT_ALGORITHM } },
 };
-/** What each older preset version lacks, newest additions last. */
+/**
+ * Version 6: the sampling-only placement settings, nested in `enemies.placement`. Every older preset migrates to
+ * the neutral values, under which permutation-v1 behaves exactly as before.
+ */
+const placementBatch5Defaults: Record<string, unknown> = { ...NEUTRAL_ENEMY_PLACEMENT_OPTIONS };
+/** What each older preset version lacks, newest additions last (the nested v6 placement keys are handled apart). */
 const missingByVersion: Record<number, SectionDefaults[]> = {
   1: [batch1Defaults, batch2Defaults, batch3Defaults, batch4Defaults],
   2: [batch2Defaults, batch3Defaults, batch4Defaults],
   3: [batch3Defaults, batch4Defaults],
   4: [batch4Defaults],
+  5: [],
 };
 
 const presetKeys = ['format', 'presetVersion', 'masterSeed', 'items', 'enemies', 'fog', 'output'];
@@ -58,7 +64,7 @@ export function importPreset(text: string): PresetImportResult {
   const problems: string[] = [];
   if (record.format !== PRESET_FORMAT) problems.push(`Preset format must be "${PRESET_FORMAT}".`);
   if (record.presetVersion !== PRESET_VERSION && !(typeof record.presetVersion === 'number' && missingByVersion[record.presetVersion])) {
-    problems.push(`Preset version must be ${PRESET_VERSION} (versions 1 to 4 are migrated).`);
+    problems.push(`Preset version must be ${PRESET_VERSION} (versions 1 to 5 are migrated).`);
   }
   for (const key of Object.keys(record)) {
     if (!presetKeys.includes(key)) problems.push(`preset.${key} is not supported.`);
@@ -76,6 +82,15 @@ export function importPreset(text: string): PresetImportResult {
         }
         settings[section] = { ...structuredClone(defaults), ...(current as Record<string, unknown>) };
       }
+    }
+    // Version 6 nests the sampling-only settings inside `enemies.placement`; fill them in without touching the algorithm.
+    const enemies = settings.enemies;
+    const placement = enemies && typeof enemies === 'object' && !Array.isArray(enemies) ? (enemies as Record<string, unknown>).placement : undefined;
+    if (placement && typeof placement === 'object' && !Array.isArray(placement)) {
+      for (const key of Object.keys(placementBatch5Defaults)) {
+        if (Object.hasOwn(placement, key)) problems.push(`preset.enemies.placement.${key} is not supported in version ${presetVersion}.`);
+      }
+      (enemies as Record<string, unknown>).placement = { ...(placement as Record<string, unknown>), ...structuredClone(placementBatch5Defaults) };
     }
     if (problems.length > 0) return { ok: false, problems };
   }
