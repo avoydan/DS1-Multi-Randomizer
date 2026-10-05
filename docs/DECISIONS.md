@@ -807,3 +807,30 @@ position-based merging across FogMod's control-flow changes.
 Also: the Asylum Demon `RemoveAll` in FogMod goes through `SkipRanges.Remove` (patch 8).
 Merge refinements, each provable: ambiguous alignments with an identical result, the skip
 range defined as `[p+1, p+n]`, and event-0 initialization removal.
+
+## Enemy placement algorithm is explicit; sampling-v1 infrastructure exists but cannot run (Part 0)
+
+Decision: the enemy placement algorithm is a typed, versioned part of the configuration
+(`enemies.placement.algorithm`: `permutation-v1` | `sampling-v1`), and presets move to version 5 to state it.
+
+- `permutation-v1` is the production default and is frozen; presets of versions 1-4 migrate to it explicitly
+  (never to `sampling-v1`), and a v5 preset must state the algorithm. Its output is unchanged.
+- `sampling-v1` is a known identifier but is not in the implemented list; every layer refuses it with the same
+  stable code, `ENEMY_PLACEMENT_ALGORITHM_UNAVAILABLE`, and nothing falls back to another algorithm. The key
+  deliberately bypasses the engine's enum-fallback in `normalizeConfig`.
+- Sampling RNG streams use the version string `enemy-placement-v1` and the name `slot:<stable-slot-id>`,
+  independent of `RANDOMIZER_VERSION` (frozen at 0.5.66) and of product versions. The permutation path derives
+  none of them.
+- Model budget policy for `sampling-v1`: safety first. The cap (30) applies to the final distinct models of a
+  map, counts fixed and vanilla-kept models, admits deterministically, records the reason `model-budget`, has no
+  Blighttown exception and not the legacy quirk of counting only new models. If real data ever showed a vanilla
+  map above the cap, the work stops for a decision (measured: maximum 28).
+- Drop-ownership compatibility policy: `permutation-v1` keeps its documented legacy behavior (duplicated
+  single-owner drops under Enemy scaling `vanilla`) because fixing it would change existing presets' packages;
+  `sampling-v1` must give every changed placement a scaled NpcParam row, so drops and team follow the slot.
+- The new engine module `placement.js` is repository-authored (GPL-3.0-only) inside the vendored source tree,
+  recorded as patch `0005` and in `UPSTREAM_PIN.md`.
+
+Why: the sampler changes every enemy seed, so it must never be reached implicitly; the infrastructure lands
+first so that Part A is only the planner and its options, with the regression proof for the old algorithm
+already in place.

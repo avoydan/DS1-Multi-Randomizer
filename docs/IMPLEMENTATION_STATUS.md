@@ -1,5 +1,28 @@
 # Implementation status
 
+**Enemy placement Part 0: infrastructure only (2026-10-05; backend 0.23.0, contracts 0.8.0, desktop 0.11.0).**
+Prepares the contract, backend, engine and tests for the future `sampling-v1` placement algorithm without
+changing any placement. `permutation-v1` remains the default and the only algorithm that runs; the sampler is
+**not implemented**, and selecting `sampling-v1` is refused with `ENEMY_PLACEMENT_ALGORITHM_UNAVAILABLE` at
+validation, mapper, bridge and engine level (never a silent fallback). Presets are version 5
+(`enemies.placement.algorithm`); versions 1 to 4 migrate to `permutation-v1`. Engine: new
+`vendor/src/core/placement.js` (patch `0005`, listed in `UPSTREAM_PIN.md` and the module-set test), the config
+key `enemyPlacementAlgorithm`, the dispatch `planExtractedEnemies`, per-slot RNG substreams
+(`enemy-placement-v1`, `slot:<id>`), `ModelBudget` (cap 30, no per-map exception), diagnostics and
+drop-ownership helpers. Model document: section 10.1.
+
+- **Unchanged output (proof):** 24 placement hashes identical; two combined-only packages identical in all 56
+  non-metadata files and the combined + Fog package identical in all 73 (metadata files embed the temporary
+  path and gain only the new fields). `RANDOMIZER_VERSION` 0.5.66 and FogHost 0.5.0 are untouched; the
+  portable EXE was not rebuilt.
+- **Model budget:** checked on the real catalog; vanilla maximum 28 distinct models, none above 30, so the
+  safety-first cap of 30 rejects no vanilla map.
+- **Known and unchanged:** `permutation-v1` with Enemy scaling `vanilla` still duplicates single-owner
+  equipment drops (model document 9.1); `sampling-v1` must always create a scaled row.
+- **Tests:** backend 168 (167 pass, 1 skipped), including the new `enemyPlacementInfrastructure.test.mjs`
+  (gating, RNG substreams, budget, diagnostics, drop ownership, permutation untouched), preset v1-v5 migration,
+  mapper and bridge gating; root typecheck and desktop build pass.
+
 **Enemy placement design (2026-10-05).** `docs/ENEMY_PLACEMENT_MODEL.md` reconstructs the legacy Enemy
 Randomizer's per-slot placement model, documents the current permutation engine, compares four
 architectures and fixes the target: a new `sampling-v1` planner beside the frozen `permutation-v1`

@@ -12,8 +12,9 @@ the legacy tool, enforces the 30-model map limit by construction, and falls back
 Implement it in small batches, selection-only options first and the event-touching ones (bosses in normal
 slots, NPCs) last.
 
-Status: **design only, nothing in this document is implemented.** No runtime behavior, default, preset,
-FogHost code or packaging changed. One scratch prototype
+Status: **design, plus the Part 0 infrastructure (section 10.1).** `sampling-v1` itself is **not implemented**:
+`permutation-v1` is the only algorithm that runs, it stays the default, and selecting `sampling-v1` is refused
+with `ENEMY_PLACEMENT_ALGORITHM_UNAVAILABLE`. One scratch prototype
 (`engines/combined/prototypes/enemy-placement-sampler.mjs`) validates the proposed core against a real
 catalog; its figures are quoted in section 11 and it is not part of any build, test run or package.
 
@@ -583,7 +584,7 @@ risk: data first, selection-only options next, event-touching options last.
 
 | Batch | Scope | Engine | Contract / preset | UI | Tests | Real-format checks | Fog risk |
 |---|---|---|---|---|---|---|---|
-| **0** | Infrastructure, no behavior change | `placement.js` (new repository-authored module in `vendor/src/core`, listed in the module-set test and the pin; patch `0005`); class derivation (size, difficulty, NPC/boss class); `classTableHash`; per-slot streams; ladder; diagnostics block | `enemies.placement.algorithm` (`permutation` only selectable), neutral-value rule, preset v5 migrating 1-4 | an "Enemy placement" group with the algorithm shown, read-only | class derivation vs fixtures; neutral-value rejection; preset v5 migration; permutation hash lock | none (output unchanged) | none |
+| **0** (done, see 10.1) | Infrastructure, no behavior change | `placement.js` (new repository-authored module in `vendor/src/core`, listed in the module-set test and the pin; patch `0005`); class derivation (size, difficulty, NPC/boss class); `classTableHash`; per-slot streams; ladder; diagnostics block | `enemies.placement.algorithm` (`permutation` only selectable), neutral-value rule, preset v5 migrating 1-4 | an "Enemy placement" group with the algorithm shown, read-only | class derivation vs fixtures; neutral-value rejection; preset v5 migration; permutation hash lock | none (output unchanged) | none |
 | **A** | Sampler for regular enemies | `sampling-v1`: chance, normal mode {none, normals}, fit, difficulty `random`, Prevent same, mimic/mosquito/Pinwheel clones, coverage reserve, budget, ladder | add `sampling`, `replacementChance`, `normalReplacement`, `fit`, `difficultyMode=random` | sliders and selects, Replacement chance / Placement activated (remove the planned badges) | determinism, budget <= 30, zero fit violations, ladder rung counts, chance statistics, hash lock; **every changed placement has a scaled row; each drop lot is referenced by the same slots as in vanilla** | 20-seed Bosses + Fog sweep with `sampling`, **one with Enemy scaling `vanilla`**, `verify-skips`, `patch-enemies`, duplicates per map | low |
 | **B** | Difficulty curve | class draw, strictness tables, D-1 refinement, Easy Asylum rule, curated overrides | `difficultyMode` curve values, `strictness`, `easyAsylum` | select + slider activation | offset distributions, same-class share, empty-class fallback | 20 seeds | none |
 | **C** | Type replacement and custom pool | type map with type-level participation and injectivity; pool filter | `typeReplacement`, `customPool` (named list of enabled types) | select, pool editor (largest UI piece) | injectivity, sentinel cases, pool filter | 10 seeds | none |
@@ -591,6 +592,49 @@ risk: data first, selection-only options next, event-touching options last.
 | **E** | Cross-class and roaming boss options | boss to normal slot, normal to boss slot, "both" modes, `getSoul` on the scaled row, respawn handling | modes `normals`/`both`, `bossChanceInNormalSlots`, `roamingBossSouls`, `respawningRoamingBosses` | activation | reward ownership, scaled row always present, boss bar rules | **40 seeds**, measure edited events against the overlay and FogMod; stop on any new overlap | **high** |
 | **F** | NPC class and hostile NPCs | NPC allowlist, talk preservation, hostile sources, allegiance events | `npcReplacement`, `hostileNpcs` | activation | NPC fit rules, talk preservation fixtures | event-set diff vs FogMod first, then 40 seeds | **high** |
 | **G** | Default flip (product decision) | none | default `sampling`, docs, migration notes | default values | n/a | full 40-seed default sweep | low once A-F passed |
+
+### 10.1 Part 0 as built (2026-10-05)
+
+Batch 0 was built narrower than the table above; the rest moves to Batch A, where it has a consumer.
+
+- **Built.** Algorithm identifier `permutation-v1` | `sampling-v1` carried UI -> preset -> contract ->
+  validation -> mapper -> engine config -> engine dispatch -> manifest (`enemyPlacement`) and result
+  (`placementDiagnostics`); preset v5 (`enemies.placement.algorithm`; versions 1-4 migrate to
+  `permutation-v1`; a v5 preset must state it); the narrow dispatch `planExtractedEnemies`; `placement.js`
+  with stable slot-id validation, per-slot substreams, `ModelBudget`, diagnostics, drop-ownership helpers; the
+  sampling-only-option gating mechanism (`SAMPLING_ONLY_OPTIONS`, empty).
+- **Gating.** The selection of `sampling-v1` fails at four layers, with one stable code: backend validation (a
+  problem containing `ENEMY_PLACEMENT_ALGORITHM_UNAVAILABLE`, also on preset import), the config mapper (typed
+  result), the bridge (non-retryable `ENEMY_PLACEMENT_ALGORITHM_UNAVAILABLE`) and the engine (`generate()`
+  throws `EnemyPlacementUnavailableError` before anything else, also when no enemy category is enabled).
+  `normalizeConfig` does not apply the enum fallback to the key, so an unknown value is refused, not replaced.
+  Part A enables the algorithm in exactly two lists (`IMPLEMENTED_ENEMY_PLACEMENT_ALGORITHMS` in the contract
+  and in `placement.js`) and implements the planner behind the dispatch.
+- **Not built (Part A or later).** Class derivation (size, difficulty), `classTableHash`, the fallback ladder
+  as code, the sampler, the UI group. The ladder and rejection vocabularies exist as diagnostic constants
+  only. No sampling option exists yet, so the neutral-value table in section 7 has no entries.
+- **RNG.** `deriveSlotStreamSeed(seed, slot)` = `deriveSeed(seed, "slot:<id>", "enemy-placement-v1")`: first
+  four bytes (little endian) of SHA-256 of `enemy-placement-v1`, NUL, seed, NUL, `slot:<id>`. It depends on no
+  product or engine version. The permutation path derives none (a counter proves it in a test). Isolation is
+  of draws, as in section 7; outcomes are still order dependent inside a map.
+- **Model-budget policy (decided).** Safety first: the budget is the number of distinct enemy models a map
+  holds **after** the run (default 30); fixed and vanilla-kept models count; admission is deterministic (fixed
+  models sorted, then candidates in caller order); a rejected candidate carries the reason `model-budget`; a
+  map that is over the cap through fixed models alone fails with `ENEMY_PLACEMENT_BUDGET_UNSATISFIABLE`. There
+  is **no** Blighttown-50 exception and **no** legacy quirk of counting only newly introduced models. Checked
+  against the real catalog: the vanilla maximum is 28 distinct models (Undead Parish, `m10_01`), no map
+  exceeds 30, so a cap of 30 rejects no vanilla map. The budget is not applied to `permutation-v1`, which has
+  its own limiter.
+- **Drop-ownership policy (decided).** `permutation-v1` keeps its documented legacy behavior (placements
+  without a scaled NpcParam row keep the replacement's own drops; 9.1) and is not fixed here. `sampling-v1`
+  must give every changed placement a scaled row; `describeDropOwnership`, `slotOwnedDrops` and
+  `assertSlotOwnedDrops` express and check that, and a test pins both behaviors.
+- **Output proof.** The 24 permutation placement hashes are identical before and after; two combined-only
+  packages (area scaling, and vanilla scaling with Prevent same and starting-loadout options) have identical
+  hashes for all 56 non-metadata files, and the combined + Fog package is identical in all 73. The three
+  metadata files (`config.json`, `randomizer.json`, `patch-manifest.json`) embed the temporary workspace path,
+  so they differ between any two runs, and gain only the new fields `enemyPlacementAlgorithm` and
+  `placementDiagnostics`. `placementHash` is computed from the placements and is unaffected.
 
 Batch 0 must also decide where `placement.js` lives: new code has to be inside `vendor/src` (that is what
 the packager copies and what the loader imports), so it is a repository-authored GPL file recorded in
