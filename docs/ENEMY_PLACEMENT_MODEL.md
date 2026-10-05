@@ -13,8 +13,8 @@ Implement it in small batches, selection-only options first and the event-touchi
 slots, NPCs) last.
 
 Status: **design, the Part 0 infrastructure (10.1) and Part A (10.2).** `sampling-v1` runs for regular enemy slots
-only and is opt-in; `permutation-v1` stays the default. **Part A is blocked on a model-budget decision for a
-replacement chance below 100 (10.2, "Open conflict").** One scratch prototype
+only and is opt-in; `permutation-v1` stays the default. **Part A is complete: the whole replacement-chance range works under a
+non-worsening model budget (10.2).** One scratch prototype
 (`engines/combined/prototypes/enemy-placement-sampler.mjs`) validates the proposed core against a real
 catalog; its figures are quoted in section 11 and it is not part of any build, test run or package.
 
@@ -396,6 +396,8 @@ slots with their own `scaling: vanilla`).
 
 ### 6.6 Budget: an invariant with a checked precondition
 
+> **Superseded in part (Part A).** The cap of 30 below is the *target*, not an unconditional whole-map invariant. sampling-v1 uses a non-worsening model-budget policy. The normal target is 30 distinct models per map. If out-of-scope/fixed plans already require more than 30, that unavoidable baseline becomes the effective cap. The regular sampler may preserve or reduce that overflow but may not increase it. See 10.2. The text that follows describes the coverage reserve, which still applies (trimmed to the effective cap).
+
 The first-come cap alone painted a map into a corner in the prototype: a late small slot found the set full
 of large types and no vanilla model to fall back on (0.13% of placements ended above their size class, every
 time with "keep vanilla" blocked by the budget). The remedy is a **coverage reserve**, defined as an invariant
@@ -436,7 +438,8 @@ is what it is in the game (normal slot, boss slot, NPC slot).
    normal slot that asked for a boss when the full set holds no boss therefore receives an in-set normal enemy,
    not a boss and not a vacancy. Recorded as `in-set-fit`, plus `category-downgraded` when the category
    changed. Boss slots only use in-set bosses; **NPC slots are never relaxed or downgraded** (they stop at rung 3).
-5. **Fit relaxed**, normal slots only: any in-set type of the slot's own class. Recorded as `fit-relaxed` with
+5. **(Removed in Part A.)** ~~Fit relaxed~~: it would place a type larger than the slot, breaking the fit invariant; a slot with no
+   fitting type is now rung 6, the retryable `ENEMY_PLACEMENT_INFEASIBLE` (10.2). The original text: any in-set type of the slot's own class. Recorded as `fit-relaxed` with
    slot, slot size and chosen size. Unreachable with the reserve; counted in the manifest so a sweep can
    assert zero.
 6. Otherwise `ENEMY_PLACEMENT_INFEASIBLE` (map, slot, class, options), a combined-stage retryable failure like
@@ -623,8 +626,9 @@ Batch 0 was built narrower than the table above; the rest moves to Batch A, wher
   map that is over the cap through fixed models alone fails with `ENEMY_PLACEMENT_BUDGET_UNSATISFIABLE`. There
   is **no** Blighttown-50 exception and **no** legacy quirk of counting only newly introduced models. Checked
   against the real catalog: the vanilla maximum is 28 distinct models (Undead Parish, `m10_01`), no map
-  exceeds 30, so a cap of 30 rejects no vanilla map. The budget is not applied to `permutation-v1`, which has
-  its own limiter.
+  exceeds 30, so a cap of 30 rejects no *vanilla* map. **Superseded by Part A (10.2): after the dragon/boss plans the
+  Parish already holds 30-31 models, so a fixed cap of 30 is not an invariant; the effective cap is
+  `max(30, baseline)`.** The budget is not applied to `permutation-v1`, which has its own limiter.
 - **Drop-ownership policy (decided).** `permutation-v1` keeps its documented legacy behavior (placements
   without a scaled NpcParam row keep the replacement's own drops; 9.1) and is not fixed here. `sampling-v1`
   must give every changed placement a scaled row; `describeDropOwnership`, `slotOwnedDrops` and
@@ -649,9 +653,9 @@ permutation share the slot filter (`regularEnemyContext`) and the placement deco
 
 | Control | Values in Part A | Status |
 |---|---|---|
-| Replacement chance | 0-100, integer; one draw per slot, `int(100) + 1 <= chance`, the slot's first draw from `slot:<id>` | **PARTIAL** (exact at 100; below 100 see "Open conflict") |
+| Replacement chance | 0-100, integer; one draw per slot, `int(100) + 1 <= chance`, the slot's first draw from `slot:<id>` | **FULL** (whole range, non-worsening budget) |
 | Normal enemy replacement | `none` (legacy 0), `normals` (legacy 2); `bosses` (1) and `both` (3) need boss sources and are unavailable | **PARTIAL** (2 of 4 values) |
-| Placement fit | `fits` (0), `anywhere` (1), `anywhere-except-npcs` (2: differs from 1 only for NPC targets, which are not replaced, so identical for regular slots) | **FULL** for regular slots |
+| Placement fit | `fits` (0), `anywhere` (1), `anywhere-except-npcs` (2: differs from 1 only for NPC targets, which are not replaced, so identical for regular slots) | **FULL** for regular slots (0 violations) |
 | Prevent same enemy | candidate with the slot's own model is rejected; keep-vanilla stays allowed | **FULL** (already FULL for `permutation-v1`) |
 
 A slot that is not replaced (chance, mode `none`, or kept-vanilla) is exactly vanilla: **no placement is
@@ -670,69 +674,106 @@ catalog order does not matter; a change that crosses a class edge, or a new mode
 class does not. It is reported in `placementDiagnostics`, the run manifest (`enemyPlacement.classTableHash`) and
 the bridge log. Real catalog: `4c7da92687b689ed...`.
 
-**Per-map flow.** Maps in sorted order, slots in sorted id order, one stream per slot. (1) participation draw;
-(2) model set = fixed models + vanilla models of non-participants + coverage reserve (`ModelBudget`, cap 30);
-(3) per participating slot: candidates = types with size <= slot size (`fits`), drawn uniformly with list shrink;
-a candidate is rejected for `prevent-same` or `model-budget` (set full and model not in it); (4) fallback ladder
-when nothing survives: `kept-vanilla` (own model in the set or room), `in-set-fit` (smallest in-set type that
-fits), `fit-relaxed` (`fits` only), else `ENEMY_PLACEMENT_INFEASIBLE` (typed, retryable); (5) variant drawn
-uniformly among the type's (NpcParam, think-param) variants; (6) post-condition: final models of the map <= 30.
-At 100% the rungs `in-set-fit` and `fit-relaxed` were never used (300 seeds); `kept-vanilla` occurred 9 times in 100 seeds, only under Prevent same.
+**Non-worsening model budget (decided).** *`sampling-v1` uses a non-worsening model-budget policy. The normal
+target is 30 distinct models per map. If out-of-scope/fixed plans already require more than 30, that
+unavoidable baseline becomes the effective cap. The regular sampler may preserve or reduce that overflow but
+may not increase it.* Implementation (`effectiveModelBudget`, `planSampledRegularEnemies`):
 
-**Deviation from 6.6.** The design's repair "demote the smallest participating slots until the precondition
-holds" cannot lower the model count (a demoted slot keeps its vanilla model in the set), so it was replaced
-by **trimming** the reserve to what fits (counter `reserveTrimmed`); the ladder is the safety net.
+- `baseline(map)` = the distinct models of the fixed plans (every non-regular slot at its final model, which
+  includes bosses, dragons, units and special placements) plus the vanilla models of regular slots that the
+  replacement chance (or mode `none`) leaves alone. These are the models the sampler cannot remove.
+- `effectiveCap(map) = max(30, baseline)`. The map's `ModelBudget` starts as baseline plus the coverage
+  reserve and admits a candidate only while it stays within `effectiveCap`.
+- No separate reference counting was needed: a map's final model set is exactly baseline plus the models the
+  sampler admits, because the vanilla model of a *replaced* slot is simply never added. A model whose last slot
+  is replaced therefore leaves the count by construction, and the capacity it would have used is available to
+  later slots. The post-condition `finalModels <= effectiveCap` is checked per map after planning.
+- The earlier wording that treated 30 as an unconditional whole-map invariant (6.6, 10.1, the first draft of this
+  section) is superseded. The reason is measured: vanilla Parish has 28 models, the dragon/boss plans already
+  push it to 30-31 (88 of 100 seeds with `permutation-v1`, regular enemies off, bosses on; up to 33 in other
+  maps when vanilla regular models are kept), and the shipped `permutation-v1` produces such maps.
+- Diagnostics per map: `baseline`, `effectiveCap`, `finalModels`; counter `mapsAboveCap`.
+- `ENEMY_PLACEMENT_BUDGET_UNSATISFIABLE` can no longer be raised by the planner (the effective cap is never below
+  the baseline); it remains a defensive, non-retryable error of the `ModelBudget` primitive.
+
+**Per-map flow.** Maps in sorted order, slots in sorted id order, one stream per slot. (1) participation draw;
+(2) model set = baseline + coverage reserve (trimmed to the effective cap); (3) per participating slot:
+candidates = types with size <= slot size (`fits`), drawn uniformly with list shrink; a candidate is rejected for
+`prevent-same` or `model-budget` (set full and model not in it); (4) fallback ladder when nothing survives:
+`kept-vanilla` (own model in the set or room), `in-set-fit` (smallest in-set type that fits), else
+`ENEMY_PLACEMENT_INFEASIBLE`; (5) variant drawn uniformly among the type's (NpcParam, think-param) variants;
+(6) post-condition: final models of the map <= effective cap.
+
+**Deviations from 6.6 and 6.7.** (a) The design's repair "demote the smallest participating slots until the
+precondition holds" cannot lower the model count (a demoted slot keeps its vanilla model in the set); the
+reserve is **trimmed** to what fits instead (counter `reserveTrimmed`). (b) The `fit-relaxed` rung was
+**removed**: with zero headroom (a map already at its effective cap) a small slot whose own model is not in the
+set can have no fitting in-set type, and an oversized type would break the fit invariant. The slot is then
+`ENEMY_PLACEMENT_INFEASIBLE`, which depends only on the participation draws, so another attempt (new combined
+seed) solves it. This is what the first Part A measurement showed as "fit violations" (3-5 per 100 seeds at 25%
+and 60%); with the rung removed there are none.
+
+**Error and retry classification.** `ENEMY_PLACEMENT_INFEASIBLE`: retryable, its own failure code, recorded as
+the attempt result in the manifest (bounded by the 3 combined attempts of the pipeline). Deterministic
+structural failures (`ENEMY_PLACEMENT_BUDGET_UNSATISFIABLE`, `ENEMY_PLACEMENT_CLASS_UNDERIVABLE`,
+`ENEMY_PLACEMENT_OPTIONS_INVALID`, `ENEMY_PLACEMENT_ALGORITHM_UNAVAILABLE`): typed, non-retryable. They no longer
+appear as a generic `GENERATION_FAILED`. The legitimate Fog retries are unchanged.
 
 **Drop ownership.** Every changed `sampling-v1` placement carries a scaled NpcParam row
 (`forceScaledNpcParam`), also with Enemy scaling `vanilla`; DsrDataTool copies the destination slot's item-lot
 fields and team onto it (checked in `Program.cs`, `AddScaledNpcRows`), so repeated sources never multiply a
 source's drops. `assertSlotOwnedDrops` runs on every plan. Catalog validation (real NpcParam/ItemLotParam): for
-every changed placement the effective drop lots are those of the destination slot (0 mismatches over 700
-seeds-configurations), so the multiset of lot owners equals vanilla and no tracked item is introduced.
-`permutation-v1` is unchanged (its `vanilla`-scaling duplication remains documented in 9.1).
+every changed placement the effective drop lots are those of the destination slot (0 mismatches), so the
+multiset of lot owners equals vanilla and no tracked item is introduced. `permutation-v1` is unchanged (its
+`vanilla`-scaling duplication remains documented in 9.1).
 
 **Catalog-only validation (real catalog, 100 seeds per variant, bosses + dragons + Gwyn nerf + Second Gargoyle on).**
+"seeds ok" are the seeds whose first attempt placed every slot; the others raised the retryable
+`ENEMY_PLACEMENT_INFEASIBLE` (all in the Parish, only with `fits`; `anywhere` never fails).
 
-| Variant | seeds | placements/seed | fallback rungs | model-budget rejections/seed | max models/map | fit viol. | prevent-same viol. | non-det. | ms/seed |
-|---|---|---|---|---|---|---|---|---|---|
-| 100%, fits | 100 | 1702 | 0 | 2451 | 30 | 0 | n/a | 0 | 17 |
-| 100%, anywhere | 100 | 1702 | 0 | 4414 | 30 | n/a | n/a | 0 | 18 |
-| 100%, fits, Prevent same | 100 | 1702 | kept-vanilla 9 (0.0005%) | 2425 + 123 prevent-same | 30 | 0 | 0 | 0 | 18 |
-| 60%, fits | 93 | 1022 | fit-relaxed 3 | 1638 | 30 | **3** | 0 | 0 | 15 |
-| 25% + Prevent same, vanilla scaling | 54 | 422 | kept 13, fit-relaxed 5 | 608 | 30 | **5** | 0 | 0 | 13 |
-| 0% / mode none | 4 | 0 | n/a | n/a | n/a | n/a | n/a | 0 | 10 |
+| Variant | seeds ok / 100 | participation | placements/seed | model-budget rej./seed | kept-vanilla | max models/map | maps with baseline > 30 (max baseline) | sampler overflow | reserve trimmed | fit viol. | prevent-same viol. | non-det. | ms/seed |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 0% fits | 100 | 0.00% | 0 | 0 | 0 | 33 | 108 (33) | 0 | 0 | 0 | 0 | 0 | 7 |
+| 0% anywhere | 100 | 0.00% | 0 | 0 | 0 | 33 | 108 (33) | 0 | 0 | 0 | 0 | 0 | 6 |
+| 0% fits + Prevent same | 100 | 0.00% | 0 | 0 | 0 | 33 | 108 (33) | 0 | 0 | 0 | 0 | 0 | 6 |
+| 25% fits | 91 | 24.93% | 424 | 550 | 0 | 33 | 50 (33) | 0 | 0 | 0 | 0 | 0 | 8 |
+| 25% anywhere | 100 | 24.92% | 424 | 868 | 0 | 33 | 54 (33) | 0 | 0 | 0 | 0 | 0 | 8 |
+| 25% fits + Prevent same | 91 | 24.93% | 424 | 604 | 15 | 33 | 50 (33) | 0 | 7 | 0 | 0 | 0 | 8 |
+| 60% fits | 95 | 59.98% | 1021 | 1636 | 0 | 31 | 5 (31) | 0 | 0 | 0 | 0 | 0 | 9 |
+| 60% anywhere | 100 | 59.99% | 1021 | 2648 | 0 | 32 | 7 (32) | 0 | 0 | 0 | 0 | 0 | 9 |
+| 60% fits + Prevent same | 95 | 59.98% | 1020 | 1809 | 59 | 31 | 5 (31) | 0 | 6 | 0 | 0 | 0 | 9 |
+| 90% fits | 100 | 90.05% | 1533 | 2408 | 0 | 30 | 0 (29) | 0 | 0 | 0 | 0 | 0 | 10 |
+| 90% anywhere | 100 | 90.05% | 1533 | 4103 | 0 | 30 | 0 (29) | 0 | 0 | 0 | 0 | 0 | 11 |
+| 90% fits + Prevent same | 100 | 90.05% | 1532 | 2569 | 38 | 30 | 0 (29) | 0 | 0 | 0 | 0 | 0 | 10 |
+| 100% fits | 100 | 100.00% | 1702 | 2451 | 0 | 30 | 0 (21) | 0 | 0 | 0 | 0 | 0 | 11 |
+| 100% anywhere | 100 | 100.00% | 1702 | 4414 | 0 | 30 | 0 (21) | 0 | 0 | 0 | 0 | 0 | 11 |
+| 100% fits + Prevent same | 100 | 100.00% | 1702 | 2425 | 9 | 30 | 0 (21) | 0 | 0 | 0 | 0 | 0 | 11 |
+| 25% fits + Prevent same, vanilla scaling | 91 | 24.93% | 424 | 604 | 15 | 33 | 50 (33) | 0 | 7 | 0 | 0 | 0 | 8 |
+| mode none | 100 | 0.00% | 0 | 0 | 0 | 33 | 108 (33) | 0 | 0 | 0 | 0 | 0 | 6 |
+Only the Parish (`m10_01`, baseline up to 33, above 30 in 96 of 100 seeds at 0%) and `m14_01` (31) ever have a
+baseline above 30; the sampler left every one of them at or below its effective cap (0 overflows). 33 is more
+than any shipped output (`permutation-v1` with regular enemies off ends at 31), because Mass of Souls and the
+vanilla regular models are kept as well; **the in-game behavior of a 32-33-model Parish has not been tested**.
+Entity-id duplicates equal the permutation's (3.0 per seed, from regular placements of both algorithms; none
+with regular enemies off). Bosses, dragons and linked units are identical to `permutation-v1` for the same seed
+in every variant.
 
-Participation matched the configured chance (60.04%, 24.81%). `classTableHash` stable (1 value). Bosses,
-dragons and linked units identical to `permutation-v1` for the same seed in every variant. Entity-id duplicates
-equal the permutation's (3.0 per seed, from regular placements of both algorithms; 0 with regular enemies off).
+**Real-format validation (Items + Enemies + Fog, bosses on, FogHost 0.5.0, 55 seeds + 2 full proofs).**
 
-**Open conflict (needs a decision).** With a replacement chance below 100 the sampler must keep the vanilla
-models of the slots it leaves alone, and the dragon/boss plans add models on top. In the Undead Parish
-(`m10_01`, vanilla 28 models) the fixed models plus the kept vanilla models exceed 30, so the run fails with
-`ENEMY_PLACEMENT_BUDGET_UNSATISFIABLE`, a retryable `GENERATION_FAILED` for the pipeline (retries mask it). Measured, 100
-seeds: bosses on, 0% / 25% / 60% / 90% fails in 94 / 49 / 6 / 0 seeds; bosses **off** (the dragon plan still runs)
-0% / 25% / 60% / 90%: 26 / 17 / 8 / 0. The fit violations at 60% and 25% come from the same near-cap
-condition (reserve trimmed, `fit-relaxed`). The Part 0 statement "a cap of 30 rejects no vanilla map" held
-for the vanilla catalog only. For reference, the *shipped* `permutation-v1` with regular enemies off and
-bosses on already ends with 30-31 models in `m10_01` in 88 of 100 seeds (it has no limiter then), while with
-regular enemies on the limiter keeps every map at 30 or fewer. Options, none chosen here: (1) reject
-`sampling-v1` with a chance below 100 (or mode `none`) while dragons or bosses are randomized; (2) accept
-seed-dependent failures; (3) a user-approved rule such as "the cap binds only the sampler's own additions, a map
-already over the cap through the fixed plans is not failed by the sampler" (which would let the Parish reach 31
-as it does today); (4) a budget-aware dragon/boss plan (Part D).
+| Configuration | seeds | generated | first-attempt placement failures (retried) | Fog retries (existing `FOG_UPSTREAM_INCOMPATIBLE`) | merge conflicts | boss overlay events | `verify-skips` failures | sampler overflow | changed without scaled row | max final models |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 100%, fits | 10 | 10 | 0 | 2 | 0 | same 15, 10/10 seeds | 0 / 12 | 0 | 0 | 30 |
+| 60%, fits | 10 | 10 | 1 | 3 | 0 | same 15 | 0 / 13 | 0 | 0 | 31 |
+| 60%, fits + Prevent same | 10 | 10 | 0 | 1 | 0 | same 15 | 0 / 11 | 0 | 0 | 31 |
+| 25%, fits | 10 | 10 | 1 | 3 | 0 | same 15 | 0 / 13 | 0 | 0 | 32 |
+| 25%, anywhere + Prevent same | 10 | 10 | 0 | 1 | 0 | same 15 | 0 / 11 | 0 | 0 | 33 |
+| 100%, mode `none` | 5 | 5 | 0 | 1 | 0 | same 15 | 0 / 6 | 0 | 0 | 32 |
 
-**Real-format validation (Items + Enemies + Fog, bosses on, 100% chance).**
-
-30 seeds (10 per configuration) through the full pipeline, FogHost 0.5.0, real installation reconstructed in a
-temporary directory, boss randomization on: **100% / anywhere**, **100% / fits**, **100% / fits + Prevent same**. Result:
-30 of 30 generated; Fog merge conflicts 0; the boss overlay applied to exactly the same 15 events as before
-(10 of 10 seeds each); `verify-skips` 0 failures (33 checks) and 0 mismatches in events the combined engine
-edited; live installation unchanged. FogHost asked for a new combined attempt (the existing
-`FOG_UPSTREAM_INCOMPATIBLE` retry) in 1, 2 and 0 seeds of the three configurations. One full proof run
-(`fits` + Prevent same): byte-identical rerun, activation and restore all pass. **Not run:** the partial-chance
-configuration (60%) and the 40-seed total, because they depend on the open budget conflict above; the final model
-count (<= 30) and the drop-ownership invariant were checked on the placements (catalog-only table), not on the
-generated NpcParam regulation.
+Mismatches in events the combined engine edited: 0 in every sweep; the live installation was unchanged in every
+run. Two full proofs (`fits` + Prevent same at 100% and at 25%): byte-identical rerun, activation and restore
+pass. A first-attempt `ENEMY_PLACEMENT_INFEASIBLE` was retried with a new combined seed and the run succeeded
+(2 of 50 partial-chance seeds). The final model count and the drop-ownership invariant were checked on the
+generated placement plans (`changed without scaled row` = 0), not on the NpcParam regulation of the package.
 
 Batch 0 must also decide where `placement.js` lives: new code has to be inside `vendor/src` (that is what
 the packager copies and what the loader imports), so it is a repository-authored GPL file recorded in

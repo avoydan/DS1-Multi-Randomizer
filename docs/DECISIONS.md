@@ -821,10 +821,10 @@ Decision: the enemy placement algorithm is a typed, versioned part of the config
 - Sampling RNG streams use the version string `enemy-placement-v1` and the name `slot:<stable-slot-id>`,
   independent of `RANDOMIZER_VERSION` (frozen at 0.5.66) and of product versions. The permutation path derives
   none of them.
-- Model budget policy for `sampling-v1`: safety first. The cap (30) applies to the final distinct models of a
+- Model budget policy for `sampling-v1`: safety first. The target (30) applies to the final distinct models of a
   map, counts fixed and vanilla-kept models, admits deterministically, records the reason `model-budget`, has no
-  Blighttown exception and not the legacy quirk of counting only new models. If real data ever showed a vanilla
-  map above the cap, the work stops for a decision (measured: maximum 28).
+  Blighttown exception and not the legacy quirk of counting only new models. (Vanilla maximum measured: 28.)
+  **Refined by the Part A decision below: 30 is a target, not an unconditional invariant.**
 - Drop-ownership compatibility policy: `permutation-v1` keeps its documented legacy behavior (duplicated
   single-owner drops under Enemy scaling `vanilla`) because fixing it would change existing presets' packages;
   `sampling-v1` must give every changed placement a scaled NpcParam row, so drops and team follow the slot.
@@ -848,5 +848,25 @@ already in place.
   win in every scaling mode.
 - The reserve repair of the design (demote participants) cannot lower the model count; it is replaced by
   trimming the reserve, with the fallback ladder as the safety net.
-- **Not decided:** the model-budget rule for a replacement chance below 100 (model document 10.2, "Open
-  conflict"). Until it is decided, such runs can fail with `ENEMY_PLACEMENT_BUDGET_UNSATISFIABLE`.
+
+## sampling-v1 model budget is non-worsening (Part A, decided 2026-10-05)
+
+Decision: sampling-v1 uses a non-worsening model-budget policy. The normal target is 30 distinct models per map. If out-of-scope/fixed plans already require more than 30, that unavoidable baseline becomes the effective cap. The regular sampler may preserve or reduce that overflow but may not increase it.
+
+- Baseline of a map = the distinct models of the fixed plans (bosses, dragons, units, Mass of Souls, special and
+  other non-regular slots, at their final models) plus the vanilla models of regular slots that the replacement
+  chance (or mode `none`) leaves alone. `effectiveCap = max(30, baseline)`. No separate allowance for the
+  sampler, no Blighttown exception, no legacy "only new models count".
+- Final-model accounting is exact by construction (baseline plus admitted models; a replaced slot's vanilla
+  model is never added), so a model whose last slot is replaced stops counting without reference counting.
+- Why: the earlier hard cap rested on vanilla data only. After the dragon/boss plans the Undead Parish has
+  30-31 models (88 of 100 seeds with `permutation-v1`, regular enemies off), and with kept vanilla models up to
+  33, so a hard 30 rejected valid configurations the shipped algorithm already produces. 32-33 models in the
+  Parish exceed anything shipped before and have not been tested in the game.
+- Consequence for fit: with zero headroom a slot can be left without a fitting type. The `fit-relaxed` rung was
+  removed instead of violating the fit invariant; the slot raises the retryable `ENEMY_PLACEMENT_INFEASIBLE`
+  (about 9% of seeds at 25% and 5% at 60% with `fits`; none with `anywhere` or from 90%), and the pipeline
+  retries with a new combined seed (3 attempts).
+- Error classification: `ENEMY_PLACEMENT_INFEASIBLE` is retryable and typed; `ENEMY_PLACEMENT_BUDGET_UNSATISFIABLE`,
+  `ENEMY_PLACEMENT_CLASS_UNDERIVABLE`, `ENEMY_PLACEMENT_OPTIONS_INVALID` and
+  `ENEMY_PLACEMENT_ALGORITHM_UNAVAILABLE` are deterministic and never retried. The Fog retries are unchanged.
