@@ -38,7 +38,7 @@ const initialConfig: RandomizerConfig = {
     // Legacy Enemy Randomizer default: the second Bell Gargoyle is replaced.
     secondGargoyle: 'replace',
     // Classic permutation is the default; sampling-v1 is opt-in. The other values are the neutral ones for the classic mode.
-    placement: { algorithm: 'permutation-v1', replacementChance: 100, normalReplacement: 'normals', fit: 'anywhere', difficultyMode: 'random', difficultyStrictness: 'loose' },
+    placement: { algorithm: 'permutation-v1', replacementChance: 100, normalReplacement: 'normals', fit: 'anywhere', difficultyMode: 'random', difficultyStrictness: 'loose', typeReplacement: 'disabled' },
   },
   fog: {
     enabled: true,
@@ -154,8 +154,8 @@ export function App() {
       enemies: {
         ...current.enemies,
         placement: algorithm === 'sampling-v1'
-          ? { algorithm, replacementChance: 100, normalReplacement: 'normals', fit: 'fits', difficultyMode: 'random-easy-asylum', difficultyStrictness: 'loose' }
-          : { algorithm, replacementChance: 100, normalReplacement: 'normals', fit: 'anywhere', difficultyMode: 'random', difficultyStrictness: 'loose' },
+          ? { algorithm, replacementChance: 100, normalReplacement: 'normals', fit: 'fits', difficultyMode: 'random-easy-asylum', difficultyStrictness: 'loose', typeReplacement: 'disabled' }
+          : { algorithm, replacementChance: 100, normalReplacement: 'normals', fit: 'anywhere', difficultyMode: 'random', difficultyStrictness: 'loose', typeReplacement: 'disabled' },
       },
     }));
   const setPlacement = <K extends keyof RandomizerConfig['enemies']['placement']>(key: K, value: RandomizerConfig['enemies']['placement'][K]) =>
@@ -394,6 +394,8 @@ export function App() {
               <select value={config.enemies.placement.difficultyMode} disabled={!config.enemies.randomizeRegularEnemies || config.enemies.placement.algorithm !== 'sampling-v1'} title="Legacy-style sampling only. Difficulty curve: a regular enemy is replaced by one of comparable difficulty (strictness decides how far it may differ). Fully random: any enemy anywhere. Easy Asylum: the Asylum only receives the easiest enemies. Difficulty classes are derived by DS1TR from the enemies' areas and HP, so they approximate the original ones." onChange={(event) => setPlacement('difficultyMode', event.target.value as RandomizerConfig['enemies']['placement']['difficultyMode'])}><option value="curve-easy-asylum">Curve + easy Asylum</option><option value="curve">Difficulty curve</option><option value="random-easy-asylum">Random + easy Asylum</option><option value="random">Fully random</option></select>
               <label className="field-label">Difficulty strictness</label>
               <select value={config.enemies.placement.difficultyStrictness} disabled={!config.enemies.randomizeRegularEnemies || config.enemies.placement.algorithm !== 'sampling-v1' || !config.enemies.placement.difficultyMode.startsWith('curve')} title="Only used by the difficulty-curve modes. Strict: mostly the same difficulty class, harder ones are rare. A bit loose: harder enemies appear more often. Very loose: any difficulty can appear anywhere." onChange={(event) => setPlacement('difficultyStrictness', event.target.value as RandomizerConfig['enemies']['placement']['difficultyStrictness'])}><option value="strict">Strict</option><option value="loose">A bit loose</option><option value="very-loose">Very loose</option></select>
+              <label className="field-label">Type replacement</label>
+              <select value={config.enemies.placement.typeReplacement} disabled={!config.enemies.randomizeRegularEnemies || config.enemies.placement.algorithm !== 'sampling-v1'} title="Legacy-style sampling only. Enabled: all enemies of one kind in a map (every Hollow in the Parish) are replaced by the same new kind, and two kinds in one map never get the same replacement. The replacement chance then applies to the kind, not to each enemy. The exception for roaming bosses only matters for boss replacements, which are not available yet." onChange={(event) => setPlacement('typeReplacement', event.target.value as RandomizerConfig['enemies']['placement']['typeReplacement'])}><option value="enabled">Enabled</option><option value="enabled-except-roaming-bosses">Enabled, except roaming bosses</option><option value="disabled">Disabled</option></select>
             </div>
             <div className="option-group"><h3>Legacy options</h3>
               <Toggle inactive={!config.enemies.randomizeRegularEnemies} label="Replace mimics" hint="Off: Mimics stay in place and are kept out of the enemy pool." checked={config.enemies.replaceMimics} onChange={(value) => setEnemy('replaceMimics', value)} />
@@ -411,7 +413,6 @@ export function App() {
               <RangeOption disabled label="Boss chance: boss slots" value={90} onChange={() => undefined} />
               <RangeOption disabled label="Roaming boss souls" value={100} onChange={() => undefined} />
               {['Allow T-pose behavior', 'Unique bosses', 'Respawning roaming bosses', 'Hostile NPCs'].map((label) => <Toggle key={label} disabled label={label} checked={false} onChange={() => undefined} />)}
-              <label className="field-label">Type replacement</label><select defaultValue="disabled" disabled><option value="enabled">Enabled</option><option value="exclude-roaming-bosses">Except roaming bosses</option><option value="disabled">Disabled</option></select>
               <label className="field-label">Custom enemy pool</label><input value="Default" disabled readOnly />
             </div>
           </section>

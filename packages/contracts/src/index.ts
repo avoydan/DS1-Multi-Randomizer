@@ -87,6 +87,15 @@ export type DifficultyStrictness = 'strict' | 'loose' | 'very-loose';
 export const DIFFICULTY_STRICTNESS: readonly DifficultyStrictness[] = ['strict', 'loose', 'very-loose'];
 
 /**
+ * Legacy "Type replacement": disabled (default) draws every slot on its own; enabled replaces all slots of one
+ * original model within a map by the same replacement model; enabled-except-roaming-bosses differs only for boss
+ * sources, which regular-enemy sampling never draws, so it behaves like enabled today.
+ */
+export type TypeReplacementMode = 'disabled' | 'enabled' | 'enabled-except-roaming-bosses';
+
+export const TYPE_REPLACEMENT_MODES: readonly TypeReplacementMode[] = ['disabled', 'enabled', 'enabled-except-roaming-bosses'];
+
+/**
  * Placement settings. Everything except `algorithm` applies to `sampling-v1` only; under `permutation-v1` the
  * backend requires the neutral values below and rejects any other (it never ignores a setting silently).
  */
@@ -98,6 +107,7 @@ export interface EnemyPlacementOptions {
   fit: PlacementFitMode;
   difficultyMode: DifficultyMode;
   difficultyStrictness: DifficultyStrictness;
+  typeReplacement: TypeReplacementMode;
 }
 
 /** The values under which `permutation-v1` behaves as it always did. Migrated presets and new configurations use them. */
@@ -107,6 +117,7 @@ export const NEUTRAL_ENEMY_PLACEMENT_OPTIONS: Omit<EnemyPlacementOptions, 'algor
   fit: 'anywhere',
   difficultyMode: 'random',
   difficultyStrictness: 'loose',
+  typeReplacement: 'disabled',
 };
 
 /** The legacy defaults offered when `sampling-v1` is chosen: replace always, only normal enemies, only where they fit. */
@@ -116,6 +127,7 @@ export const LEGACY_ENEMY_PLACEMENT_OPTIONS: Omit<EnemyPlacementOptions, 'algori
   fit: 'fits',
   difficultyMode: 'random-easy-asylum',
   difficultyStrictness: 'loose',
+  typeReplacement: 'disabled',
 };
 
 export interface EnemyOptions {
@@ -232,7 +244,7 @@ export type GenerationResult =
   | { ok: false; code: string; message: string; stage: string };
 
 export const PRESET_FORMAT = 'ds1tr-preset';
-export const PRESET_VERSION = 7;
+export const PRESET_VERSION = 8;
 
 /** Shareable settings: everything in RandomizerConfig except the machine-specific game path. */
 export interface PresetDocument {

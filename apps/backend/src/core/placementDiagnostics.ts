@@ -11,7 +11,7 @@ export interface PlacementSummary {
   categoryDowngrades: number;
   terminalFailures: string[];
   counters: Record<string, number>;
-  maps: Record<string, { slots: number; replaced: number; finalModels: number; modelSet: number; baseline: number; effectiveCap: number; attempts?: number }>;
+  maps: Record<string, { slots: number; replaced: number; finalModels: number; modelSet: number; baseline: number; effectiveCap: number; attempts?: number; typeGroups?: number }>;
   /** Map attempts that failed and were retried (map-local retries); empty when every map succeeded first time. */
   retries?: Array<{ mapId: string; attempt: number; slotId?: string; baseline?: number; effectiveCap?: number }>;
 }
@@ -55,7 +55,9 @@ export function formatPlacementDiagnostics(diagnostics: PlacementDiagnosticsSumm
   const stages = Object.entries(summary.stages).filter(([, count]) => count > 0).map(([name, count]) => `${name} ${count}`).join(', ');
   const options = diagnostics.options ?? {};
   const retried = summary.counters.mapsRetried ?? 0;
-  return `Enemy placement sampling-v1 (difficulty ${String(options.difficultyMode ?? 'random')}/${String(options.difficultyStrictness ?? 'loose')}): ${summary.slots} regular slots, ${replaced} sampled, `
+  const typeMode = String(options.typeReplacement ?? 'disabled');
+  const groups = typeMode === 'disabled' ? '' : `type replacement ${typeMode} (${summary.counters.typeGroupsReplaced ?? 0}/${summary.counters.typeGroups ?? 0} groups replaced), `;
+  return `Enemy placement sampling-v1 (difficulty ${String(options.difficultyMode ?? 'random')}/${String(options.difficultyStrictness ?? 'loose')}): ${groups}${summary.slots} regular slots, ${replaced} sampled, `
     + `${retried} map(s) retried, ${summary.counters.difficultyLapses ?? 0} difficulty lapses, `
     + `${summary.counters.keptByChance ?? 0} left by replacement chance, ${summary.rejections['model-budget'] ?? 0} model-budget rejections, `
     + `at most ${maxModels} models in a map, stages ${stages || 'none'}, class table ${diagnostics.classTableHash?.slice(0, 12) ?? 'n/a'}.`;

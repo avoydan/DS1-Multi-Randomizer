@@ -39,10 +39,13 @@ const placementBatch6Defaults: Record<string, unknown> = {
   difficultyMode: NEUTRAL_ENEMY_PLACEMENT_OPTIONS.difficultyMode,
   difficultyStrictness: NEUTRAL_ENEMY_PLACEMENT_OPTIONS.difficultyStrictness,
 };
+/** Version 8: Type replacement; older presets migrate to `disabled`. */
+const placementBatch7Defaults: Record<string, unknown> = { typeReplacement: NEUTRAL_ENEMY_PLACEMENT_OPTIONS.typeReplacement };
 /** Nested `enemies.placement` keys added by each preset version, applied to every older preset. */
 const placementKeysAddedIn: Array<{ version: number; defaults: Record<string, unknown> }> = [
   { version: 6, defaults: placementBatch5Defaults },
   { version: 7, defaults: placementBatch6Defaults },
+  { version: 8, defaults: placementBatch7Defaults },
 ];
 /** What each older preset version lacks, newest additions last (the nested v6 placement keys are handled apart). */
 const missingByVersion: Record<number, SectionDefaults[]> = {
@@ -52,6 +55,7 @@ const missingByVersion: Record<number, SectionDefaults[]> = {
   4: [batch4Defaults],
   5: [],
   6: [],
+  7: [],
 };
 
 const presetKeys = ['format', 'presetVersion', 'masterSeed', 'items', 'enemies', 'fog', 'output'];
@@ -79,7 +83,7 @@ export function importPreset(text: string): PresetImportResult {
   const problems: string[] = [];
   if (record.format !== PRESET_FORMAT) problems.push(`Preset format must be "${PRESET_FORMAT}".`);
   if (record.presetVersion !== PRESET_VERSION && !(typeof record.presetVersion === 'number' && missingByVersion[record.presetVersion])) {
-    problems.push(`Preset version must be ${PRESET_VERSION} (versions 1 to 6 are migrated).`);
+    problems.push(`Preset version must be ${PRESET_VERSION} (versions 1 to 7 are migrated).`);
   }
   for (const key of Object.keys(record)) {
     if (!presetKeys.includes(key)) problems.push(`preset.${key} is not supported.`);

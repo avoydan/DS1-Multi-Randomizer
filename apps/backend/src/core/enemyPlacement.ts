@@ -7,6 +7,7 @@ import {
   NEUTRAL_ENEMY_PLACEMENT_OPTIONS,
   NORMAL_ENEMY_REPLACEMENT_MODES,
   PLACEMENT_FIT_MODES,
+  TYPE_REPLACEMENT_MODES,
 } from '@ds1tr/contracts';
 import type { EnemyPlacementAlgorithm } from '@ds1tr/contracts';
 
@@ -25,6 +26,7 @@ export const SAMPLING_ONLY_OPTIONS: readonly SamplingOnlyOption[] = [
   { key: 'fit', neutral: NEUTRAL_ENEMY_PLACEMENT_OPTIONS.fit },
   { key: 'difficultyMode', neutral: NEUTRAL_ENEMY_PLACEMENT_OPTIONS.difficultyMode },
   { key: 'difficultyStrictness', neutral: NEUTRAL_ENEMY_PLACEMENT_OPTIONS.difficultyStrictness },
+  { key: 'typeReplacement', neutral: NEUTRAL_ENEMY_PLACEMENT_OPTIONS.typeReplacement },
 ];
 
 /** Value-domain checks of the sampling-only options (they apply to both algorithms: a bad value is never ignored). */
@@ -44,6 +46,9 @@ function validateSamplingOnlyValues(value: Record<string, unknown>, path: string
   }
   if (Object.hasOwn(value, 'difficultyStrictness') && !(DIFFICULTY_STRICTNESS as readonly unknown[]).includes(value.difficultyStrictness)) {
     problems.push(`${path}.difficultyStrictness must be ${DIFFICULTY_STRICTNESS.join(', ')}.`);
+  }
+  if (Object.hasOwn(value, 'typeReplacement') && !(TYPE_REPLACEMENT_MODES as readonly unknown[]).includes(value.typeReplacement)) {
+    problems.push(`${path}.typeReplacement must be ${TYPE_REPLACEMENT_MODES.join(', ')}.`);
   }
 }
 

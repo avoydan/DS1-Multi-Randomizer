@@ -106,7 +106,7 @@ test('sampling-only options are validated in the engine and refused under permut
 
 test('validation rejects an unimplemented algorithm, unknown algorithms and non-neutral sampling-only options', () => {
   const problemsOf = (value, context) => { const problems = []; validateEnemyPlacement(value, problems, context); return problems; };
-  const neutral = { replacementChance: 100, normalReplacement: 'normals', fit: 'anywhere', difficultyMode: 'random', difficultyStrictness: 'loose' };
+  const neutral = { replacementChance: 100, normalReplacement: 'normals', fit: 'anywhere', difficultyMode: 'random', difficultyStrictness: 'loose', typeReplacement: 'disabled' };
   assert.deepEqual(problemsOf({ algorithm: 'permutation-v1', ...neutral }), []);
   assert.deepEqual(problemsOf({ algorithm: 'sampling-v1', ...neutral, fit: 'fits' }), []);
   assert.match(problemsOf({ algorithm: 'sampling-v1', ...neutral }, { implemented: ['permutation-v1'] }).join(' '), /ENEMY_PLACEMENT_ALGORITHM_UNAVAILABLE/);

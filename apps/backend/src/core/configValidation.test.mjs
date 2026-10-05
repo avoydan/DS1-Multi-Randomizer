@@ -38,7 +38,7 @@ function validConfig() {
       pinwheelChaos: false,
       gwynNerf: 'medium',
       secondGargoyle: 'replace',
-      placement: { algorithm: 'permutation-v1', replacementChance: 100, normalReplacement: 'normals', fit: 'anywhere', difficultyMode: 'random', difficultyStrictness: 'loose' },
+      placement: { algorithm: 'permutation-v1', replacementChance: 100, normalReplacement: 'normals', fit: 'anywhere', difficultyMode: 'random', difficultyStrictness: 'loose', typeReplacement: 'disabled' },
     },
     fog: {
       enabled: true,

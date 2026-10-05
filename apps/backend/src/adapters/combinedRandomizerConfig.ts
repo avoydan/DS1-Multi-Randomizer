@@ -1,4 +1,4 @@
-import type { DifficultyMode, DifficultyStrictness, EnemyPlacementAlgorithm, NormalEnemyReplacementMode, PlacementFitMode, EnemyScaling, GwynNerfMode, SecondGargoyleMode, SoulItemsMode, StartingItemsMode } from '@ds1tr/contracts';
+import type { DifficultyMode, DifficultyStrictness, TypeReplacementMode, EnemyPlacementAlgorithm, NormalEnemyReplacementMode, PlacementFitMode, EnemyScaling, GwynNerfMode, SecondGargoyleMode, SoulItemsMode, StartingItemsMode } from '@ds1tr/contracts';
 import { enemyPlacementUnavailableMessage, ENEMY_PLACEMENT_UNAVAILABLE, isEnemyPlacementImplemented } from '../core/enemyPlacement.js';
 import type { CombinedRandomizerRequest } from './combinedRandomizerAdapter.js';
 
@@ -35,6 +35,7 @@ export interface UpstreamCombinedRandomizerConfig {
   enemyPlacementFit: PlacementFitMode;
   enemyDifficultyMode: DifficultyMode;
   enemyDifficultyStrictness: DifficultyStrictness;
+  enemyTypeReplacement: TypeReplacementMode;
   placementDiagnosticsLevel: 'summary' | 'detail';
   generateSpoilerLog: boolean;
 }
@@ -97,6 +98,7 @@ export function mapCombinedRandomizerConfig(
     enemyPlacementFit: request.enemies.placement.fit,
     enemyDifficultyMode: request.enemies.placement.difficultyMode,
     enemyDifficultyStrictness: request.enemies.placement.difficultyStrictness,
+    enemyTypeReplacement: request.enemies.placement.typeReplacement,
     placementDiagnosticsLevel: request.placementDiagnosticsLevel ?? 'summary',
     generateSpoilerLog: request.generateSpoilerLog,
   };

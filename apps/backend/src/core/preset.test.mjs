@@ -9,7 +9,7 @@ function config() {
       guaranteeEarlyWeapon: true, balancedEarlyLoot: true, randomizeStartingClass: false,
       randomizeStartingEquipment: false, randomizeGifts: false, randomizeEnemyDrops: false,
       guaranteedEnemyDrops: false, randomizeShops: false, fashionSouls: false, soulItems: 'replaced', startingItems: 'shield-1h' },
-    enemies: { enabled: true, randomizeRegularEnemies: true, randomizeBosses: true, scaling: 'progressive', replaceMimics: false, replaceRespawningMosquitoes: true, preventSameEnemy: true, pinwheelChaos: true, gwynNerf: 'strong', secondGargoyle: 'keep', placement: { algorithm: 'permutation-v1', replacementChance: 100, normalReplacement: 'normals', fit: 'anywhere', difficultyMode: 'random', difficultyStrictness: 'loose' } },
+    enemies: { enabled: true, randomizeRegularEnemies: true, randomizeBosses: true, scaling: 'progressive', replaceMimics: false, replaceRespawningMosquitoes: true, preventSameEnemy: true, pinwheelChaos: true, gwynNerf: 'strong', secondGargoyle: 'keep', placement: { algorithm: 'permutation-v1', replacementChance: 100, normalReplacement: 'normals', fit: 'anywhere', difficultyMode: 'random', difficultyStrictness: 'loose', typeReplacement: 'disabled' } },
     fog: { enabled: true, traversableFogs: true, bossFogs: true, areaWarps: true, majorPvpFogs: true,
       minorPvpFogs: false, lordvesselGates: false, randomStart: false, disconnectedFogs: false,
       noFallBedOfChaos: false, scaling: true, glitchedLogic: false, requireLordSouls: true,
@@ -34,7 +34,7 @@ test('import rejects malformed, foreign and unsupported presets', () => {
   assert.equal(importPreset('[]').ok, false);
   const preset = exportPreset(config());
   assert.match(importPreset(JSON.stringify({ ...preset, format: 'other' })).problems.join(' '), /format/);
-  assert.match(importPreset(JSON.stringify({ ...preset, presetVersion: 8 })).problems.join(' '), /version/);
+  assert.match(importPreset(JSON.stringify({ ...preset, presetVersion: 9 })).problems.join(' '), /version/);
   assert.match(importPreset(JSON.stringify({ ...preset, gamePath: 'C:/x' })).problems.join(' '), /gamePath is not supported/);
   const unknown = { ...preset, fog: { ...preset.fog, bogus: true } };
   assert.match(importPreset(JSON.stringify(unknown)).problems.join(' '), /bogus is not supported/);
@@ -54,7 +54,7 @@ test('a version-1 preset is migrated with the legacy defaults', () => {
   for (const key of ['pinwheelChaos', 'gwynNerf', 'secondGargoyle', 'placement']) delete v1.enemies[key];
   const imported = importPreset(JSON.stringify(v1));
   assert.equal(imported.ok, true);
-  assert.equal(imported.preset.presetVersion, 7);
+  assert.equal(imported.preset.presetVersion, 8);
   assert.equal(imported.preset.items.fashionSouls, true);
   assert.equal(imported.preset.enemies.replaceMimics, true);
   assert.equal(imported.preset.enemies.replaceRespawningMosquitoes, true);
@@ -64,7 +64,7 @@ test('a version-1 preset is migrated with the legacy defaults', () => {
   assert.equal(imported.preset.items.startingItems, 'mixed-pool');
   assert.equal(imported.preset.enemies.pinwheelChaos, false);
   assert.equal(imported.preset.enemies.gwynNerf, 'none');
-  assert.deepEqual(imported.preset.enemies.placement, { algorithm: 'permutation-v1', replacementChance: 100, normalReplacement: 'normals', fit: 'anywhere', difficultyMode: 'random', difficultyStrictness: 'loose' });
+  assert.deepEqual(imported.preset.enemies.placement, { algorithm: 'permutation-v1', replacementChance: 100, normalReplacement: 'normals', fit: 'anywhere', difficultyMode: 'random', difficultyStrictness: 'loose', typeReplacement: 'disabled' });
   // A version-1 document must not already carry version-2 keys.
   const smuggled = JSON.parse(JSON.stringify(v1));
   smuggled.items.fashionSouls = false;
@@ -73,7 +73,7 @@ test('a version-1 preset is migrated with the legacy defaults', () => {
 
 test('a version-2 preset round-trips the Batch 1 options', () => {
   const preset = exportPreset(config());
-  assert.equal(preset.presetVersion, 7);
+  assert.equal(preset.presetVersion, 8);
   assert.equal(preset.items.fashionSouls, false);
   assert.equal(preset.enemies.replaceMimics, false);
   assert.equal(preset.enemies.preventSameEnemy, true);
@@ -90,7 +90,7 @@ test('a version-2 preset is migrated with the behavior-preserving Batch 2 values
   for (const key of ['pinwheelChaos', 'gwynNerf', 'secondGargoyle', 'placement']) delete v2.enemies[key];
   const imported = importPreset(JSON.stringify(v2));
   assert.equal(imported.ok, true);
-  assert.equal(imported.preset.presetVersion, 7);
+  assert.equal(imported.preset.presetVersion, 8);
   assert.equal(imported.preset.items.fashionSouls, false, 'version-2 keys are kept');
   assert.equal(imported.preset.items.soulItems, 'shuffled');
   assert.equal(imported.preset.items.startingItems, 'mixed-pool');
@@ -125,7 +125,7 @@ test('presets of versions 1 to 3 migrate the second Gargoyle to the earlier sing
     }
     const imported = importPreset(JSON.stringify(old));
     assert.equal(imported.ok, true, `version ${version}`);
-    assert.equal(imported.preset.presetVersion, 7);
+    assert.equal(imported.preset.presetVersion, 8);
     // Not the new legacy default: the old preset keeps reproducing the old Bell Gargoyle handling.
     assert.equal(imported.preset.enemies.secondGargoyle, 'single-boss');
     const smuggled = JSON.parse(JSON.stringify(old));
@@ -134,15 +134,16 @@ test('presets of versions 1 to 3 migrate the second Gargoyle to the earlier sing
   }
 });
 
-test('presets of versions 1 to 6 migrate to permutation-v1 with neutral sampling settings; version 7 states them', () => {
+test('presets of versions 1 to 7 migrate to permutation-v1 with neutral sampling settings; version 8 states them', () => {
   const v6 = exportPreset(config());
-  assert.equal(v6.presetVersion, 7);
-  assert.deepEqual(v6.enemies.placement, { algorithm: 'permutation-v1', replacementChance: 100, normalReplacement: 'normals', fit: 'anywhere', difficultyMode: 'random', difficultyStrictness: 'loose' });
-  for (const version of [1, 2, 3, 4, 5, 6]) {
+  assert.equal(v6.presetVersion, 8);
+  assert.deepEqual(v6.enemies.placement, { algorithm: 'permutation-v1', replacementChance: 100, normalReplacement: 'normals', fit: 'anywhere', difficultyMode: 'random', difficultyStrictness: 'loose', typeReplacement: 'disabled' });
+  for (const version of [1, 2, 3, 4, 5, 6, 7]) {
     const old = JSON.parse(JSON.stringify(v6));
     old.presetVersion = version;
     // Version 6 had the algorithm and the first three settings, version 5 the algorithm only; versions 1-4 no placement section.
-    if (version === 6) old.enemies.placement = { algorithm: 'permutation-v1', replacementChance: 100, normalReplacement: 'normals', fit: 'anywhere' };
+    if (version === 7) old.enemies.placement = { algorithm: 'permutation-v1', replacementChance: 100, normalReplacement: 'normals', fit: 'anywhere', difficultyMode: 'random', difficultyStrictness: 'loose' };
+    else if (version === 6) old.enemies.placement = { algorithm: 'permutation-v1', replacementChance: 100, normalReplacement: 'normals', fit: 'anywhere' };
     else if (version === 5) old.enemies.placement = { algorithm: 'permutation-v1' };
     else delete old.enemies.placement;
     if (version <= 3) delete old.enemies.secondGargoyle;
@@ -156,10 +157,10 @@ test('presets of versions 1 to 6 migrate to permutation-v1 with neutral sampling
     }
     const imported = importPreset(JSON.stringify(old));
     assert.equal(imported.ok, true, `version ${version}: ${(imported.problems ?? []).join(' ')}`);
-    assert.deepEqual(imported.preset.enemies.placement, { algorithm: 'permutation-v1', replacementChance: 100, normalReplacement: 'normals', fit: 'anywhere', difficultyMode: 'random', difficultyStrictness: 'loose' }, `version ${version}`);
+    assert.deepEqual(imported.preset.enemies.placement, { algorithm: 'permutation-v1', replacementChance: 100, normalReplacement: 'normals', fit: 'anywhere', difficultyMode: 'random', difficultyStrictness: 'loose', typeReplacement: 'disabled' }, `version ${version}`);
     // An old document must not already carry the newer keys.
     const smuggled = JSON.parse(JSON.stringify(old));
-    smuggled.enemies.placement = version === 6 ? { algorithm: 'sampling-v1', replacementChance: 50, normalReplacement: 'normals', fit: 'fits', difficultyMode: 'curve' } : { algorithm: 'sampling-v1', replacementChance: 50 };
+    smuggled.enemies.placement = version === 7 ? { algorithm: 'sampling-v1', replacementChance: 50, normalReplacement: 'normals', fit: 'fits', difficultyMode: 'curve', difficultyStrictness: 'strict', typeReplacement: 'enabled' } : version === 6 ? { algorithm: 'sampling-v1', replacementChance: 50, normalReplacement: 'normals', fit: 'fits', difficultyMode: 'curve' } : { algorithm: 'sampling-v1', replacementChance: 50 };
     assert.match(importPreset(JSON.stringify(smuggled)).problems.join(' '), new RegExp(`not supported in version ${version}`));
     if (version === 5) {
       const sneaky = JSON.parse(JSON.stringify(old));
@@ -183,7 +184,7 @@ test('a version-6 preset states every placement setting; sampling-v1 round-trips
   assert.equal(importPreset(JSON.stringify(missingSection)).ok, false);
 
   const sampling = JSON.parse(JSON.stringify(preset));
-  sampling.enemies.placement = { algorithm: 'sampling-v1', replacementChance: 35, normalReplacement: 'normals', fit: 'fits', difficultyMode: 'random', difficultyStrictness: 'loose' };
+  sampling.enemies.placement = { algorithm: 'sampling-v1', replacementChance: 35, normalReplacement: 'normals', fit: 'fits', difficultyMode: 'random', difficultyStrictness: 'loose', typeReplacement: 'disabled' };
   const text = JSON.stringify(sampling);
   const imported = importPreset(text);
   assert.equal(imported.ok, true, (imported.problems ?? []).join(' '));
@@ -211,7 +212,29 @@ test('sampling-only settings are rejected under permutation-v1 and validated und
   }
   for (const chance of [0, 1, 99, 100]) {
     const document = JSON.parse(JSON.stringify(preset));
-    document.enemies.placement = { algorithm: 'sampling-v1', replacementChance: chance, normalReplacement: 'none', fit: 'anywhere-except-npcs', difficultyMode: 'random', difficultyStrictness: 'loose' };
+    document.enemies.placement = { algorithm: 'sampling-v1', replacementChance: chance, normalReplacement: 'none', fit: 'anywhere-except-npcs', difficultyMode: 'random', difficultyStrictness: 'loose', typeReplacement: 'disabled' };
     assert.equal(importPreset(JSON.stringify(document)).ok, true, `chance ${chance}`);
   }
 });
+
+test('Type replacement round-trips in a sampling preset, is required in version 8 and refused under permutation-v1', () => {
+  const preset = exportPreset(config());
+  for (const value of ['enabled', 'enabled-except-roaming-bosses', 'disabled']) {
+    const document = JSON.parse(JSON.stringify(preset));
+    document.enemies.placement = { algorithm: 'sampling-v1', replacementChance: 70, normalReplacement: 'normals', fit: 'fits', difficultyMode: 'curve', difficultyStrictness: 'strict', typeReplacement: value };
+    const text = JSON.stringify(document);
+    const imported = importPreset(text);
+    assert.equal(imported.ok, true, (imported.problems ?? []).join(' '));
+    assert.equal(JSON.stringify(imported.preset), text, 'export reproduces the document');
+  }
+  const missing = JSON.parse(JSON.stringify(preset));
+  delete missing.enemies.placement.typeReplacement;
+  assert.match(importPreset(JSON.stringify(missing)).problems.join(' '), /typeReplacement is required/);
+  const classic = JSON.parse(JSON.stringify(preset));
+  classic.enemies.placement.typeReplacement = 'enabled';
+  assert.match(importPreset(JSON.stringify(classic)).problems.join(' '), /only applies to sampling-v1/);
+  const bad = JSON.parse(JSON.stringify(preset));
+  bad.enemies.placement = { ...bad.enemies.placement, algorithm: 'sampling-v1', typeReplacement: 'sometimes' };
+  assert.equal(importPreset(JSON.stringify(bad)).ok, false);
+});
+
