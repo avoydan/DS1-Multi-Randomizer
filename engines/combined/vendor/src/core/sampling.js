@@ -25,8 +25,10 @@ import {
   MODEL_BUDGET_CAP,
   ModelBudget,
   ModelBudgetError,
+  ModelLedger,
   createPlacementDiagnostics,
   createSlotStream,
+  createTypeStream,
 } from "./placement.js";
 
 const compare = (left, right) => (left < right ? -1 : left > right ? 1 : 0);
@@ -294,28 +296,140 @@ export function buildMapModelSet({ mapId, cap, fixedModels, participants, sizeOf
  */
 export const effectiveModelBudget = (baseline, cap = MODEL_BUDGET_CAP) => Math.max(cap, baseline);
 
+// ---- candidate pool ----------------------------------------------------------------------------------------------------
+
+/**
+ * The replacement types the sampler may draw from. Today every regular model qualifies; a custom enemy pool only has
+ * to pass `accept` (a predicate over a class-table type) and nothing downstream - slot sampling, Type replacement
+ * groups, the in-set fallback - changes.
+ */
+export function createCandidatePool(table, accept = () => true) {
+  const types = table.types.filter(accept);
+  return Object.freeze({ types, models: new Set(types.map((type) => type.model)), total: types.length });
+}
+
 // ---- fallback ladder -----------------------------------------------------------------------------------------------
 
 /**
- * What a slot receives when the sampled draw found no candidate (model document 6.7, regular slots). Pure and
- * bounded: every rung is a scan over a sorted list, nothing draws again.
- *   kept-vanilla - the slot's own model is in the set or the set has room (allowed under Prevent same);
- *   in-set-fit   - the smallest in-set type that fits the slot (and is not its own model under Prevent same);
+ * What a slot (or a Type replacement group) receives when the sampled draw found no candidate (model document 6.7,
+ * regular slots). Pure and bounded: every rung is a scan over a sorted list, nothing draws again.
+ *   kept-vanilla - the subject's own model is in the set or the set has room (allowed under Prevent same);
+ *   in-set-fit   - the smallest in-set type that fits (and is not its own model under Prevent same, nor in `excluded`);
  *   infeasible   - nothing is left; the caller retries the map with attempt-specific streams, and raises
  *                  ENEMY_PLACEMENT_INFEASIBLE when every attempt fails.
- * There is deliberately no "fit relaxed" rung: with the non-worsening budget a slot can be left without any
+ * There is deliberately no "fit relaxed" rung: with the non-worsening budget a subject can be left without any
  * fitting type only when the map has no headroom, and placing an oversized type would break the documented fit
  * invariant. `chosen` is null for kept-vanilla and infeasible. The in-set rung ignores difficulty (a counted
  * difficulty lapse): physical fit is never relaxed, difficulty may be.
  */
-export function fallbackLadder({ slot, budget, table, maxSize, preventSame }) {
+export function fallbackLadder({ slot, budget, table, pool = null, maxSize, preventSame, excluded = new Set() }) {
   if (budget.evaluate(slot.modelName).admitted) return { stage: "kept-vanilla", chosen: null };
   const inSet = budget.models().map((model) => table.byModel.get(model)).filter(Boolean)
-    .filter((type) => !(preventSame && type.model === slot.modelName))
+    .filter((type) => !pool || pool.models.has(type.model))
+    .filter((type) => !(preventSame && type.model === slot.modelName) && !excluded.has(type.model))
+    .filter((type) => budget.evaluate(type.model).admitted)
     .sort((left, right) => left.size - right.size || compare(left.model, right.model));
   const fitting = inSet.find((type) => type.size <= maxSize);
   if (fitting) return { stage: "in-set-fit", chosen: fitting };
   return { stage: "infeasible", chosen: null };
+}
+
+/**
+ * Last rung of a Type replacement group (after sampling, keeping the original model and the injective in-set scan):
+ * give the group a model that is already in the map even if another group received it, i.e. relax the legacy rule that
+ * two kinds in one map never get the same replacement. The rule is a variety preference of the original tool; the model
+ * budget is a safety limit, and with a fixed cap and many groups the preference cannot always hold. Only models that
+ * fit every member (and are not the group's own under Prevent same) qualify; models held by something that stays
+ * (solid) come first because they shrink the map, then the nearest difficulty class, then the model id; ties are
+ * broken by one draw. Bounded and never relaxes fit or the budget.
+ */
+export function sharedFallback({ group, budget, pool, table, maxSize, preventSame, destination, rng }) {
+  const candidates = budget.models()
+    .map((model) => table.byModel.get(model))
+    .filter((type) => type && pool.models.has(type.model) && type.size <= maxSize && !(preventSame && type.model === group.modelName))
+    .map((type) => ({ type, solid: budget.isSolid(type.model) ? 0 : 1, distance: Math.abs(type.difficulty - destination) }))
+    .sort((a, b) => a.solid - b.solid || a.distance - b.distance || compare(a.type.model, b.type.model));
+  if (candidates.length === 0) return null;
+  const best = candidates.filter((c) => c.solid === candidates[0].solid && c.distance === candidates[0].distance);
+  return best[rng.int(best.length)].type;
+}
+
+// ---- candidate selection (shared by slots and Type replacement groups) ----------------------------------------------------
+
+/**
+ * Steps 3-8 of the filtering order for one subject: a slot, or a Type replacement group (id, modelName). Draws only
+ * from `rng`. `excluded` holds the models already given to other groups of the map (Type replacement injectivity);
+ * it is empty for ordinary slots.
+ */
+function sampleCandidate({ rng, subject, mapId, maxSize, destinationOf, settings, pool, budget, preventSame, excluded, diagnostics }) {
+  const curve = CURVE_MODES.has(settings.difficultyMode);
+  const easyAsylum = EASY_ASYLUM_MODES.has(settings.difficultyMode) && mapId === EASY_ASYLUM_MAP;
+  const fitPool = pool.types.filter((type) => type.size <= maxSize);
+  const rejected = [];
+  const info = {};
+  let budgetBlocked = false;
+
+  // Candidate pools, tried in order; each is drawn uniformly with list shrink (steps 5-8 of the filtering order).
+  const pools = [];
+  if (easyAsylum) {
+    pools.push(fitPool.filter((type) => type.difficulty <= EASY_ASYLUM_MAX_CLASS));
+  } else if (curve) {
+    const destination = destinationOf();
+    const target = difficultyTargetClass(destination, settings.difficultyStrictness, rng.int(100));
+    info.destinationClass = destination;
+    info.targetClass = target;
+    const targetPool = fitPool.filter((type) => type.difficulty === target);
+    if (targetPool.length === 0) {
+      diagnostics.count("classFallbacks");
+      rejected.push({ model: `class-${target}`, reason: "difficulty-empty" });
+    } else {
+      pools.push(targetPool);
+    }
+    if (target !== destination) pools.push(fitPool.filter((type) => type.difficulty === destination));
+  } else {
+    pools.push(fitPool);
+  }
+  if (pools.length > 0) diagnostics.count("candidatesOutOfClass", Math.max(0, fitPool.length - pools[0].length));
+
+  const draw = (poolList) => {
+    const list = [...poolList];
+    while (list.length > 0) {
+      const index = rng.int(list.length);
+      const candidate = list[index];
+      if (preventSame && candidate.model === subject.modelName) {
+        rejected.push({ model: candidate.model, reason: "prevent-same" });
+      } else if (excluded.has(candidate.model)) {
+        rejected.push({ model: candidate.model, reason: "type-injectivity" });
+      } else if (!budget.evaluate(candidate.model).admitted) {
+        rejected.push({ model: candidate.model, reason: "model-budget" });
+        budgetBlocked = true;
+      } else {
+        return candidate;
+      }
+      list.splice(index, 1);
+    }
+    return null;
+  };
+
+  let chosen = null;
+  for (let i = 0; i < pools.length && !chosen; i += 1) {
+    chosen = draw(pools[i]);
+    if (!chosen && i > 0) diagnostics.count("classFallbacks");
+  }
+  // Difficulty lapse (model document D-1): a full map keeps the class filter while it can and, only when the budget
+  // has removed every candidate of the wanted classes, widens it class by class away from the destination. The
+  // physical fit is never relaxed.
+  if (!chosen && curve && !easyAsylum && budgetBlocked) {
+    // Nearest classes first: the classes at distance 1 from the destination (either side), then 2, ... 7.
+    const destination = info.destinationClass;
+    for (let distance = 1; distance <= MAX_DIFFICULTY_CLASS && !chosen; distance += 1) {
+      chosen = draw(fitPool.filter((type) => Math.abs(type.difficulty - destination) === distance));
+    }
+    if (chosen) diagnostics.count("difficultyLapses");
+  }
+  const sizeRejections = pool.total - fitPool.length;
+  if (sizeRejections > 0) diagnostics.count("candidatesOverSize", sizeRejections);
+  return { chosen, rejected, info, curve, easyAsylum, sizeRejections };
 }
 
 // ---- the planner ------------------------------------------------------------------------------------------------------
@@ -329,27 +443,32 @@ export const MAP_ATTEMPTS = 3;
  *
  * @param {object} input
  * @param {string} input.seed                    combined seed (the stream seed of the whole run)
- * @param {{replacementChance:number, normalReplacement:string, fit:string, difficultyMode:string, difficultyStrictness:string}} input.options
+ * @param {{replacementChance:number, normalReplacement:string, fit:string, difficultyMode:string, difficultyStrictness:string, typeReplacement:string}} input.options
  * @param {boolean} input.preventSame
  * @param {Array<object>} input.slots            regular catalog slots (class table is derived from these)
  * @param {Array<object>} [input.extraSlots]     further regular-class slots with no type of their own (Pinwheel clones)
  * @param {Map<string, Set<string>>} input.fixedModelsByMap
  * @param {object} input.diagnostics             from createPlacementDiagnostics
+ * @param {(type: object) => boolean} [input.candidateFilter]  restricts the replacement types (custom pool hook)
  */
 export function planSampledRegularEnemies({
-  seed, options, preventSame, slots, extraSlots = [], fixedModelsByMap, diagnostics, cap = MODEL_BUDGET_CAP, mapAttempts = MAP_ATTEMPTS,
+  seed, options, preventSame, slots, extraSlots = [], fixedModelsByMap, diagnostics, cap = MODEL_BUDGET_CAP,
+  mapAttempts = MAP_ATTEMPTS, candidateFilter = undefined,
 }) {
   const settings = {
     ...options,
     difficultyMode: options.difficultyMode ?? "random",
     difficultyStrictness: options.difficultyStrictness ?? "loose",
+    typeReplacement: options.typeReplacement ?? "disabled",
   };
   const table = deriveRegularClassTable(slots);
+  const pool = createCandidatePool(table, candidateFilter);
   diagnostics.classTableHash = table.hash;
   diagnostics.options = { ...settings, preventSame };
   const assignment = new Map();
   const all = [...slots, ...extraSlots];
   const mapIds = [...new Set(all.map((slot) => slot.mapId))].sort(compare);
+  const planMap = settings.typeReplacement === "disabled" ? planMapAttempt : planMapByType;
 
   for (const mapId of mapIds) {
     const mapSlots = all.filter((slot) => slot.mapId === mapId).sort((left, right) => compare(left.id, right.id));
@@ -358,11 +477,12 @@ export function planSampledRegularEnemies({
     for (let attempt = 0; attempt < mapAttempts; attempt += 1) {
       const scratch = createPlacementDiagnostics({ algorithm: "sampling-v1", level: diagnostics.level });
       try {
-        planned = planMapAttempt({ seed, settings, preventSame, table, mapId, mapSlots, attempt, fixedModelsByMap, cap, diagnostics: scratch });
+        planned = planMap({ seed, settings, preventSame, table, pool, mapId, mapSlots, attempt, fixedModelsByMap, cap, diagnostics: scratch });
       } catch (error) {
         if (!(error instanceof EnemyPlacementInfeasibleError)) throw error;
         lastError = error;
         diagnostics.count("mapAttemptsFailed");
+        if (settings.typeReplacement !== "disabled") diagnostics.count("typeMapAttemptsFailed");
         diagnostics.addRetry({ mapId, attempt, slotId: error.slotId, baseline: error.baseline, effectiveCap: error.effectiveCap });
         continue;
       }
@@ -377,9 +497,10 @@ export function planSampledRegularEnemies({
       diagnostics.peak("maxMapAttempt", mapAttempts - 1);
       throw new EnemyPlacementInfeasibleError(mapId, lastError.slotId,
         `${mapAttempts} map attempts failed; last: ${lastError.detail}; difficulty ${settings.difficultyMode}/${settings.difficultyStrictness}, fit ${settings.fit}, `
-        + `prevent same ${preventSame}, chance ${settings.replacementChance}%, baseline ${lastError.baseline}, effective cap ${lastError.effectiveCap}`,
+        + `type replacement ${settings.typeReplacement}, prevent same ${preventSame}, chance ${settings.replacementChance}%, `
+        + `baseline ${lastError.baseline}, effective cap ${lastError.effectiveCap}`,
         { attempts: mapAttempts, baseline: lastError.baseline, effectiveCap: lastError.effectiveCap, difficultyMode: settings.difficultyMode,
-          difficultyStrictness: settings.difficultyStrictness, fit: settings.fit, terminal: lastError.detail });
+          difficultyStrictness: settings.difficultyStrictness, fit: settings.fit, typeReplacement: settings.typeReplacement, terminal: lastError.detail });
     }
     for (const [slotId, source] of planned.assignment) assignment.set(slotId, source);
     diagnostics.setMap(mapId, { ...planned.info, attempts: planned.attempt + 1 });
@@ -387,12 +508,38 @@ export function planSampledRegularEnemies({
   return { assignment, table };
 }
 
-/** One attempt at one map. Pure; throws EnemyPlacementInfeasibleError (with baseline/cap) when a slot cannot be placed. */
-function planMapAttempt({ seed, settings, preventSame, table, mapId, mapSlots, attempt, fixedModelsByMap, cap, diagnostics }) {
+/** Steps shared by both modes once participation is decided: baseline, effective cap, model set. */
+function mapBudget({ mapId, fixedModelsByMap, nonParticipantModels, cap, participants, sizeOf, fitSize, preventSame, table, diagnostics }) {
+  const fixedModels = new Set(fixedModelsByMap.get(mapId) ?? []);
+  for (const model of nonParticipantModels) fixedModels.add(model);
+  // Non-worsening budget: the models the sampler cannot remove (fixed plans and the vanilla models of slots
+  // it leaves alone) are the baseline. The map may hold `cap` models, or its baseline when that is larger;
+  // the sampler never takes it above that.
+  const baseline = fixedModels.size;
+  const mapCap = effectiveModelBudget(baseline, cap);
+  if (baseline > cap) diagnostics.count("mapsAboveCap");
+  const { budget, kept, trimmed } = buildMapModelSet({ mapId, cap: mapCap, fixedModels, participants, sizeOf, fitSize, preventSame, table });
+  if (trimmed > 0) diagnostics.count("reserveTrimmed", trimmed);
+  return { budget, kept, baseline, mapCap };
+}
+
+/** Post-condition: the models the map really holds after the run (what DsrDataTool keeps) fit the cap. */
+function finalizeMap({ mapId, fixedModelsByMap, mapSlots, modelOfSlot, mapCap, assignment, budget, baseline, attempt, extra = {} }) {
+  const finalModels = new Set(fixedModelsByMap.get(mapId) ?? []);
+  for (const slot of mapSlots) finalModels.add(modelOfSlot.get(slot.id));
+  if (finalModels.size > mapCap) throw new ModelBudgetError(mapId, mapCap, [...finalModels].sort(compare));
+  const replaced = mapSlots.filter((slot) => assignment.has(slot.id)).length;
+  return {
+    assignment,
+    attempt,
+    info: { slots: mapSlots.length, replaced, finalModels: finalModels.size, modelSet: budget.size, baseline, effectiveCap: mapCap, ...extra },
+  };
+}
+
+/** One attempt at one map, slot by slot (Type replacement disabled). Throws EnemyPlacementInfeasibleError (with baseline/cap). */
+function planMapAttempt({ seed, settings, preventSame, table, pool, mapId, mapSlots, attempt, fixedModelsByMap, cap, diagnostics }) {
   const sizeOf = (slot) => slotSizeClass(table, slot);
   const fitSize = (slot) => (settings.fit === "fits" ? sizeOf(slot) : UNKNOWN_SLOT_SIZE);
-  const curve = CURVE_MODES.has(settings.difficultyMode);
-  const easyAsylum = EASY_ASYLUM_MODES.has(settings.difficultyMode) && mapId === EASY_ASYLUM_MAP;
   const streams = new Map(mapSlots.map((slot) => [slot.id, createSlotStream(seed, slot.id, attempt)]));
   const participates = new Map();
   for (const slot of mapSlots) {
@@ -407,21 +554,14 @@ function planMapAttempt({ seed, settings, preventSame, table, mapId, mapSlots, a
       if (!passes) diagnostics.count("keptByChance");
     }
   }
-  const fixedModels = new Set(fixedModelsByMap.get(mapId) ?? []);
-  for (const slot of mapSlots) if (!participates.get(slot.id)) fixedModels.add(slot.modelName);
-  // Non-worsening budget: the models the sampler cannot remove (fixed plans and the vanilla models of slots
-  // it leaves alone) are the baseline. The map may hold `cap` models, or its baseline when that is larger;
-  // the sampler never takes it above that.
-  const baseline = fixedModels.size;
-  const mapCap = effectiveModelBudget(baseline, cap);
-  if (baseline > cap) diagnostics.count("mapsAboveCap");
-  const { budget, kept, trimmed } = buildMapModelSet({
-    mapId, cap: mapCap, fixedModels, participants: mapSlots.filter((slot) => participates.get(slot.id)), sizeOf, fitSize, preventSame, table,
+  const { budget, kept, baseline, mapCap } = mapBudget({
+    mapId, fixedModelsByMap, nonParticipantModels: mapSlots.filter((slot) => !participates.get(slot.id)).map((slot) => slot.modelName),
+    cap, participants: mapSlots.filter((slot) => participates.get(slot.id)), sizeOf, fitSize, preventSame, table, diagnostics,
   });
-  if (trimmed > 0) diagnostics.count("reserveTrimmed", trimmed);
   const active = new Set(kept.map((slot) => slot.id));
   const assignment = new Map();
   const modelOfSlot = new Map();
+  const noExclusions = new Set();
 
   for (const slot of mapSlots) {
     if (!active.has(slot.id)) {
@@ -431,73 +571,17 @@ function planMapAttempt({ seed, settings, preventSame, table, mapId, mapSlots, a
     }
     const rng = streams.get(slot.id);
     const maxSize = fitSize(slot);
-    const fitPool = table.types.filter((type) => type.size <= maxSize);
-    const rejected = [];
-    const info = { attempt };
-    let budgetBlocked = false;
-
-    // Candidate pools, tried in order; each is drawn uniformly with list shrink (steps 5-8 of the filtering order).
-    const pools = [];
-    if (easyAsylum) {
-      pools.push(fitPool.filter((type) => type.difficulty <= EASY_ASYLUM_MAX_CLASS));
-    } else if (curve) {
-      const destination = slotDifficultyClass(table, slot);
-      const target = difficultyTargetClass(destination, settings.difficultyStrictness, rng.int(100));
-      info.destinationClass = destination;
-      info.targetClass = target;
-      const targetPool = fitPool.filter((type) => type.difficulty === target);
-      if (targetPool.length === 0) {
-        diagnostics.count("classFallbacks");
-        rejected.push({ model: `class-${target}`, reason: "difficulty-empty" });
-      } else {
-        pools.push(targetPool);
-      }
-      if (target !== destination) pools.push(fitPool.filter((type) => type.difficulty === destination));
-    } else {
-      pools.push(fitPool);
-    }
-    if (pools.length > 0) diagnostics.count("candidatesOutOfClass", Math.max(0, fitPool.length - pools[0].length));
-
-    const draw = (poolList) => {
-      const list = [...poolList];
-      while (list.length > 0) {
-        const index = rng.int(list.length);
-        const candidate = list[index];
-        if (preventSame && candidate.model === slot.modelName) {
-          rejected.push({ model: candidate.model, reason: "prevent-same" });
-        } else if (!budget.evaluate(candidate.model).admitted) {
-          rejected.push({ model: candidate.model, reason: "model-budget" });
-          budgetBlocked = true;
-        } else {
-          return candidate;
-        }
-        list.splice(index, 1);
-      }
-      return null;
-    };
-
-    let chosen = null;
+    const sampled = sampleCandidate({
+      rng, subject: slot, mapId, maxSize, destinationOf: () => slotDifficultyClass(table, slot), settings, pool, budget, preventSame,
+      excluded: noExclusions, diagnostics,
+    });
+    const rejected = sampled.rejected;
+    const info = { attempt, ...sampled.info };
+    let chosen = sampled.chosen;
     let stage = "sampled";
-    for (let i = 0; i < pools.length && !chosen; i += 1) {
-      chosen = draw(pools[i]);
-      if (!chosen && i > 0) diagnostics.count("classFallbacks");
-    }
-    // Difficulty lapse (model document D-1): a full map keeps the class filter while it can and, only when the budget
-    // has removed every candidate of the wanted classes, widens it class by class away from the destination. The
-    // physical fit is never relaxed.
-    if (!chosen && curve && !easyAsylum && budgetBlocked) {
-      // Nearest classes first: the classes at distance 1 from the destination (either side), then 2, ... 7.
-      const destination = info.destinationClass;
-      for (let distance = 1; distance <= MAX_DIFFICULTY_CLASS && !chosen; distance += 1) {
-        chosen = draw(fitPool.filter((type) => Math.abs(type.difficulty - destination) === distance));
-      }
-      if (chosen) diagnostics.count("difficultyLapses");
-    }
-    const sizeRejections = table.types.length - fitPool.length;
-    if (sizeRejections > 0) diagnostics.count("candidatesOverSize", sizeRejections);
 
     if (!chosen) {
-      const fallback = fallbackLadder({ slot, budget, table, maxSize, preventSame });
+      const fallback = fallbackLadder({ slot, budget, table, pool, maxSize, preventSame });
       stage = fallback.stage;
       chosen = fallback.chosen;
       if (stage === "infeasible") {
@@ -507,7 +591,7 @@ function planMapAttempt({ seed, settings, preventSame, table, mapId, mapSlots, a
           { baseline, effectiveCap: mapCap, detail: `slot ${slot.id}, attempt ${attempt}` });
       }
       if (stage === "kept-vanilla") budget.admit(slot.modelName);
-      else if (chosen && (curve || easyAsylum)) diagnostics.count("difficultyLapses");
+      else if (chosen && (sampled.curve || sampled.easyAsylum)) diagnostics.count("difficultyLapses");
     }
 
     if (chosen) {
@@ -524,15 +608,151 @@ function planMapAttempt({ seed, settings, preventSame, table, mapId, mapSlots, a
       diagnostics.record({ slotId: slot.id, slotClass: "normal", participates: true, category: "normal", selected: slot.modelName, stage, rejected, ...info });
     }
   }
+  return finalizeMap({ mapId, fixedModelsByMap, mapSlots, modelOfSlot, mapCap, assignment, budget, baseline, attempt });
+}
 
-  // Post-condition: the models the map really holds after the run (what DsrDataTool keeps) fit the cap.
-  const finalModels = new Set(fixedModelsByMap.get(mapId) ?? []);
-  for (const slot of mapSlots) finalModels.add(modelOfSlot.get(slot.id));
-  if (finalModels.size > mapCap) throw new ModelBudgetError(mapId, mapCap, [...finalModels].sort(compare));
-  const replaced = mapSlots.filter((slot) => assignment.has(slot.id)).length;
-  return {
-    assignment,
-    attempt,
-    info: { slots: mapSlots.length, replaced, finalModels: finalModels.size, modelSet: budget.size, baseline, effectiveCap: mapCap },
-  };
+/**
+ * One attempt at one map with Type replacement (legacy semantics, model document 10.4). The group is the original
+ * model within the map (`map:<map>:model:<model>`); it is decided once, from the group's own stream: the replacement
+ * chance, the difficulty class and the candidate draw all belong to the group, every member slot then receives the
+ * same replacement model (each slot draws only its variant from its own stream). A candidate must satisfy every member
+ * (the smallest member fit), must not be a model another group of the map already received (injectivity) and obeys
+ * Prevent same, difficulty and the model budget (a reference-counted set: see ModelLedger). A group that gets no
+ * candidate stays vanilla as a whole - the legacy outcome - or, when its model cannot stay, takes the in-set fallback
+ * and then, as the last rung, a model another group already has (sharedFallback); a group with none fails the attempt. There is no coverage reserve: every group keeps its original model as the
+ * fallback until it is decided.
+ */
+function planMapByType({ seed, settings, preventSame, table, pool, mapId, mapSlots, attempt, fixedModelsByMap, cap, diagnostics }) {
+  const sizeOf = (slot) => slotSizeClass(table, slot);
+  const fitSize = (slot) => (settings.fit === "fits" ? sizeOf(slot) : UNKNOWN_SLOT_SIZE);
+  const byModel = new Map();
+  for (const slot of mapSlots) {
+    if (!byModel.has(slot.modelName)) byModel.set(slot.modelName, []);
+    byModel.get(slot.modelName).push(slot);
+  }
+  const groups = [...byModel.keys()].sort(compare).map((model) => ({
+    id: `map:${mapId}:model:${model}`, mapId, modelName: model, members: byModel.get(model).sort((a, b) => compare(a.id, b.id)),
+  }));
+  const groupSize = (group) => Math.min(...group.members.map(sizeOf));
+  const groupFit = (group) => Math.min(...group.members.map(fitSize));
+  const typeStreams = new Map(groups.map((group) => [group.id, createTypeStream(seed, mapId, group.modelName, attempt)]));
+  const slotStreams = new Map(mapSlots.map((slot) => [slot.id, createSlotStream(seed, slot.id, attempt)]));
+  diagnostics.count("typeGroups", groups.length);
+
+  const participates = new Map();
+  for (const group of groups) {
+    if (settings.normalReplacement === "none") {
+      participates.set(group.id, false);
+      diagnostics.count("keptByMode", group.members.length);
+    } else {
+      // Legacy: the roll that counts is the first slot's of the type; here it is the group's first draw.
+      const passes = typeStreams.get(group.id).int(100) + 1 <= settings.replacementChance;
+      participates.set(group.id, passes);
+      if (!passes) {
+        diagnostics.count("keptByChance", group.members.length);
+        diagnostics.count("typeGroupsKeptByChance");
+      }
+    }
+  }
+  // Reference-counted model set. The models the sampler cannot remove (fixed plans, groups left alone) are pinned; every
+  // participating group still owns its original model until it is decided, so keeping it is always possible while the
+  // map is within its cap, and a replaced group frees its original model (unless something else still owns it).
+  const pinned = new Set(fixedModelsByMap.get(mapId) ?? []);
+  for (const group of groups) if (!participates.get(group.id)) pinned.add(group.modelName);
+  const baseline = pinned.size;
+  const mapCap = effectiveModelBudget(baseline, cap);
+  if (baseline > cap) diagnostics.count("mapsAboveCap");
+  const budget = new ModelLedger({ mapId, cap: mapCap });
+  for (const model of pinned) budget.hold(model);
+  const active = new Set(groups.filter((group) => participates.get(group.id)).map((group) => group.id));
+  for (const group of groups) if (active.has(group.id)) budget.hold(group.modelName, { pending: true });
+  if (budget.size > mapCap) diagnostics.count("typeMapsStartedOverCap");
+  const assignment = new Map();
+  const modelOfSlot = new Map();
+  const used = new Set();
+
+  for (const group of groups) {
+    const subject = { id: group.id, modelName: group.modelName, mapId };
+    if (!active.has(group.id)) {
+      for (const member of group.members) {
+        modelOfSlot.set(member.id, member.modelName);
+        diagnostics.record({ slotId: member.id, slotClass: "normal", participates: false, attempt, groupId: group.id });
+      }
+      diagnostics.recordGroup({ groupId: group.id, model: group.modelName, members: group.members.length, participates: false, attempt });
+      continue;
+    }
+    const rng = typeStreams.get(group.id);
+    const maxSize = groupFit(group);
+    budget.release(group.modelName, { pending: true }); // tentatively free the original model; a group that stays vanilla takes it back
+    const sampled = sampleCandidate({
+      rng, subject, mapId, maxSize, destinationOf: () => slotDifficultyClass(table, group.members[0]), settings, pool, budget, preventSame,
+      excluded: used, diagnostics,
+    });
+    const rejected = sampled.rejected;
+    const info = { attempt, groupId: group.id, ...sampled.info };
+    let chosen = sampled.chosen;
+    let stage = "sampled";
+    for (const entry of rejected) {
+      if (entry.reason === "prevent-same") diagnostics.count("typePreventSameRejections");
+      else if (entry.reason === "type-injectivity") diagnostics.count("typeInjectivityRejections");
+      else if (entry.reason === "difficulty-empty") diagnostics.count("typeDifficultyRejections");
+    }
+    if (sampled.sizeRejections > 0) diagnostics.count("typeFitRejections", sampled.sizeRejections);
+
+    if (!chosen) {
+      const fallback = fallbackLadder({ slot: subject, budget, table, pool, maxSize, preventSame, excluded: used });
+      stage = fallback.stage;
+      chosen = fallback.chosen;
+      if (stage === "infeasible") {
+        const shared = sharedFallback({ group, budget, pool, table, maxSize, preventSame, destination: slotDifficultyClass(table, group.members[0]), rng });
+        if (shared) {
+          chosen = shared;
+          stage = "shared-fit";
+          diagnostics.count("typeGroupsShared");
+        }
+      }
+      if (stage === "infeasible") {
+        budget.hold(group.modelName);
+        diagnostics.record({ slotId: group.members[0].id, slotClass: "normal", participates: true, category: "normal", stage, rejected, ...info });
+        throw new EnemyPlacementInfeasibleError(mapId, group.members[0].id,
+          `type group ${group.id} (${group.members.length} slots), in-set models ${budget.size}/${budget.cap}, fit ${settings.fit}, prevent same ${preventSame}`,
+          { baseline, effectiveCap: mapCap, detail: `group ${group.id}, attempt ${attempt}` });
+      }
+      diagnostics.count("typeGroupsFallback");
+      if (stage === "kept-vanilla") {
+        budget.hold(group.modelName);
+        diagnostics.count("typeGroupsKeptVanilla");
+      } else if (chosen && (sampled.curve || sampled.easyAsylum)) {
+        diagnostics.count("difficultyLapses");
+      }
+    }
+
+    if (chosen) {
+      budget.hold(chosen.model);
+      used.add(chosen.model);
+      diagnostics.count("typeGroupsReplaced");
+    }
+    group.members.forEach((member, index) => {
+      if (chosen) {
+        const variant = chosen.variants[slotStreams.get(member.id).int(chosen.variants.length)];
+        assignment.set(member.id, variant.source);
+        modelOfSlot.set(member.id, chosen.model);
+      } else {
+        modelOfSlot.set(member.id, member.modelName);
+      }
+      diagnostics.record({
+        slotId: member.id, slotClass: "normal", participates: true, category: "normal", selected: chosen ? chosen.model : member.modelName,
+        stage, rejected: index === 0 ? rejected : [], ...(chosen ? { candidateClass: chosen.difficulty } : {}), ...info,
+      });
+    });
+    diagnostics.recordGroup({
+      groupId: group.id, model: group.modelName, members: group.members.length, participates: true, selected: chosen ? chosen.model : group.modelName,
+      stage, maxSize, ...sampled.info, rejected: rejected.length, attempt,
+    });
+  }
+  if (budget.size > mapCap) {
+    throw new EnemyPlacementInfeasibleError(mapId, groups[0].members[0].id,
+      `${budget.size} models remain, above the effective cap ${mapCap}`, { baseline, effectiveCap: mapCap, detail: `map ${mapId}, attempt ${attempt}` });
+  }
+  return finalizeMap({ mapId, fixedModelsByMap, mapSlots, modelOfSlot, mapCap, assignment, budget, baseline, attempt, extra: { typeGroups: groups.length } });
 }

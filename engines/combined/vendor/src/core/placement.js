@@ -65,6 +65,12 @@ export const DIFFICULTY_MODES = Object.freeze(["curve", "random", "random-easy-a
 /** Legacy "Difficulty strictness": 0 strict, 1 a bit loose (default), 2 very loose. Only effective in the curve modes. */
 export const DIFFICULTY_STRICTNESS = Object.freeze(["strict", "loose", "very-loose"]);
 
+/**
+ * Legacy "Type replacement": 0 enabled, 1 disabled (default), 2 enabled except roaming bosses. The exception only
+ * concerns boss sources, which regular-enemy sampling never draws, so for regular enemies 2 behaves as 0.
+ */
+export const TYPE_REPLACEMENT_MODES = Object.freeze(["disabled", "enabled", "enabled-except-roaming-bosses"]);
+
 /** Values under which permutation-v1 behaves exactly as it always did; anything else is refused there. */
 export const SAMPLING_NEUTRAL_OPTIONS = Object.freeze({
   enemyReplacementChance: 100,
@@ -72,6 +78,7 @@ export const SAMPLING_NEUTRAL_OPTIONS = Object.freeze({
   enemyPlacementFit: "anywhere",
   enemyDifficultyMode: "random",
   enemyDifficultyStrictness: "loose",
+  enemyTypeReplacement: "disabled",
 });
 
 /** Typed refusal: a sampling-only option has an invalid value, or a non-neutral one under permutation-v1. */
@@ -116,6 +123,9 @@ export function resolveEnemyPlacementOptions(config, algorithm = config.enemyPla
   if (!DIFFICULTY_STRICTNESS.includes(config.enemyDifficultyStrictness)) {
     problems.push(`enemyDifficultyStrictness must be ${DIFFICULTY_STRICTNESS.join(", ")} (got ${String(config.enemyDifficultyStrictness)}).`);
   }
+  if (!TYPE_REPLACEMENT_MODES.includes(config.enemyTypeReplacement)) {
+    problems.push(`enemyTypeReplacement must be ${TYPE_REPLACEMENT_MODES.join(", ")} (got ${String(config.enemyTypeReplacement)}).`);
+  }
   if (problems.length === 0 && algorithm === "permutation-v1") {
     for (const [key, neutral] of Object.entries(SAMPLING_NEUTRAL_OPTIONS)) {
       if (config[key] !== neutral) problems.push(`${key} only applies to sampling-v1; it must be ${JSON.stringify(neutral)} with permutation-v1.`);
@@ -128,6 +138,7 @@ export function resolveEnemyPlacementOptions(config, algorithm = config.enemyPla
     fit: config.enemyPlacementFit,
     difficultyMode: config.enemyDifficultyMode,
     difficultyStrictness: config.enemyDifficultyStrictness,
+    typeReplacement: config.enemyTypeReplacement,
   };
 }
 
@@ -157,6 +168,21 @@ export const slotStreamName = (slotOrId, attempt = 0) => {
   return attempt === 0 ? `slot:${stableSlotId(slotOrId)}` : `attempt:${attempt}:slot:${stableSlotId(slotOrId)}`;
 };
 
+const STABLE_TYPE_MODEL = /^[A-Za-z0-9_]+$/u;
+
+/**
+ * Stream name of a Type replacement group: the original model within one map. Attempt 0 is `type:<map>:<model>`, a
+ * map-local retry `n` is `attempt:<n>:type:<map>:<model>`. Disjoint from every slot stream name, so enabling Type
+ * replacement never moves a draw of ordinary slot sampling.
+ */
+export function typeStreamName(mapId, model, attempt = 0) {
+  if (!/^m\d{2}_\d{2}_\d{2}_\d{2}$/u.test(String(mapId)) || !STABLE_TYPE_MODEL.test(String(model))) {
+    throw new TypeError(`Not a stable type group: ${String(mapId)} / ${String(model)}`);
+  }
+  if (!Number.isInteger(attempt) || attempt < 0) throw new RangeError("attempt must be a non-negative integer.");
+  return attempt === 0 ? `type:${mapId}:${model}` : `attempt:${attempt}:type:${mapId}:${model}`;
+}
+
 let slotStreamDerivations = 0;
 
 /** 32-bit seed of the stream that owns one slot: master/combined seed + "enemy-placement-v1" + "slot:<id>". */
@@ -167,6 +193,11 @@ export function deriveSlotStreamSeed(seed, slotOrId, attempt = 0) {
 
 export function createSlotStream(seed, slotOrId, attempt = 0) {
   return new DeterministicRng(deriveSlotStreamSeed(seed, slotOrId, attempt));
+}
+
+export function createTypeStream(seed, mapId, model, attempt = 0) {
+  slotStreamDerivations += 1;
+  return new DeterministicRng(deriveSeed(seed, typeStreamName(mapId, model, attempt), SAMPLING_RNG_VERSION));
 }
 
 /** Diagnostic counter used by tests to prove that `permutation-v1` never derives a sampling stream. */
@@ -263,6 +294,56 @@ export class ModelBudget {
 }
 
 /**
+ * Reference-counted model set of one map for Type replacement. Unlike {@link ModelBudget} (which only grows) a model
+ * leaves the set when its last owner releases it, so a group that moves from its original model to another one frees
+ * the original and takes the new one. Owners are *solid* (the fixed plans, groups left alone, groups already decided)
+ * or *pending* (a group that has not decided yet and still owns its original model, the fallback that keeps it
+ * possible to leave the group alone). `evaluate` admits a model that a solid owner already holds, or - below the cap -
+ * any other model; a model held only by pending owners counts as new, because choosing it does not reduce the final
+ * count. A set that starts above the cap (an unavoidable overflow) can therefore only shrink, through solid models,
+ * until it is below the cap again.
+ */
+export class ModelLedger {
+  #cap;
+  #mapId;
+  #solid = new Map();
+  #pending = new Map();
+
+  constructor({ mapId, cap = MODEL_BUDGET_CAP }) {
+    if (!Number.isInteger(cap) || cap < 1) throw new RangeError("cap must be a positive integer.");
+    this.#mapId = mapId;
+    this.#cap = cap;
+  }
+
+  get cap() { return this.#cap; }
+  get size() { return new Set([...this.#solid.keys(), ...this.#pending.keys()]).size; }
+  has(model) { return this.#solid.has(model) || this.#pending.has(model); }
+  /** True when something that will stay (a fixed plan, a group left alone or a decided group) owns the model. */
+  isSolid(model) { return this.#solid.has(model); }
+  models() { return [...new Set([...this.#solid.keys(), ...this.#pending.keys()])].sort(); }
+
+  /** Adds one owner of a model (no cap check: the caller decides with {@link evaluate}). */
+  hold(model, { pending = false } = {}) {
+    const table = pending ? this.#pending : this.#solid;
+    table.set(model, (table.get(model) ?? 0) + 1);
+  }
+
+  /** Removes one owner; the model leaves the set with its last owner. */
+  release(model, { pending = false } = {}) {
+    const table = pending ? this.#pending : this.#solid;
+    const count = table.get(model);
+    if (count === undefined) throw new RangeError(`${model} has no ${pending ? "pending" : "solid"} owner in ${this.#mapId}.`);
+    if (count === 1) table.delete(model); else table.set(model, count - 1);
+  }
+
+  evaluate(model) {
+    if (this.#solid.has(model)) return { admitted: true, alreadyPresent: true };
+    if (this.size < this.#cap) return { admitted: true, alreadyPresent: this.#pending.has(model) };
+    return { admitted: false, reason: "model-budget", size: this.size, cap: this.#cap, mapId: this.#mapId };
+  }
+}
+
+/**
  * Checked precondition of the coverage reserve (model document, 6.6): fixed models, the vanilla models of slots
  * that do not participate, and the reserve models together must fit the cap.
  */
@@ -275,7 +356,7 @@ export function checkCoverageReserve({ cap = MODEL_BUDGET_CAP, fixedModels = [],
 
 /** Where a slot ended up on the fallback ladder (model document, 6.7). */
 export const FALLBACK_STAGES = Object.freeze([
-  "sampled", "category-fallback", "kept-vanilla", "in-set-fit", "fit-relaxed", "infeasible",
+  "sampled", "category-fallback", "kept-vanilla", "in-set-fit", "shared-fit", "fit-relaxed", "infeasible",
 ]);
 
 /** Why a candidate was rejected. */
@@ -305,6 +386,7 @@ export function createPlacementDiagnostics({ algorithm, level = "summary" }) {
     retries: [],
   };
   const slots = [];
+  const groups = [];
   return {
     algorithm,
     rngVersion: algorithm === "sampling-v1" ? SAMPLING_RNG_VERSION : null,
@@ -336,7 +418,14 @@ export function createPlacementDiagnostics({ algorithm, level = "summary" }) {
       summary.terminalFailures.push(...from.terminalFailures);
       for (const [key, value] of Object.entries(from.counters)) summary.counters[key] = (summary.counters[key] ?? 0) + value;
       Object.assign(summary.maps, from.maps);
-      if (level === "detail") slots.push(...(json.slots ?? []));
+      if (level === "detail") {
+        slots.push(...(json.slots ?? []));
+        groups.push(...(json.groups ?? []));
+      }
+    },
+    /** One Type replacement group decision (kept at the detail level only; counters go through count()). */
+    recordGroup(entry) {
+      if (level === "detail") groups.push({ ...entry });
     },
     /** Named counters of the planner (for example how many slots the replacement chance left alone). */
     count(name, amount = 1) {
@@ -379,7 +468,7 @@ export function createPlacementDiagnostics({ algorithm, level = "summary" }) {
     toJSON() {
       return {
         algorithm: this.algorithm, rngVersion: this.rngVersion, level, classTableHash: this.classTableHash, options: this.options, summary,
-        ...(level === "detail" ? { slots } : {}),
+        ...(level === "detail" ? { slots, groups } : {}),
       };
     },
   };

@@ -50,6 +50,8 @@ export const defaultConfig = Object.freeze({
   // Part B (patches/0008): difficulty. "random" (legacy mode 2) and "loose" are neutral: permutation-v1 requires them.
   enemyDifficultyMode: "random",
   enemyDifficultyStrictness: "loose",
+  // Part C1 (patches/0009): legacy Type replacement; "disabled" (legacy default 1) is neutral for permutation-v1.
+  enemyTypeReplacement: "disabled",
   // "summary" keeps counters only; "detail" adds one record per slot (debugging).
   placementDiagnosticsLevel: "summary",
   useExtractedData: true,
