@@ -1,5 +1,23 @@
 # Implementation status
 
+**Enemy placement Part B: difficulty and map-local retries for regular enemies (2026-10-05; contracts 0.10.0, backend 0.26.0, desktop 0.13.0).**
+`sampling-v1` gains Difficulty mode (curve, fully random, and both easy-Asylum modes: legacy default random +
+easy Asylum) and Difficulty strictness (strict, a bit loose, very loose), both **FULL** for regular enemies. Classes are
+derived by DS1TR (`regular-class-v2`: map progression tier and HP rank, in `classTableHash`), not copied; strictness
+tables and the Easy Asylum cap are authored. A map that cannot be placed is replanned alone with attempt streams
+(`attempt:<n>:slot:<id>`, at most 3 attempts; attempt 0 equals Part A), so the former whole-run retry for
+`ENEMY_PLACEMENT_INFEASIBLE` is now almost never needed. Presets are version 7 (1-6 migrate to `permutation-v1` with
+neutral difficulty). Details, eligibility matrix, filtering order and results: model document 10.3. Patch `0008`.
+
+- **Proofs:** `permutation-v1` unchanged (24 hashes; 56/56 and 73/73 package files); 24 Part A synthetic hashes
+  identical; real catalog: 700 Part A outputs identical, all 14 Part A first-attempt failures solved by a map retry.
+- **Catalog sweep:** 13 variants x 100 seeds: 0 final failures, 0 sampler overflows, 0 fit / Prevent-same / Easy
+  Asylum violations. **Real format:** 50 seeds (Items + Enemies + Fog + bosses) + 3 full proofs incl. retried Parish
+  maps: all pass, 0 merge conflicts, same 15 overlay events, `verify-skips` 0 failures.
+- **Parish risk unchanged:** 31-33 models are reproducible with `parish-12` (31), `parish-11` (32), `parish-28`
+  and `parish-92` (33) (config in 10.3); not tested in the game.
+- **Tests:** backend 228 (227 pass, 1 skipped); new `enemyDifficulty.test.mjs` (18 tests); typecheck and desktop build pass.
+
 **Enemy placement Part A: `sampling-v1` for regular enemy slots (2026-10-05; contracts 0.9.0, backend 0.25.0, desktop 0.12.0).**
 `sampling-v1` is implemented and opt-in (UI: "Legacy-style sampling"); `permutation-v1` stays the default and its
 output is unchanged (24 placement hashes; 56/56 and 73/73 package files). It samples regular enemy slots only;

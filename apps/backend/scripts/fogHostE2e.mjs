@@ -146,6 +146,10 @@ async function sweep(count, prefix) {
         mapsAboveCap: maps.filter((map) => map.baseline > 30).length,
         samplerOverflow: maps.filter((map) => map.finalModels > map.effectiveCap).length,
         stages: placementInfo.summary.stages,
+        mapsRetried: placementInfo.summary.counters.mapsRetried ?? 0,
+        mapAttemptsFailed: placementInfo.summary.counters.mapAttemptsFailed ?? 0,
+        difficultyLapses: placementInfo.summary.counters.difficultyLapses ?? 0,
+        retries: placementInfo.summary.retries ?? [],
       };
       const last = (await readdir(workspace).catch(() => [])).filter((d) => d.startsWith('combined-')).sort().pop();
       const seedDirs = last ? (await readdir(path.join(workspace, last)).catch(() => [])).filter((d) => d.startsWith('seed_')) : [];
@@ -199,6 +203,8 @@ async function sweep(count, prefix) {
     conflictEvents: tally(results.flatMap((r) => r.conflicts)),
     instructionMerges: tally(results.flatMap((r) => r.merges)),
     bossOverlays: tally(results.flatMap((r) => r.overlays)),
+    mapsRetried: results.reduce((total, r) => total + (r.placement?.mapsRetried ?? 0), 0),
+    seedsWithMapRetry: results.filter((r) => r.placement?.mapsRetried).length,
     samplerOverflow: results.reduce((total, r) => total + (r.placement?.samplerOverflow ?? 0), 0),
     changedWithoutScaledRow: results.reduce((total, r) => total + (r.placement?.changedWithoutScaledRow ?? 0), 0),
     maxFinalModels: Math.max(0, ...results.map((r) => r.placement?.maxFinalModels ?? 0)),

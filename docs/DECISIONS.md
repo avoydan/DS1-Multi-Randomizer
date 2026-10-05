@@ -870,3 +870,20 @@ Decision: sampling-v1 uses a non-worsening model-budget policy. The normal targe
 - Error classification: `ENEMY_PLACEMENT_INFEASIBLE` is retryable and typed; `ENEMY_PLACEMENT_BUDGET_UNSATISFIABLE`,
   `ENEMY_PLACEMENT_CLASS_UNDERIVABLE`, `ENEMY_PLACEMENT_OPTIONS_INVALID` and
   `ENEMY_PLACEMENT_ALGORITHM_UNAVAILABLE` are deterministic and never retried. The Fog retries are unchanged.
+
+## sampling-v1 difficulty: derived classes, authored curve, map-local retries (Part B)
+
+- Difficulty mode and strictness keep the legacy values and meanings (modes 1-4, strictness 0-2, strictness only in the
+  curve modes); new sampling configurations default to the legacy defaults (random + easy Asylum, a bit loose);
+  `permutation-v1` requires `random` / `loose`. Presets move to version 7.
+- Difficulty classes are derived (`regular-class-v2`): map progression tier (authored play-order table) and HP rank;
+  the destination class is the class of the slot's own model. No legacy class table; agreement with the original
+  classes is moderate by design. The class table, progression table and strictness tables are fingerprinted/versioned.
+- The strictness offset tables and the Easy Asylum rule (every regular Asylum slot accepts only classes 0-1) are
+  DS1TR-authored; the legacy tables and hard-coded Asylum lists are not used.
+- Under budget pressure the difficulty filter widens to the nearest class (counted); physical Placement fit is never
+  relaxed, and no `fit-relaxed` placement exists.
+- An infeasible map is replanned alone with attempt-specific streams (`attempt:<n>:slot:<id>`, attempt 0 = the
+  unchanged `slot:<id>` stream), at most 3 attempts; after that `ENEMY_PLACEMENT_INFEASIBLE` carries map, attempts,
+  settings, baseline and effective cap and stays retryable at the pipeline level. Structural errors stay non-retryable.
+- Residual risk, deliberately not addressed here: a Parish with 31-33 models has not been tried in the game.

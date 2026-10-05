@@ -12,7 +12,7 @@ the legacy tool, enforces the 30-model map limit by construction, and falls back
 Implement it in small batches, selection-only options first and the event-touching ones (bosses in normal
 slots, NPCs) last.
 
-Status: **design, the Part 0 infrastructure (10.1) and Part A (10.2).** `sampling-v1` runs for regular enemy slots
+Status: **design, the Part 0 infrastructure (10.1), Part A (10.2) and Part B difficulty (10.3).** `sampling-v1` runs for regular enemy slots
 only and is opt-in; `permutation-v1` stays the default. **Part A is complete: the whole replacement-chance range works under a
 non-worsening model budget (10.2).** One scratch prototype
 (`engines/combined/prototypes/enemy-placement-sampler.mjs`) validates the proposed core against a real
@@ -382,7 +382,7 @@ for map in mapOrder:                               # sorted ids
 Curve modes draw `offset` from the strictness table (an authored distribution; the sum below 100 stays on
 the slot's own class). Strict: +2 2%, +1 12%, -1 5%. Loose: +4 2%, +3 3%, +2 4%, +1 15%, -1 5%, -2 2%, -3 1%.
 Very loose: +5 2%, +4 3%, +3 5%, +2 8%, +1 12%, -1 6%, -2 4%, -3 2%, -4 1%. Classes outside 0-7 are skipped.
-These are starting values to tune against play, not legacy data.
+These are starting values to tune against play, not legacy data. **Superseded by 10.3**: the tables actually used (and the reach of very loose up to +7) are listed there.
 
 ### 6.5 Rejection and exclusions
 
@@ -589,7 +589,7 @@ risk: data first, selection-only options next, event-touching options last.
 |---|---|---|---|---|---|---|---|
 | **0** (done, see 10.1) | Infrastructure, no behavior change | `placement.js` (new repository-authored module in `vendor/src/core`, listed in the module-set test and the pin; patch `0005`); class derivation (size, difficulty, NPC/boss class); `classTableHash`; per-slot streams; ladder; diagnostics block | `enemies.placement.algorithm` (`permutation` only selectable), neutral-value rule, preset v5 migrating 1-4 | an "Enemy placement" group with the algorithm shown, read-only | class derivation vs fixtures; neutral-value rejection; preset v5 migration; permutation hash lock | none (output unchanged) | none |
 | **A** (built, one open conflict, see 10.2) | Sampler for regular enemies | `sampling-v1`: chance, normal mode {none, normals}, fit, difficulty `random`, Prevent same, mimic/mosquito/Pinwheel clones, coverage reserve, budget, ladder | add `sampling`, `replacementChance`, `normalReplacement`, `fit`, `difficultyMode=random` | sliders and selects, Replacement chance / Placement activated (remove the planned badges) | determinism, budget <= 30, zero fit violations, ladder rung counts, chance statistics, hash lock; **every changed placement has a scaled row; each drop lot is referenced by the same slots as in vanilla** | 20-seed Bosses + Fog sweep with `sampling`, **one with Enemy scaling `vanilla`**, `verify-skips`, `patch-enemies`, duplicates per map | low |
-| **B** | Difficulty curve | class draw, strictness tables, D-1 refinement, Easy Asylum rule, curated overrides | `difficultyMode` curve values, `strictness`, `easyAsylum` | select + slider activation | offset distributions, same-class share, empty-class fallback | 20 seeds | none |
+| **B** (built, see 10.3) | Difficulty curve | class draw, strictness tables, D-1 refinement, Easy Asylum rule, curated overrides | `difficultyMode` curve values, `strictness`, `easyAsylum` | select + slider activation | offset distributions, same-class share, empty-class fallback | 20 seeds | none |
 | **C** | Type replacement and custom pool | type map with type-level participation and injectivity; pool filter | `typeReplacement`, `customPool` (named list of enabled types) | select, pool editor (largest UI piece) | injectivity, sentinel cases, pool filter | 10 seeds | none |
 | **D** | Boss class (bosses only) | boss sampler over the portable single-body pool, per-candidate Gwyn nerf, Unique bosses, unit participation | `bossReplacement` {none, bosses}, `uniqueBosses`, `bossChanceInBossSlots` | activation | boss repetition, unit swaps, hash lock | **40 seeds** Bosses + Fog (overlay set must remain the 15 events), `verify-skips` | medium |
 | **E** | Cross-class and roaming boss options | boss to normal slot, normal to boss slot, "both" modes, `getSoul` on the scaled row, respawn handling | modes `normals`/`both`, `bossChanceInNormalSlots`, `roamingBossSouls`, `respawningRoamingBosses` | activation | reward ownership, scaled row always present, boss bar rules | **40 seeds**, measure edited events against the overlay and FogMod; stop on any new overlap | **high** |
@@ -774,6 +774,142 @@ run. Two full proofs (`fits` + Prevent same at 100% and at 25%): byte-identical 
 pass. A first-attempt `ENEMY_PLACEMENT_INFEASIBLE` was retried with a new combined seed and the run succeeded
 (2 of 50 partial-chance seeds). The final model count and the drop-ownership invariant were checked on the
 generated placement plans (`changed without scaled row` = 0), not on the NpcParam regulation of the package.
+
+### 10.3 Part B as built (2026-10-05): difficulty and map-local retries for regular enemies
+
+**Legacy semantics confirmed (pinned revision 83f008d, `enemy_rng.py` / `enemy_randomizer.py`).**
+
+| Item | Legacy behavior |
+|---|---|
+| Difficulty mode | GUI "Difficulty mode", config position 5: 1 "Random with difficulty curve", 2 "Fully random", 3 "Fully random + easy asylum" (**default**), 4 "Difficulty curve + easy asylum". |
+| Difficulty strictness | GUI "Difficulty strictness", position 10: 0 Strict, 1 A bit loose (**default**), 2 Very loose. Disabled in the GUI unless the mode is 1 or 4 ("[No Effect]"). |
+| Classes | Every original and every replacement enemy has a curated class 0-7 (`valid_replacements.txt`, `valid_new.txt`). The destination reference is the class of the **original model** of the slot. |
+| Curve | `getDifficultyList`: draw a class offset from a strictness table around the destination class (offsets that leave 0-7 are skipped and their mass falls back to the own class), take the list of that class (already size-filtered), and draw uniformly from it. The class is a probabilistic preference; inside the chosen class the list is a hard filter. |
+| Fallbacks | Drawn class empty (for the size) -> the destination's own class list; that empty too -> no replacement ("Failed to find fitting enemy with appropriate difficulty", the slot stays vanilla). Once the map's unique-type limit is reached the draw is from the types already used, filtered by size only: the difficulty filter lapses. |
+| Modes 2 and 3 | No class filter at all (destination class ignored). Mode 3 and 4 add Easy Asylum: twelve hard-coded Asylum slots take a random pick from a hard-coded list of easy enemies, overriding everything including fit and Prevent same. |
+| Order | Replace chance first (every eligible slot), then category by mode, then max size by fit, then the class list by difficulty, then rejection per candidate (hard-coded pairs, Prevent same) with list shrink. Boss and NPC slots use the same functions; NPC slots always use mode 2. |
+| Quirks | `randint(0, 100)` has 101 outcomes against percentages that sum to 100 (a 1-in-101 skew to the own class); the cap lapses the filter entirely; Easy Asylum bypasses fit and Prevent same. |
+
+**Values supported for regular enemies: all four modes and all three strictness values (parity FULL for both
+controls).** Strictness keeps the legacy meaning (only effective in the curve modes). New `sampling-v1`
+configurations start at the legacy defaults, mode `random-easy-asylum` and strictness `loose`; the neutral values
+under `permutation-v1` are `random` and `loose`.
+
+**Project-owned classes (`regular-class-v2`, no legacy table).** For every model in a regular slot:
+`difficulty = floor(8 * (0.6 * tier / 7 + 0.4 * hpRank))`, clamped to 0-7, where `tier` is the upper median of the
+**map progression tier** of the maps the model occurs in (an authored play-order table, 0 Asylum ... 7 Kiln:
+`m18_01` 0; `m10_01`, `m10_02` 1; `m10_00`, `m12_00`, `m12_00_01` 2; `m13_00`, `m11_00` 3; `m14_00`, `m16_00` 4;
+`m15_00`, `m15_01`, `m13_02` 5; `m12_01`, `m13_01`, `m14_01`, `m17_00` 6; `m18_00` 7) and `hpRank` is the rank
+(0..1) of the model's median log HP among all regular models. The destination class of a slot is the class of its
+own model; a slot whose model is not a regular type (a Pinwheel clone) uses its map tier and its own HP with the same
+formula. A model without usable HP or in a map outside the table raises `ENEMY_PLACEMENT_CLASS_UNDERIVABLE`; there is
+no default class. `classTableHash` now covers the version, size edges, the progression table and every
+`(model, size, difficulty)`. Real catalog: 85 regular models over the classes 0-7 as 1 / 6 / 12 / 13 / 23 / 16 /
+9 / 5, hash `b48e6ebfba7474f4...`. The derived classes agree with the original ones only moderately (rank correlation
+about 0.6 in the Part A evaluation); the goal is the user-facing semantics, not table parity. Weights and tiers were
+not tuned against the legacy classes.
+
+**Strictness tables (authored; percent, the rest stays on the own class).**
+
+| Strictness | Harder (+1, +2, ...) | Easier (-1, -2, ...) | Own class | Reach |
+|---|---|---|---|---|
+| Strict | 11, 4 | 5 | 80 | +2 / -1 |
+| A bit loose | 14, 8, 4, 2, 1 | 6, 3, 2 | 60 | +5 / -3 |
+| Very loose | 13, 10, 8, 6, 4, 2, 1 | 7, 4, 3, 2 | 40 | +7 / -4 |
+
+Very loose reaches any class from any class (the original describes it as able to put a late boss in the Asylum).
+The class draw uses `int(100)`, so there is no 1-in-101 skew.
+
+**Eligibility matrix** (`eligibleDifficultyClasses`, tested for every mode x strictness x destination class 0-7 x map):
+fully random: classes 0-7; curve: destination - down .. destination + up clamped to 0-7 (always containing the
+destination), with the reach column above; easy-Asylum modes in the Asylum map (`m18_01_00_00`, every regular slot):
+classes 0-1 whatever the mode or destination. The draw maps onto the distribution exactly (tested over all 100
+draws). Easy Asylum is an authored rule (a hard cap of class 1, still subject to fit, Prevent same and the budget),
+not the hard-coded slot and enemy lists.
+
+**Filtering order (one deterministic order, per slot, sorted maps and ids).** (1) replacement chance, the slot's
+first draw; (2) replacement mode `none`; (3) Placement fit: types no larger than the slot, never relaxed; (4)
+difficulty: the Easy Asylum cap, or the curve class (second draw, then the pool of that class), or nothing; (5)
+Prevent same; (6) special exclusions: none for regular-to-regular replacement (Mimic and mosquito slots are not
+regular slots when their options are off); (7) model budget (effective cap); (8) uniform draw over the surviving
+types with list shrink. Pools are tried in order: wanted class, the destination's own class, and (only when the
+budget removed candidates) the nearest classes outward. Then the fallback ladder (keep vanilla, smallest in-set
+fitting type) and the variant draw. A difficulty fallback exists only where the legacy tool has one (own class) or
+where the budget forces it (nearest class: deviation D-1, counted as `difficultyLapses`); **physical fit is never
+relaxed**.
+
+**Map-local retries.** If a slot has no placement the whole map is planned again from scratch (participation,
+reserve, every draw) with the streams `enemy-placement-v1 / attempt:<n>:slot:<stable-slot-id>` (the slot id contains
+the stable map id); attempt 0 is the original `slot:<id>` stream, so a map that succeeds at once is byte-identical to
+Part A. At most `MAP_ATTEMPTS` = 3 attempts per map; only the failing map is replanned, every other map, the
+boss/dragon/NPC plans and the master seed are untouched. Diagnostics: `mapAttemptsFailed`, `mapsRetried`,
+`maxMapAttempt`, `retries` (map, attempt, slot, baseline, cap), per-map `attempts`. When all attempts fail the run
+raises `ENEMY_PLACEMENT_INFEASIBLE` with the map, the attempt count, difficulty and fit settings, Prevent same,
+chance, baseline, effective cap and the terminal slot. That error is still retryable at the pipeline level (a new
+combined seed also changes the baseline); structural errors stay non-retryable. The Fog retry is unchanged.
+
+**Part A compatibility (measured).** 24 synthetic placement hashes of the Part A planner are identical in Part B; on
+the real catalog, 100 seeds x 7 Part A variants: 0 outputs differ, and every Part A first-attempt failure (5 at 60%
+fits, 9 at 25% fits) is now solved by a map retry.
+
+**Catalog-only validation (real catalog, 100 seeds per variant, bosses + dragons + Gwyn nerf + Second Gargoyle on).**
+
+| Variant | seeds ok | participation | map attempts 1 / 2 / 3 | seeds with a retry | final failures | max models | sampler overflow | fit viol. | Prevent-same viol. | Easy Asylum viol. | mean abs class offset | class fallbacks | difficulty lapses | non-det. | ms/seed |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| default diff (random+easy Asylum) 100% fits | 100 | 100.00% | 1800 / 0 / 0 | 0 | 0 | 30 | 0 | 0 | 0 | 0 | 0.00 | 0 | 0 | 0 | 14 |
+| default diff 100% anywhere | 100 | 100.00% | 1800 / 0 / 0 | 0 | 0 | 30 | 0 | 0 | 0 | 0 | 0.00 | 0 | 0 | 0 | 14 |
+| default diff 60% fits | 100 | 59.98% | 1795 / 5 / 0 | 5 | 0 | 31 | 0 | 0 | 0 | 0 | 0.00 | 0 | 0 | 0 | 12 |
+| default diff 25% fits | 100 | 24.93% | 1791 / 7 / 2 | 9 | 0 | 33 | 0 | 0 | 0 | 0 | 0.00 | 0 | 0 | 0 | 9 |
+| permissive (curve very-loose) 100% fits | 100 | 100.00% | 1800 / 0 / 0 | 0 | 0 | 30 | 0 | 0 | 0 | 0 | 0.70 | 11815 | 6186 | 0 | 14 |
+| permissive (curve very-loose) 60% fits + Prevent same | 100 | 59.98% | 1795 / 5 / 0 | 5 | 0 | 31 | 0 | 0 | 0 | 0 | 0.65 | 7638 | 3244 | 0 | 12 |
+| curve loose 100% fits | 100 | 100.00% | 1800 / 0 / 0 | 0 | 0 | 30 | 0 | 0 | 0 | 0 | 0.46 | 8080 | 7142 | 0 | 13 |
+| curve loose 25% fits + Prevent same | 100 | 24.93% | 1791 / 7 / 2 | 9 | 0 | 33 | 0 | 0 | 0 | 0 | 0.44 | 2012 | 777 | 0 | 9 |
+| strict curve 100% fits | 100 | 100.00% | 1800 / 0 / 0 | 0 | 0 | 30 | 0 | 0 | 0 | 0 | 0.24 | 3981 | 9849 | 0 | 14 |
+| strict curve 60% fits + Prevent same | 100 | 59.98% | 1795 / 5 / 0 | 5 | 0 | 31 | 0 | 0 | 0 | 0 | 0.23 | 2335 | 2840 | 0 | 11 |
+| strict curve 25% fits + Prevent same | 100 | 24.93% | 1791 / 7 / 2 | 9 | 0 | 33 | 0 | 0 | 0 | 0 | 0.21 | 949 | 802 | 0 | 9 |
+| strict curve+easy Asylum 60% fits | 100 | 59.98% | 1795 / 5 / 0 | 5 | 0 | 31 | 0 | 0 | 0 | 0 | 0.18 | 2152 | 534 | 0 | 11 |
+| strict curve 100% anywhere | 100 | 100.00% | 1800 / 0 / 0 | 0 | 0 | 30 | 0 | 0 | 0 | 0 | 0.27 | 385 | 8925 | 0 | 14 |
+
+The catalog sweep is clean: 0 final failures in 13 variants x 100 seeds, 0 sampler overflows, 0 fit violations, 0
+Prevent-same violations, 0 Easy Asylum violations, deterministic. A map needed a retry in 5 of 100 seeds at 60% and
+9 of 100 at 25% (11 failed attempts, never more than 3 attempts); at 100% never. The mean absolute class offset
+follows the tables (strict 0.21-0.24 against 0.24 expected, a bit loose 0.44-0.46, very loose 0.65-0.70). Difficulty
+lapses (budget-forced widening to the nearest class) are the cost of a full map: 534-9,849 placements per 100 seeds,
+i.e. at most 5.8% of the placements of the strict 100% variant; the lapse of the original tool was an unfiltered draw.
+
+**Parish (`m10_01`) baseline / effective cap** at 25% fits (100 seeds): 29/30 20, 30/30 27, 28/30 6, **31/31 27,
+32/32 15, 33/33 5**; at 60%: mostly 25-30 under the 30 target and 31/31 in 2; at 100%: 14-17. The sampler never raises
+a map above its effective cap. These are the unverified-in-game cases; reproducible master seeds (config: bosses on,
+Enemy scaling area, Gwyn nerf medium, Second Gargoyle replace, `sampling-v1`, 25% replacement, fits, default
+difficulty `random-easy-asylum`/`loose`; attempt-0 combined seed; checked through `generateRun`):
+
+| Parish final models | master seed | notes |
+|---|---|---|
+| 31 | `parish-12` | baseline 31, no retry |
+| 32 | `parish-11` | baseline 32, no retry |
+| 33 | `parish-28` | baseline 33, no retry (Fog needed one extra combined attempt) |
+| 33 | `parish-92` | baseline 33, the Parish was planned with attempt 2 (a map retry) |
+| 30 | `parish-10` | the Parish needed attempt 3 and ended at 30 |
+
+**Real-format validation (Items + Enemies + Fog, bosses on, FogHost 0.5.0): 50 seeds + 3 full proofs.**
+
+| Configuration | seeds | generated | Fog retries (`FOG_UPSTREAM_INCOMPATIBLE`) | merge conflicts | boss overlay | `verify-skips` failures | sampler overflow | changed without scaled row | max final models |
+|---|---|---|---|---|---|---|---|---|---|
+| default difficulty, 100%, fits | 10 | 10 | 1 | 0 | same 15 events | 0 / 11 | 0 | 0 | 30 |
+| default difficulty, 60%, fits | 10 | 10 | 1 | 0 | same 15 | 0 / 11 | 0 | 0 | 31 |
+| strict curve, 60%, fits | 10 | 10 | 0 | 0 | same 15 | 0 / 10 | 0 | 0 | 30 |
+| strict curve, 25%, fits + Prevent same | 10 | 10 | 0 | 0 | same 15 | 0 / 10 | 0 | 0 | 31 |
+| very-loose curve, 100%, fits | 10 | 10 | 0 | 0 | same 15 | 0 / 10 | 0 | 0 | 30 |
+
+Mismatches in events the combined engine edited: 0; the live installation was unchanged in every run. No map retry
+happened inside these 50 seeds (in the catalog sweep a retry occurs for about 1 in 10-20 seeds at 25%-60%), so three
+full proofs were run on the Parish seeds above (`parish-92` and `parish-10` with Parish retries, `parish-28` without):
+byte-identical reruns, activation and restore pass. The final model count and the drop-ownership invariant were
+checked on the generated placement plans, not on the NpcParam regulation of the package.
+
+**Remaining risk.** A Parish with 31-33 models has not been tried in the running game; use the seeds above. For Part C
+(type replacement, custom pool) note that both reduce the candidate pool further, so the per-map retry bound (3) and
+the nearest-class lapse should be re-measured; the class table is shared (`regular-class-v2`).
 
 Batch 0 must also decide where `placement.js` lives: new code has to be inside `vendor/src` (that is what
 the packager copies and what the loader imports), so it is a repository-authored GPL file recorded in
