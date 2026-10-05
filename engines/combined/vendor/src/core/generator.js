@@ -17,7 +17,7 @@ import {
   resolveEnemyPlacementAlgorithm,
   resolveEnemyPlacementOptions,
 } from "./placement.js";
-import { planSampledRegularEnemies } from "./sampling.js";
+import { deriveRegularClassTable, planSampledRegularEnemies } from "./sampling.js";
 import {
   enemies,
   enemySlots,
@@ -2732,6 +2732,40 @@ function gwynNerfApplied(config) {
     createStream(config.seed, "gwyn-nerf", config.version).next() <
       gwynNerfRejection[config.gwynNerf]
   );
+}
+
+/**
+ * The replacement types sampling-v1 can draw from for this catalog, for a custom-pool editor: one entry per regular
+ * model with its derived size and difficulty class, the number of regular slots it has and the maps it occurs in.
+ * Read-only and deterministic; it uses the same slot filter and class table as the planner (default options: Mimics
+ * and the respawning mosquitoes count as regular enemies).
+ */
+export function describeRegularEnemyPool(inputConfig, gameCatalog) {
+  if (!gameCatalog || gameCatalog.schemaVersion !== 17) {
+    throw new Error("A catalog of schema 17 is required to describe the enemy pool.");
+  }
+  const config = normalizeConfig({ ...inputConfig, randomizeEnemies: true });
+  const dragonPlan = buildDragonPlan(config, gameCatalog);
+  const { slots } = regularEnemyContext(config, gameCatalog, dragonPlan, []);
+  const table = deriveRegularClassTable(slots);
+  const bySlots = new Map();
+  for (const slot of slots) {
+    const entry = bySlots.get(slot.modelName) ?? { slots: 0, maps: new Set() };
+    entry.slots += 1;
+    entry.maps.add(slot.mapId);
+    bySlots.set(slot.modelName, entry);
+  }
+  return {
+    classTableHash: table.hash,
+    regularSlots: slots.length,
+    entries: table.types.map((type) => ({
+      model: type.model,
+      size: type.size,
+      difficulty: type.difficulty,
+      slots: bySlots.get(type.model).slots,
+      maps: [...bySlots.get(type.model).maps].sort(),
+    })),
+  };
 }
 
 export function generate(inputConfig, { gameCatalog = null } = {}) {

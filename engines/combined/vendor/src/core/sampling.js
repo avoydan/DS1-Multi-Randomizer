@@ -24,6 +24,7 @@ import {
   EnemyPlacementInfeasibleError,
   MODEL_BUDGET_CAP,
   ModelBudget,
+  EnemyPlacementCustomPoolError,
   ModelBudgetError,
   ModelLedger,
   createPlacementDiagnostics,
@@ -264,18 +265,29 @@ export function eligibleDifficultyClasses({ mode, strictness, destination, mapId
  * non-participating models alone exceed the cap cannot be repaired and fails with
  * ENEMY_PLACEMENT_BUDGET_UNSATISFIABLE.
  */
-export function buildMapModelSet({ mapId, cap, fixedModels, participants, sizeOf, fitSize, preventSame, table }) {
+export function buildMapModelSet({ mapId, cap, fixedModels, participants, sizeOf, fitSize, preventSame, table, pool = null }) {
   const base = new Set(fixedModels);
   if (base.size > cap) throw new ModelBudgetError(mapId, cap, [...base]);
   const active = [...participants].sort((left, right) => sizeOf(left) - sizeOf(right) || compare(left.id, right.id));
   const wanted = [];
+  // With a restricted custom pool only pool models can serve as the in-set fitting type; the full pool takes the
+  // original code path unchanged.
+  const restricted = pool !== null && pool.excluded > 0;
+  const isCandidate = (model) => table.byModel.has(model) && (!restricted || pool.models.has(model));
   if (active.length > 0) {
     const ceiling = fitSize(active[0]);
     const needed = preventSame ? 2 : 1;
-    const fitting = [...base].filter((model) => table.byModel.has(model) && table.byModel.get(model).size <= ceiling).length;
+    const fitting = [...base].filter((model) => isCandidate(model) && table.byModel.get(model).size <= ceiling).length;
     for (const slot of active) {
       if (fitting + wanted.length >= needed) break;
-      if (!base.has(slot.modelName) && !wanted.includes(slot.modelName) && table.byModel.has(slot.modelName)) wanted.push(slot.modelName);
+      if (!base.has(slot.modelName) && !wanted.includes(slot.modelName) && isCandidate(slot.modelName)) wanted.push(slot.modelName);
+    }
+    if (restricted) {
+      const smallest = [...pool.types].sort((a, b) => a.size - b.size || compare(a.model, b.model));
+      for (const type of smallest) {
+        if (fitting + wanted.length >= needed || type.size > ceiling) break;
+        if (!base.has(type.model) && !wanted.includes(type.model)) wanted.push(type.model);
+      }
     }
   }
   const reserve = wanted.slice(0, Math.max(0, cap - base.size));
@@ -305,7 +317,77 @@ export const effectiveModelBudget = (baseline, cap = MODEL_BUDGET_CAP) => Math.m
  */
 export function createCandidatePool(table, accept = () => true) {
   const types = table.types.filter(accept);
-  return Object.freeze({ types, models: new Set(types.map((type) => type.model)), total: types.length });
+  return Object.freeze({
+    types, models: new Set(types.map((type) => type.model)), total: types.length, excluded: table.types.length - types.length,
+  });
+}
+
+// ---- custom pool ---------------------------------------------------------------------------------------------------------
+
+export const CUSTOM_POOL_HASH_VERSION = "custom-pool-v1";
+
+/** Stable fingerprint of a canonical (sorted, unique) custom pool; null for the full pool. */
+export function customPoolHash(models) {
+  if (models === null) return null;
+  return createHash("sha256").update(JSON.stringify({ version: CUSTOM_POOL_HASH_VERSION, models })).digest("hex");
+}
+
+/**
+ * Coverage of a candidate pool: how many selected types exist per size class (0-5) and per difficulty class (0-7),
+ * and how many of the given slots have no candidate that fits them under Placement fit. Deterministic, static; the
+ * planner remains the authority for map-level feasibility.
+ */
+export function analyzePoolCoverage({ table, pool, slots, fit, preventSame = false }) {
+  const sizeCoverage = new Array(SIZE_EDGES.length + 1).fill(0);
+  const difficultyCoverage = new Array(DIFFICULTY_CLASS_COUNT).fill(0);
+  for (const type of pool.types) {
+    sizeCoverage[type.size] += 1;
+    difficultyCoverage[type.difficulty] += 1;
+  }
+  const smallest = pool.types.reduce((min, type) => Math.min(min, type.size), Infinity);
+  // A slot can take a candidate that fits it (Placement fit) and, under Prevent same, is not its own model.
+  const slotsWithoutFit = slots.filter((slot) => {
+    const size = slotSizeClass(table, slot);
+    return !pool.types.some((type) => (fit !== "fits" || type.size <= size) && !(preventSame && type.model === slot.modelName));
+  }).length;
+  return {
+    total: table.types.length,
+    selected: pool.total,
+    sizeCoverage,
+    difficultyCoverage,
+    smallestSize: pool.total === 0 ? null : smallest,
+    slotsTotal: slots.length,
+    slotsWithoutFit,
+  };
+}
+
+/**
+ * Validates a custom pool against the class table of the run and the configuration. Structural problems raise the
+ * typed, never-retryable ENEMY_PLACEMENT_CUSTOM_POOL_INVALID: an unknown or non-regular model (a stale selection),
+ * and - when the pool will be consulted - a pool no regular slot can take under Placement fit and Prevent same. Gaps that only make
+ * some slots unreplaceable are reported by analyzePoolCoverage, not raised.
+ */
+export function resolveCustomPool({ models, table, slots, settings, preventSame = false }) {
+  if (models === null) return null;
+  const unknown = models.filter((model) => !table.byModel.has(model));
+  if (unknown.length > 0) {
+    throw new EnemyPlacementCustomPoolError("unknown",
+      `${unknown.length} selected model(s) are not regular enemy candidates of this game data: ${unknown.slice(0, 10).join(", ")}${unknown.length > 10 ? ", ..." : ""}.`,
+      { unknown });
+  }
+  const set = new Set(models);
+  const pool = createCandidatePool(table, (type) => set.has(type.model));
+  const consulted = settings.normalReplacement !== "none" && settings.replacementChance > 0;
+  if (consulted) {
+    const coverage = analyzePoolCoverage({ table, pool, slots, fit: settings.fit, preventSame });
+    if (coverage.slotsWithoutFit === coverage.slotsTotal && coverage.slotsTotal > 0) {
+      throw new EnemyPlacementCustomPoolError("no-candidate",
+        `no regular slot can take any selected enemy (${settings.fit === "fits" ? `Placement fit "only where they fit", smallest selected size class ${coverage.smallestSize}` : "Placement fit anywhere"}${preventSame ? ", Prevent same enemy on" : ""}); `
+        + "select more or different enemies, or relax Placement fit or Prevent same.",
+        { smallestSize: coverage.smallestSize });
+    }
+  }
+  return models;
 }
 
 // ---- fallback ladder -----------------------------------------------------------------------------------------------
@@ -429,6 +511,7 @@ function sampleCandidate({ rng, subject, mapId, maxSize, destinationOf, settings
   }
   const sizeRejections = pool.total - fitPool.length;
   if (sizeRejections > 0) diagnostics.count("candidatesOverSize", sizeRejections);
+  if (pool.excluded > 0) diagnostics.count("candidatesOutsideCustomPool", pool.excluded);
   return { chosen, rejected, info, curve, easyAsylum, sizeRejections };
 }
 
@@ -462,9 +545,15 @@ export function planSampledRegularEnemies({
     typeReplacement: options.typeReplacement ?? "disabled",
   };
   const table = deriveRegularClassTable(slots);
-  const pool = createCandidatePool(table, candidateFilter);
+  const customModels = resolveCustomPool({ models: settings.customPool ?? null, table, slots: [...slots, ...extraSlots], settings, preventSame });
+  const customSet = customModels === null ? null : new Set(customModels);
+  const pool = createCandidatePool(table, (type) => (customSet === null || customSet.has(type.model)) && (candidateFilter === undefined || candidateFilter(type)));
   diagnostics.classTableHash = table.hash;
-  diagnostics.options = { ...settings, preventSame };
+  diagnostics.options = { ...settings, customPool: undefined, preventSame };
+  diagnostics.customPool = {
+    enabled: customModels !== null, hash: customPoolHash(customModels),
+    ...analyzePoolCoverage({ table, pool, slots: [...slots, ...extraSlots], fit: settings.fit, preventSame }),
+  };
   const assignment = new Map();
   const all = [...slots, ...extraSlots];
   const mapIds = [...new Set(all.map((slot) => slot.mapId))].sort(compare);
@@ -497,10 +586,10 @@ export function planSampledRegularEnemies({
       diagnostics.peak("maxMapAttempt", mapAttempts - 1);
       throw new EnemyPlacementInfeasibleError(mapId, lastError.slotId,
         `${mapAttempts} map attempts failed; last: ${lastError.detail}; difficulty ${settings.difficultyMode}/${settings.difficultyStrictness}, fit ${settings.fit}, `
-        + `type replacement ${settings.typeReplacement}, prevent same ${preventSame}, chance ${settings.replacementChance}%, `
+        + `type replacement ${settings.typeReplacement}, ${customModels === null ? 'full pool' : `custom pool ${customModels.length} of ${table.types.length} (${customPoolHash(customModels).slice(0, 12)})`}, prevent same ${preventSame}, chance ${settings.replacementChance}%, `
         + `baseline ${lastError.baseline}, effective cap ${lastError.effectiveCap}`,
         { attempts: mapAttempts, baseline: lastError.baseline, effectiveCap: lastError.effectiveCap, difficultyMode: settings.difficultyMode,
-          difficultyStrictness: settings.difficultyStrictness, fit: settings.fit, typeReplacement: settings.typeReplacement, terminal: lastError.detail });
+          difficultyStrictness: settings.difficultyStrictness, fit: settings.fit, typeReplacement: settings.typeReplacement, customPoolHash: customPoolHash(customModels), terminal: lastError.detail });
     }
     for (const [slotId, source] of planned.assignment) assignment.set(slotId, source);
     diagnostics.setMap(mapId, { ...planned.info, attempts: planned.attempt + 1 });

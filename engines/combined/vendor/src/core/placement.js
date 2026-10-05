@@ -79,7 +79,34 @@ export const SAMPLING_NEUTRAL_OPTIONS = Object.freeze({
   enemyDifficultyMode: "random",
   enemyDifficultyStrictness: "loose",
   enemyTypeReplacement: "disabled",
+  enemyCustomPool: null,
 });
+
+/** Typed refusal: the custom pool cannot work with the current catalog or configuration. Never retryable. */
+export class EnemyPlacementCustomPoolError extends Error {
+  constructor(reason, detail, context = {}) {
+    super(`ENEMY_PLACEMENT_CUSTOM_POOL_INVALID: ${detail}`);
+    this.name = "EnemyPlacementCustomPoolError";
+    this.code = "ENEMY_PLACEMENT_CUSTOM_POOL_INVALID";
+    this.reason = reason;
+    Object.assign(this, context);
+  }
+}
+
+const MODEL_ID = /^[A-Za-z][A-Za-z0-9_]{0,15}$/u;
+
+/** Canonical form of a custom pool: unique model ids in ascending order, or null for the full pool. */
+export function canonicalCustomPool(value) {
+  if (value === null || value === undefined) return null;
+  if (!Array.isArray(value)) throw new EnemyPlacementCustomPoolError("format", "enemyCustomPool must be null or a list of model ids.");
+  const bad = value.filter((entry) => typeof entry !== "string" || !MODEL_ID.test(entry));
+  if (bad.length > 0) throw new EnemyPlacementCustomPoolError("format", `enemyCustomPool entries must be model ids such as c2500 (got ${bad.slice(0, 5).map(String).join(", ")}).`);
+  const sorted = [...value].sort();
+  const duplicates = sorted.filter((entry, index) => index > 0 && entry === sorted[index - 1]);
+  if (duplicates.length > 0) throw new EnemyPlacementCustomPoolError("duplicate", `enemyCustomPool lists ${[...new Set(duplicates)].join(", ")} more than once.`, { duplicates: [...new Set(duplicates)] });
+  if (sorted.length === 0) throw new EnemyPlacementCustomPoolError("empty", "enemyCustomPool is empty: select at least one enemy or use the full pool (null).");
+  return sorted;
+}
 
 /** Typed refusal: a sampling-only option has an invalid value, or a non-neutral one under permutation-v1. */
 export class EnemyPlacementOptionsError extends Error {
@@ -104,6 +131,11 @@ export class EnemyPlacementInfeasibleError extends Error {
   }
 }
 
+function customPoolOf(config) {
+  // Canonical (sorted, unique) form; a malformed, duplicate or empty list raises the typed custom-pool error.
+  return canonicalCustomPool(config.enemyCustomPool);
+}
+
 /** Validates the sampling-only options of a normalized config; never replaces a value silently. */
 export function resolveEnemyPlacementOptions(config, algorithm = config.enemyPlacementAlgorithm) {
   const problems = [];
@@ -126,6 +158,11 @@ export function resolveEnemyPlacementOptions(config, algorithm = config.enemyPla
   if (!TYPE_REPLACEMENT_MODES.includes(config.enemyTypeReplacement)) {
     problems.push(`enemyTypeReplacement must be ${TYPE_REPLACEMENT_MODES.join(", ")} (got ${String(config.enemyTypeReplacement)}).`);
   }
+  if (config.enemyCustomPool !== null && config.enemyCustomPool !== undefined && algorithm === "permutation-v1") {
+    problems.push("enemyCustomPool only applies to sampling-v1; it must be null with permutation-v1.");
+  } else if (algorithm === "sampling-v1") {
+    canonicalCustomPool(config.enemyCustomPool); // typed ENEMY_PLACEMENT_CUSTOM_POOL_INVALID for a malformed, duplicate or empty list
+  }
   if (problems.length === 0 && algorithm === "permutation-v1") {
     for (const [key, neutral] of Object.entries(SAMPLING_NEUTRAL_OPTIONS)) {
       if (config[key] !== neutral) problems.push(`${key} only applies to sampling-v1; it must be ${JSON.stringify(neutral)} with permutation-v1.`);
@@ -139,6 +176,7 @@ export function resolveEnemyPlacementOptions(config, algorithm = config.enemyPla
     difficultyMode: config.enemyDifficultyMode,
     difficultyStrictness: config.enemyDifficultyStrictness,
     typeReplacement: config.enemyTypeReplacement,
+    customPool: customPoolOf(config),
   };
 }
 
@@ -394,6 +432,8 @@ export function createPlacementDiagnostics({ algorithm, level = "summary" }) {
     classTableHash: null,
     /** The effective sampling options of the run (mode, strictness, fit, chance, ...). */
     options: null,
+    /** Custom pool state and coverage (sampling-v1): enabled, total, selected, hash, size/difficulty coverage. */
+    customPool: null,
     /** Highest value seen for a named quantity (for example the highest map attempt used). */
     peak(name, value) {
       summary.counters[name] = Math.max(summary.counters[name] ?? 0, value);
@@ -467,7 +507,7 @@ export function createPlacementDiagnostics({ algorithm, level = "summary" }) {
     },
     toJSON() {
       return {
-        algorithm: this.algorithm, rngVersion: this.rngVersion, level, classTableHash: this.classTableHash, options: this.options, summary,
+        algorithm: this.algorithm, rngVersion: this.rngVersion, level, classTableHash: this.classTableHash, options: this.options, customPool: this.customPool, summary,
         ...(level === "detail" ? { slots, groups } : {}),
       };
     },
@@ -475,7 +515,7 @@ export function createPlacementDiagnostics({ algorithm, level = "summary" }) {
 }
 
 /** The one-line identity recorded for the frozen algorithm: no counters, no streams. */
-export const permutationDiagnostics = () => ({ algorithm: "permutation-v1", rngVersion: null, level: "summary", classTableHash: null, options: null, summary: null });
+export const permutationDiagnostics = () => ({ algorithm: "permutation-v1", rngVersion: null, level: "summary", classTableHash: null, options: null, customPool: null, summary: null });
 
 // ---- drop ownership -----------------------------------------------------------------------------------------------
 

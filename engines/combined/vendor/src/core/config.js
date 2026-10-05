@@ -52,6 +52,9 @@ export const defaultConfig = Object.freeze({
   enemyDifficultyStrictness: "loose",
   // Part C1 (patches/0009): legacy Type replacement; "disabled" (legacy default 1) is neutral for permutation-v1.
   enemyTypeReplacement: "disabled",
+  // Part C2 (patches/0010): custom enemy pool for the replacement types. null = the full regular pool (neutral for
+  // permutation-v1); otherwise a non-empty list of unique model ids.
+  enemyCustomPool: null,
   // "summary" keeps counters only; "detail" adds one record per slot (debugging).
   placementDiagnosticsLevel: "summary",
   useExtractedData: true,
