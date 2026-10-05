@@ -921,3 +921,28 @@ Decision: sampling-v1 uses a non-worsening model-budget policy. The normal targe
   left alone has no solution at any draw, a failure retries cannot remove (about 2 of 100 seeds at 25% for a small healthy
   pool); 31 is a model count `permutation-v1` already produces in valid output. This is not a general raise of the limit and the
   Parish 32-33 baseline risk stays a separate item. Use of the grace is recorded per map in the diagnostics.
+
+## The world randomizer data is prepared by the application; helpers are self-contained (backend 0.29.0, desktop 0.16.0)
+
+Date: 2026-10-05. Supersedes point 2 of "FogHost v1: ... user-supplied data root" (the data root is no longer chosen by the
+player) and the "Fog data root" blocker of the packaging notes.
+
+1. **Product rule:** a player needs Windows, Dark Souls Remastered and DS1TR only. No folder of another tool, no .NET, no
+   Node, no command line.
+2. **Provenance first** (`docs/FOG_DATA_PROVENANCE.md`): of the 59 files FogHost reads, 19 (18 maps, GameParam) are
+   byte-identical to a clean installation and are copied from the verified pristine snapshot; 40 (fog.txt, 4 layouts, 18 event
+   and 17 talk files) are not vanilla (the events and talk scripts are FromSoftware data edited by the FogMod author) and
+   cannot be derived.
+3. **Nothing from FogMod's `dist` is bundled.** The 40 files are fetched by the player's computer, once, over HTTPS, from the
+   FogMod repository at the pinned commit (SHA-256 per file, size bound, atomic install, no execution of anything
+   downloaded). This replaces "never bundled or downloaded" with "never bundled, fetched from upstream by the player's own
+   machine". It carries a legal caveat for the project owner (the fetched scripts are FromSoftware-derived material the
+   upstream repository already publishes); if upstream disappears or objects, the world randomizer is refused with a plain
+   message and no copy is ever shipped.
+4. **Offline:** a valid cache needs no network; only the first run of the world randomizer does. An unsupported game build
+   (a derived file whose hash differs) is reported as such, never worked around.
+5. **Self-contained .NET:** DsrDataTool and FogHost are published `win-x64`, `--self-contained`, single-file with compression.
+   Each carries its own runtime; no PATH, global dotnet or `dotnet` CLI is used at run time. The packager fails if a helper
+   does not start with all .NET locations hidden.
+6. **Plain-language errors:** the primary message is for players; the code and exact reason go to the run log and manifest.
+   `DS1TR_FOG_DATA_ROOT` stays as a developer override only.

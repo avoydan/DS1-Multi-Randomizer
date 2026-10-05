@@ -1,5 +1,22 @@
 # Implementation status
 
+**User-friendly runtime / Fog bootstrap (2026-10-05; backend 0.29.0, desktop 0.16.0, contracts 0.12.0, FogHost 0.5.0).**
+A player no longer picks a FogMod folder or installs .NET. The app finds Dark Souls Remastered through Steam, checks it,
+imports the clean snapshot and prepares the world randomizer data itself: 19 of the 59 files are copied from the verified
+clean snapshot, 40 are fetched once over HTTPS from the pinned FogMod commit (SHA-256 per file, size bound, temp folder,
+whole-set verification, atomic install), after which no network is needed. FogHost and DsrDataTool are self-contained
+win-x64 single-file executables. The main screen uses plain wording and readiness indicators; failures are phrased for
+players and the exact reason stays in the log and manifest. Details: `docs/FOG_DATA_PROVENANCE.md`,
+`docs/DESKTOP_PACKAGING.md`, `docs/DECISIONS.md`.
+
+- **Proof through the packaged path (no `DS1TR_FOG_DATA_ROOT`):** a full Items + Enemies + Bosses + Fog proof with the
+  self-contained helpers and an empty state folder (first-run download): generation, byte-identical rerun, activation,
+  restore, live installation unchanged. The packaged 0.16.0 app, driven through its own UI on a clean copy of the game: game
+  folder check, world data preparation, Randomize, Apply to game, Restore original game.
+- **Fixed on the way:** the 0.15.0 portable executable could not start its backend (`@ds1tr/contracts` was not staged).
+- **Tests:** backend 312 (311 pass, 1 skipped; new: world data bootstrap, game discovery, prerequisites, plain messages),
+  desktop settings migration 2.
+
 **Enemy placement Part C2: custom enemy pool for regular enemies (2026-10-05; contracts 0.12.0, backend 0.28.0, desktop 0.15.0).**
 `sampling-v1` gains the custom enemy pool (**PARTIAL**: regular enemies; the original's boss and NPC entries need later
 parts). A pool is a canonical sorted list of model ids (`null` = the full pool); it enters only through the candidate

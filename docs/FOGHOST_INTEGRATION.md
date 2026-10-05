@@ -958,3 +958,12 @@ Verification (all on real-format data):
 - Proof run (generate, byte-identical rerun, activate, restore): the two events in the final Fog
   package are identical to the combined package's; all checks pass; the live install is untouched.
 - Sweeps and `verify-skips`: see `docs/IMPLEMENTATION_STATUS.md`.
+
+## Data root preparation by the application (2026-10-05)
+
+The data root is no longer supplied by the user. `apps/backend/src/adapters/worldData.ts` assembles it in
+`<state>/world-data/<id>` and the pipeline passes that folder as `fogDataRoot`; the request schema and FogHost's
+verification are unchanged. 19 files (18 `.msb`, `GameParam.parambnd.dcx`) are copied from the verified pristine snapshot;
+the other 40 are fetched once from the pinned FogMod commit and hash-checked. The per-file inventory, the comparison with a
+clean installation and the redistribution decision are in `docs/FOG_DATA_PROVENANCE.md`. `DS1TR_FOG_DATA_ROOT` is a
+developer override. FogHost and DsrDataTool are shipped as self-contained single-file executables (`docs/DESKTOP_PACKAGING.md`).

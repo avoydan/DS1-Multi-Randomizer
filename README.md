@@ -4,6 +4,17 @@ DS1 Triple Randomizer is a Windows desktop application for generating one
 deterministic Dark Souls Remastered randomization from item, enemy/boss, and
 FogMod settings.
 
+## For players
+
+1. Download **DS1 Triple Randomizer** and run it.
+2. Choose your settings.
+3. Click **Randomize**, then **Apply to game**.
+4. Start Dark Souls Remastered from Steam and play offline.
+
+You need Windows and your own copy of Dark Souls Remastered on Steam. Nothing else has to be installed or downloaded by
+hand: the app finds the game, prepares everything it needs (the world randomizer fetches a small set of data files once
+and then works offline) and can put your original game files back at any time with **Restore original game**.
+
 ## Architecture
 
 ```text

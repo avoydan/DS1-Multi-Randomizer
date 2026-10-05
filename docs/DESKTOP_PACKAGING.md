@@ -5,14 +5,28 @@
 The portable executable extracts Electron and its `resources/runtime` payload. The same payload is visible in `release/win-unpacked` for inspection. It includes:
 
 - compiled backend and vendored combined JavaScript core;
-- DsrDataTool and FogHost executables, runtime configuration, and managed dependencies;
-- GPL, Apache and third-party notices plus upstream pins under `runtime/licenses`.
+- DsrDataTool and FogHost as **self-contained win-x64 single-file executables** (about 36 MB each, compressed, with the
+  .NET 8 runtime inside); a computer without .NET runs them. The packager smoke-tests both with every .NET location hidden
+  (no `DOTNET_ROOT`, a PATH that holds only System32) and fails the build if one does not start;
+- `@ds1tr/contracts`, which the backend imports at run time. electron-builder never copies a `node_modules` folder through
+  `extraResources`, so `scripts/stage-runtime-modules.cjs` (`afterPack`) places it in `resources/runtime/node_modules`;
+- GPL, Apache and third-party notices plus upstream pins and the world randomizer data provenance under `runtime/licenses`.
 
-It deliberately excludes FogMod's game-derived `dist/DS1R` data, game files, catalogs, and generated packages. Before a Fog run, select the user-provided FogMod 6e6dc78 data root in the desktop app. The picker checks the required `dist/DS1R/event` and `dist/DS1R/map/MapStudio` directories; FogHost checks the complete pinned file hash manifest during generation.
+It deliberately excludes game files, catalogs, generated packages and every file of FogMod's `dist` folder. The world
+randomizer's 59 data files are prepared by the app (`apps/backend/src/adapters/worldData.ts`, inventory in
+`docs/FOG_DATA_PROVENANCE.md`): 19 map and parameter files are copied from the verified clean snapshot of the player's own
+installation, and the 40 FogMod-authored or FogMod-edited files are fetched once over HTTPS from the pinned FogMod commit,
+SHA-256 verified, assembled in a temporary folder and moved into `userData/state/world-data/<id>` atomically. The player
+selects no data folder; once the cache is valid, generation needs no network. FogHost still verifies the complete pinned
+hash manifest during generation. `DS1TR_FOG_DATA_ROOT` remains a developer override.
 
 Electron starts the backend as a child using its bundled Node mode, an argument vector, a random loopback port, and a per-session API token. It supplies packaged runtime paths through environment variables. The backend owns snapshots, runs, activation and restore under Electron's user-data directory, not the installation directory. The app stops the backend process tree at shutdown. The renderer only calls the typed backend API and selects directories through Electron IPC. The sandboxed preload is compiled as CommonJS (`preload.cts` to `preload.cjs`).
 
-First run needs no DSR installation. Select the DSR directory and validate it before import. Missing DSR paths return explicit validation problems; missing Fog data returns a visible prerequisite message. A backend startup failure is shown in the app. The executable is unsigned and currently uses the default Electron icon; public GPL corresponding source and a matching release tag remain prerequisites before any external release.
+First run: the app looks for Dark Souls Remastered through Steam (registry, library folders and the game's app manifest), checks
+it, imports the clean snapshot and, when the world randomizer is switched on, prepares its data, showing plain progress
+("Dark Souls Remastered found", "World randomizer ready"). Only when the game cannot be found does it ask for the game
+folder, and a choice is offered when several copies exist. Failures are phrased for players and the exact reason is kept
+under Advanced and in the run manifest. A backend startup failure is shown in the app. The executable is unsigned and currently uses the default Electron icon; public GPL corresponding source and a matching release tag remain prerequisites before any external release.
 
 The build uses a minimal staged Electron app with no runtime npm dependencies: React is bundled by Vite, and the backend is separate in `extraResources`. The full source repository and its pre-existing orchestrator files are not copied into the package.
 
