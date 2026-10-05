@@ -1,0 +1,92 @@
+diff --git a/engines/combined/vendor/src/core/sampling.js b/engines/combined/vendor/src/core/sampling.js
+index 1bdb152..0e7b54a 100644
+--- a/engines/combined/vendor/src/core/sampling.js
++++ b/engines/combined/vendor/src/core/sampling.js
+@@ -7,7 +7,7 @@
+ // Per slot (in stable id order inside a stable map order):
+ //   1. replacement chance - the slot's first draw from its own stream (`slot:<id>`, "enemy-placement-v1");
+ //   2. candidate = uniform draw over the surviving TYPES (size fit, Prevent same, model budget) with list shrink;
+-//   3. bounded fallback ladder when nothing survives: keep vanilla, in-set fitting type, relaxed fit, failure;
++//   3. bounded fallback ladder when nothing survives: keep vanilla, in-set fitting type, failure;
+ //   4. variant = uniform draw among the type's (NpcParam, think-param) variants.
+ // The model set of a map is a ModelBudget: fixed and vanilla-kept models are in it from the start, together with
+ // a coverage reserve that gives every participating slot an in-set type that fits it.
+@@ -133,6 +133,15 @@ export function buildMapModelSet({ mapId, cap, fixedModels, participants, sizeOf
+   };
+ }
+ 
++// ---- effective budget -------------------------------------------------------------------------------------------------
++
++/**
++ * Non-worsening model budget (model document 10.2). The target is `cap` (30) distinct final models per map. When
++ * the models outside the sampler's control - fixed plans plus the vanilla models of slots it leaves alone -
++ * already exceed it, that baseline is the cap for the map: the sampler may keep or reduce it, never raise it.
++ */
++export const effectiveModelBudget = (baseline, cap = MODEL_BUDGET_CAP) => Math.max(cap, baseline);
++
+ // ---- fallback ladder -----------------------------------------------------------------------------------------------
+ 
+ /**
+@@ -140,18 +149,19 @@ export function buildMapModelSet({ mapId, cap, fixedModels, participants, sizeOf
+  * bounded: every rung is a scan over a sorted list, nothing draws again.
+  *   kept-vanilla - the slot's own model is in the set or the set has room (allowed under Prevent same);
+  *   in-set-fit   - the smallest in-set type that fits the slot (and is not its own model under Prevent same);
+- *   fit-relaxed  - with Placement fit "fits" only: the smallest in-set type whatever its size;
+- *   infeasible   - nothing is left; the caller raises ENEMY_PLACEMENT_INFEASIBLE.
+- * `chosen` is null for kept-vanilla and infeasible.
++ *   infeasible   - nothing is left; the caller raises ENEMY_PLACEMENT_INFEASIBLE, which another attempt (a new
++ *                  combined seed, hence new participation draws) can solve.
++ * There is deliberately no "fit relaxed" rung: with the non-worsening budget a slot can be left without any
++ * fitting type only when the map has no headroom, and placing an oversized type would break the documented fit
++ * invariant. `chosen` is null for kept-vanilla and infeasible.
+  */
+-export function fallbackLadder({ slot, budget, table, maxSize, fit, preventSame }) {
++export function fallbackLadder({ slot, budget, table, maxSize, preventSame }) {
+   if (budget.evaluate(slot.modelName).admitted) return { stage: "kept-vanilla", chosen: null };
+   const inSet = budget.models().map((model) => table.byModel.get(model)).filter(Boolean)
+     .filter((type) => !(preventSame && type.model === slot.modelName))
+     .sort((left, right) => left.size - right.size || compare(left.model, right.model));
+   const fitting = inSet.find((type) => type.size <= maxSize);
+   if (fitting) return { stage: "in-set-fit", chosen: fitting };
+-  if (fit === "fits" && inSet.length > 0) return { stage: "fit-relaxed", chosen: inSet[0] };
+   return { stage: "infeasible", chosen: null };
+ }
+ 
+@@ -199,8 +209,14 @@ export function planSampledRegularEnemies({
+     }
+     const fixedModels = new Set(fixedModelsByMap.get(mapId) ?? []);
+     for (const slot of mapSlots) if (!participates.get(slot.id)) fixedModels.add(slot.modelName);
++    // Non-worsening budget: the models the sampler cannot remove (fixed plans and the vanilla models of slots
++    // it leaves alone) are the baseline. The map may hold `cap` models, or its baseline when that is larger;
++    // the sampler never takes it above that.
++    const baseline = fixedModels.size;
++    const mapCap = effectiveModelBudget(baseline, cap);
++    if (baseline > cap) diagnostics.count("mapsAboveCap");
+     const { budget, kept, trimmed } = buildMapModelSet({
+-      mapId, cap, fixedModels, participants: mapSlots.filter((slot) => participates.get(slot.id)), sizeOf, fitSize, preventSame, table,
++      mapId, cap: mapCap, fixedModels, participants: mapSlots.filter((slot) => participates.get(slot.id)), sizeOf, fitSize, preventSame, table,
+     });
+     if (trimmed > 0) diagnostics.count("reserveTrimmed", trimmed);
+     const active = new Set(kept.map((slot) => slot.id));
+@@ -236,7 +252,7 @@ export function planSampledRegularEnemies({
+       if (sizeRejections > 0) diagnostics.count("candidatesOverSize", sizeRejections);
+ 
+       if (!chosen) {
+-        const fallback = fallbackLadder({ slot, budget, table, maxSize, fit: options.fit, preventSame });
++        const fallback = fallbackLadder({ slot, budget, table, maxSize, preventSame });
+         stage = fallback.stage;
+         chosen = fallback.chosen;
+         if (stage === "infeasible") {
+@@ -261,10 +277,10 @@ export function planSampledRegularEnemies({
+     // Post-condition: the models the map really holds after the run (what DsrDataTool keeps) fit the cap.
+     const finalModels = new Set(fixedModelsByMap.get(mapId) ?? []);
+     for (const slot of mapSlots) finalModels.add(modelOfSlot.get(slot.id));
+-    if (finalModels.size > cap) throw new ModelBudgetError(mapId, cap, [...finalModels].sort(compare));
++    if (finalModels.size > mapCap) throw new ModelBudgetError(mapId, mapCap, [...finalModels].sort(compare));
+     const replaced = mapSlots.filter((slot) => assignment.has(slot.id)).length;
+     diagnostics.setMap(mapId, {
+-      slots: mapSlots.length, replaced, finalModels: finalModels.size, modelSet: budget.size,
++      slots: mapSlots.length, replaced, finalModels: finalModels.size, modelSet: budget.size, baseline, effectiveCap: mapCap,
+     });
+   }
+   return { assignment, table };
