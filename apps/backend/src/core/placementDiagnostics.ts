@@ -11,13 +11,17 @@ export interface PlacementSummary {
   categoryDowngrades: number;
   terminalFailures: string[];
   counters: Record<string, number>;
-  maps: Record<string, { slots: number; replaced: number; finalModels: number; modelSet: number; baseline: number; effectiveCap: number }>;
+  maps: Record<string, { slots: number; replaced: number; finalModels: number; modelSet: number; baseline: number; effectiveCap: number; attempts?: number }>;
+  /** Map attempts that failed and were retried (map-local retries); empty when every map succeeded first time. */
+  retries?: Array<{ mapId: string; attempt: number; slotId?: string; baseline?: number; effectiveCap?: number }>;
 }
 
 export interface PlacementDiagnosticsSummary {
   algorithm: EnemyPlacementAlgorithm;
   rngVersion: string | null;
   classTableHash: string | null;
+  /** The effective sampling options of the run (sampling-v1 only). */
+  options?: Record<string, unknown> | null;
   summary: PlacementSummary | null;
 }
 
@@ -37,6 +41,7 @@ export function summarizePlacementDiagnostics(value: unknown): PlacementDiagnost
     algorithm: algorithm as EnemyPlacementAlgorithm,
     rngVersion: typeof input?.rngVersion === 'string' ? input.rngVersion : null,
     classTableHash: typeof input?.classTableHash === 'string' ? input.classTableHash : null,
+    options: record(input?.options) ? structuredClone(record(input?.options)) as Record<string, unknown> : null,
     summary: summary ? structuredClone(summary) as unknown as PlacementSummary : null,
   };
 }
@@ -48,7 +53,10 @@ export function formatPlacementDiagnostics(diagnostics: PlacementDiagnosticsSumm
   const replaced = Object.values(summary.maps).reduce((total, map) => total + map.replaced, 0);
   const maxModels = Math.max(0, ...Object.values(summary.maps).map((map) => map.finalModels));
   const stages = Object.entries(summary.stages).filter(([, count]) => count > 0).map(([name, count]) => `${name} ${count}`).join(', ');
-  return `Enemy placement sampling-v1: ${summary.slots} regular slots, ${replaced} sampled, `
+  const options = diagnostics.options ?? {};
+  const retried = summary.counters.mapsRetried ?? 0;
+  return `Enemy placement sampling-v1 (difficulty ${String(options.difficultyMode ?? 'random')}/${String(options.difficultyStrictness ?? 'loose')}): ${summary.slots} regular slots, ${replaced} sampled, `
+    + `${retried} map(s) retried, ${summary.counters.difficultyLapses ?? 0} difficulty lapses, `
     + `${summary.counters.keptByChance ?? 0} left by replacement chance, ${summary.rejections['model-budget'] ?? 0} model-budget rejections, `
     + `at most ${maxModels} models in a map, stages ${stages || 'none'}, class table ${diagnostics.classTableHash?.slice(0, 12) ?? 'n/a'}.`;
 }

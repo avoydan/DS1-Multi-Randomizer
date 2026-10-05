@@ -38,7 +38,7 @@ const initialConfig: RandomizerConfig = {
     // Legacy Enemy Randomizer default: the second Bell Gargoyle is replaced.
     secondGargoyle: 'replace',
     // Classic permutation is the default; sampling-v1 is opt-in. The other values are the neutral ones for the classic mode.
-    placement: { algorithm: 'permutation-v1', replacementChance: 100, normalReplacement: 'normals', fit: 'anywhere' },
+    placement: { algorithm: 'permutation-v1', replacementChance: 100, normalReplacement: 'normals', fit: 'anywhere', difficultyMode: 'random', difficultyStrictness: 'loose' },
   },
   fog: {
     enabled: true,
@@ -154,8 +154,8 @@ export function App() {
       enemies: {
         ...current.enemies,
         placement: algorithm === 'sampling-v1'
-          ? { algorithm, replacementChance: 100, normalReplacement: 'normals', fit: 'fits' }
-          : { algorithm, replacementChance: 100, normalReplacement: 'normals', fit: 'anywhere' },
+          ? { algorithm, replacementChance: 100, normalReplacement: 'normals', fit: 'fits', difficultyMode: 'random-easy-asylum', difficultyStrictness: 'loose' }
+          : { algorithm, replacementChance: 100, normalReplacement: 'normals', fit: 'anywhere', difficultyMode: 'random', difficultyStrictness: 'loose' },
       },
     }));
   const setPlacement = <K extends keyof RandomizerConfig['enemies']['placement']>(key: K, value: RandomizerConfig['enemies']['placement'][K]) =>
@@ -390,6 +390,10 @@ export function App() {
               <select value={config.enemies.placement.normalReplacement} disabled={!config.enemies.randomizeRegularEnemies || config.enemies.placement.algorithm !== 'sampling-v1'} title="Legacy-style sampling only. Replacing normal enemies with bosses needs boss replacement, which is not available yet." onChange={(event) => setPlacement('normalReplacement', event.target.value as RandomizerConfig['enemies']['placement']['normalReplacement'])}><option value="none">Disabled</option><option value="normals">Only normal enemies</option><option disabled value="bosses">Only bosses (planned)</option><option disabled value="both">Bosses or normal enemies (planned)</option></select>
               <label className="field-label">Placement</label>
               <select value={config.enemies.placement.fit} disabled={!config.enemies.randomizeRegularEnemies || config.enemies.placement.algorithm !== 'sampling-v1'} title="Legacy-style sampling only. Only where they fit: a replacement is never larger than the slot. Anywhere: any size. For regular enemies the last option equals Anywhere (it differs only for NPC slots)." onChange={(event) => setPlacement('fit', event.target.value as RandomizerConfig['enemies']['placement']['fit'])}><option value="fits">Only where they fit</option><option value="anywhere">Anywhere</option><option value="anywhere-except-npcs">Anywhere, fit NPCs</option></select>
+              <label className="field-label">Difficulty mode</label>
+              <select value={config.enemies.placement.difficultyMode} disabled={!config.enemies.randomizeRegularEnemies || config.enemies.placement.algorithm !== 'sampling-v1'} title="Legacy-style sampling only. Difficulty curve: a regular enemy is replaced by one of comparable difficulty (strictness decides how far it may differ). Fully random: any enemy anywhere. Easy Asylum: the Asylum only receives the easiest enemies. Difficulty classes are derived by DS1TR from the enemies' areas and HP, so they approximate the original ones." onChange={(event) => setPlacement('difficultyMode', event.target.value as RandomizerConfig['enemies']['placement']['difficultyMode'])}><option value="curve-easy-asylum">Curve + easy Asylum</option><option value="curve">Difficulty curve</option><option value="random-easy-asylum">Random + easy Asylum</option><option value="random">Fully random</option></select>
+              <label className="field-label">Difficulty strictness</label>
+              <select value={config.enemies.placement.difficultyStrictness} disabled={!config.enemies.randomizeRegularEnemies || config.enemies.placement.algorithm !== 'sampling-v1' || !config.enemies.placement.difficultyMode.startsWith('curve')} title="Only used by the difficulty-curve modes. Strict: mostly the same difficulty class, harder ones are rare. A bit loose: harder enemies appear more often. Very loose: any difficulty can appear anywhere." onChange={(event) => setPlacement('difficultyStrictness', event.target.value as RandomizerConfig['enemies']['placement']['difficultyStrictness'])}><option value="strict">Strict</option><option value="loose">A bit loose</option><option value="very-loose">Very loose</option></select>
             </div>
             <div className="option-group"><h3>Legacy options</h3>
               <Toggle inactive={!config.enemies.randomizeRegularEnemies} label="Replace mimics" hint="Off: Mimics stay in place and are kept out of the enemy pool." checked={config.enemies.replaceMimics} onChange={(value) => setEnemy('replaceMimics', value)} />
@@ -403,12 +407,10 @@ export function App() {
             </div>
             <div className="option-group planned-group"><h3>Legacy parity <span>planned</span></h3>
               {['Boss replacement', 'NPC replacement'].map((label) => <div key={label}><label className="field-label">{label}</label><select defaultValue="disabled" disabled><option value="disabled">Disabled</option><option value="bosses">Only bosses</option><option value="enemies">Only normal enemies</option><option value="all">Bosses or normal enemies</option></select></div>)}
-              <label className="field-label">Difficulty mode</label><select defaultValue="random" disabled><option value="curve-easy-asylum">Curve + easy Asylum</option><option value="curve">Difficulty curve</option><option value="random-easy-asylum">Random + easy Asylum</option><option value="random">Fully random</option></select>
               <RangeOption disabled label="Boss chance: normal slots" value={10} onChange={() => undefined} />
               <RangeOption disabled label="Boss chance: boss slots" value={90} onChange={() => undefined} />
               <RangeOption disabled label="Roaming boss souls" value={100} onChange={() => undefined} />
               {['Allow T-pose behavior', 'Unique bosses', 'Respawning roaming bosses', 'Hostile NPCs'].map((label) => <Toggle key={label} disabled label={label} checked={false} onChange={() => undefined} />)}
-              <label className="field-label">Difficulty strictness</label><select defaultValue="loose" disabled><option value="strict">Strict</option><option value="loose">A bit loose</option><option value="very-loose">Very loose</option></select>
               <label className="field-label">Type replacement</label><select defaultValue="disabled" disabled><option value="enabled">Enabled</option><option value="exclude-roaming-bosses">Except roaming bosses</option><option value="disabled">Disabled</option></select>
               <label className="field-label">Custom enemy pool</label><input value="Default" disabled readOnly />
             </div>

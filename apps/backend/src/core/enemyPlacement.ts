@@ -2,6 +2,8 @@ import {
   DEFAULT_ENEMY_PLACEMENT_ALGORITHM,
   ENEMY_PLACEMENT_ALGORITHMS,
   IMPLEMENTED_ENEMY_PLACEMENT_ALGORITHMS,
+  DIFFICULTY_MODES,
+  DIFFICULTY_STRICTNESS,
   NEUTRAL_ENEMY_PLACEMENT_OPTIONS,
   NORMAL_ENEMY_REPLACEMENT_MODES,
   PLACEMENT_FIT_MODES,
@@ -21,6 +23,8 @@ export const SAMPLING_ONLY_OPTIONS: readonly SamplingOnlyOption[] = [
   { key: 'replacementChance', neutral: NEUTRAL_ENEMY_PLACEMENT_OPTIONS.replacementChance },
   { key: 'normalReplacement', neutral: NEUTRAL_ENEMY_PLACEMENT_OPTIONS.normalReplacement },
   { key: 'fit', neutral: NEUTRAL_ENEMY_PLACEMENT_OPTIONS.fit },
+  { key: 'difficultyMode', neutral: NEUTRAL_ENEMY_PLACEMENT_OPTIONS.difficultyMode },
+  { key: 'difficultyStrictness', neutral: NEUTRAL_ENEMY_PLACEMENT_OPTIONS.difficultyStrictness },
 ];
 
 /** Value-domain checks of the sampling-only options (they apply to both algorithms: a bad value is never ignored). */
@@ -34,6 +38,12 @@ function validateSamplingOnlyValues(value: Record<string, unknown>, path: string
   }
   if (Object.hasOwn(value, 'fit') && !(PLACEMENT_FIT_MODES as readonly unknown[]).includes(value.fit)) {
     problems.push(`${path}.fit must be ${PLACEMENT_FIT_MODES.join(', ')}.`);
+  }
+  if (Object.hasOwn(value, 'difficultyMode') && !(DIFFICULTY_MODES as readonly unknown[]).includes(value.difficultyMode)) {
+    problems.push(`${path}.difficultyMode must be ${DIFFICULTY_MODES.join(', ')}.`);
+  }
+  if (Object.hasOwn(value, 'difficultyStrictness') && !(DIFFICULTY_STRICTNESS as readonly unknown[]).includes(value.difficultyStrictness)) {
+    problems.push(`${path}.difficultyStrictness must be ${DIFFICULTY_STRICTNESS.join(', ')}.`);
   }
 }
 

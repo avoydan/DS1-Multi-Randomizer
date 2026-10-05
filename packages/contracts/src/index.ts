@@ -73,6 +73,20 @@ export type PlacementFitMode = 'fits' | 'anywhere' | 'anywhere-except-npcs';
 export const PLACEMENT_FIT_MODES: readonly PlacementFitMode[] = ['fits', 'anywhere', 'anywhere-except-npcs'];
 
 /**
+ * Legacy "Difficulty mode": curve = replacements of comparable difficulty (strictness applies), random = fully
+ * random, random-easy-asylum = fully random with an easy Asylum, curve-easy-asylum = curve with an easy Asylum.
+ * Legacy default: random-easy-asylum. Regular enemies only in Part B.
+ */
+export type DifficultyMode = 'curve' | 'random' | 'random-easy-asylum' | 'curve-easy-asylum';
+
+export const DIFFICULTY_MODES: readonly DifficultyMode[] = ['curve', 'random', 'random-easy-asylum', 'curve-easy-asylum'];
+
+/** Legacy "Difficulty strictness" (strict, a bit loose = default, very loose); only effective in the curve modes. */
+export type DifficultyStrictness = 'strict' | 'loose' | 'very-loose';
+
+export const DIFFICULTY_STRICTNESS: readonly DifficultyStrictness[] = ['strict', 'loose', 'very-loose'];
+
+/**
  * Placement settings. Everything except `algorithm` applies to `sampling-v1` only; under `permutation-v1` the
  * backend requires the neutral values below and rejects any other (it never ignores a setting silently).
  */
@@ -82,6 +96,8 @@ export interface EnemyPlacementOptions {
   replacementChance: number;
   normalReplacement: NormalEnemyReplacementMode;
   fit: PlacementFitMode;
+  difficultyMode: DifficultyMode;
+  difficultyStrictness: DifficultyStrictness;
 }
 
 /** The values under which `permutation-v1` behaves as it always did. Migrated presets and new configurations use them. */
@@ -89,6 +105,8 @@ export const NEUTRAL_ENEMY_PLACEMENT_OPTIONS: Omit<EnemyPlacementOptions, 'algor
   replacementChance: 100,
   normalReplacement: 'normals',
   fit: 'anywhere',
+  difficultyMode: 'random',
+  difficultyStrictness: 'loose',
 };
 
 /** The legacy defaults offered when `sampling-v1` is chosen: replace always, only normal enemies, only where they fit. */
@@ -96,6 +114,8 @@ export const LEGACY_ENEMY_PLACEMENT_OPTIONS: Omit<EnemyPlacementOptions, 'algori
   replacementChance: 100,
   normalReplacement: 'normals',
   fit: 'fits',
+  difficultyMode: 'random-easy-asylum',
+  difficultyStrictness: 'loose',
 };
 
 export interface EnemyOptions {
@@ -212,7 +232,7 @@ export type GenerationResult =
   | { ok: false; code: string; message: string; stage: string };
 
 export const PRESET_FORMAT = 'ds1tr-preset';
-export const PRESET_VERSION = 6;
+export const PRESET_VERSION = 7;
 
 /** Shareable settings: everything in RandomizerConfig except the machine-specific game path. */
 export interface PresetDocument {

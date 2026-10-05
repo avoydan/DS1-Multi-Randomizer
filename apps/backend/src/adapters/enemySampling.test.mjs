@@ -644,7 +644,7 @@ test('the backend summary keeps counters and the class table hash, drops per-slo
   assert.equal('slots' in summary, false);
   assert.equal(summary.summary.slots, catalogOf(SPEC).enemySlots.length);
   const line = formatPlacementDiagnostics(summary);
-  assert.match(line, /^Enemy placement sampling-v1: \d+ regular slots, \d+ sampled/u);
+  assert.match(line, /^Enemy placement sampling-v1 \(difficulty random\/loose\): \d+ regular slots, \d+ sampled/u);
   assert.doesNotMatch(line, /[A-Za-z]:\|\/Users\//u);
   // permutation-v1 and anything unreadable reduce to the frozen algorithm's identity.
   assert.deepEqual(summarizePlacementDiagnostics(undefined), { algorithm: 'permutation-v1', rngVersion: null, classTableHash: null, summary: null });

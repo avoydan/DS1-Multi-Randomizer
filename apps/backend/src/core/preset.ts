@@ -29,7 +29,21 @@ const batch4Defaults: SectionDefaults = {
  * Version 6: the sampling-only placement settings, nested in `enemies.placement`. Every older preset migrates to
  * the neutral values, under which permutation-v1 behaves exactly as before.
  */
-const placementBatch5Defaults: Record<string, unknown> = { ...NEUTRAL_ENEMY_PLACEMENT_OPTIONS };
+const placementBatch5Defaults: Record<string, unknown> = {
+  replacementChance: NEUTRAL_ENEMY_PLACEMENT_OPTIONS.replacementChance,
+  normalReplacement: NEUTRAL_ENEMY_PLACEMENT_OPTIONS.normalReplacement,
+  fit: NEUTRAL_ENEMY_PLACEMENT_OPTIONS.fit,
+};
+/** Version 7: the difficulty settings, again nested in `enemies.placement`; older presets migrate to the neutral values. */
+const placementBatch6Defaults: Record<string, unknown> = {
+  difficultyMode: NEUTRAL_ENEMY_PLACEMENT_OPTIONS.difficultyMode,
+  difficultyStrictness: NEUTRAL_ENEMY_PLACEMENT_OPTIONS.difficultyStrictness,
+};
+/** Nested `enemies.placement` keys added by each preset version, applied to every older preset. */
+const placementKeysAddedIn: Array<{ version: number; defaults: Record<string, unknown> }> = [
+  { version: 6, defaults: placementBatch5Defaults },
+  { version: 7, defaults: placementBatch6Defaults },
+];
 /** What each older preset version lacks, newest additions last (the nested v6 placement keys are handled apart). */
 const missingByVersion: Record<number, SectionDefaults[]> = {
   1: [batch1Defaults, batch2Defaults, batch3Defaults, batch4Defaults],
@@ -37,6 +51,7 @@ const missingByVersion: Record<number, SectionDefaults[]> = {
   3: [batch3Defaults, batch4Defaults],
   4: [batch4Defaults],
   5: [],
+  6: [],
 };
 
 const presetKeys = ['format', 'presetVersion', 'masterSeed', 'items', 'enemies', 'fog', 'output'];
@@ -64,7 +79,7 @@ export function importPreset(text: string): PresetImportResult {
   const problems: string[] = [];
   if (record.format !== PRESET_FORMAT) problems.push(`Preset format must be "${PRESET_FORMAT}".`);
   if (record.presetVersion !== PRESET_VERSION && !(typeof record.presetVersion === 'number' && missingByVersion[record.presetVersion])) {
-    problems.push(`Preset version must be ${PRESET_VERSION} (versions 1 to 5 are migrated).`);
+    problems.push(`Preset version must be ${PRESET_VERSION} (versions 1 to 6 are migrated).`);
   }
   for (const key of Object.keys(record)) {
     if (!presetKeys.includes(key)) problems.push(`preset.${key} is not supported.`);
@@ -83,14 +98,17 @@ export function importPreset(text: string): PresetImportResult {
         settings[section] = { ...structuredClone(defaults), ...(current as Record<string, unknown>) };
       }
     }
-    // Version 6 nests the sampling-only settings inside `enemies.placement`; fill them in without touching the algorithm.
+    // Versions 6 and 7 nest the sampling-only settings inside `enemies.placement`; fill in the ones an older preset
+    // lacks without touching the algorithm, and reject a document that already carries a key from a newer version.
     const enemies = settings.enemies;
-    const placement = enemies && typeof enemies === 'object' && !Array.isArray(enemies) ? (enemies as Record<string, unknown>).placement : undefined;
-    if (placement && typeof placement === 'object' && !Array.isArray(placement)) {
-      for (const key of Object.keys(placementBatch5Defaults)) {
+    for (const added of placementKeysAddedIn) {
+      if (presetVersion >= added.version) continue;
+      const placement = enemies && typeof enemies === 'object' && !Array.isArray(enemies) ? (enemies as Record<string, unknown>).placement : undefined;
+      if (!placement || typeof placement !== 'object' || Array.isArray(placement)) continue;
+      for (const key of Object.keys(added.defaults)) {
         if (Object.hasOwn(placement, key)) problems.push(`preset.enemies.placement.${key} is not supported in version ${presetVersion}.`);
       }
-      (enemies as Record<string, unknown>).placement = { ...(placement as Record<string, unknown>), ...structuredClone(placementBatch5Defaults) };
+      (enemies as Record<string, unknown>).placement = { ...(placement as Record<string, unknown>), ...structuredClone(added.defaults) };
     }
     if (problems.length > 0) return { ok: false, problems };
   }
