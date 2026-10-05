@@ -6,6 +6,7 @@ import { executeCombinedGeneration, type CombinedGenerationResult } from '../ada
 import { buildFogCompatibility, decideFogRetry, defaultFogRetryBounds, planFogStaging } from '../adapters/fogCompatibility.js';
 import { FogHostProcess, type FogHostResponse } from '../adapters/fogHostProcess.js';
 import { userMessageFor } from './userMessages.js';
+import { readFogItemRules, type FogTrackedItems } from '../adapters/fogItemRules.js';
 import { resolveFogPrerequisites, type FogPreparationContext, type FogPrerequisiteFailure, type FogPrerequisites } from '../adapters/fogPrerequisites.js';
 import { effectiveCombinedEnabled, validateRandomizerConfig } from './configValidation.js';
 import { validateInstallation } from './installation.js';
@@ -111,7 +112,7 @@ export async function generateRun(
   const workspace = typeof request.workspacePath === 'string' && request.workspacePath
     ? path.resolve(request.workspacePath) : '';
   const manifest: GenerationManifest = {
-    schemaVersion: 1, appVersion: '0.29.0', game: 'DSR', masterSeed: config.masterSeed,
+    schemaVersion: 1, appVersion: '0.29.1', game: 'DSR', masterSeed: config.masterSeed,
     pristineSnapshotId: null, gameTreeRoot: '',
     options: { items: config.items, enemies: config.enemies, fog: config.fog, output: config.output },
     enemyPlacement: {
@@ -173,6 +174,14 @@ export async function generateRun(
     catch { return fail('fog', 'FOG_PREREQUISITES_MISSING', 'The world randomizer files could not be found. Click Retry; if it keeps failing, download DS1 Triple Randomizer again.'); }
   }
 
+  // The world randomizer follows some items by lot; the item shuffle must keep them where it can (fogItemRules.ts).
+  let fogTrackedItems: FogTrackedItems | null = null;
+  if (fogReady) {
+    try { fogTrackedItems = await readFogItemRules(fogReady.dataRoot); } catch (error) {
+      return fail('fog', 'FOG_ITEM_RULES_UNREADABLE', error instanceof Error ? error.message : String(error));
+    }
+  }
+
   const combinedEnabled = effectiveCombinedEnabled(config);
   let combinedAttempt = 0;
   let fogAttempt = 0;
@@ -188,6 +197,7 @@ export async function generateRun(
         items: config.items, enemies: config.enemies,
         generateSpoilerLog: config.output.generateSpoilerLog,
         placementDiagnosticsLevel: process.env[placementDiagnosticsVariable] === 'detail' ? 'detail' : 'summary',
+        fogTrackedItems,
       }, (event) => {
         if (event.type === 'log') onEvent({ ...event, stage: 'combined' });
         else progress('combined', 0.15 + event.progress * 0.4, event.message ?? 'Combined generation.');

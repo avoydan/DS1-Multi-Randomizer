@@ -1,6 +1,7 @@
 import type { DifficultyMode, DifficultyStrictness, TypeReplacementMode, EnemyPlacementAlgorithm, NormalEnemyReplacementMode, PlacementFitMode, EnemyScaling, GwynNerfMode, SecondGargoyleMode, SoulItemsMode, StartingItemsMode } from '@ds1tr/contracts';
 import { enemyPlacementUnavailableMessage, ENEMY_PLACEMENT_UNAVAILABLE, isEnemyPlacementImplemented } from '../core/enemyPlacement.js';
 import type { CombinedRandomizerRequest } from './combinedRandomizerAdapter.js';
+import type { FogTrackedItems } from './fogItemRules.js';
 
 export interface UpstreamCombinedRandomizerConfig {
   seed: string;
@@ -39,6 +40,8 @@ export interface UpstreamCombinedRandomizerConfig {
   /** Canonical custom pool (ascending unique model ids) or null for the full regular pool. */
   enemyCustomPool: string[] | null;
   placementDiagnosticsLevel: 'summary' | 'detail';
+  /** Items the world randomizer follows and the lots it can follow them in; null when it does not run. */
+  fogTrackedItems: FogTrackedItems | null;
   generateSpoilerLog: boolean;
 }
 
@@ -103,6 +106,7 @@ export function mapCombinedRandomizerConfig(
     enemyTypeReplacement: request.enemies.placement.typeReplacement,
     enemyCustomPool: request.enemies.placement.customPool === null ? null : [...request.enemies.placement.customPool].sort(),
     placementDiagnosticsLevel: request.placementDiagnosticsLevel ?? 'summary',
+    fogTrackedItems: request.fogTrackedItems ?? null,
     generateSpoilerLog: request.generateSpoilerLog,
   };
 

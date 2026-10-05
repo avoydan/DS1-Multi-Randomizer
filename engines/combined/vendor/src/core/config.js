@@ -55,6 +55,11 @@ export const defaultConfig = Object.freeze({
   // Part C2 (patches/0010): custom enemy pool for the replacement types. null = the full regular pool (neutral for
   // permutation-v1); otherwise a non-empty list of unique model ids.
   enemyCustomPool: null,
+  // Items that the world randomizer (FogMod) follows by lot: null (no world randomizer) or
+  // { items: [{ equipType, itemId, required }], lotStarts: [itemLotRowId] }. FogMod needs exactly one copy of each required
+  // item in the lots it annotates (a start row or the rows that follow it without a gap) and at most one of any other;
+  // see randomizeExtractedItemLots and docs/FOG_ITEM_TRACKING.md.
+  fogTrackedItems: null,
   // "summary" keeps counters only; "detail" adds one record per slot (debugging).
   placementDiagnosticsLevel: "summary",
   useExtractedData: true,

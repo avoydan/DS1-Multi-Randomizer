@@ -350,9 +350,12 @@ export type FogRetryDecision =
  * authority; the host's own `retryScope` field is informational. Only
  * failures a new seed can change are retryable: merge conflicts and
  * post-write violations are deterministic for a given base install.
+ *
+ * FOG_UPSTREAM_INCOMPATIBLE (a key item outside FogMod's annotated item lots) used to be retried with a new combined seed.
+ * It is structural now: the item shuffle keeps the tracked items inside those lots (fogItemRules.ts), so a repeat means
+ * the configuration or the game data cannot work, and a new seed would only burn the attempts.
  */
 const retryScopeByCode: Readonly<Record<string, 'combined' | 'fog'>> = {
-  FOG_UPSTREAM_INCOMPATIBLE: 'combined',
   FOG_SEED_UNSOLVABLE: 'fog',
 };
 

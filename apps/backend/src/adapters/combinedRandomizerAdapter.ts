@@ -1,4 +1,5 @@
 import type { EnemyOptions, ItemOptions } from '@ds1tr/contracts';
+import type { FogTrackedItems } from './fogItemRules.js';
 import {
   executeCombinedGeneration,
   type CombinedGenerationFailure,
@@ -15,6 +16,8 @@ export interface CombinedRandomizerRequest {
   generateSpoilerLog: boolean;
   /** `detail` adds one record per slot to the sampling-v1 diagnostics (debugging); default `summary`. */
   placementDiagnosticsLevel?: 'summary' | 'detail';
+  /** Set when the world randomizer runs: items it follows may only be placed in lots it can follow (see fogItemRules.ts). */
+  fogTrackedItems?: FogTrackedItems | null;
 }
 
 export type CombinedRandomizerEvent =

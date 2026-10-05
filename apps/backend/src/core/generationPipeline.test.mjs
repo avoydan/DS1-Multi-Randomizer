@@ -45,6 +45,15 @@ async function fixture(fn) {
   finally { await rm(root, { recursive: true, force: true }); }
 }
 
+
+const FOG_TXT = 'KeyItems:\n- Name: darkmoon_seance_ring\n  ID: 2:149\nWarps:\nLotLocations:\n  1300020: catacombs\nDefaultFlagCols:\n';
+async function fogData(root) {
+  const dataRoot = path.join(root, 'fog-data');
+  await mkdir(path.join(dataRoot, 'dist'), { recursive: true });
+  await writeFile(path.join(dataRoot, 'dist', 'fog.txt'), FOG_TXT);
+  return dataRoot;
+}
+
 function combinedStub() {
   return async (request, onEvent) => {
     const seedDirectory = path.join(request.workspacePath, `seed_${request.combinedSeed}`);
@@ -130,9 +139,8 @@ test('writes a validated combined package, manifest and progress', async () => f
 
 test('retries a Fog seed and retains combined files outside the Fog read set', async () => fixture(async ({ root, game, pristine, workspace }) => {
   const executablePath = path.join(root, 'FogHost.exe');
-  const dataRoot = path.join(root, 'fog-data');
   await writeFile(executablePath, 'host');
-  await mkdir(dataRoot);
+  const dataRoot = await fogData(root);
   let calls = 0;
   const fog = { execute: async (execution) => {
     calls++;
@@ -225,4 +233,54 @@ test('technical failures are turned into plain messages while the code and detai
   assert.doesNotMatch(result.message, /DsrDataTool|0xC0000005|C:/u);
   assert.match(result.message, /Something went wrong/u);
   assert.ok(events.some((event) => /0xC0000005/u.test(event.message)));
+}));
+
+test('Fog runs hand the combined engine the items the world randomizer follows and the lots it can follow them in', async () => fixture(async ({ root, game, pristine, workspace }) => {
+  const executablePath = path.join(root, 'FogHost.exe');
+  await writeFile(executablePath, 'host');
+  const dataRoot = await fogData(root);
+  const requests = [];
+  const stub = combinedStub();
+  await generateRun({ config: config(game, true), workspacePath: workspace }, () => {}, {
+    getPristineSource: async () => ({ directory: pristine }),
+    getFogPrerequisites: async () => ({ executablePath, dataRoot, readSet: [] }),
+    combined: async (request, onEvent) => { requests.push(request); return stub(request, onEvent); },
+    fog: { execute: async () => ({ schemaVersion: 2, ok: false, error: { code: 'FOG_ENGINE_FAILED', retryable: false, retryScope: 'none', message: 'stop here' } }) },
+  });
+  assert.deepEqual(requests[0].fogTrackedItems, { items: [{ equipType: 2, itemId: 149, required: true }], lotStarts: [1300020] });
+  // Without the world randomizer nothing is constrained.
+  const plain = [];
+  await generateRun({ config: config(game, false), workspacePath: path.join(root, 'plain') }, () => {}, {
+    getPristineSource: async () => ({ directory: pristine }),
+    combined: async (request, onEvent) => { plain.push(request); return stub(request, onEvent); },
+  });
+  assert.equal(plain[0].fogTrackedItems ?? null, null);
+}));
+
+test('a key item outside the world randomizer lots is structural: one attempt, no reseeding, plain message without internals', async () => fixture(async ({ root, game, pristine, workspace }) => {
+  const executablePath = path.join(root, 'FogHost.exe');
+  await writeFile(executablePath, 'host');
+  const dataRoot = await fogData(root);
+  let combinedCalls = 0;
+  let fogCalls = 0;
+  const stub = combinedStub();
+  const events = [];
+  const result = await generateRun({ config: config(game, true), workspacePath: workspace }, (event) => events.push(event), {
+    getPristineSource: async () => ({ directory: pristine }),
+    getFogPrerequisites: async () => ({ executablePath, dataRoot, readSet: [] }),
+    combined: async (request, onEvent) => { combinedCalls += 1; return stub(request, onEvent); },
+    fog: { execute: async () => {
+      fogCalls += 1;
+      return { schemaVersion: 2, ok: false, error: { code: 'FOG_UPSTREAM_INCOMPATIBLE', retryable: true, retryScope: 'combined', message: "Couldn't find darkmoon_seance_ring in item lots" } };
+    } },
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.code, 'FOG_UPSTREAM_INCOMPATIBLE');
+  assert.equal(combinedCalls, 1, 'the combined engine is not run again');
+  assert.equal(fogCalls, 1);
+  assert.equal(result.manifest.attempts.length, 1);
+  assert.match(result.message, /cannot be combined yet/u);
+  assert.doesNotMatch(result.message, /darkmoon|ItemLot|item lots|FOG_UPSTREAM|try another seed/iu);
+  assert.ok(events.some((event) => event.type === 'log' && /darkmoon_seance_ring/u.test(event.message)), 'the exact reason is in the log');
+  assert.ok(result.manifest.validation.some((line) => /darkmoon_seance_ring/u.test(line)), 'and in the manifest');
 }));

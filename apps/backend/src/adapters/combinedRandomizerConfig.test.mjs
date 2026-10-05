@@ -117,6 +117,7 @@ test('maps both enabled capabilities deterministically', () => {
       enemyTypeReplacement: 'disabled',
       enemyCustomPool: null,
       placementDiagnosticsLevel: 'summary',
+      fogTrackedItems: null,
       generateSpoilerLog: true,
     },
   });

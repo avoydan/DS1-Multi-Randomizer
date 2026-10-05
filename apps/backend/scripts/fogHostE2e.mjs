@@ -90,6 +90,8 @@ const config = (gamePath, masterSeed = process.env.DS1TR_E2E_SEED ?? 'foghost-e2
     fashionSouls: process.env.DS1TR_E2E_FASHION !== '0',
     soulItems: process.env.DS1TR_E2E_SOULS === 'replaced' ? 'replaced' : 'shuffled',
     startingItems: process.env.DS1TR_E2E_STARTING ?? 'shield-2h',
+    // DS1TR_E2E_ITEMS='{"randomizeShops":true}' overrides item settings (category matrix).
+    ...(process.env.DS1TR_E2E_ITEMS ? JSON.parse(process.env.DS1TR_E2E_ITEMS) : {}),
   },
   // DS1TR_E2E_ENEMIES=0 runs Items + Fog only.
   enemies: { enabled: process.env.DS1TR_E2E_ENEMIES !== '0', randomizeRegularEnemies: true, randomizeBosses: process.env.DS1TR_E2E_BOSSES === '1', scaling: 'area',
@@ -119,7 +121,9 @@ async function sweep(count, prefix) {
   for (let i = 1; i <= count; i++) {
     const seed = `${prefix}-${i}`;
     const workspace = path.join(temp, `sweep-${i}`);
-    const result = await generateRun({ config: config(game, seed), workspacePath: workspace }, () => {}, deps);
+    // DS1TR_E2E_LOGS=1 prints every log event (diagnosing a failing seed).
+    const result = await generateRun({ config: config(game, seed), workspacePath: workspace },
+      (event) => { if (process.env.DS1TR_E2E_LOGS && event.type === 'log') console.log(`  [${event.stage}] ${event.level}: ${event.message}`); }, deps);
     const merges = [];
     const overlays = [];
     for (const directory of await readdir(workspace).catch(() => [])) {
@@ -245,9 +249,12 @@ try {
   const liveBefore = await hashRoots(livePath);
   console.log(`live read set: ${liveBefore.size} files`);
 
-  await cp(path.join(livePath, executableName), path.join(game, executableName));
+  // DS1TR_E2E_GAME_SOURCE: a clean copy of the game (for example the application's pristine snapshot) to use instead of the
+  // live installation, which is not clean once the app (or another tool) has applied a randomization to it. Read only.
+  const source = process.env.DS1TR_E2E_GAME_SOURCE ?? livePath;
+  await cp(path.join(source, executableName), path.join(game, executableName));
   for (const managed of managedRoots) {
-    await cp(path.join(livePath, ...managed.split('/')), path.join(game, ...managed.split('/')), { recursive: true });
+    await cp(path.join(source, ...managed.split('/')), path.join(game, ...managed.split('/')), { recursive: true });
   }
   for (const managed of managedRoots) {
     for (const relative of await listTree(game, managed)) {

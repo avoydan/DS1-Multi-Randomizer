@@ -137,9 +137,10 @@ test('retries deterministically within bounds and never retries merge conflicts'
     reason: 'FOG_SEED_UNSOLVABLE: Ran out of eligible edges',
   });
   assert.equal(decideFogRetry(unsolvable, { combinedAttempt: 0, fogAttempt: 1 }, bounds).action, 'fail');
-  assert.deepEqual(decideFogRetry(incompatible, { combinedAttempt: 0, fogAttempt: 1 }, bounds).next,
-    { combinedAttempt: 1, fogAttempt: 0 });
-  assert.equal(decideFogRetry(incompatible, { combinedAttempt: 1, fogAttempt: 0 }, bounds).action, 'fail');
+  // A key item outside FogMod's annotated lots is structural (the item shuffle keeps tracked items inside them): no retry.
+  const structural = decideFogRetry(incompatible, { combinedAttempt: 0, fogAttempt: 0 }, bounds);
+  assert.equal(structural.action, 'fail');
+  assert.match(structural.reason, /not retryable/u);
   for (const code of ['FOG_MERGE_CONFLICT', 'FOG_COMPATIBILITY_VIOLATED', 'FOG_ENGINE_FAILED', 'FOG_HOST_CRASHED']) {
     assert.equal(decideFogRetry({ code, message: 'x' }, { combinedAttempt: 0, fogAttempt: 0 }).action, 'fail');
   }

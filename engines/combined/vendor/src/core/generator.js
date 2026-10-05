@@ -1904,6 +1904,8 @@ function randomizeExtractedItemLots(config, catalog) {
       : shuffledWithoutFixedPoints(rng, targets);
     if (stream === "all-item-sources") {
       sources = keepConsumableSoulsInFiniteShops(targets, sources);
+      const fogRules = fogPlacementRules(config, catalog, targets);
+      if (fogRules) sources = repairFogTrackedItems(rng, targets, sources, fogRules);
     }
     targets.forEach((target, index) => addPlacement(target, sources[index]));
   }
@@ -2080,6 +2082,100 @@ function shuffledWithoutNativeTitaniteDemon(rng, values) {
     }
   }
   throw new Error("Could not keep Titanite Demons out of native Titanite Demon slots.");
+}
+
+// World randomizer (FogMod) item tracking. FogMod reads the annotated item lots of the finished game data
+// (ItemReader.FindItems) and needs every required key item in exactly one of them: an item that left them (an unannotated
+// world lot, a gift or drop lot it does not annotate, a shop, the starting inventory) stops generation with "Couldn't find
+// <item> in item lots", and a second copy in another annotated area stops it with "Item <item> found in both ...". The
+// shuffle therefore gives each source of a tracked item a role:
+//   "annotated" - the one copy FogMod must find: it may only be placed in a lot FogMod annotates (a start row or a row that
+//                 follows one without a gap in the catalog's lots - a subset of what FogMod walks, so never too permissive);
+//   "shop"      - an extra copy (the shops sell a second Crest of Artorias and Residence Key, and Cast Light): it may only go
+//                 into a shop, where FogMod does not look, so it can never become a second copy in an annotated lot.
+// The first lot copy of a required item is the annotated one; an item with no copy in the catalog's lots (FogMod finds it
+// in a protected lot outside the shuffle) has only extra copies. Items FogMod does not require are always extras.
+function fogCoveredLotRows(config, catalog) {
+  const starts = config.fogTrackedItems?.lotStarts ?? [];
+  const known = new Set([
+    ...(catalog?.worldItemLots || []).map((lot) => lot.rowId),
+    ...(catalog?.gifts || []).map((lot) => lot.rowId),
+    ...(catalog?.enemyDropLots || []).map((lot) => lot.rowId),
+  ]);
+  const covered = new Set();
+  for (const start of starts) {
+    for (let row = start; known.has(row); row += 1) covered.add(row);
+  }
+  return covered;
+}
+
+function fogPlacementRules(config, catalog, targets) {
+  const tracked = config.fogTrackedItems;
+  if (!tracked?.items?.length) return null;
+  const trackedItems = new Map(tracked.items.map((item) => [`${item.equipType}:${item.itemId}`, item]));
+  // Vanilla copies of each tracked item in the catalog's lots (not shops), whether or not the lot joins this shuffle.
+  const vanillaLotCopies = new Map();
+  for (const lot of [...(catalog?.worldItemLots || []), ...(catalog?.gifts || []), ...(catalog?.enemyDropLots || [])]) {
+    for (const entry of lot.entries || []) {
+      const key = `${entry.equipType}:${entry.itemId}`;
+      if (trackedItems.has(key)) vanillaLotCopies.set(key, (vanillaLotCopies.get(key) ?? 0) + 1);
+    }
+  }
+  const roles = new Map();
+  const annotatedGiven = new Set();
+  for (const source of targets) {
+    const key = `${source.equipType}:${source.itemId}`;
+    const item = trackedItems.get(key);
+    if (!item) continue;
+    const isAnnotatedCopy = item.required !== false && source.kind === "lot" && (vanillaLotCopies.get(key) ?? 0) > 0 && !annotatedGiven.has(key);
+    if (isAnnotatedCopy) annotatedGiven.add(key);
+    roles.set(source, isAnnotatedCopy ? "annotated" : "shop");
+  }
+  if (roles.size === 0) return null;
+  const covered = fogCoveredLotRows(config, catalog);
+  return {
+    roleOf: (source) => roles.get(source) ?? null,
+    isBad: (target, source) => {
+      const role = roles.get(source);
+      if (role === "annotated") return !(target.kind === "lot" && covered.has(target.rowId));
+      if (role === "shop") return target.kind !== "shop";
+      return false;
+    },
+  };
+}
+
+// Repairs a finished shuffle so that every tracked item respects its role. Only swaps, so the permutation (and every other
+// item) stays intact; the other rules of the shuffle (no fixed points, DLC-restricted items, consumable souls in finite
+// shops) are kept. The RNG is used only when a swap is needed, so a shuffle that already satisfies the rule is returned
+// untouched and seeds that worked before keep their exact placement.
+function repairFogTrackedItems(rng, values, shuffled, rules) {
+  const dlcBad = (target, source) => target.mapId === "m12_01_00_00" && isDlcRestrictedItem(source);
+  const soulBad = (target, source) =>
+    target.kind === "shop" && target.eventFlag < 0 && isConsumableSoul(source);
+  const pairBad = (target, source) => rules.isBad(target, source) || dlcBad(target, source) || soulBad(target, source);
+  for (let index = 0; index < values.length; index += 1) {
+    if (!rules.isBad(values[index], shuffled[index])) continue;
+    const donors = [];
+    for (let other = 0; other < values.length; other += 1) {
+      if (other === index) continue;
+      if (
+        !pairBad(values[index], shuffled[other]) &&
+        !pairBad(values[other], shuffled[index]) &&
+        shuffled[other] !== values[index] &&
+        shuffled[index] !== values[other]
+      ) {
+        donors.push(other);
+      }
+    }
+    if (donors.length === 0) {
+      throw new Error(
+        `FOG_TRACKED_ITEM_UNPLACEABLE: ${shuffled[index].name} has no place the world randomizer can follow.`,
+      );
+    }
+    const donor = donors[rng.int(donors.length)];
+    [shuffled[index], shuffled[donor]] = [shuffled[donor], shuffled[index]];
+  }
+  return shuffled;
 }
 
 function shuffledWithoutDlcRestrictedItems(rng, values) {
