@@ -79,6 +79,9 @@ export type CombinedGenerationFailureCode =
   | 'NO_RANDOMIZATION_FEATURES_ENABLED'
   | 'ENEMY_PLACEMENT_ALGORITHM_UNAVAILABLE'
   | 'ENEMY_PLACEMENT_OPTIONS_INVALID'
+  | 'ENEMY_PLACEMENT_BUDGET_UNSATISFIABLE'
+  | 'ENEMY_PLACEMENT_CLASS_UNDERIVABLE'
+  | 'ENEMY_PLACEMENT_INFEASIBLE'
   | 'JS_CORE_MISSING'
   | 'JS_CORE_INCOMPLETE'
   | 'INVALID_CONFIG'
@@ -425,8 +428,16 @@ export async function executeCombinedGeneration(
   } catch (error) {
     // The engine refuses an algorithm that is not implemented. Another seed cannot fix that.
     const errorCode = typeof error === 'object' && error !== null ? (error as { code?: unknown }).code : undefined;
-    if (errorCode === 'ENEMY_PLACEMENT_ALGORITHM_UNAVAILABLE' || errorCode === 'ENEMY_PLACEMENT_OPTIONS_INVALID') {
+    // Deterministic structural failures: the same configuration fails the same way with any seed, so they are
+    // typed and never retried. (The budget error is defensive: the non-worsening budget cannot be unsatisfiable.)
+    if (errorCode === 'ENEMY_PLACEMENT_ALGORITHM_UNAVAILABLE' || errorCode === 'ENEMY_PLACEMENT_OPTIONS_INVALID'
+      || errorCode === 'ENEMY_PLACEMENT_BUDGET_UNSATISFIABLE' || errorCode === 'ENEMY_PLACEMENT_CLASS_UNDERIVABLE') {
       return { ok: false, code: errorCode, message: messageOf(error), retryable: false };
+    }
+    // A slot that has no placement within the map's budget depends on the participation draws, so another
+    // attempt (a new combined seed) can solve it. It keeps its own code so the attempt log shows why it retried.
+    if (errorCode === 'ENEMY_PLACEMENT_INFEASIBLE') {
+      return { ok: false, code: 'ENEMY_PLACEMENT_INFEASIBLE', message: messageOf(error), retryable: true };
     }
     return {
       ok: false,

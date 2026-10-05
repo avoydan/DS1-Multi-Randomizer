@@ -751,7 +751,7 @@ test('reports ENEMY_PLACEMENT_OPTIONS_INVALID from the engine as a non-retryable
   assert.deepEqual(dataTool.invocations, []);
 });
 
-test('reports ENEMY_PLACEMENT_INFEASIBLE from the engine as a retryable GENERATION_FAILED', async (t) => {
+test('reports ENEMY_PLACEMENT_INFEASIBLE from the engine as a retryable, typed failure', async (t) => {
   const { workspacePath, gamePath } = await makeWorkspace(t);
   const dataTool = fakeDataTool();
 
@@ -783,9 +783,83 @@ test('reports ENEMY_PLACEMENT_INFEASIBLE from the engine as a retryable GENERATI
   );
 
   assert.equal(result.ok, false);
-  assert.equal(result.code, 'GENERATION_FAILED');
+  assert.equal(result.code, 'ENEMY_PLACEMENT_INFEASIBLE');
   assert.equal(result.retryable, true);
   assert.match(result.message, /ENEMY_PLACEMENT_INFEASIBLE/u);
+  assert.deepEqual(dataTool.invocations, []);
+});
+
+test('reports ENEMY_PLACEMENT_BUDGET_UNSATISFIABLE from the engine as a non-retryable, typed failure', async (t) => {
+  const { workspacePath, gamePath } = await makeWorkspace(t);
+  const dataTool = fakeDataTool();
+
+  const result = await executeCombinedGeneration(
+    request({ gamePath, workspacePath }),
+    () => {},
+    {
+      ...dataToolPaths,
+      dependencies: {
+        dataTool,
+        loadCore: async () => ({
+          ok: true,
+          coreRoot: 'fixture',
+          core: {
+            randomizerVersion: '0.5.66',
+            defaultConfig: {},
+            normalizeConfig: (input) => ({ ...input, seed: String(input.seed).trim() }),
+            validateConfig: () => [],
+            generate: () => {
+              throw Object.assign(new Error('ENEMY_PLACEMENT_BUDGET_UNSATISFIABLE: structural'), { code: 'ENEMY_PLACEMENT_BUDGET_UNSATISFIABLE' });
+            },
+            writeOutput: async () => {
+              throw new Error('writeOutput must not run after a generation failure.');
+            },
+          },
+        }),
+      },
+    },
+  );
+
+  assert.equal(result.ok, false);
+  assert.equal(result.code, 'ENEMY_PLACEMENT_BUDGET_UNSATISFIABLE');
+  assert.equal(result.retryable, false);
+  assert.deepEqual(dataTool.invocations, []);
+});
+
+test('reports ENEMY_PLACEMENT_CLASS_UNDERIVABLE from the engine as a non-retryable, typed failure', async (t) => {
+  const { workspacePath, gamePath } = await makeWorkspace(t);
+  const dataTool = fakeDataTool();
+
+  const result = await executeCombinedGeneration(
+    request({ gamePath, workspacePath }),
+    () => {},
+    {
+      ...dataToolPaths,
+      dependencies: {
+        dataTool,
+        loadCore: async () => ({
+          ok: true,
+          coreRoot: 'fixture',
+          core: {
+            randomizerVersion: '0.5.66',
+            defaultConfig: {},
+            normalizeConfig: (input) => ({ ...input, seed: String(input.seed).trim() }),
+            validateConfig: () => [],
+            generate: () => {
+              throw Object.assign(new Error('ENEMY_PLACEMENT_CLASS_UNDERIVABLE: structural'), { code: 'ENEMY_PLACEMENT_CLASS_UNDERIVABLE' });
+            },
+            writeOutput: async () => {
+              throw new Error('writeOutput must not run after a generation failure.');
+            },
+          },
+        }),
+      },
+    },
+  );
+
+  assert.equal(result.ok, false);
+  assert.equal(result.code, 'ENEMY_PLACEMENT_CLASS_UNDERIVABLE');
+  assert.equal(result.retryable, false);
   assert.deepEqual(dataTool.invocations, []);
 });
 

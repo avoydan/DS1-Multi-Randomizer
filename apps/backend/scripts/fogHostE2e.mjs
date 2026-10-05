@@ -134,6 +134,28 @@ async function sweep(count, prefix) {
       overlays: [...new Set(overlays)],
       ...(result.ok ? {} : { message: result.message.slice(0, 6000) }),
     };
+    // sampling-v1: budget and drop-ownership checks on the plan of the last combined attempt.
+    const placementInfo = result.manifest.enemyPlacement;
+    if (placementInfo.summary) {
+      const maps = Object.values(placementInfo.summary.maps);
+      entry.placement = {
+        classTableHash: placementInfo.classTableHash?.slice(0, 12),
+        replaced: maps.reduce((total, map) => total + map.replaced, 0),
+        slots: placementInfo.summary.slots,
+        maxFinalModels: Math.max(0, ...maps.map((map) => map.finalModels)),
+        mapsAboveCap: maps.filter((map) => map.baseline > 30).length,
+        samplerOverflow: maps.filter((map) => map.finalModels > map.effectiveCap).length,
+        stages: placementInfo.summary.stages,
+      };
+      const last = (await readdir(workspace).catch(() => [])).filter((d) => d.startsWith('combined-')).sort().pop();
+      const seedDirs = last ? (await readdir(path.join(workspace, last)).catch(() => [])).filter((d) => d.startsWith('seed_')) : [];
+      if (seedDirs.length > 0) {
+        const plan = JSON.parse(await readFile(path.join(workspace, last, seedDirs[0], 'randomizer.json'), 'utf8'));
+        const sampled = plan.placements.enemies.filter((p) => /sampled|^pinwheel|passive-until|grounded-new-londo|active-darkroot/u.test(p.compatibility) && p.changed);
+        entry.placement.sampledChanged = sampled.length;
+        entry.placement.changedWithoutScaledRow = sampled.filter((p) => !Number.isInteger(p.scaledNpcParamId)).length;
+      }
+    }
     let combinedEdited = new Set();
     if (process.env.DS1TR_E2E_VERIFY_SKIPS) {
       const pristine = (await authority.getPristineSource(game)).directory;
@@ -177,6 +199,10 @@ async function sweep(count, prefix) {
     conflictEvents: tally(results.flatMap((r) => r.conflicts)),
     instructionMerges: tally(results.flatMap((r) => r.merges)),
     bossOverlays: tally(results.flatMap((r) => r.overlays)),
+    samplerOverflow: results.reduce((total, r) => total + (r.placement?.samplerOverflow ?? 0), 0),
+    changedWithoutScaledRow: results.reduce((total, r) => total + (r.placement?.changedWithoutScaledRow ?? 0), 0),
+    maxFinalModels: Math.max(0, ...results.map((r) => r.placement?.maxFinalModels ?? 0)),
+    mapsAboveCap: results.reduce((total, r) => total + (r.placement?.mapsAboveCap ?? 0), 0),
     skipChecksFailed: results.flatMap((r) => r.skipChecks ?? []).filter((c) => !c.includes('exit 0')).length,
     skipChecks: results.flatMap((r) => r.skipChecks ?? []).length,
     fogCombinedEventMismatches: tally(results.flatMap((r) => r.fogCombinedEventMismatches ?? [])),

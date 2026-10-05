@@ -325,14 +325,14 @@ test('the reserve is skipped when the set already holds a fitting type and trimm
     () => sampling.buildMapModelSet(parameters(['x1', 'x2', 'x3', 'x4'], 3)),
     (error) => error.code === 'ENEMY_PLACEMENT_BUDGET_UNSATISFIABLE' && error.mapId === 'm10_00_00_00',
   );
+  // The planner no longer treats a baseline above the cap as an error: that baseline becomes the map's cap.
+  const accepted = plannerInput(spec, { fixedModelsByMap: new Map([['m10_00_00_00', new Set(['cC', 'x1', 'x2', 'x3'])]]), cap: 3, options: { replacementChance: 100, normalReplacement: 'normals', fit: 'anywhere' } });
+  sampling.planSampledRegularEnemies(accepted);
+  assert.equal(accepted.diagnostics.toJSON().summary.maps.m10_00_00_00.effectiveCap, 4);
+  // ...but with no regular type in the full map there is nowhere to put the slots: infeasible, not a budget error.
   assert.throws(
     () => sampling.planSampledRegularEnemies(plannerInput(spec, { fixedModelsByMap: new Map([['m10_00_00_00', new Set(['x1', 'x2', 'x3', 'x4'])]]), cap: 3 })),
-    (error) => error.code === 'ENEMY_PLACEMENT_BUDGET_UNSATISFIABLE',
-  );
-  // Non-participating slots count: their vanilla models plus the fixed ones above the cap is also impossible.
-  assert.throws(
-    () => sampling.planSampledRegularEnemies(plannerInput(spec, { options: { replacementChance: 0, normalReplacement: 'normals', fit: 'fits' }, cap: 2 })),
-    (error) => error.code === 'ENEMY_PLACEMENT_BUDGET_UNSATISFIABLE',
+    (error) => error.code === 'ENEMY_PLACEMENT_INFEASIBLE',
   );
 });
 
@@ -353,15 +353,115 @@ test('budget rejections are recorded with the reason model-budget and the set si
   for (const info of Object.values(summary.maps)) assert.ok(info.finalModels <= 4);
 });
 
+// ---- non-worsening effective budget ------------------------------------------------------------------------------------------------
+
+const MAP = 'm10_00_00_00';
+/** n fixed models that are not regular types (boss/dragon/special plans), plus any named table models. */
+const fixedSet = (count, tableModels = []) => new Set([...tableModels, ...Array.from({ length: count - tableModels.length }, (_, i) => `x${i + 1}`)]);
+const MANY = { [MAP]: [['cA', 0, 3], ['cB', 1, 3], ['cC', 2, 3], ['cD', 3, 3], ['cE', 4, 3], ['cF', 5, 3], ['cG', 1, 3], ['cH', 2, 3]] };
+const budgetRun = (spec, fixed, overrides = {}) => {
+  const input = plannerInput(spec, { fixedModelsByMap: new Map([[MAP, fixed]]), ...overrides });
+  const result = sampling.planSampledRegularEnemies(input);
+  return { input, result, info: input.diagnostics.toJSON().summary.maps[MAP], finals: finalModelsOf(input, result, MAP) };
+};
+const ANYWHERE = { replacementChance: 100, normalReplacement: 'normals', fit: 'anywhere' };
+
+test('baseline 28: the target of 30 applies; the sampler can fill it and never goes beyond', () => {
+  let reached = 0;
+  for (let i = 0; i < 30; i += 1) {
+    const { info, finals } = budgetRun(MANY, fixedSet(28), { options: ANYWHERE, seed: `b28-${i}` });
+    assert.equal(info.baseline, 28);
+    assert.equal(info.effectiveCap, 30);
+    assert.ok(finals.size <= 30, `seed ${i}: ${finals.size}`);
+    if (finals.size === 30) reached += 1;
+  }
+  assert.ok(reached > 0, 'the sampler uses the headroom of 2');
+});
+
+test('baseline 30: the cap stays 30 and the sampler adds nothing', () => {
+  const fixed = fixedSet(30, ['cA', 'cB']);
+  for (let i = 0; i < 20; i += 1) {
+    const { info, finals, result } = budgetRun(MANY, fixed, { options: ANYWHERE, seed: `b30-${i}` });
+    assert.equal(info.effectiveCap, 30);
+    assert.equal(finals.size, 30);
+    for (const source of result.assignment.values()) assert.ok(['cA', 'cB'].includes(source.modelName), 'only in-set types');
+  }
+});
+
+test('baseline 31 (fixed plans already exceed 30): 31 is the cap, it is accepted, 32 is never created', () => {
+  const fixed = fixedSet(31, ['cA', 'cB']);
+  for (let i = 0; i < 20; i += 1) {
+    const { info, finals, input } = budgetRun(MANY, fixed, { options: ANYWHERE, seed: `b31-${i}` });
+    assert.equal(info.baseline, 31);
+    assert.equal(info.effectiveCap, 31);
+    assert.equal(finals.size, 31, 'the existing overflow is preserved, not worsened');
+    assert.equal(input.diagnostics.toJSON().summary.counters.mapsAboveCap, 1);
+  }
+  assert.equal(sampling.effectiveModelBudget(28), 30);
+  assert.equal(sampling.effectiveModelBudget(30), 30);
+  assert.equal(sampling.effectiveModelBudget(31), 31);
+  assert.equal(sampling.effectiveModelBudget(33), 33);
+});
+
+test('replacing the last slot of a model frees it: the final set counts only models that remain', () => {
+  // 30 fixed models including cA; every other model of the map is replaced, so none of them remains.
+  const spec = { [MAP]: [['cA', 0, 2], ['cB', 1, 4], ['cC', 2, 4], ['cD', 3, 4]] };
+  const { finals, info } = budgetRun(spec, fixedSet(30, ['cA']), { options: ANYWHERE });
+  assert.equal(info.baseline, 30);
+  for (const gone of ['cB', 'cC', 'cD']) assert.equal(finals.has(gone), false, `${gone} no longer exists in the map`);
+  assert.equal(finals.size, 30);
+  // The capacity freed by the removal can host a different model: one slot of cB, 29 fixed models, cap 30.
+  const freed = { [MAP]: [['cB', 1, 1]], m11_00_00_00: [['cC', 2, 3], ['cD', 3, 3], ['cA', 0, 1]] };
+  const replacements = new Set();
+  for (let i = 0; i < 30; i += 1) {
+    const run = budgetRun(freed, fixedSet(29, ['cA']), { options: ANYWHERE, seed: `free-${i}` });
+    assert.ok(run.finals.size <= 30);
+    replacements.add(run.result.assignment.get(`${MAP}:cB_0000`)?.modelName);
+  }
+  assert.ok([...replacements].some((model) => model && model !== 'cB'), 'cB is replaced by a model that was not there before');
+});
+
+test('vanilla-kept slots keep their models in the count, and so do fixed models', () => {
+  const spec = { [MAP]: [['cA', 0, 2], ['cB', 1, 2], ['cC', 2, 2]] };
+  const none = budgetRun(spec, fixedSet(27), { options: { replacementChance: 0, normalReplacement: 'normals', fit: 'fits' } });
+  assert.equal(none.info.baseline, 30, '27 fixed + 3 vanilla-kept models');
+  assert.equal(none.finals.size, 30);
+  assert.equal(none.result.assignment.size, 0);
+  const some = budgetRun(spec, fixedSet(28), { options: { replacementChance: 50, normalReplacement: 'normals', fit: 'anywhere' }, seed: 'keep-1' });
+  assert.ok(some.info.baseline >= 28 && some.info.baseline <= 31);
+  assert.ok(some.finals.size <= some.info.effectiveCap);
+});
+
+test('a repeated existing model does not consume another model slot', () => {
+  const spec = { [MAP]: [['cA', 0, 40]], m11_00_00_00: [['cB', 1, 2], ['cC', 2, 2]] };
+  const { finals, info } = budgetRun(spec, fixedSet(29), { options: ANYWHERE });
+  assert.ok(finals.size <= 30);
+  assert.equal(info.slots, 40);
+});
+
+test('structural impossibility is typed: a slot with no placement inside a full map (fit is never relaxed)', () => {
+  // 30 fixed non-regular models: the map is full and no regular type is in it.
+  assert.throws(
+    () => budgetRun({ [MAP]: [['cA', 0, 2]], m11_00_00_00: [['cB', 1, 2]] }, fixedSet(30), { options: ANYWHERE }),
+    (error) => error.code === 'ENEMY_PLACEMENT_INFEASIBLE' && error.mapId === MAP && /m10_00_00_00:cA_0000/u.test(error.message),
+  );
+  // Fit: the only in-set type (cC, size 2) is too large for the size-0 slots, and keep-vanilla is blocked by the cap.
+  const spec = { [MAP]: [['cA', 0, 2]], m11_00_00_00: [['cC', 2, 2]] };
+  const fixed = fixedSet(30, ['cC']);
+  assert.throws(() => budgetRun(spec, fixed), (error) => error.code === 'ENEMY_PLACEMENT_INFEASIBLE');
+  // ...and with "anywhere" the same map is fine.
+  assert.ok(budgetRun(spec, fixed, { options: ANYWHERE }).finals.size <= 30);
+});
+
 // ---- fallback ladder --------------------------------------------------------------------------------------------------------
 
-test('the fallback ladder is ordered and bounded: keep vanilla, in-set fit, relaxed fit, infeasible', () => {
+test('the fallback ladder is ordered and bounded: keep vanilla, in-set fit, infeasible (never an oversized type)', () => {
   const slots = catalogOf({ m10_00_00_00: [['cA', 0, 1], ['cB', 2, 1], ['cC', 4, 1]] }).enemySlots;
   const table = sampling.deriveRegularClassTable(slots);
   const target = slots.find((s) => s.modelName === 'cB');
   const ladder = (members, overrides = {}) => sampling.fallbackLadder({
     slot: target, budget: new placement.ModelBudget({ mapId: 'm10_00_00_00', cap: members.length || 1, fixedModels: members }),
-    table, maxSize: 2, fit: 'fits', preventSame: false, ...overrides,
+    table, maxSize: 2, preventSame: false, ...overrides,
   });
   // 1. the slot's own model is in the set -> keep it (also with Prevent same: an unreplaced slot is unchanged)
   assert.deepEqual(ladder(['cB']), { stage: 'kept-vanilla', chosen: null });
@@ -370,20 +470,18 @@ test('the fallback ladder is ordered and bounded: keep vanilla, in-set fit, rela
   const inSet = ladder(['cC', 'cA']);
   assert.equal(inSet.stage, 'in-set-fit');
   assert.equal(inSet.chosen.model, 'cA');
-  // 3. nothing in the set fits: relax the fit (recorded)
-  const relaxed = ladder(['cC']);
-  assert.equal(relaxed.stage, 'fit-relaxed');
-  assert.equal(relaxed.chosen.model, 'cC');
-  // 4. relaxation is not available with "anywhere" (everything fits already) and Prevent same can empty the set
-  assert.equal(ladder([], { fit: 'anywhere' }).stage === 'kept-vanilla', true, 'an empty set has room for the slot model');
+  // 3. nothing in the set fits: infeasible - the fit invariant is not relaxed
+  assert.deepEqual(ladder(['cC']), { stage: 'infeasible', chosen: null });
+  // 4. an empty set has room for the slot model, and Prevent same can leave a different fitting type
+  assert.equal(ladder([]).stage === 'kept-vanilla', true, 'an empty set has room for the slot model');
   const stuck = sampling.fallbackLadder({
     slot: target, budget: new placement.ModelBudget({ mapId: 'm10_00_00_00', cap: 1, fixedModels: ['cA'] }),
-    table: { byModel: new Map([['cA', table.byModel.get('cA')]]) }, maxSize: 2, fit: 'fits', preventSame: true,
+    table: { byModel: new Map([['cA', table.byModel.get('cA')]]) }, maxSize: 2, preventSame: true,
   });
   assert.equal(stuck.stage, 'in-set-fit');
   const impossible = sampling.fallbackLadder({
     slot: target, budget: new placement.ModelBudget({ mapId: 'm10_00_00_00', cap: 1, fixedModels: ['cA'] }),
-    table: { byModel: new Map() }, maxSize: 2, fit: 'fits', preventSame: true,
+    table: { byModel: new Map() }, maxSize: 2, preventSame: true,
   });
   assert.deepEqual(impossible, { stage: 'infeasible', chosen: null });
 });

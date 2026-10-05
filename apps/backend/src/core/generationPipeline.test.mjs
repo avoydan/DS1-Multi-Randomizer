@@ -84,6 +84,33 @@ test('reports absent FogHost prerequisites before combined generation', async ()
   assert.equal(called, false);
 }));
 
+test('a sampling placement that is infeasible for this seed is retried with a new combined seed and logged', async () => fixture(async ({ game, pristine, workspace }) => {
+  const stub = combinedStub();
+  let calls = 0;
+  const result = await generateRun({ config: config(game), workspacePath: workspace }, () => {}, {
+    getPristineSource: async () => ({ directory: pristine }),
+    combined: async (request, onEvent) => {
+      calls += 1;
+      if (calls === 1) return { ok: false, code: 'ENEMY_PLACEMENT_INFEASIBLE', message: 'no placement', retryable: true };
+      return stub(request, onEvent);
+    },
+  });
+  assert.equal(result.ok, true);
+  assert.equal(calls, 2);
+  assert.deepEqual(result.manifest.attempts.map((a) => a.result), ['ENEMY_PLACEMENT_INFEASIBLE', 'success']);
+}));
+
+test('a structural placement failure is reported with its own code and is not retried', async () => fixture(async ({ game, pristine, workspace }) => {
+  let calls = 0;
+  const result = await generateRun({ config: config(game), workspacePath: workspace }, () => {}, {
+    getPristineSource: async () => ({ directory: pristine }),
+    combined: async () => { calls += 1; return { ok: false, code: 'ENEMY_PLACEMENT_BUDGET_UNSATISFIABLE', message: 'structural', retryable: false }; },
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.code, 'ENEMY_PLACEMENT_BUDGET_UNSATISFIABLE');
+  assert.equal(calls, 1);
+}));
+
 test('writes a validated combined package, manifest and progress', async () => fixture(async ({ game, pristine, workspace }) => {
   const events = [];
   const result = await generateRun({ config: config(game), workspacePath: workspace },

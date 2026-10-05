@@ -109,7 +109,7 @@ export async function generateRun(
   const workspace = typeof request.workspacePath === 'string' && request.workspacePath
     ? path.resolve(request.workspacePath) : '';
   const manifest: GenerationManifest = {
-    schemaVersion: 1, appVersion: '0.24.0', game: 'DSR', masterSeed: config.masterSeed,
+    schemaVersion: 1, appVersion: '0.25.0', game: 'DSR', masterSeed: config.masterSeed,
     pristineSnapshotId: null, gameTreeRoot: '',
     options: { items: config.items, enemies: config.enemies, fog: config.fog, output: config.output },
     enemyPlacement: {

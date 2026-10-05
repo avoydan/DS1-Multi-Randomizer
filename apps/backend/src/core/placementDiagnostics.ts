@@ -11,7 +11,7 @@ export interface PlacementSummary {
   categoryDowngrades: number;
   terminalFailures: string[];
   counters: Record<string, number>;
-  maps: Record<string, { slots: number; replaced: number; finalModels: number; modelSet: number }>;
+  maps: Record<string, { slots: number; replaced: number; finalModels: number; modelSet: number; baseline: number; effectiveCap: number }>;
 }
 
 export interface PlacementDiagnosticsSummary {
