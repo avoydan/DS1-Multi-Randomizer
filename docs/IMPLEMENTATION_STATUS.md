@@ -1,5 +1,21 @@
 # Implementation status
 
+**Enemy placement Part A: `sampling-v1` for regular enemy slots (2026-10-05; contracts 0.9.0, backend 0.24.0, desktop 0.12.0) - WORK IN PROGRESS, one decision open.**
+`sampling-v1` is implemented and opt-in (UI: "Legacy-style sampling"); `permutation-v1` stays the default and its
+output is unchanged (24 placement hashes; 56/56 and 73/73 package files). It samples regular enemy slots only;
+bosses, units and NPCs are planned as before. Controls: Replacement chance (PARTIAL), Normal enemy replacement
+(`none`, `normals`: PARTIAL), Placement fit (FULL for regular slots), Prevent same (FULL). Presets are version 6
+(1-5 migrate to `permutation-v1` with neutral settings). Engine: `vendor/src/core/sampling.js` (patch `0006`),
+class table `regular-size-v1` with `classTableHash`, coverage reserve, fallback ladder, per-slot streams,
+slot-owned drops, summary/detail diagnostics. Details and measurements: model document 10.2.
+
+- **Works at a replacement chance of 100** (100 catalog seeds x 3 variants: 0 errors, 0 fit violations, 0
+  prevent-same violations, at most 30 models in every map, deterministic, bosses/units identical to permutation).
+- **Open conflict:** below 100 the sampler must keep vanilla models and the dragon/boss plans add models, so the
+  Undead Parish exceeds 30: fails in 94/49/6/0 of 100 seeds at 0/25/60/90% (bosses on). Not worked around; options in 10.2.
+- **Tests:** backend 199 (198 pass, 1 skipped); new `enemySampling.test.mjs` (27 tests), preset v1-v6 migration,
+  mapper, bridge and pipeline tests; root typecheck and desktop build pass.
+
 **Enemy placement Part 0: infrastructure only (2026-10-05; backend 0.23.0, contracts 0.8.0, desktop 0.11.0).**
 Prepares the contract, backend, engine and tests for the future `sampling-v1` placement algorithm without
 changing any placement. `permutation-v1` remains the default and the only algorithm that runs; the sampler is

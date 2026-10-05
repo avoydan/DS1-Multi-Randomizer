@@ -834,3 +834,19 @@ Decision: the enemy placement algorithm is a typed, versioned part of the config
 Why: the sampler changes every enemy seed, so it must never be reached implicitly; the infrastructure lands
 first so that Part A is only the planner and its options, with the regression proof for the old algorithm
 already in place.
+
+## sampling-v1 for regular enemy slots (Part A): scope, classes and what is deliberately not decided
+
+- `sampling-v1` is implemented for regular enemy slots only and is opt-in; the default stays `permutation-v1`.
+  Slots that are not replaced get no placement. Everything else is planned by the unchanged code.
+- Presets move to version 6 (`enemies.placement` = algorithm, `replacementChance`, `normalReplacement`, `fit`);
+  versions 1-5 migrate to `permutation-v1` with the neutral values (100, `normals`, `anywhere`). Under
+  `permutation-v1` any other value is rejected by validation and by the engine.
+- Size classes are derived from the catalog capsule (`regular-size-v1`, model footprint = largest usable slot
+  footprint) and fingerprinted by `classTableHash`; no curated table.
+- Every changed `sampling-v1` placement carries a scaled NpcParam row, so the destination slot's drops and team
+  win in every scaling mode.
+- The reserve repair of the design (demote participants) cannot lower the model count; it is replaced by
+  trimming the reserve, with the fallback ladder as the safety net.
+- **Not decided:** the model-budget rule for a replacement chance below 100 (model document 10.2, "Open
+  conflict"). Until it is decided, such runs can fail with `ENEMY_PLACEMENT_BUDGET_UNSATISFIABLE`.

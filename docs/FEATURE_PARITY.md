@@ -34,9 +34,9 @@ a scratch directory for this audit only. The commit ids above are the revisions 
 | | Count |
 |---|---|
 | Original options audited (Item 11 + Enemy 27 + FogMod 16) | **54** |
-| FULL | 29 (21 + 4 in Batch 1 + 3 in Batch 2 + 1 Second Gargoyle) |
-| UI_ONLY (engine gap) | 21 |
-| PARTIAL | 2 (I11 hintsheet; I5 Soul items, where Transposed is unavailable) |
+| FULL | 30 (21 + 4 in Batch 1 + 3 in Batch 2 + 1 Second Gargoyle + 1 Placement fit in Part A) |
+| UI_ONLY (engine gap) | 18 |
+| PARTIAL | 4 (I11 hintsheet; I5 Soul items, where Transposed is unavailable; E2 Normal enemy replacement and E7 Replacement chance, added in Part A) |
 | INTENTIONALLY_UNSUPPORTED | 1 |
 | DUPLICATE | 1 |
 | Newly wired in the audit task | 2 (settings preset import/export; restore default settings) |
@@ -76,12 +76,12 @@ All 21 configuration fields map to one position in the original config string. T
 | # | Original option | Original values | Proposed DS1TR control / default | UI | Contract | Backend | Engine | Status |
 |---|---|---|---|---|---|---|---|---|
 | E1 | Replace bosses | 0 don't, 1 only with bosses, 2 only with normal enemies, 3 either | select, `1` | placeholder | no | no | no | UI_ONLY |
-| E2 | Replace normal enemies | same four values | select, `2` | placeholder | no | no | no | UI_ONLY |
+| E2 | Replace normal enemies | same four values | select, `2` | yes (`enemies.placement.normalReplacement`, `sampling-v1`) | yes | yes | yes (Part A: `none`, `normals`; `bosses` and `both` need boss sources) | PARTIAL |
 | E3 | Replace NPCs | same four values | select, `0` | placeholder | no | no | no | UI_ONLY |
 | E4 | Replace mimics | 0 no, 1 yes | toggle, on | yes (`enemies.replaceMimics`) | yes | yes | yes (Batch 1) | FULL |
-| E5 | Placement fit | 0 only where they fit, 1 anywhere, 2 anywhere except when replacing NPCs | select, `0` | placeholder | no | no | no | UI_ONLY |
+| E5 | Placement fit | 0 only where they fit, 1 anywhere, 2 anywhere except when replacing NPCs | select, `0` | yes (`enemies.placement.fit`, `sampling-v1`) | yes | yes | yes (Part A, regular slots; value 2 equals 1 until NPCs are replaced) | FULL |
 | E6 | Difficulty mode | 4 curve + easy Asylum, 1 random with curve, 3 random + easy Asylum, 2 fully random | select, `3` | placeholder | no | no | no | UI_ONLY |
-| E7 | Replacement chance | 0-100 % | slider, 100 | placeholder | no | no | no | UI_ONLY |
+| E7 | Replacement chance | 0-100 % | slider, 100 | yes (`enemies.placement.replacementChance`, `sampling-v1`) | yes | yes | yes (Part A) | PARTIAL: exact at 100; below 100 fails on dense maps while the dragon/boss plans run, see `ENEMY_PLACEMENT_MODEL.md` 10.2 |
 | E8 | Boss chance for normal-enemy slots | 0-100 % | slider, 10 | placeholder | no | no | no | UI_ONLY |
 | E9 | Boss chance for boss slots | 0-100 % | slider, 90 | placeholder | no | no | no | UI_ONLY |
 | E10 | Replace second Gargoyle | 0 no, 1 yes | select, Replace (legacy default); also Do not replace and Single boss (earlier DS1TR behavior) | yes (`enemies.secondGargoyle`) | yes | yes | yes | FULL |
@@ -220,10 +220,10 @@ mapped one-to-one.
 
 | ID | Option(s) | Class | Notes and risk |
 |---|---|---|---|
-| G8 | Replacement chance (E7) | B | Per-slot keep/replace decision before the permutation. A count-preserving permutation must be rebuilt over only the replaced subset. |
+| G8 | Replacement chance (E7) | B (Part A built; open budget conflict below 100) | Per-slot keep/replace decision before the permutation. A count-preserving permutation must be rebuilt over only the replaced subset. |
 | G9 | Boss replace/normal replace/NPC replace modes (E1, E2, E3) | B-C | Source/target class partitions. NPC replacement is the hardest: friendly NPCs are deliberately kept vanilla by the engine today. |
 | G10 | Boss chance for normal / boss slots (E8, E9) | B | Cross-class sampling probabilities. Depends on G9. |
-| G11 | Placement fit (E5) | B | The engine already checks compatibility via `pickCompatibleEnemy` and `bossGrounding`; "anywhere" requires relaxing these and accepting the crash and softlock risk, which the 40/40 sweeps do not cover. |
+| G11 | Placement fit (E5) | done for regular slots (Part A) | The engine already checks compatibility via `pickCompatibleEnemy` and `bossGrounding`; "anywhere" requires relaxing these and accepting the crash and softlock risk, which the 40/40 sweeps do not cover. |
 | G12 | Difficulty mode and strictness (E6, E11) | B | Needs a per-enemy tier table and area tiers. The prototype data shows tiers, but the real catalog needs them for all enemies. |
 | G13 | Mimics, second Gargoyle, mosquitoes (E4, E10, E21) | done | See 6a. |
 | G14 | T-pose behavior (E12) | B | Relates to Anor Londo / New Londo event scripts. It needs an event-level change and interacts with the Fog EMEVD merge. |
