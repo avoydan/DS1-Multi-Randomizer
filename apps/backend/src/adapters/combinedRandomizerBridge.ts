@@ -76,6 +76,7 @@ export const supportedCatalogSchemaVersion = 17;
 
 export type CombinedGenerationFailureCode =
   | 'NO_RANDOMIZATION_FEATURES_ENABLED'
+  | 'ENEMY_PLACEMENT_ALGORITHM_UNAVAILABLE'
   | 'JS_CORE_MISSING'
   | 'JS_CORE_INCOMPLETE'
   | 'INVALID_CONFIG'
@@ -418,6 +419,10 @@ export async function executeCombinedGeneration(
   try {
     result = core.generate(config, { gameCatalog: catalog });
   } catch (error) {
+    // The engine refuses an algorithm that is not implemented. Another seed cannot fix that.
+    if (typeof error === 'object' && error !== null && (error as { code?: unknown }).code === 'ENEMY_PLACEMENT_ALGORITHM_UNAVAILABLE') {
+      return { ok: false, code: 'ENEMY_PLACEMENT_ALGORITHM_UNAVAILABLE', message: messageOf(error), retryable: false };
+    }
     return {
       ok: false,
       code: 'GENERATION_FAILED',

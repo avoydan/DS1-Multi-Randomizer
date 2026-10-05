@@ -1,4 +1,5 @@
 import type { RandomizerConfig } from '@ds1tr/contracts';
+import { validateEnemyPlacement } from './enemyPlacement.js';
 
 const topLevelKeys = ['gamePath', 'masterSeed', 'items', 'enemies', 'fog', 'output'] as const;
 const itemKeys = [
@@ -9,7 +10,7 @@ const itemKeys = [
 ] as const;
 const enemyKeys = [
   'enabled', 'randomizeRegularEnemies', 'randomizeBosses', 'scaling',
-  'replaceMimics', 'replaceRespawningMosquitoes', 'preventSameEnemy', 'pinwheelChaos', 'gwynNerf', 'secondGargoyle',
+  'replaceMimics', 'replaceRespawningMosquitoes', 'preventSameEnemy', 'pinwheelChaos', 'gwynNerf', 'secondGargoyle', 'placement',
 ] as const;
 const fogKeys = [
   'enabled', 'traversableFogs', 'bossFogs', 'areaWarps', 'majorPvpFogs',
@@ -108,7 +109,8 @@ export function validateRandomizerConfig(input: unknown): asserts input is Rando
     if (!startingItemModes.has(String(input.items.startingItems))) problems.push('Starting items mode is invalid.');
   }
   if (isObject(input.enemies)) {
-    validateBooleans(input.enemies, enemyKeys.filter((key) => key !== 'scaling' && key !== 'gwynNerf' && key !== 'secondGargoyle'), 'config.enemies', problems);
+    validateBooleans(input.enemies, enemyKeys.filter((key) => key !== 'scaling' && key !== 'gwynNerf' && key !== 'secondGargoyle' && key !== 'placement'), 'config.enemies', problems);
+    if (Object.hasOwn(input.enemies, 'placement')) validateEnemyPlacement(input.enemies.placement, problems);
     if (!gwynNerfModes.has(String(input.enemies.gwynNerf))) problems.push('Gwyn nerf mode is invalid.');
     if (!secondGargoyleModes.has(String(input.enemies.secondGargoyle))) problems.push('Second Gargoyle mode is invalid.');
     if (!['vanilla', 'area', 'progressive'].includes(String(input.enemies.scaling))) {

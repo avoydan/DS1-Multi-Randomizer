@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { access, copyFile, cp, mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { FogLanguage, RandomizerConfig } from '@ds1tr/contracts';
+import type { EnemyPlacementAlgorithm, FogLanguage, RandomizerConfig } from '@ds1tr/contracts';
 import { executeCombinedGeneration, type CombinedGenerationResult } from '../adapters/combinedRandomizerBridge.js';
 import { buildFogCompatibility, decideFogRetry, defaultFogRetryBounds, planFogStaging } from '../adapters/fogCompatibility.js';
 import { FogHostProcess, type FogHostResponse } from '../adapters/fogHostProcess.js';
@@ -29,6 +29,8 @@ export interface GenerationManifest {
   /** Package-relative directory mirroring the game root ('' = package root). */
   gameTreeRoot: string;
   options: Omit<RandomizerConfig, 'gamePath' | 'masterSeed'>;
+  /** Which enemy placement algorithm produced the layout, and the RNG version of its own streams (null: the frozen engine version). */
+  enemyPlacement: { algorithm: EnemyPlacementAlgorithm; rngVersion: string | null };
   attempts: Array<{ combinedAttempt: number; fogAttempt: number; combinedSeed: string; fogSeed: number; result: string }>;
   engines: { combined?: string; fog?: string };
   validation: string[];
@@ -96,9 +98,13 @@ export async function generateRun(
   const workspace = typeof request.workspacePath === 'string' && request.workspacePath
     ? path.resolve(request.workspacePath) : '';
   const manifest: GenerationManifest = {
-    schemaVersion: 1, appVersion: '0.22.0', game: 'DSR', masterSeed: config.masterSeed,
+    schemaVersion: 1, appVersion: '0.23.0', game: 'DSR', masterSeed: config.masterSeed,
     pristineSnapshotId: null, gameTreeRoot: '',
     options: { items: config.items, enemies: config.enemies, fog: config.fog, output: config.output },
+    enemyPlacement: {
+      algorithm: config.enemies.placement.algorithm,
+      rngVersion: config.enemies.placement.algorithm === 'sampling-v1' ? 'enemy-placement-v1' : null,
+    },
     attempts: [], engines: {}, validation: [], files: [],
   };
   const fail = (stage: string, code: string, message: string): GenerationResult => {

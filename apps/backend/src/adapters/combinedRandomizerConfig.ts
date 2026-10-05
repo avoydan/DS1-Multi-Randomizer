@@ -1,4 +1,5 @@
-import type { EnemyScaling, GwynNerfMode, SecondGargoyleMode, SoulItemsMode, StartingItemsMode } from '@ds1tr/contracts';
+import type { EnemyPlacementAlgorithm, EnemyScaling, GwynNerfMode, SecondGargoyleMode, SoulItemsMode, StartingItemsMode } from '@ds1tr/contracts';
+import { enemyPlacementUnavailableMessage, ENEMY_PLACEMENT_UNAVAILABLE, isEnemyPlacementImplemented } from '../core/enemyPlacement.js';
 import type { CombinedRandomizerRequest } from './combinedRandomizerAdapter.js';
 
 export interface UpstreamCombinedRandomizerConfig {
@@ -28,16 +29,22 @@ export interface UpstreamCombinedRandomizerConfig {
   pinwheelChaos: boolean;
   gwynNerf: GwynNerfMode;
   secondGargoyle: SecondGargoyleMode;
+  enemyPlacementAlgorithm: EnemyPlacementAlgorithm;
   generateSpoilerLog: boolean;
 }
 
 export type CombinedRandomizerConfigMappingResult =
   | { ok: true; config: UpstreamCombinedRandomizerConfig }
-  | { ok: false; code: 'NO_RANDOMIZATION_FEATURES_ENABLED'; message: string };
+  | { ok: false; code: 'NO_RANDOMIZATION_FEATURES_ENABLED' | typeof ENEMY_PLACEMENT_UNAVAILABLE; message: string };
 
 export function mapCombinedRandomizerConfig(
   request: CombinedRandomizerRequest,
 ): CombinedRandomizerConfigMappingResult {
+  // An algorithm that cannot run never reaches the engine, whatever else is selected (no silent fallback).
+  const algorithm = request.enemies.placement.algorithm;
+  if (!isEnemyPlacementImplemented(algorithm)) {
+    return { ok: false, code: ENEMY_PLACEMENT_UNAVAILABLE, message: enemyPlacementUnavailableMessage(algorithm) };
+  }
   const regularEnemies = request.enemies.enabled && request.enemies.randomizeRegularEnemies;
   // Lesser souls sit in world lots, NPC gifts and enemy drops; shops hold none.
   const itemPoolsWithSouls = request.items.enabled && (
@@ -77,6 +84,8 @@ export function mapCombinedRandomizerConfig(
     gwynNerf: request.enemies.enabled && request.enemies.randomizeBosses ? request.enemies.gwynNerf : 'none',
     // 'single-boss' is the engine's behavior without the option and the fallback while bosses are off.
     secondGargoyle: request.enemies.enabled && request.enemies.randomizeBosses ? request.enemies.secondGargoyle : 'single-boss',
+    // Passed through unconditionally: the algorithm is part of the run's identity, not an enemy feature toggle.
+    enemyPlacementAlgorithm: algorithm,
     generateSpoilerLog: request.generateSpoilerLog,
   };
 

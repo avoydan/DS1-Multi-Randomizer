@@ -42,6 +42,28 @@ export type EnemyScaling = 'vanilla' | 'area' | 'progressive';
  */
 export type SecondGargoyleMode = 'replace' | 'keep' | 'single-boss';
 
+/**
+ * Enemy placement algorithm (docs/ENEMY_PLACEMENT_MODEL.md).
+ *
+ * - `permutation-v1`: the count-preserving global permutation. Frozen: every existing preset and seed depends on it.
+ * - `sampling-v1`: the per-slot sampler of the legacy-parity group. Typed and validated, but **not implemented**;
+ *   it is not in {@link IMPLEMENTED_ENEMY_PLACEMENT_ALGORITHMS}, so a configuration that selects it is rejected.
+ */
+export type EnemyPlacementAlgorithm = 'permutation-v1' | 'sampling-v1';
+
+export const ENEMY_PLACEMENT_ALGORITHMS: readonly EnemyPlacementAlgorithm[] = ['permutation-v1', 'sampling-v1'];
+
+/** Algorithms that can currently run. Part A of the placement work adds `sampling-v1` here, and nowhere else. */
+export const IMPLEMENTED_ENEMY_PLACEMENT_ALGORITHMS: readonly EnemyPlacementAlgorithm[] = ['permutation-v1'];
+
+/** The algorithm of every new configuration and of every migrated older preset. */
+export const DEFAULT_ENEMY_PLACEMENT_ALGORITHM: EnemyPlacementAlgorithm = 'permutation-v1';
+
+/** Placement settings. Sampling-only options are added here by later parts; none exist yet. */
+export interface EnemyPlacementOptions {
+  algorithm: EnemyPlacementAlgorithm;
+}
+
 export interface EnemyOptions {
   enabled: boolean;
   randomizeRegularEnemies: boolean;
@@ -59,6 +81,7 @@ export interface EnemyOptions {
   gwynNerf: GwynNerfMode;
   /** Legacy default: replace. Acts only with boss randomization on. */
   secondGargoyle: SecondGargoyleMode;
+  placement: EnemyPlacementOptions;
 }
 
 export type FogLanguage =
@@ -155,7 +178,7 @@ export type GenerationResult =
   | { ok: false; code: string; message: string; stage: string };
 
 export const PRESET_FORMAT = 'ds1tr-preset';
-export const PRESET_VERSION = 4;
+export const PRESET_VERSION = 5;
 
 /** Shareable settings: everything in RandomizerConfig except the machine-specific game path. */
 export interface PresetDocument {

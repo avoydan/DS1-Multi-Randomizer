@@ -121,6 +121,7 @@ function request(overrides = {}) {
       pinwheelChaos: false,
       gwynNerf: 'medium',
       secondGargoyle: 'replace',
+      placement: { algorithm: 'permutation-v1' },
     },
     generateSpoilerLog: false,
     ...overrides,
@@ -673,6 +674,43 @@ test('reports GENERATION_FAILED as retryable when upstream gives up on a seed', 
   assert.equal(result.code, 'GENERATION_FAILED');
   assert.equal(result.retryable, true);
   assert.match(result.message, /safe boss permutation/u);
+  assert.deepEqual(dataTool.invocations, []);
+});
+
+test('reports ENEMY_PLACEMENT_ALGORITHM_UNAVAILABLE from the engine as a non-retryable failure', async (t) => {
+  const { workspacePath, gamePath } = await makeWorkspace(t);
+  const dataTool = fakeDataTool();
+
+  const result = await executeCombinedGeneration(
+    request({ gamePath, workspacePath }),
+    () => {},
+    {
+      ...dataToolPaths,
+      dependencies: {
+        dataTool,
+        loadCore: async () => ({
+          ok: true,
+          coreRoot: 'fixture',
+          core: {
+            randomizerVersion: '0.5.66',
+            defaultConfig: {},
+            normalizeConfig: (input) => ({ ...input, seed: String(input.seed).trim() }),
+            validateConfig: () => [],
+            generate: () => {
+              throw Object.assign(new Error('ENEMY_PLACEMENT_ALGORITHM_UNAVAILABLE: not implemented yet'), { code: 'ENEMY_PLACEMENT_ALGORITHM_UNAVAILABLE' });
+            },
+            writeOutput: async () => {
+              throw new Error('writeOutput must not run after a generation failure.');
+            },
+          },
+        }),
+      },
+    },
+  );
+
+  assert.equal(result.ok, false);
+  assert.equal(result.code, 'ENEMY_PLACEMENT_ALGORITHM_UNAVAILABLE');
+  assert.equal(result.retryable, false);
   assert.deepEqual(dataTool.invocations, []);
 });
 

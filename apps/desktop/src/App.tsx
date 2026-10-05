@@ -37,6 +37,8 @@ const initialConfig: RandomizerConfig = {
     gwynNerf: 'medium',
     // Legacy Enemy Randomizer default: the second Bell Gargoyle is replaced.
     secondGargoyle: 'replace',
+    // Production algorithm; sampling-v1 is not implemented and has no control.
+    placement: { algorithm: 'permutation-v1' },
   },
   fog: {
     enabled: true,

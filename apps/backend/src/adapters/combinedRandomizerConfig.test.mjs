@@ -31,6 +31,7 @@ const enemyOptions = {
   pinwheelChaos: true,
   gwynNerf: 'strong',
   secondGargoyle: 'keep',
+  placement: { algorithm: 'permutation-v1' },
 };
 
 function createRequest(overrides = {}) {
@@ -107,6 +108,7 @@ test('maps both enabled capabilities deterministically', () => {
       pinwheelChaos: true,
       gwynNerf: 'strong',
       secondGargoyle: 'keep',
+      enemyPlacementAlgorithm: 'permutation-v1',
       generateSpoilerLog: true,
     },
   });
@@ -208,7 +210,7 @@ test('legacy-parity options fall back to the legacy defaults when their parent i
 test('legacy-parity options are forwarded when their parents are on', () => {
   const result = mapCombinedRandomizerConfig(createRequest({
     items: { ...itemOptions, fashionSouls: true, soulItems: 'shuffled', startingItems: 'shield-2h' },
-    enemies: { ...enemyOptions, replaceMimics: true, replaceRespawningMosquitoes: true, preventSameEnemy: false, pinwheelChaos: false, gwynNerf: 'medium', secondGargoyle: 'replace' },
+    enemies: { ...enemyOptions, replaceMimics: true, replaceRespawningMosquitoes: true, preventSameEnemy: false, pinwheelChaos: false, gwynNerf: 'medium', secondGargoyle: 'replace', placement: { algorithm: 'permutation-v1' } },
   }));
   assert.equal(result.config.fashionSouls, true);
   assert.equal(result.config.replaceMimics, true);
@@ -270,4 +272,14 @@ test('the second Gargoyle mode maps through with boss randomization and falls ba
   assert.equal(noBosses.config.secondGargoyle, 'single-boss');
   const noEnemies = mapCombinedRandomizerConfig(createRequest({ enemies: { ...enemyOptions, enabled: false } }));
   assert.equal(noEnemies.config.secondGargoyle, 'single-boss');
+});
+
+test('the mapper passes permutation-v1 and refuses sampling-v1 before any engine call', () => {
+  const ok = mapCombinedRandomizerConfig(createRequest({ enemies: { ...enemyOptions, placement: { algorithm: 'permutation-v1' } } }));
+  assert.equal(ok.ok, true);
+  assert.equal(ok.config.enemyPlacementAlgorithm, 'permutation-v1');
+  const refused = mapCombinedRandomizerConfig(createRequest({ enemies: { ...enemyOptions, placement: { algorithm: 'sampling-v1' } } }));
+  assert.equal(refused.ok, false);
+  assert.equal(refused.code, 'ENEMY_PLACEMENT_ALGORITHM_UNAVAILABLE');
+  assert.match(refused.message, /not implemented yet/);
 });
