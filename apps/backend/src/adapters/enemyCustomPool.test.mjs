@@ -261,24 +261,80 @@ function plannerInput(spec, { fixed = new Map(), options = {}, seed = 'planner',
   };
 }
 
-test('the pool gets no budget exemption: a pool model at the cap is rejected, one already present is reused', () => {
-  const spec = { [MAP]: [['cA', 1, 4]], m11_00_00_00: [['cB', 1, 3], ['cC', 1, 3]] };
-  // 30 fixed models, none of them regular: the pool models are all new, so nothing can be placed.
+test('the pool gets no budget exemption: at chance 100 a map the pool cannot fit is a structural, non-retryable refusal; below 100 it is a bounded stochastic retry', () => {
+  const spec = { [MAP]: [['cA', 1, 1]], m11_00_00_00: [['cB', 1, 3], ['cC', 1, 3]] };
+  // 30 fixed models, none of them regular and none in the pool: the slot of cA either stays (cA) or takes the new cB, so the
+  // map would hold 31 models. The cap stays 30; no draw can change that when every enemy takes part.
   assert.throws(
     () => sampling.planSampledRegularEnemies(plannerInput(spec, { fixed: new Map([[MAP, fixedSet(30)]]), options: { customPool: ['cB'] } })),
-    (error) => error.code === 'ENEMY_PLACEMENT_INFEASIBLE' && error.attempts === 3 && /custom pool 1 of 3/u.test(error.message) && typeof error.customPoolHash === 'string',
+    (error) => error.code === 'ENEMY_PLACEMENT_CUSTOM_POOL_INVALID' && error.reason === 'map-infeasible' && error.mapId === MAP
+      && error.baseline === 30 && error.effectiveCap === 30 && error.neededModels === 1 && !('attempts' in error) && /replacement chance of 100%/u.test(error.message),
   );
+  // Below 100 the same map depends on the participation draw: bounded map-local attempts, then the retryable typed error.
+  let exhausted = null;
+  for (let i = 0; i < 40 && !exhausted; i += 1) {
+    try {
+      sampling.planSampledRegularEnemies(plannerInput(spec, { fixed: new Map([[MAP, fixedSet(30)]]), seed: `stoch-${i}`, options: { customPool: ['cB'], replacementChance: 80 } }));
+    } catch (error) {
+      exhausted = error;
+    }
+  }
+  assert.ok(exhausted, 'participating makes the map infeasible');
+  assert.equal(exhausted.code, 'ENEMY_PLACEMENT_INFEASIBLE');
+  assert.equal(exhausted.attempts, sampling.MAP_ATTEMPTS);
+  assert.ok(/custom pool 1 of 3/u.test(exhausted.message) && typeof exhausted.customPoolHash === 'string');
   // With the pool model already present (a fixed plan holds it) the same map is fine and nothing is added.
-  const input = plannerInput(spec, { fixed: new Map([[MAP, fixedSet(30, ['cB'])]]), options: { customPool: ['cB'] } });
-  const result = sampling.planSampledRegularEnemies(input);
-  const info = input.diagnostics.toJSON().summary.maps[MAP];
+  const present = plannerInput(spec, { fixed: new Map([[MAP, fixedSet(30, ['cB'])]]), options: { customPool: ['cB'] } });
+  const result = sampling.planSampledRegularEnemies(present);
+  const info = present.diagnostics.toJSON().summary.maps[MAP];
   assert.equal(info.baseline, 30);
   assert.equal(info.effectiveCap, 30);
   assert.ok(info.finalModels <= 30);
   for (const source of result.assignment.values()) assert.equal(source.modelName, 'cB');
 });
 
-test('a restricted pool changes the coverage reserve: it holds a pool model that fits the smallest slot', () => {
+test('slots no pool model can replace stay vanilla and join the baseline of their map', () => {
+  // Size-0 enemies cannot be replaced by a pool of size >= 2 under Placement fit: they are the models the sampler cannot remove.
+  const spec = { [MAP]: [['cS0', 0, 3], ['cS1', 0, 3], ['cBig', 3, 3]], m11_00_00_00: [['cP', 2, 2], ['cQ', 3, 2]] };
+  const input = plannerInput(spec, { fixed: new Map([[MAP, fixedSet(10)]]), options: { customPool: ['cP', 'cQ'], fit: 'fits' } });
+  const result = sampling.planSampledRegularEnemies(input);
+  const summary = input.diagnostics.toJSON().summary;
+  assert.equal(summary.maps[MAP].baseline, 12, '10 fixed models plus the two models of the slots that can never be replaced');
+  assert.equal(summary.counters.keptByPool, 6);
+  for (const id of result.assignment.keys()) if (id.startsWith(MAP)) assert.ok(id.includes('cBig'), 'only the slots a pool model fits are replaced');
+  // The full pool is not touched by this rule (Part C1 treated every slot as a participant).
+  const full = plannerInput(spec, { fixed: new Map([[MAP, fixedSet(10)]]), options: { fit: 'fits' } });
+  sampling.planSampledRegularEnemies(full);
+  assert.equal(full.diagnostics.toJSON().summary.counters.keptByPool ?? 0, 0);
+});
+
+test('the static verdict is exact and only claimed at chance 100: a cover that does not fit, proven minimal', () => {
+  const spec = { [MAP]: [['cA', 1, 2], ['cB', 2, 2]], m11_00_00_00: [['cP', 1, 2]] };
+  const pool = sampling.createCandidatePool(sampling.deriveRegularClassTable(catalogOf(spec).enemySlots), (t) => t.model === 'cP');
+  const subjects = [{ own: 'cA', maxSize: 1 }, { own: 'cB', maxSize: 2 }];
+  const exact = sampling.coverWitnessSearch({ base: new Set(), subjects, pool, preventSame: false });
+  assert.deepEqual(exact.witness, ['cP']);
+  assert.equal(exact.exact, true, 'a small search finishes, so the cover is proven minimal');
+});
+
+test('the coverage witness: nothing when the base serves everyone, the pool model that serves most, own model only when needed', () => {
+  const spec = { [MAP]: [['cA', 1, 2], ['cB', 3, 2]], m11_00_00_00: [['cC', 1, 2], ['cD', 4, 2], ['cE', 0, 2]] };
+  const table = sampling.deriveRegularClassTable(catalogOf(spec).enemySlots);
+  const pool = (models) => sampling.createCandidatePool(table, (t) => models.includes(t.model));
+  const subjects = [{ own: 'cA', maxSize: 1 }, { own: 'cB', maxSize: 3 }];
+  assert.deepEqual(sampling.coverWitness({ base: new Set(['cC']), subjects, pool: pool(['cC', 'cD']), preventSame: false }), [], 'cC is in the base and fits both');
+  assert.deepEqual(sampling.coverWitness({ base: new Set(), subjects, pool: pool(['cC', 'cD']), preventSame: false }), ['cC'], 'one pool model serves both subjects');
+  assert.deepEqual(sampling.coverWitness({ base: new Set(), subjects, pool: pool(['cD']), preventSame: false }), ['cA', 'cB'], 'cD fits neither, so each keeps its own model');
+  // Prevent same: a subject cannot take its own model as a replacement, but it can stay (own model in the set serves it).
+  assert.deepEqual(sampling.coverWitness({ base: new Set(), subjects: [{ own: 'cC', maxSize: 1 }], pool: pool(['cC']), preventSame: true }), ['cC']);
+  // Deterministic and independent of subject order.
+  assert.deepEqual(
+    sampling.coverWitness({ base: new Set(), subjects: [...subjects].reverse(), pool: pool(['cC', 'cD']), preventSame: false }),
+    sampling.coverWitness({ base: new Set(), subjects, pool: pool(['cC', 'cD']), preventSame: false }),
+  );
+});
+
+test('a restricted pool changes the coverage reserve: it holds a pool model that fits, not an original that is not a candidate', () => {
   const spec = { [MAP]: [['cA', 1, 2], ['cB', 3, 2]], m11_00_00_00: [['cC', 1, 2], ['cD', 4, 2]] };
   const table = sampling.deriveRegularClassTable(catalogOf(spec).enemySlots);
   const slots = catalogOf(spec).enemySlots.filter((s) => s.mapId === MAP);
@@ -288,13 +344,79 @@ test('a restricted pool changes the coverage reserve: it holds a pool model that
   });
   assert.deepEqual(sampling.buildMapModelSet(params(sampling.createCandidatePool(table))).reserve, ['cA'], 'the full pool: the original of the smallest slot');
   const restricted = sampling.createCandidatePool(table, (t) => ['cC', 'cD'].includes(t.model));
-  const reserve = sampling.buildMapModelSet(params(restricted)).reserve;
-  assert.deepEqual(reserve, ['cC'], 'a restricted pool: the smallest pool model, not an original that is not a candidate');
+  const built = sampling.buildMapModelSet(params(restricted));
+  assert.deepEqual(built.reserve, ['cC']);
+  assert.equal(built.cap, 30);
+});
+
+test('the reserve fits the smallest slot: a pool model that is the original of a larger slot is not enough for a size-0 slot', () => {
+  // The pool-E shape: the smallest slot (size 0) has a non-pool model, a larger slot's model (cU) is a pool member, and the one
+  // pool model that fits size 0 (cP0) lives in another map. The reserve must be cP0, not the first pool-model original.
+  const regular = Array.from({ length: 6 }, (_, i) => [`cR${i}`, 1, 4]);
+  const spec = { [MAP]: [['cZ', 0, 1], ...regular, ['cU', 2, 1]], m11_00_00_00: [['cP0', 0, 2], ['cP1', 1, 2]] };
+  const pool = ['cP0', 'cU'];
+  const table = sampling.deriveRegularClassTable(catalogOf(spec).enemySlots);
+  const slots = catalogOf(spec).enemySlots.filter((s) => s.mapId === MAP);
+  const built = sampling.buildMapModelSet({
+    mapId: MAP, cap: 30, fixedModels: fixedSet(16), participants: slots, sizeOf: (s) => sampling.slotSizeClass(table, s), fitSize: (s) => sampling.slotSizeClass(table, s),
+    preventSame: false, table, pool: sampling.createCandidatePool(table, (t) => pool.includes(t.model)),
+  });
+  assert.deepEqual(built.reserve, ['cP0']);
+  for (let i = 0; i < 40; i += 1) {
+    const input = plannerInput(spec, { fixed: new Map([[MAP, fixedSet(16)]]), seed: `pool-e-${i}`, options: { customPool: pool, replacementChance: 60, fit: 'fits' } });
+    const result = sampling.planSampledRegularEnemies(input);
+    const summary = input.diagnostics.toJSON().summary;
+    assert.equal(summary.counters.mapAttemptsFailed ?? 0, 0, `seed ${i}: attempt 0 succeeds`);
+    assert.ok(summary.maps[MAP].finalModels <= summary.maps[MAP].effectiveCap);
+    for (const source of result.assignment.values()) assert.ok(pool.includes(source.modelName));
+  }
+});
+
+test('Type replacement: a map that starts above its cap still serves its first group (the c2430 shape); vanilla and shared fallbacks stay legal', () => {
+  // 21 fixed + 10 regular groups = 31 models at the start, and a pool of three models none of which is an original.
+  const regular = Array.from({ length: 10 }, (_, i) => [`cR${String(i).padStart(2, '0')}`, i % 3, 3]);
+  const spec = { [MAP]: regular, m11_00_00_00: [['cP0', 0, 2], ['cP1', 1, 2], ['cP2', 2, 2]] };
+  const pool = ['cP0', 'cP1', 'cP2'];
+  let replaced = 0;
+  for (let i = 0; i < 60; i += 1) {
+    const input = plannerInput(spec, { fixed: new Map([[MAP, fixedSet(21)]]), seed: `c2430-${i}`, options: { customPool: pool, typeReplacement: 'enabled', fit: 'fits' } });
+    const result = sampling.planSampledRegularEnemies(input);
+    const summary = input.diagnostics.toJSON().summary;
+    assert.equal(summary.counters.mapAttemptsFailed ?? 0, 0, `seed ${i}: attempt 0 succeeds`);
+    const info = summary.maps[MAP];
+    assert.ok(info.finalModels <= info.effectiveCap);
+    assert.ok(info.effectiveCap <= 30);
+    for (const source of result.assignment.values()) assert.ok(pool.includes(source.modelName), 'every replacement, shared ones included, is a pool model');
+    replaced += summary.counters.typeGroupsReplaced ?? 0;
+  }
+  assert.ok(replaced > 0, 'groups are replaced from the pool');
+});
+
+test('the Type ledger: insurance counts toward the cap until dropped; an original with another owner stays counted, the last owner frees it', () => {
+  const ledger = new placement.ModelLedger({ mapId: MAP, cap: 3 });
+  ledger.hold('a');
+  ledger.hold('b', { pending: true });
+  ledger.reserve('r');
+  assert.equal(ledger.size, 3);
+  assert.equal(ledger.evaluate('new').admitted, false, 'the set is at its cap');
+  assert.equal(ledger.evaluate('r').admitted, true, 'the insurance model is free to take');
+  assert.equal(ledger.isSolid('r'), false);
+  // Two owners of one original: releasing one keeps the model counted, releasing the last frees the capacity.
+  ledger.hold('b', { pending: true });
+  ledger.release('b', { pending: true });
+  assert.equal(ledger.has('b'), true);
+  ledger.release('b', { pending: true });
+  assert.equal(ledger.has('b'), false);
+  assert.equal(ledger.size, 2);
+  assert.equal(ledger.evaluate('new').admitted, true, 'the freed capacity is available');
+  ledger.dropReserve();
+  assert.equal(ledger.has('r'), false);
+  assert.equal(ledger.size, 1);
 });
 
 // ---- retries and errors ---------------------------------------------------------------------------------------------------------------------
 
-test('a supported pool can still make one map attempt fail: bounded map-local retries, then a typed retryable error that names the pool', () => {
+test('map-local retries stay bounded at three attempts: a squeezed map is rescued by a retry or ends in a typed retryable error that names the pool', () => {
   const spec = { [MAP]: [['cB', 3, 4], ['cC', 3, 4]], m11_00_00_00: [['cA', 0, 6], ['cB', 3, 6], ['cD', 2, 6]] };
   const fixed = new Map([[MAP, fixedSet(30)]]);
   let retried = null;
@@ -331,6 +453,8 @@ test('coverage analysis counts the selected enemies per size and difficulty clas
   assert.equal(coverage.smallestSize, 2);
   assert.equal(coverage.slotsWithoutFit, 3, 'the three size-0 slots have no candidate that fits');
   assert.equal(sampling.analyzePoolCoverage({ table, pool, slots: catalog.enemySlots, fit: 'anywhere' }).slotsWithoutFit, 0);
+  assert.equal(coverage.slotsBelowSmallest, 3);
+  assert.deepEqual(coverage.sizeClassesBelowSmallest, [0]);
   const result = run({ enemyCustomPool: ['cB', 'cC'], enemyPlacementFit: 'fits' }, spec);
   assert.equal(result.placementDiagnostics.customPool.slotsWithoutFit, 3);
   assert.equal(result.placementDiagnostics.customPool.selected, 2);

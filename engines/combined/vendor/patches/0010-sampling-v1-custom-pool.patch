@@ -67,7 +67,7 @@ index 3e7934f..aaeada9 100644
    const config = normalizeConfig(inputConfig);
    const errors = validateConfig(config);
 diff --git a/engines/combined/vendor/src/core/placement.js b/engines/combined/vendor/src/core/placement.js
-index 76ace59..79b6800 100644
+index 76ace59..267e3b6 100644
 --- a/engines/combined/vendor/src/core/placement.js
 +++ b/engines/combined/vendor/src/core/placement.js
 @@ -79,8 +79,35 @@ export const SAMPLING_NEUTRAL_OPTIONS = Object.freeze({
@@ -138,7 +138,47 @@ index 76ace59..79b6800 100644
    };
  }
  
-@@ -394,6 +432,8 @@ export function createPlacementDiagnostics({ algorithm, level = "summary" }) {
+@@ -308,6 +346,7 @@ export class ModelLedger {
+   #mapId;
+   #solid = new Map();
+   #pending = new Map();
++  #reserve = new Set();
+ 
+   constructor({ mapId, cap = MODEL_BUDGET_CAP }) {
+     if (!Number.isInteger(cap) || cap < 1) throw new RangeError("cap must be a positive integer.");
+@@ -316,11 +355,19 @@ export class ModelLedger {
+   }
+ 
+   get cap() { return this.#cap; }
+-  get size() { return new Set([...this.#solid.keys(), ...this.#pending.keys()]).size; }
+-  has(model) { return this.#solid.has(model) || this.#pending.has(model); }
++  get size() { return new Set([...this.#solid.keys(), ...this.#pending.keys(), ...this.#reserve]).size; }
++  has(model) { return this.#solid.has(model) || this.#pending.has(model) || this.#reserve.has(model); }
+   /** True when something that will stay (a fixed plan, a group left alone or a decided group) owns the model. */
+   isSolid(model) { return this.#solid.has(model); }
+-  models() { return [...new Set([...this.#solid.keys(), ...this.#pending.keys()])].sort(); }
++  models() { return [...new Set([...this.#solid.keys(), ...this.#pending.keys(), ...this.#reserve])].sort(); }
++
++  /**
++   * Holds a model as coverage insurance (restricted custom pool only): it occupies capacity from the start, so a later
++   * group can always be given it, and choosing it costs nothing. It is not an owner: {@link dropReserve} removes what no
++   * group took before the final model set is counted.
++   */
++  reserve(model) { this.#reserve.add(model); }
++  dropReserve() { this.#reserve.clear(); }
+ 
+   /** Adds one owner of a model (no cap check: the caller decides with {@link evaluate}). */
+   hold(model, { pending = false } = {}) {
+@@ -337,7 +384,7 @@ export class ModelLedger {
+   }
+ 
+   evaluate(model) {
+-    if (this.#solid.has(model)) return { admitted: true, alreadyPresent: true };
++    if (this.#solid.has(model) || this.#reserve.has(model)) return { admitted: true, alreadyPresent: true };
+     if (this.size < this.#cap) return { admitted: true, alreadyPresent: this.#pending.has(model) };
+     return { admitted: false, reason: "model-budget", size: this.size, cap: this.#cap, mapId: this.#mapId };
+   }
+@@ -394,6 +441,8 @@ export function createPlacementDiagnostics({ algorithm, level = "summary" }) {
      classTableHash: null,
      /** The effective sampling options of the run (mode, strictness, fit, chance, ...). */
      options: null,
@@ -147,7 +187,7 @@ index 76ace59..79b6800 100644
      /** Highest value seen for a named quantity (for example the highest map attempt used). */
      peak(name, value) {
        summary.counters[name] = Math.max(summary.counters[name] ?? 0, value);
-@@ -467,7 +507,7 @@ export function createPlacementDiagnostics({ algorithm, level = "summary" }) {
+@@ -467,7 +516,7 @@ export function createPlacementDiagnostics({ algorithm, level = "summary" }) {
      },
      toJSON() {
        return {
@@ -156,7 +196,7 @@ index 76ace59..79b6800 100644
          ...(level === "detail" ? { slots, groups } : {}),
        };
      },
-@@ -475,7 +515,7 @@ export function createPlacementDiagnostics({ algorithm, level = "summary" }) {
+@@ -475,7 +524,7 @@ export function createPlacementDiagnostics({ algorithm, level = "summary" }) {
  }
  
  /** The one-line identity recorded for the frozen algorithm: no counters, no streams. */
@@ -166,7 +206,7 @@ index 76ace59..79b6800 100644
  // ---- drop ownership -----------------------------------------------------------------------------------------------
  
 diff --git a/engines/combined/vendor/src/core/sampling.js b/engines/combined/vendor/src/core/sampling.js
-index 5400222..c158063 100644
+index 5400222..2ceac0c 100644
 --- a/engines/combined/vendor/src/core/sampling.js
 +++ b/engines/combined/vendor/src/core/sampling.js
 @@ -24,6 +24,7 @@ import {
@@ -186,11 +226,18 @@ index 5400222..c158063 100644
    const base = new Set(fixedModels);
    if (base.size > cap) throw new ModelBudgetError(mapId, cap, [...base]);
    const active = [...participants].sort((left, right) => sizeOf(left) - sizeOf(right) || compare(left.id, right.id));
++  if (pool !== null && pool.excluded > 0) {
++    // A restricted custom pool: the reserve is a coverage witness (see coverWitness), trimmed to the room under the cap like
++    // any reserve. The full pool takes the original path below unchanged.
++    const witness = coverWitness({ base, subjects: active.map((slot) => ({ own: slot.modelName, maxSize: fitSize(slot) })), pool, preventSame });
++    const reserve = witness.slice(0, Math.max(0, cap - base.size));
++    return {
++      budget: new ModelBudget({ mapId, cap, fixedModels: [...base, ...reserve] }),
++      reserve, trimmed: witness.length - reserve.length, kept: active, cap,
++    };
++  }
    const wanted = [];
-+  // With a restricted custom pool only pool models can serve as the in-set fitting type; the full pool takes the
-+  // original code path unchanged.
-+  const restricted = pool !== null && pool.excluded > 0;
-+  const isCandidate = (model) => table.byModel.has(model) && (!restricted || pool.models.has(model));
++  const isCandidate = (model) => table.byModel.has(model);
    if (active.length > 0) {
      const ceiling = fitSize(active[0]);
      const needed = preventSame ? 2 : 1;
@@ -200,17 +247,92 @@ index 5400222..c158063 100644
        if (fitting + wanted.length >= needed) break;
 -      if (!base.has(slot.modelName) && !wanted.includes(slot.modelName) && table.byModel.has(slot.modelName)) wanted.push(slot.modelName);
 +      if (!base.has(slot.modelName) && !wanted.includes(slot.modelName) && isCandidate(slot.modelName)) wanted.push(slot.modelName);
-+    }
-+    if (restricted) {
-+      const smallest = [...pool.types].sort((a, b) => a.size - b.size || compare(a.model, b.model));
-+      for (const type of smallest) {
-+        if (fitting + wanted.length >= needed || type.size > ceiling) break;
-+        if (!base.has(type.model) && !wanted.includes(type.model)) wanted.push(type.model);
-+      }
      }
    }
    const reserve = wanted.slice(0, Math.max(0, cap - base.size));
-@@ -305,7 +317,77 @@ export const effectiveModelBudget = (baseline, cap = MODEL_BUDGET_CAP) => Math.m
+@@ -284,7 +296,81 @@ export function buildMapModelSet({ mapId, cap, fixedModels, participants, sizeOf
+     reserve,
+     trimmed: wanted.length - reserve.length,
+     kept: active,
++    cap,
++  };
++}
++
++// ---- coverage witness (restricted custom pool) ------------------------------------------------------------------------
++
++/** Bound on the exact search of coverWitness; the greedy cover is the answer when it is reached. Deterministic. */
++const WITNESS_NODE_LIMIT = 20000;
++
++/**
++ * The models a map must hold so that every participating subject (a slot, or a Type replacement group) can always be
++ * served from inside the set: each keeps its own model or takes a pool model that fits it (and is not its own under
++ * Prevent same). A subject is served when one of those options is already in `base` (fixed models, models of subjects
++ * left alone). The result is a minimal set of further models (an exact cover search, bounded; the greedy cover when the
++ * bound is hit), ordered by how many subjects each model serves. With the full pool a fitting in-set model always
++ * exists once the first one does, so the plain coverage reserve is enough; a restricted pool can leave a subject with
++ * nothing in the set, which is what this prevents. The caller trims it to the room under the effective cap like any
++ * reserve - the non-worsening cap is never lifted for it. Pure and deterministic.
++ */
++export function coverWitness(input) {
++  return coverWitnessSearch(input).witness;
++}
++
++/** coverWitness plus whether the cover is proven minimal (the bounded search finished). */
++export function coverWitnessSearch({ base, subjects, pool, preventSame }) {
++  const lists = new Map();
++  const subjectOwn = new Map();
++  for (const subject of subjects) {
++    const key = `${subject.own}:${subject.maxSize}`;
++    if (lists.has(key)) continue;
++    const options = new Set([subject.own]);
++    for (const type of pool.types) {
++      if (type.size <= subject.maxSize && !(preventSame && type.model === subject.own)) options.add(type.model);
++    }
++    lists.set(key, [...options]);
++    subjectOwn.set(lists.get(key), subject.own);
++  }
++  const open = [...lists.values()].filter((options) => !options.some((model) => base.has(model)));
++  if (open.length === 0) return { witness: [], exact: true };
++  const coverage = new Map();
++  for (const options of open) for (const model of options) coverage.set(model, (coverage.get(model) ?? 0) + 1);
++  const rank = (left, right) => coverage.get(right) - coverage.get(left)
++    || (pool.models.has(right) ? 1 : 0) - (pool.models.has(left) ? 1 : 0) || compare(left, right);
++  for (const options of open) options.sort(rank);
++
++  let best = [];
++  for (let rest = open; rest.length > 0;) {
++    const counts = new Map();
++    for (const options of rest) for (const model of options) counts.set(model, (counts.get(model) ?? 0) + 1);
++    const pick = [...counts.keys()].sort((left, right) => counts.get(right) - counts.get(left)
++      || (pool.models.has(right) ? 1 : 0) - (pool.models.has(left) ? 1 : 0) || compare(left, right))[0];
++    best.push(pick);
++    rest = rest.filter((options) => !options.includes(pick));
++  }
++  let nodes = 0;
++  const search = (chosen, rest) => {
++    if (rest.length === 0) {
++      if (chosen.length < best.length) best = [...chosen];
++      return;
++    }
++    if (chosen.length + 1 >= best.length || nodes >= WITNESS_NODE_LIMIT) return;
++    nodes += 1;
++    let target = rest[0];
++    for (const options of rest) if (options.length < target.length) target = options;
++    for (const model of target) {
++      chosen.push(model);
++      search(chosen, rest.filter((options) => !options.includes(model)));
++      chosen.pop();
++    }
+   };
++  search([], open);
++  // Never more than every subject keeping its own model (the vanilla map).
++  const keepAll = [...new Set(open.map((options) => subjectOwn.get(options)))];
++  if (keepAll.length < best.length) best = keepAll;
++  return { witness: [...best].sort(rank), exact: nodes < WITNESS_NODE_LIMIT };
+ }
+ 
+ // ---- effective budget -------------------------------------------------------------------------------------------------
+@@ -305,7 +391,81 @@ export const effectiveModelBudget = (baseline, cap = MODEL_BUDGET_CAP) => Math.m
   */
  export function createCandidatePool(table, accept = () => true) {
    const types = table.types.filter(accept);
@@ -243,6 +365,8 @@ index 5400222..c158063 100644
 +    difficultyCoverage[type.difficulty] += 1;
 +  }
 +  const smallest = pool.types.reduce((min, type) => Math.min(min, type.size), Infinity);
++  // Slots smaller than every selected enemy: under Placement fit "only where they fit" nothing can ever replace them.
++  const tooSmall = fit === "fits" ? slots.filter((slot) => slotSizeClass(table, slot) < smallest) : [];
 +  // A slot can take a candidate that fits it (Placement fit) and, under Prevent same, is not its own model.
 +  const slotsWithoutFit = slots.filter((slot) => {
 +    const size = slotSizeClass(table, slot);
@@ -256,6 +380,8 @@ index 5400222..c158063 100644
 +    smallestSize: pool.total === 0 ? null : smallest,
 +    slotsTotal: slots.length,
 +    slotsWithoutFit,
++    slotsBelowSmallest: tooSmall.length,
++    sizeClassesBelowSmallest: [...new Set(tooSmall.map((slot) => slotSizeClass(table, slot)))].sort((left, right) => left - right),
 +  };
 +}
 +
@@ -289,7 +415,45 @@ index 5400222..c158063 100644
  }
  
  // ---- fallback ladder -----------------------------------------------------------------------------------------------
-@@ -429,6 +511,7 @@ function sampleCandidate({ rng, subject, mapId, maxSize, destinationOf, settings
+@@ -354,6 +514,37 @@ export function sharedFallback({ group, budget, pool, table, maxSize, preventSam
+   return best[rng.int(best.length)].type;
+ }
+ 
++/**
++ * True when no type of a restricted pool can ever replace this subject (a slot, or a Type replacement group with its
++ * smallest member fit): nothing in the pool fits it, or the only fitting type is its own model under Prevent same. Such a
++ * subject stays as it is whatever the draws say, so its model belongs to the baseline of the map - the models the sampler
++ * cannot remove. Difficulty is not consulted: it can lapse, fit cannot. Only evaluated for a restricted pool; the full pool
++ * is treated as in Part C1.
++ */
++function cannotBeReplaced({ modelName, maxSize, pool, preventSame }) {
++  return !pool.types.some((type) => type.size <= maxSize && !(preventSame && type.model === modelName));
++}
++
++/**
++ * Structural check for one map at a replacement chance of 100%, where every replaceable subject participates and the
++ * outcome does not depend on a draw: the models that stay whatever happens (fixed plans and the subjects the pool can
++ * never replace) plus the least a cover of the remaining subjects needs must fit the map's cap. When the cover is proven
++ * minimal and still does not fit, no placement exists for the map under this pool and configuration - retrying cannot
++ * help. Below 100% a participation draw decides, so the same shortfall is only a stochastic per-attempt failure.
++ */
++function staticMapVerdict({ subjects, fixed, pool, preventSame, cap }) {
++  const stays = new Set(fixed);
++  const open = [];
++  for (const subject of subjects) {
++    if (cannotBeReplaced({ modelName: subject.own, maxSize: subject.maxSize, pool, preventSame })) stays.add(subject.own);
++    else open.push(subject);
++  }
++  const mapCap = effectiveModelBudget(stays.size, cap);
++  const { witness, exact } = coverWitnessSearch({ base: stays, subjects: open, pool, preventSame });
++  const room = mapCap - stays.size;
++  return { feasible: !exact || witness.length <= room, baseline: stays.size, effectiveCap: mapCap, needed: witness.length, room, stays };
++}
++
+ // ---- candidate selection (shared by slots and Type replacement groups) ----------------------------------------------------
+ 
+ /**
+@@ -429,6 +620,7 @@ function sampleCandidate({ rng, subject, mapId, maxSize, destinationOf, settings
    }
    const sizeRejections = pool.total - fitPool.length;
    if (sizeRejections > 0) diagnostics.count("candidatesOverSize", sizeRejections);
@@ -297,7 +461,7 @@ index 5400222..c158063 100644
    return { chosen, rejected, info, curve, easyAsylum, sizeRejections };
  }
  
-@@ -462,9 +545,15 @@ export function planSampledRegularEnemies({
+@@ -462,14 +654,41 @@ export function planSampledRegularEnemies({
      typeReplacement: options.typeReplacement ?? "disabled",
    };
    const table = deriveRegularClassTable(slots);
@@ -315,7 +479,33 @@ index 5400222..c158063 100644
    const assignment = new Map();
    const all = [...slots, ...extraSlots];
    const mapIds = [...new Set(all.map((slot) => slot.mapId))].sort(compare);
-@@ -497,10 +586,10 @@ export function planSampledRegularEnemies({
+   const planMap = settings.typeReplacement === "disabled" ? planMapAttempt : planMapByType;
+ 
++  if (pool.excluded > 0 && settings.normalReplacement !== "none" && settings.replacementChance === 100) {
++    for (const mapId of mapIds) {
++      const mapSlots = all.filter((slot) => slot.mapId === mapId);
++      const subjects = settings.typeReplacement === "disabled"
++        ? mapSlots.map((slot) => ({ own: slot.modelName, maxSize: settings.fit === "fits" ? slotSizeClass(table, slot) : UNKNOWN_SLOT_SIZE }))
++        : [...new Set(mapSlots.map((slot) => slot.modelName))].map((model) => ({
++          own: model,
++          maxSize: Math.min(...mapSlots.filter((slot) => slot.modelName === model).map((slot) => (settings.fit === "fits" ? slotSizeClass(table, slot) : UNKNOWN_SLOT_SIZE))),
++        }));
++      const verdict = staticMapVerdict({ subjects, fixed: fixedModelsByMap.get(mapId) ?? [], pool, preventSame, cap });
++      if (!verdict.feasible) {
++        throw new EnemyPlacementCustomPoolError("map-infeasible",
++          `no placement exists for map ${mapId}: with a replacement chance of 100% (every replaceable enemy takes part) the ${verdict.baseline} models that stay `
++          + `(fixed plans and enemies the ${pool.total} selected enemies cannot replace under Placement fit "${settings.fit === "fits" ? "only where they fit" : "anywhere"}"${preventSame ? " and Prevent same enemy" : ""}) `
++          + `plus ${verdict.needed} more that the rest would need exceed the map's limit of ${verdict.effectiveCap}; `
++          + "select more enemies (small ones, or ones the map already holds), lower the replacement chance, or relax Placement fit.",
++          { mapId, baseline: verdict.baseline, effectiveCap: verdict.effectiveCap, neededModels: verdict.needed, selected: pool.total, fit: settings.fit, typeReplacement: settings.typeReplacement });
++      }
++    }
++  }
++
+   for (const mapId of mapIds) {
+     const mapSlots = all.filter((slot) => slot.mapId === mapId).sort((left, right) => compare(left.id, right.id));
+     let planned = null;
+@@ -497,10 +716,10 @@ export function planSampledRegularEnemies({
        diagnostics.peak("maxMapAttempt", mapAttempts - 1);
        throw new EnemyPlacementInfeasibleError(mapId, lastError.slotId,
          `${mapAttempts} map attempts failed; last: ${lastError.detail}; difficulty ${settings.difficultyMode}/${settings.difficultyStrictness}, fit ${settings.fit}, `
@@ -328,3 +518,87 @@ index 5400222..c158063 100644
      }
      for (const [slotId, source] of planned.assignment) assignment.set(slotId, source);
      diagnostics.setMap(mapId, { ...planned.info, attempts: planned.attempt + 1 });
+@@ -509,7 +728,7 @@ export function planSampledRegularEnemies({
+ }
+ 
+ /** Steps shared by both modes once participation is decided: baseline, effective cap, model set. */
+-function mapBudget({ mapId, fixedModelsByMap, nonParticipantModels, cap, participants, sizeOf, fitSize, preventSame, table, diagnostics }) {
++function mapBudget({ mapId, fixedModelsByMap, nonParticipantModels, cap, participants, sizeOf, fitSize, preventSame, table, pool, diagnostics }) {
+   const fixedModels = new Set(fixedModelsByMap.get(mapId) ?? []);
+   for (const model of nonParticipantModels) fixedModels.add(model);
+   // Non-worsening budget: the models the sampler cannot remove (fixed plans and the vanilla models of slots
+@@ -518,9 +737,9 @@ function mapBudget({ mapId, fixedModelsByMap, nonParticipantModels, cap, partici
+   const baseline = fixedModels.size;
+   const mapCap = effectiveModelBudget(baseline, cap);
+   if (baseline > cap) diagnostics.count("mapsAboveCap");
+-  const { budget, kept, trimmed } = buildMapModelSet({ mapId, cap: mapCap, fixedModels, participants, sizeOf, fitSize, preventSame, table });
++  const { budget, kept, trimmed, cap: setCap } = buildMapModelSet({ mapId, cap: mapCap, fixedModels, participants, sizeOf, fitSize, preventSame, table, pool });
+   if (trimmed > 0) diagnostics.count("reserveTrimmed", trimmed);
+-  return { budget, kept, baseline, mapCap };
++  return { budget, kept, baseline, mapCap: setCap };
+ }
+ 
+ /** Post-condition: the models the map really holds after the run (what DsrDataTool keeps) fit the cap. */
+@@ -554,9 +773,17 @@ function planMapAttempt({ seed, settings, preventSame, table, pool, mapId, mapSl
+       if (!passes) diagnostics.count("keptByChance");
+     }
+   }
++  if (pool.excluded > 0) {
++    for (const slot of mapSlots) {
++      if (participates.get(slot.id) && cannotBeReplaced({ modelName: slot.modelName, maxSize: fitSize(slot), pool, preventSame })) {
++        participates.set(slot.id, false);
++        diagnostics.count("keptByPool");
++      }
++    }
++  }
+   const { budget, kept, baseline, mapCap } = mapBudget({
+     mapId, fixedModelsByMap, nonParticipantModels: mapSlots.filter((slot) => !participates.get(slot.id)).map((slot) => slot.modelName),
+-    cap, participants: mapSlots.filter((slot) => participates.get(slot.id)), sizeOf, fitSize, preventSame, table, diagnostics,
++    cap, participants: mapSlots.filter((slot) => participates.get(slot.id)), sizeOf, fitSize, preventSame, table, pool, diagnostics,
+   });
+   const active = new Set(kept.map((slot) => slot.id));
+   const assignment = new Map();
+@@ -654,17 +881,33 @@ function planMapByType({ seed, settings, preventSame, table, pool, mapId, mapSlo
+       }
+     }
+   }
++  if (pool.excluded > 0) {
++    for (const group of groups) {
++      if (participates.get(group.id) && cannotBeReplaced({ modelName: group.modelName, maxSize: groupFit(group), pool, preventSame })) {
++        participates.set(group.id, false);
++        diagnostics.count("keptByPool", group.members.length);
++        diagnostics.count("typeGroupsKeptByPool");
++      }
++    }
++  }
+   // Reference-counted model set. The models the sampler cannot remove (fixed plans, groups left alone) are pinned; every
+   // participating group still owns its original model until it is decided, so keeping it is always possible while the
+   // map is within its cap, and a replaced group frees its original model (unless something else still owns it).
+   const pinned = new Set(fixedModelsByMap.get(mapId) ?? []);
+   for (const group of groups) if (!participates.get(group.id)) pinned.add(group.modelName);
+   const baseline = pinned.size;
+-  const mapCap = effectiveModelBudget(baseline, cap);
++  let mapCap = effectiveModelBudget(baseline, cap);
+   if (baseline > cap) diagnostics.count("mapsAboveCap");
++  const active = new Set(groups.filter((group) => participates.get(group.id)).map((group) => group.id));
++  // A restricted custom pool gets a coverage witness (see coverWitness): models held as insurance so that every group can
++  // always keep its model or take a pool model that fits it, however the draws before it went.
++  const witness = pool.excluded > 0
++    ? coverWitness({ base: pinned, subjects: groups.filter((group) => active.has(group.id)).map((group) => ({ own: group.modelName, maxSize: groupFit(group) })), pool, preventSame })
++        .slice(0, Math.max(0, mapCap - pinned.size))
++    : [];
+   const budget = new ModelLedger({ mapId, cap: mapCap });
+   for (const model of pinned) budget.hold(model);
+-  const active = new Set(groups.filter((group) => participates.get(group.id)).map((group) => group.id));
++  for (const model of witness) budget.reserve(model);
+   for (const group of groups) if (active.has(group.id)) budget.hold(group.modelName, { pending: true });
+   if (budget.size > mapCap) diagnostics.count("typeMapsStartedOverCap");
+   const assignment = new Map();
+@@ -750,6 +993,7 @@ function planMapByType({ seed, settings, preventSame, table, pool, mapId, mapSlo
+       stage, maxSize, ...sampled.info, rejected: rejected.length, attempt,
+     });
+   }
++  budget.dropReserve();
+   if (budget.size > mapCap) {
+     throw new EnemyPlacementInfeasibleError(mapId, groups[0].members[0].id,
+       `${budget.size} models remain, above the effective cap ${mapCap}`, { baseline, effectiveCap: mapCap, detail: `map ${mapId}, attempt ${attempt}` });

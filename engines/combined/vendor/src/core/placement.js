@@ -346,6 +346,7 @@ export class ModelLedger {
   #mapId;
   #solid = new Map();
   #pending = new Map();
+  #reserve = new Set();
 
   constructor({ mapId, cap = MODEL_BUDGET_CAP }) {
     if (!Number.isInteger(cap) || cap < 1) throw new RangeError("cap must be a positive integer.");
@@ -354,11 +355,19 @@ export class ModelLedger {
   }
 
   get cap() { return this.#cap; }
-  get size() { return new Set([...this.#solid.keys(), ...this.#pending.keys()]).size; }
-  has(model) { return this.#solid.has(model) || this.#pending.has(model); }
+  get size() { return new Set([...this.#solid.keys(), ...this.#pending.keys(), ...this.#reserve]).size; }
+  has(model) { return this.#solid.has(model) || this.#pending.has(model) || this.#reserve.has(model); }
   /** True when something that will stay (a fixed plan, a group left alone or a decided group) owns the model. */
   isSolid(model) { return this.#solid.has(model); }
-  models() { return [...new Set([...this.#solid.keys(), ...this.#pending.keys()])].sort(); }
+  models() { return [...new Set([...this.#solid.keys(), ...this.#pending.keys(), ...this.#reserve])].sort(); }
+
+  /**
+   * Holds a model as coverage insurance (restricted custom pool only): it occupies capacity from the start, so a later
+   * group can always be given it, and choosing it costs nothing. It is not an owner: {@link dropReserve} removes what no
+   * group took before the final model set is counted.
+   */
+  reserve(model) { this.#reserve.add(model); }
+  dropReserve() { this.#reserve.clear(); }
 
   /** Adds one owner of a model (no cap check: the caller decides with {@link evaluate}). */
   hold(model, { pending = false } = {}) {
@@ -375,7 +384,7 @@ export class ModelLedger {
   }
 
   evaluate(model) {
-    if (this.#solid.has(model)) return { admitted: true, alreadyPresent: true };
+    if (this.#solid.has(model) || this.#reserve.has(model)) return { admitted: true, alreadyPresent: true };
     if (this.size < this.#cap) return { admitted: true, alreadyPresent: this.#pending.has(model) };
     return { admitted: false, reason: "model-budget", size: this.size, cap: this.#cap, mapId: this.#mapId };
   }
