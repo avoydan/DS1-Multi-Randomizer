@@ -265,18 +265,20 @@ export function eligibleDifficultyClasses({ mode, strictness, destination, mapId
  * non-participating models alone exceed the cap cannot be repaired and fails with
  * ENEMY_PLACEMENT_BUDGET_UNSATISFIABLE.
  */
-export function buildMapModelSet({ mapId, cap, fixedModels, participants, sizeOf, fitSize, preventSame, table, pool = null }) {
+export function buildMapModelSet({ mapId, cap, fixedModels, participants, sizeOf, fitSize, preventSame, table, pool = null, nominalCap = cap }) {
   const base = new Set(fixedModels);
   if (base.size > cap) throw new ModelBudgetError(mapId, cap, [...base]);
   const active = [...participants].sort((left, right) => sizeOf(left) - sizeOf(right) || compare(left.id, right.id));
   if (pool !== null && pool.excluded > 0) {
-    // A restricted custom pool: the reserve is a coverage witness (see coverWitness), trimmed to the room under the cap like
-    // any reserve. The full pool takes the original path below unchanged.
-    const witness = coverWitness({ base, subjects: active.map((slot) => ({ own: slot.modelName, maxSize: fitSize(slot) })), pool, preventSame });
-    const reserve = witness.slice(0, Math.max(0, cap - base.size));
+    // A restricted custom pool: the reserve is a coverage witness (see coverWitness). It is trimmed to the room under the cap
+    // like any reserve, unless the one-model grace of resolveModelCap proves it fits at nominal + 1. The full pool takes the
+    // original path below unchanged.
+    const { witness, exact } = coverWitnessSearch({ base, subjects: active.map((slot) => ({ own: slot.modelName, maxSize: fitSize(slot) })), pool, preventSame });
+    const model = resolveModelCap({ nominalCap, baseSize: base.size, coverSize: witness.length, exact });
+    const reserve = witness.slice(0, Math.max(0, model.effectiveCap - base.size));
     return {
-      budget: new ModelBudget({ mapId, cap, fixedModels: [...base, ...reserve] }),
-      reserve, trimmed: witness.length - reserve.length, kept: active, cap,
+      budget: new ModelBudget({ mapId, cap: model.effectiveCap, fixedModels: [...base, ...reserve] }),
+      reserve, trimmed: witness.length - reserve.length, kept: active, cap: model.effectiveCap, model,
     };
   }
   const wanted = [];
@@ -381,6 +383,27 @@ export function coverWitnessSearch({ base, subjects, pool, preventSame }) {
  * already exceed it, that baseline is the cap for the map: the sampler may keep or reduce it, never raise it.
  */
 export const effectiveModelBudget = (baseline, cap = MODEL_BUDGET_CAP) => Math.max(cap, baseline);
+
+/**
+ * The cap of one map for a restricted custom pool (Part C2 decision: controlled model grace). `baseSize` is the models
+ * that stay whatever happens and `coverSize` the fewest further models that let every participating subject keep its
+ * model or take a fitting pool model, so `baseSize + coverSize` is the smallest final model count the map can have.
+ *   - it fits the base cap max(nominal, baseSize): the cap is that base cap (the grace is not used);
+ *   - it is exactly nominal + 1 on a map whose base cap is the nominal target (baseSize <= nominal), and the cover is
+ *     proven minimal (`exact`): the cap is nominal + 1, a one-model grace. 31 is a count permutation-v1 already produces;
+ *   - anything else: the cap stays the base cap. A map whose baseline is already above nominal gets no grace at all - the
+ *     pool may keep or reduce that overflow, never add to it - and no map ever gets more than nominal + 1.
+ * `feasible` is false only when the shortfall is proven (exact cover).
+ */
+export function resolveModelCap({ nominalCap, baseSize, coverSize, exact }) {
+  const baseCap = effectiveModelBudget(baseSize, nominalCap);
+  const minimumFeasible = baseSize + coverSize;
+  if (minimumFeasible <= baseCap) return { effectiveCap: baseCap, baseCap, minimumFeasible, grace: false, feasible: true };
+  if (exact && baseCap === nominalCap && minimumFeasible === nominalCap + 1) {
+    return { effectiveCap: nominalCap + 1, baseCap, minimumFeasible, grace: true, feasible: true };
+  }
+  return { effectiveCap: baseCap, baseCap, minimumFeasible, grace: false, feasible: !exact };
+}
 
 // ---- candidate pool ----------------------------------------------------------------------------------------------------
 
@@ -539,10 +562,9 @@ function staticMapVerdict({ subjects, fixed, pool, preventSame, cap }) {
     if (cannotBeReplaced({ modelName: subject.own, maxSize: subject.maxSize, pool, preventSame })) stays.add(subject.own);
     else open.push(subject);
   }
-  const mapCap = effectiveModelBudget(stays.size, cap);
   const { witness, exact } = coverWitnessSearch({ base: stays, subjects: open, pool, preventSame });
-  const room = mapCap - stays.size;
-  return { feasible: !exact || witness.length <= room, baseline: stays.size, effectiveCap: mapCap, needed: witness.length, room, stays };
+  const model = resolveModelCap({ nominalCap: cap, baseSize: stays.size, coverSize: witness.length, exact });
+  return { feasible: model.feasible, baseline: stays.size, effectiveCap: model.effectiveCap, needed: witness.length, grace: model.grace };
 }
 
 // ---- candidate selection (shared by slots and Type replacement groups) ----------------------------------------------------
@@ -727,6 +749,12 @@ export function planSampledRegularEnemies({
   return { assignment, table };
 }
 
+/** Per-map diagnostics of the custom pool model cap (restricted pools only; nothing is added for the full pool). */
+function modelInfo(model, nominalCap) {
+  if (!model) return {};
+  return { nominalCap, minimumFeasibleModels: model.minimumFeasible, customPoolModelGrace: model.grace };
+}
+
 /** Steps shared by both modes once participation is decided: baseline, effective cap, model set. */
 function mapBudget({ mapId, fixedModelsByMap, nonParticipantModels, cap, participants, sizeOf, fitSize, preventSame, table, pool, diagnostics }) {
   const fixedModels = new Set(fixedModelsByMap.get(mapId) ?? []);
@@ -737,9 +765,10 @@ function mapBudget({ mapId, fixedModelsByMap, nonParticipantModels, cap, partici
   const baseline = fixedModels.size;
   const mapCap = effectiveModelBudget(baseline, cap);
   if (baseline > cap) diagnostics.count("mapsAboveCap");
-  const { budget, kept, trimmed, cap: setCap } = buildMapModelSet({ mapId, cap: mapCap, fixedModels, participants, sizeOf, fitSize, preventSame, table, pool });
+  const { budget, kept, trimmed, cap: setCap, model } = buildMapModelSet({ mapId, cap: mapCap, fixedModels, participants, sizeOf, fitSize, preventSame, table, pool, nominalCap: cap });
   if (trimmed > 0) diagnostics.count("reserveTrimmed", trimmed);
-  return { budget, kept, baseline, mapCap: setCap };
+  if (model?.grace) diagnostics.count("customPoolModelGraceMaps");
+  return { budget, kept, baseline, mapCap: setCap, modelInfo: modelInfo(model, cap) };
 }
 
 /** Post-condition: the models the map really holds after the run (what DsrDataTool keeps) fit the cap. */
@@ -781,7 +810,7 @@ function planMapAttempt({ seed, settings, preventSame, table, pool, mapId, mapSl
       }
     }
   }
-  const { budget, kept, baseline, mapCap } = mapBudget({
+  const { budget, kept, baseline, mapCap, modelInfo: capInfo } = mapBudget({
     mapId, fixedModelsByMap, nonParticipantModels: mapSlots.filter((slot) => !participates.get(slot.id)).map((slot) => slot.modelName),
     cap, participants: mapSlots.filter((slot) => participates.get(slot.id)), sizeOf, fitSize, preventSame, table, pool, diagnostics,
   });
@@ -835,7 +864,7 @@ function planMapAttempt({ seed, settings, preventSame, table, pool, mapId, mapSl
       diagnostics.record({ slotId: slot.id, slotClass: "normal", participates: true, category: "normal", selected: slot.modelName, stage, rejected, ...info });
     }
   }
-  return finalizeMap({ mapId, fixedModelsByMap, mapSlots, modelOfSlot, mapCap, assignment, budget, baseline, attempt });
+  return finalizeMap({ mapId, fixedModelsByMap, mapSlots, modelOfSlot, mapCap, assignment, budget, baseline, attempt, extra: capInfo });
 }
 
 /**
@@ -900,11 +929,20 @@ function planMapByType({ seed, settings, preventSame, table, pool, mapId, mapSlo
   if (baseline > cap) diagnostics.count("mapsAboveCap");
   const active = new Set(groups.filter((group) => participates.get(group.id)).map((group) => group.id));
   // A restricted custom pool gets a coverage witness (see coverWitness): models held as insurance so that every group can
-  // always keep its model or take a pool model that fits it, however the draws before it went.
-  const witness = pool.excluded > 0
-    ? coverWitness({ base: pinned, subjects: groups.filter((group) => active.has(group.id)).map((group) => ({ own: group.modelName, maxSize: groupFit(group) })), pool, preventSame })
-        .slice(0, Math.max(0, mapCap - pinned.size))
-    : [];
+  // always keep its model or take a pool model that fits it, however the draws before it went. The one-model grace of
+  // resolveModelCap lifts the cap to nominal + 1 only when that is proven to be the least the map can hold.
+  let witness = [];
+  let capInfo = {};
+  if (pool.excluded > 0) {
+    const cover = coverWitnessSearch({
+      base: pinned, subjects: groups.filter((group) => active.has(group.id)).map((group) => ({ own: group.modelName, maxSize: groupFit(group) })), pool, preventSame,
+    });
+    const model = resolveModelCap({ nominalCap: cap, baseSize: pinned.size, coverSize: cover.witness.length, exact: cover.exact });
+    mapCap = model.effectiveCap;
+    witness = cover.witness.slice(0, Math.max(0, mapCap - pinned.size));
+    capInfo = modelInfo(model, cap);
+    if (model.grace) diagnostics.count("customPoolModelGraceMaps");
+  }
   const budget = new ModelLedger({ mapId, cap: mapCap });
   for (const model of pinned) budget.hold(model);
   for (const model of witness) budget.reserve(model);
@@ -998,5 +1036,5 @@ function planMapByType({ seed, settings, preventSame, table, pool, mapId, mapSlo
     throw new EnemyPlacementInfeasibleError(mapId, groups[0].members[0].id,
       `${budget.size} models remain, above the effective cap ${mapCap}`, { baseline, effectiveCap: mapCap, detail: `map ${mapId}, attempt ${attempt}` });
   }
-  return finalizeMap({ mapId, fixedModelsByMap, mapSlots, modelOfSlot, mapCap, assignment, budget, baseline, attempt, extra: { typeGroups: groups.length } });
+  return finalizeMap({ mapId, fixedModelsByMap, mapSlots, modelOfSlot, mapCap, assignment, budget, baseline, attempt, extra: { typeGroups: groups.length, ...capInfo } });
 }

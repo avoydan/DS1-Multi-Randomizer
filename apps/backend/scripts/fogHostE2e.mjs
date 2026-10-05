@@ -144,6 +144,12 @@ async function sweep(count, prefix) {
         slots: placementInfo.summary.slots,
         maxFinalModels: Math.max(0, ...maps.map((map) => map.finalModels)),
         mapsAboveCap: maps.filter((map) => map.baseline > 30).length,
+        graceMaps: Object.entries(placementInfo.summary.maps).filter(([, map]) => map.customPoolModelGrace).map(([id, map]) => `${id}:${map.finalModels}`),
+        // Cap invariant: the effective cap is max(30, baseline), or exactly 31 for a map on the proven one-model grace
+        // (baseline <= 30); an existing overflow is never raised.
+        capInvariantBad: maps.filter((map) => (map.customPoolModelGrace
+          ? map.effectiveCap !== 31 || map.baseline > 30 || map.minimumFeasibleModels !== 31
+          : map.effectiveCap !== Math.max(30, map.baseline)) || (map.baseline > 30 && map.finalModels > map.baseline)).length,
         samplerOverflow: maps.filter((map) => map.finalModels > map.effectiveCap).length,
         stages: placementInfo.summary.stages,
         mapsRetried: placementInfo.summary.counters.mapsRetried ?? 0,
@@ -160,6 +166,8 @@ async function sweep(count, prefix) {
         const sampled = plan.placements.enemies.filter((p) => /sampled|^pinwheel|passive-until|grounded-new-londo|active-darkroot/u.test(p.compatibility) && p.changed);
         entry.placement.sampledChanged = sampled.length;
         entry.placement.changedWithoutScaledRow = sampled.filter((p) => !Number.isInteger(p.scaledNpcParamId)).length;
+        const customPool = process.env.DS1TR_E2E_PLACEMENT ? JSON.parse(process.env.DS1TR_E2E_PLACEMENT).customPool : null;
+        entry.placement.poolViolations = Array.isArray(customPool) ? sampled.filter((p) => !customPool.includes(p.targetModelName)).length : 0;
       }
     }
     let combinedEdited = new Set();
@@ -212,6 +220,9 @@ async function sweep(count, prefix) {
     samplerOverflow: results.reduce((total, r) => total + (r.placement?.samplerOverflow ?? 0), 0),
     changedWithoutScaledRow: results.reduce((total, r) => total + (r.placement?.changedWithoutScaledRow ?? 0), 0),
     maxFinalModels: Math.max(0, ...results.map((r) => r.placement?.maxFinalModels ?? 0)),
+    graceMaps: results.flatMap((r) => (r.placement?.graceMaps ?? []).map((m) => `${r.seed}:${m}`)),
+    capInvariantBad: results.reduce((total, r) => total + (r.placement?.capInvariantBad ?? 0), 0),
+    poolViolations: results.reduce((total, r) => total + (r.placement?.poolViolations ?? 0), 0),
     mapsAboveCap: results.reduce((total, r) => total + (r.placement?.mapsAboveCap ?? 0), 0),
     skipChecksFailed: results.flatMap((r) => r.skipChecks ?? []).filter((c) => !c.includes('exit 0')).length,
     skipChecks: results.flatMap((r) => r.skipChecks ?? []).length,

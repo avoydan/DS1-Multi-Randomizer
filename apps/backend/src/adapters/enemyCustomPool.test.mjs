@@ -261,34 +261,149 @@ function plannerInput(spec, { fixed = new Map(), options = {}, seed = 'planner',
   };
 }
 
-test('the pool gets no budget exemption: at chance 100 a map the pool cannot fit is a structural, non-retryable refusal; below 100 it is a bounded stochastic retry', () => {
-  const spec = { [MAP]: [['cA', 1, 1]], m11_00_00_00: [['cB', 1, 3], ['cC', 1, 3]] };
-  // 30 fixed models, none of them regular and none in the pool: the slot of cA either stays (cA) or takes the new cB, so the
-  // map would hold 31 models. The cap stays 30; no draw can change that when every enemy takes part.
-  assert.throws(
-    () => sampling.planSampledRegularEnemies(plannerInput(spec, { fixed: new Map([[MAP, fixedSet(30)]]), options: { customPool: ['cB'] } })),
-    (error) => error.code === 'ENEMY_PLACEMENT_CUSTOM_POOL_INVALID' && error.reason === 'map-infeasible' && error.mapId === MAP
-      && error.baseline === 30 && error.effectiveCap === 30 && error.neededModels === 1 && !('attempts' in error) && /replacement chance of 100%/u.test(error.message),
-  );
-  // Below 100 the same map depends on the participation draw: bounded map-local attempts, then the retryable typed error.
-  let exhausted = null;
-  for (let i = 0; i < 40 && !exhausted; i += 1) {
-    try {
-      sampling.planSampledRegularEnemies(plannerInput(spec, { fixed: new Map([[MAP, fixedSet(30)]]), seed: `stoch-${i}`, options: { customPool: ['cB'], replacementChance: 80 } }));
-    } catch (error) {
-      exhausted = error;
-    }
+// ---- controlled model grace (Part C2 decision) ------------------------------------------------------------------------------
+
+const GRACE_SPEC = { [MAP]: [['cA', 1, 1]], m11_00_00_00: [['cB', 1, 3], ['cC', 1, 3]] };
+const planGrace = (fixedCount, options = {}, spec = GRACE_SPEC, extra = {}) => {
+  const input = plannerInput(spec, { fixed: new Map([[MAP, fixedSet(fixedCount)]]), options: { customPool: ['cB'], ...options }, ...extra });
+  const result = sampling.planSampledRegularEnemies(input);
+  return { input, result, info: input.diagnostics.toJSON().summary.maps[MAP], counters: input.diagnostics.toJSON().summary.counters };
+};
+
+test('model cap, base cap 30 and the smallest final count 30: the cap stays 30 and the grace is not used', () => {
+  const { info, counters, result } = planGrace(29);
+  assert.equal(info.baseline, 29);
+  assert.equal(info.effectiveCap, 30);
+  assert.equal(info.minimumFeasibleModels, 30);
+  assert.equal(info.customPoolModelGrace, false);
+  assert.equal(info.nominalCap, 30);
+  assert.equal(counters.customPoolModelGraceMaps ?? 0, 0);
+  assert.ok(info.finalModels <= 30);
+  for (const source of result.assignment.values()) assert.equal(source.modelName, 'cB');
+  // Plenty of room: nothing to prove, nothing consumed.
+  const roomy = planGrace(20);
+  assert.equal(roomy.info.effectiveCap, 30);
+  assert.equal(roomy.info.customPoolModelGrace, false);
+});
+
+test('model cap, base cap 30 and the smallest final count 31: the cap is 31, one model of grace, recorded', () => {
+  // 30 fixed models, none regular, none in the pool: the slot of cA either stays (cA) or takes the new cB - 31 models either way.
+  const { info, counters, result } = planGrace(30);
+  assert.equal(info.baseline, 30);
+  assert.equal(info.minimumFeasibleModels, 31);
+  assert.equal(info.effectiveCap, 31);
+  assert.equal(info.customPoolModelGrace, true);
+  assert.equal(counters.customPoolModelGraceMaps, 1);
+  assert.equal(counters.mapAttemptsFailed ?? 0, 0);
+  assert.ok(info.finalModels <= 31 && info.finalModels > 30, 'the map really holds the 31st model');
+  for (const source of result.assignment.values()) assert.equal(source.modelName, 'cB');
+  // The same at any replacement chance: the participation draw decides, the cap is never above 31.
+  for (let i = 0; i < 12; i += 1) {
+    const run80 = planGrace(30, { replacementChance: 80 }, GRACE_SPEC, { seed: `grace-${i}` });
+    assert.ok(run80.info.effectiveCap === 30 || run80.info.effectiveCap === 31);
+    assert.ok(run80.info.finalModels <= run80.info.effectiveCap);
   }
-  assert.ok(exhausted, 'participating makes the map infeasible');
-  assert.equal(exhausted.code, 'ENEMY_PLACEMENT_INFEASIBLE');
-  assert.equal(exhausted.attempts, sampling.MAP_ATTEMPTS);
-  assert.ok(/custom pool 1 of 3/u.test(exhausted.message) && typeof exhausted.customPoolHash === 'string');
-  // With the pool model already present (a fixed plan holds it) the same map is fine and nothing is added.
-  const present = plannerInput(spec, { fixed: new Map([[MAP, fixedSet(30, ['cB'])]]), options: { customPool: ['cB'] } });
+});
+
+test('model cap, the smallest count 32 on a base cap of 30: never granted, the cap and the verdict say so', () => {
+  const resolved = sampling.resolveModelCap({ nominalCap: 30, baseSize: 30, coverSize: 2, exact: true });
+  assert.deepEqual(resolved, { effectiveCap: 30, baseCap: 30, minimumFeasible: 32, grace: false, feasible: false });
+  const lower = sampling.resolveModelCap({ nominalCap: 30, baseSize: 29, coverSize: 3, exact: true });
+  assert.equal(lower.effectiveCap, 30);
+  assert.equal(lower.grace, false);
+  assert.equal(lower.feasible, false);
+  // An unproven cover (search bound hit) is not enough for the grace and is not claimed impossible.
+  const unproven = sampling.resolveModelCap({ nominalCap: 30, baseSize: 30, coverSize: 1, exact: false });
+  assert.equal(unproven.effectiveCap, 30);
+  assert.equal(unproven.grace, false);
+  assert.equal(unproven.feasible, true);
+  // Exactly one more than nominal is the only grace.
+  assert.deepEqual(sampling.resolveModelCap({ nominalCap: 30, baseSize: 30, coverSize: 1, exact: true }),
+    { effectiveCap: 31, baseCap: 30, minimumFeasible: 31, grace: true, feasible: true });
+  assert.deepEqual(sampling.resolveModelCap({ nominalCap: 30, baseSize: 29, coverSize: 2, exact: true }),
+    { effectiveCap: 31, baseCap: 30, minimumFeasible: 31, grace: true, feasible: true });
+});
+
+test('an existing overflow is never worsened: baseline 31, 32 and 33 keep their cap and get no grace', () => {
+  for (const baseline of [31, 32, 33]) {
+    const resolved = sampling.resolveModelCap({ nominalCap: 30, baseSize: baseline, coverSize: 1, exact: true });
+    assert.equal(resolved.effectiveCap, baseline, `baseline ${baseline}`);
+    assert.equal(resolved.grace, false);
+    assert.equal(resolved.minimumFeasible, baseline + 1);
+    assert.equal(resolved.feasible, false, 'one model too many is proven impossible, not granted');
+    // The planner agrees: at chance 100 the map is refused with the typed non-retryable error, at the baseline cap.
+    assert.throws(
+      () => planGrace(baseline),
+      (error) => error.code === 'ENEMY_PLACEMENT_CUSTOM_POOL_INVALID' && error.reason === 'map-infeasible' && error.effectiveCap === baseline
+        && error.baseline === baseline && !('attempts' in error),
+      `baseline ${baseline}`,
+    );
+    // A pool model the map already holds costs nothing: the overflow is preserved, not increased.
+    const input = plannerInput(GRACE_SPEC, { fixed: new Map([[MAP, fixedSet(baseline, ['cB'])]]), options: { customPool: ['cB'] } });
+    sampling.planSampledRegularEnemies(input);
+    const info = input.diagnostics.toJSON().summary.maps[MAP];
+    assert.equal(info.effectiveCap, baseline);
+    assert.ok(info.finalModels <= baseline);
+    assert.equal(info.customPoolModelGrace, false);
+  }
+});
+
+test('while the grace is active fit, Prevent same, pool membership and determinism still hold', () => {
+  // cA (size 2) can take cB (size 1) but never cC (size 3); under Prevent same a cB slot cannot take cB.
+  const spec = { [MAP]: [['cA', 2, 2]], m11_00_00_00: [['cB', 1, 3], ['cC', 3, 3]] };
+  const pool = ['cB', 'cC'];
+  const once = (seed) => {
+    const input = plannerInput(spec, { fixed: new Map([[MAP, fixedSet(30)]]), seed, preventSame: true, options: { customPool: pool, fit: 'fits' } });
+    const result = sampling.planSampledRegularEnemies(input);
+    return { result, info: input.diagnostics.toJSON().summary.maps[MAP] };
+  };
+  for (let i = 0; i < 12; i += 1) {
+    const first = once(`grace-fit-${i}`);
+    assert.equal(first.info.customPoolModelGrace, true);
+    assert.equal(first.info.effectiveCap, 31);
+    for (const [slotId, source] of first.result.assignment) {
+      if (!slotId.startsWith(MAP)) continue;
+      assert.equal(source.modelName, 'cB', 'cC does not fit a size-2 slot, cA is its own model');
+    }
+    const second = once(`grace-fit-${i}`);
+    assert.deepEqual([...second.result.assignment.entries()].map(([id, source]) => [id, source.modelName]),
+      [...first.result.assignment.entries()].map(([id, source]) => [id, source.modelName]), 'same seed, same placement');
+    assert.deepEqual(second.info, first.info, 'same seed, same cap and diagnostics');
+  }
+  // Prevent same on a pool whose only fitting model is the slot's own: it stays, the cap is not consumed for nothing.
+  const own = plannerInput({ [MAP]: [['cB', 1, 2]], m11_00_00_00: [['cC', 3, 2]], m12_00_00_00: [['cD', 2, 2]] }, { fixed: new Map([[MAP, fixedSet(30)]]), preventSame: true, options: { customPool: ['cB', 'cC'], fit: 'fits' } });
+  const ownResult = sampling.planSampledRegularEnemies(own);
+  for (const [slotId, source] of ownResult.assignment) assert.ok(!slotId.startsWith(MAP) || source.modelName !== 'cB');
+  assert.ok(own.diagnostics.toJSON().summary.maps[MAP].finalModels <= own.diagnostics.toJSON().summary.maps[MAP].effectiveCap);
+});
+
+test('the full pool is not touched by the grace: no cap fields, no lift, Part C1 behavior', () => {
+  const input = plannerInput(GRACE_SPEC, { fixed: new Map([[MAP, fixedSet(30)]]), options: { customPool: null } });
+  try {
+    sampling.planSampledRegularEnemies(input);
+  } catch (error) {
+    assert.equal(error.code, 'ENEMY_PLACEMENT_INFEASIBLE');
+  }
+  const summary = input.diagnostics.toJSON().summary;
+  assert.equal(summary.counters.customPoolModelGraceMaps ?? 0, 0);
+  const info = summary.maps[MAP];
+  if (info) {
+    assert.equal(info.effectiveCap, 30);
+    assert.equal('customPoolModelGrace' in info, false);
+  }
+  // Listing every model is the full pool as well.
+  const listed = plannerInput(GRACE_SPEC, { fixed: new Map([[MAP, fixedSet(29)]]), options: { customPool: ['cA', 'cB', 'cC'] } });
+  sampling.planSampledRegularEnemies(listed);
+  assert.equal('customPoolModelGrace' in listed.diagnostics.toJSON().summary.maps[MAP], false);
+});
+
+test('with the pool model already present the map needs no grace', () => {
+  const present = plannerInput(GRACE_SPEC, { fixed: new Map([[MAP, fixedSet(30, ['cB'])]]), options: { customPool: ['cB'] } });
   const result = sampling.planSampledRegularEnemies(present);
   const info = present.diagnostics.toJSON().summary.maps[MAP];
   assert.equal(info.baseline, 30);
   assert.equal(info.effectiveCap, 30);
+  assert.equal(info.customPoolModelGrace, false);
   assert.ok(info.finalModels <= 30);
   for (const source of result.assignment.values()) assert.equal(source.modelName, 'cB');
 });
