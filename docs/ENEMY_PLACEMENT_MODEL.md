@@ -303,7 +303,7 @@ in its own change with a documented preset migration.
 | 4 | Preserve per-model totals? | **No** (legacy does not). Sampling is uniform over *types*; the permutation remains for users who want conservation. |
 | 5 | Boss replacement samples bosses with replacement? | **Yes**, from the portable single-body boss pool, uniform over types; repeats allowed; Unique bosses cycles. |
 | 6 | Linked and multi-body bosses? | They are **units**, not sources. A unit slot participates as a whole (one chance draw per unit, from the stream of its first body); participating units swap with other participating units as today (`shuffledWithoutFixedPoints` over the participants, a unit that is alone keeps itself). Units are not sampled into normal slots. Supporting "a multi-body boss as a lone source" needs synthetic parts and is out of scope. |
-| 7 | Prevent same with partial replacement? | A candidate is rejected when its model equals the slot's model. A slot that is not replaced is, by definition, unchanged and not subject to the rule. Keep-vanilla as a fallback is forbidden under Prevent same (the ladder skips it). |
+| 7 | Prevent same with partial replacement? | A candidate is rejected when its model equals the slot's model. A slot that is not replaced is, by definition, unchanged and not subject to the rule, so the keep-vanilla fallback stays available under Prevent same (the legacy outcome when every candidate is rejected). |
 | 8 | Fit? | `maxSize` per slot as in step 2 above, against **derived** size classes (section 6.2). NPC rule as legacy (fit 2 = anywhere except NPCs). |
 | 9 | Difficulty mode and strictness? | Curve modes draw a class offset (authored tables, section 6.3) around the slot's derived class; empty class falls back to the own class, then to the ladder. **Deviation D-1:** the class filter is *kept inside the full model set* (falling back to size only when empty); the literal legacy lapse measured 30-31% same-class placements in the full phase against 72-77% with the refinement, and with DS1TR's stricter budget the full phase covers 56-63% of placements. Easy Asylum: an independently authored rule (section 12). |
 | 10 | No valid replacement? | The deterministic, bounded ladder of section 6.7. Never an unbounded retry. |
@@ -371,7 +371,8 @@ for map in mapOrder:                               # sorted ids
     P6  draw by bounded rejection (6.5); a typeMap entry is used first when still valid for P4 and P6
     P7  if no candidate: fallback ladder (6.7)
     P8  commit: modelSet ∪= {chosen}; typeMap; variant = uniform among the type's variants
-        (stream of the slot); placement = existing enemyPlacement(...) with the usual extras
+        (stream of the slot); placement = existing enemyPlacement(...) with the usual extras,
+        ALWAYS with a scaled NpcParam row (6.9)
   post-condition: |final models of the map| <= cap, else typed error (should be unreachable)
 ```
 
@@ -392,27 +393,55 @@ used boss is rejected while the cycle has other candidates), custom pool (filter
 built, not per draw), and the existing option exclusions (Mimics, mosquitoes, Pinwheel Chaos clones as
 slots with their own `scaling: vanilla`).
 
-### 6.6 Budget by construction
+### 6.6 Budget: an invariant with a checked precondition
 
 The first-come cap alone painted a map into a corner in the prototype: a late small slot found the set full
 of large types and no vanilla model to fall back on (0.13% of placements ended above their size class, every
-time with "keep vanilla" blocked by the budget). The fix is a **coverage reserve**: before sampling a map,
-the vanilla model of its smallest participating slot (two distinct ones under Prevent same) is added to the
-model set. Then every participating slot has an in-set type that fits it, for any later state. Measured: 0
-violations over 68,120 placements (section 11).
+time with "keep vanilla" blocked by the budget). The remedy is a **coverage reserve**, defined as an invariant
+rather than as an unconditional addition:
 
-### 6.7 Fallback ladder (deterministic, bounded)
+- **Reserve.** For each slot class present among a map's participating slots (normal, boss, NPC), the vanilla
+  model of the smallest participating slot of that class (two distinct ones under Prevent same, when the map
+  has them) belongs to the model set.
+- **Invariant.** After the reserve, every participating slot has an in-set type of its own class that fits it
+  (size <= the slot's), and the set never exceeds the cap.
+- **Precondition, checked per map before sampling:** `|fixed models + vanilla models of non-participants +
+  reserve| <= cap`. The fixed models are those of the unit planners and special slots, which are known
+  before sampling.
+- **If the precondition fails** (deterministic, in this order): (a) a reserve entry is skipped when the set
+  already holds a fitting type of that class; (b) otherwise the smallest participating slots of the class are
+  demoted to non-participants (they keep their vanilla model, which only helps because it is a vanilla model
+  of the map) until the precondition holds; (c) if the set is over the cap with **no** participant left, the
+  special plans alone exceed the cap and the run fails with `ENEMY_PLACEMENT_BUDGET_UNSATISFIABLE` (map,
+  models). `permutation-v1` fails in the same situation (its limiter throws), so this is not a new failure
+  mode.
+- **Prevent same** with a single distinct model at a class's minimum size: the slot holding that model cannot
+  be replaced by a different fitting type and stays vanilla (rung 2 below). That is the legacy outcome and is
+  recorded, not an error.
 
-1. The sampled candidate (P6).
-2. **Keep the slot vanilla** (the legacy outcome), if its model is already in the set or the set has room,
-   and Prevent same is off. Recorded as `kept-vanilla`.
-3. A type already in the set that **fits** the slot. Recorded as `in-set-fit`.
-4. A type already in the set, **fit relaxed**. Recorded as `fit-relaxed` with the slot id, size and chosen
-   size. Unreachable with the coverage reserve; counted in the manifest so a sweep can assert zero.
-5. Otherwise `ENEMY_PLACEMENT_INFEASIBLE` (map, slot, class, options), a combined-stage retryable failure
-   like the existing key-item retry (new combined seed, bounded attempts).
+Measured on the real catalog (normal slots): 0 violations over 68,120 placements per variant (section 11).
 
-Every step is a bounded scan; nothing retries with fresh randomness.
+### 6.7 Fallback ladder (deterministic, bounded), with category semantics
+
+The requested **category** (normal, boss) comes from step P3 and is part of every rung. A slot's **own class**
+is what it is in the game (normal slot, boss slot, NPC slot).
+
+1. **Sampled candidate** of the requested category (P6).
+2. **Category fallback**, only where the legacy tool has one: in a "both" mode, a failed boss draw is retried
+   once as a normal draw (the legacy `canBeNormal`). In "bosses only" or "normals only" modes there is none.
+3. **Keep the slot vanilla** (the legacy outcome), if its model is already in the set or the set has room
+   (allowed under Prevent same). Recorded as `kept-vanilla`.
+4. **Downgrade to the slot's own class:** a type of the slot's own class already in the set that fits it. A
+   normal slot that asked for a boss when the full set holds no boss therefore receives an in-set normal enemy,
+   not a boss and not a vacancy. Recorded as `in-set-fit`, plus `category-downgraded` when the category
+   changed. Boss slots only use in-set bosses; **NPC slots are never relaxed or downgraded** (they stop at rung 3).
+5. **Fit relaxed**, normal slots only: any in-set type of the slot's own class. Recorded as `fit-relaxed` with
+   slot, slot size and chosen size. Unreachable with the reserve; counted in the manifest so a sweep can
+   assert zero.
+6. Otherwise `ENEMY_PLACEMENT_INFEASIBLE` (map, slot, class, options), a combined-stage retryable failure like
+   the existing key-item retry (new combined seed, bounded attempts).
+
+Every rung is a bounded scan over a list; nothing retries with fresh randomness.
 
 ### 6.8 Diagnostics
 
@@ -420,6 +449,21 @@ Every step is a bounded scan; nothing retries with fresh randomness.
 per-map model-set size, the list of fallback slots, the `classTableHash`, `algorithm` and option summary;
 the spoiler gets a one-line summary and the manifest records the counts. A `kept-vanilla` or `in-set-fit`
 count above a threshold is logged as a warning.
+
+### 6.9 Rule: drops and team always follow the slot
+
+**Every changed `sampling-v1` placement carries a scaled NpcParam row, whatever the global scaling mode.**
+DsrDataTool copies the destination slot's item-lot fields and team onto the scaled row; without a row the
+placed enemy keeps its own NpcParam and with it its own drops. `enemyPlacement` currently leaves the row out
+when scaling is `vanilla`, drops are not randomized and no team or tangibility override applies, so the planner
+must force it (an `extra` override; the per-placement `scaling: "vanilla"` already means "keep the
+replacement's own combat stats, still take the slot's drops and team", as the Pinwheel clones use it).
+
+Why this is a requirement and not a nicety (measured, section 11.2): a sampled type is placed any number of
+times, so a drop that exists once in the game would be duplicated, and a drop of a type that is never drawn
+would vanish. The FogMod "found in both areas" check is not the concern: none of FogMod's 27 tracked items is
+reachable through an NpcParam drop lot (they are in world and gift lots; boss souls and lord souls are awarded
+by events). The concern is item integrity.
 
 ---
 
@@ -496,7 +540,7 @@ a new semantic rule.
 
 | Option / change | MSB | EMEVD | NpcParam | Linked | Progress | Overlay | Risk |
 |---|---|---|---|---|---|---|---|
-| Algorithm switch alone | yes | per replaced entity (as today) | scaled rows (as today) | no | no | no | low; more repeated sources, wider type variety. DsrDataTool accepts repeats. |
+| Algorithm switch alone | yes | per replaced entity (as today) | scaled rows; **must exist for every placement (6.9)** | no | item integrity: drops of repeated types (rule 6.9); FogMod's tracked items are not NpcParam drops | no | low **with** rule 6.9; medium without it. DsrDataTool accepts repeats. |
 | Replacement chance | yes | fewer edits | fewer rows | per-unit | no | **only fewer edits** | low: a strict subset of today's surface. |
 | Normal replacement (normals only) | yes | as today | as today | no | no | no | low |
 | Fit, difficulty, strictness, Type replacement, Custom pool, Unique bosses | selection only | none new | none new | no | no | no | none beyond the algorithm switch |
@@ -507,6 +551,22 @@ a new semantic rule.
 | Respawning roaming bosses | no | per-entity custom events (or an NpcParam bit on the scaled row) | maybe a flag | no | no | no | low; custom events are appended in free ranges |
 | NPC replacement | yes | **NPC talk and quest events share entity ids** | row for the replaced NPC | no | quest flags | **possible new overlap** (Fog also edits NPC-adjacent events) | **high**; measure the edited-event set against FogMod's before shipping |
 | Hostile NPCs | yes | allegiance events per entity | NPC rows | no | shop and quest NPCs as hostile sources | no | medium-high |
+
+### 9.1 Drop ownership
+
+Measured on the real catalog (section 11.2): 1,595 of 1,703 regular slots reference an NpcParam drop lot (193
+distinct lots); 41 lots belong to a single slot and 30 of those contain weapons, armor or rings; 37 of the 86
+regular types drop equipment of their own. None of FogMod's 27 key items is in an NpcParam drop lot, and the
+12 lots holding boss souls are not referenced by any NpcParam. So drop duplication cannot trigger the
+Peculiar Doll class of Fog failure, but it duplicates or loses equipment unless drops follow the slot (6.9).
+
+**Finding about the current engine (not fixed here):** with Enemy scaling set to `vanilla` and drops not
+randomized, `permutation-v1` already duplicates single-owner equipment drops in 95 of 100 seeds, because
+placements without a scaled row keep the replacement's own drops. Most cases are the Titanite Demon dragon
+group (Titanite Catch Pole, 92 of 100 seeds); the rest are archetype-duplicated bosses (Pinwheel's three masks
+9, Taurus's axe 6, Super Ornstein's ring 5, Capra's weapon 3). The options added later (Gwyn nerf, Second
+Gargoyle) add about 0.05-0.10 duplicated lots per seed to that baseline. The default scaling, `area`, creates
+a scaled row for every changed placement and shows none (0 of 100). No Fog impact, no progression impact.
 
 Rules for the implementation tasks, inherited from the Gargoyle work: do not broaden the FogHost overlay;
 if a batch edits an event outside the known set, **stop and report** the event and its FogMod form. The two
@@ -524,7 +584,7 @@ risk: data first, selection-only options next, event-touching options last.
 | Batch | Scope | Engine | Contract / preset | UI | Tests | Real-format checks | Fog risk |
 |---|---|---|---|---|---|---|---|
 | **0** | Infrastructure, no behavior change | `placement.js` (new repository-authored module in `vendor/src/core`, listed in the module-set test and the pin; patch `0005`); class derivation (size, difficulty, NPC/boss class); `classTableHash`; per-slot streams; ladder; diagnostics block | `enemies.placement.algorithm` (`permutation` only selectable), neutral-value rule, preset v5 migrating 1-4 | an "Enemy placement" group with the algorithm shown, read-only | class derivation vs fixtures; neutral-value rejection; preset v5 migration; permutation hash lock | none (output unchanged) | none |
-| **A** | Sampler for regular enemies | `sampling-v1`: chance, normal mode {none, normals}, fit, difficulty `random`, Prevent same, mimic/mosquito/Pinwheel clones, coverage reserve, budget, ladder | add `sampling`, `replacementChance`, `normalReplacement`, `fit`, `difficultyMode=random` | sliders and selects, Replacement chance / Placement activated (remove the planned badges) | determinism, budget <= 30, zero fit violations, ladder rung counts, chance statistics, hash lock | 20-seed Bosses + Fog sweep with `sampling`, `verify-skips`, `patch-enemies`, duplicates per map | low |
+| **A** | Sampler for regular enemies | `sampling-v1`: chance, normal mode {none, normals}, fit, difficulty `random`, Prevent same, mimic/mosquito/Pinwheel clones, coverage reserve, budget, ladder | add `sampling`, `replacementChance`, `normalReplacement`, `fit`, `difficultyMode=random` | sliders and selects, Replacement chance / Placement activated (remove the planned badges) | determinism, budget <= 30, zero fit violations, ladder rung counts, chance statistics, hash lock; **every changed placement has a scaled row; each drop lot is referenced by the same slots as in vanilla** | 20-seed Bosses + Fog sweep with `sampling`, **one with Enemy scaling `vanilla`**, `verify-skips`, `patch-enemies`, duplicates per map | low |
 | **B** | Difficulty curve | class draw, strictness tables, D-1 refinement, Easy Asylum rule, curated overrides | `difficultyMode` curve values, `strictness`, `easyAsylum` | select + slider activation | offset distributions, same-class share, empty-class fallback | 20 seeds | none |
 | **C** | Type replacement and custom pool | type map with type-level participation and injectivity; pool filter | `typeReplacement`, `customPool` (named list of enabled types) | select, pool editor (largest UI piece) | injectivity, sentinel cases, pool filter | 10 seeds | none |
 | **D** | Boss class (bosses only) | boss sampler over the portable single-body pool, per-candidate Gwyn nerf, Unique bosses, unit participation | `bossReplacement` {none, bosses}, `uniqueBosses`, `bossChanceInBossSlots` | activation | boss repetition, unit swaps, hash lock | **40 seeds** Bosses + Fog (overlay set must remain the 15 events), `verify-skips` | medium |
@@ -539,6 +599,8 @@ the packager copies and what the loader imports), so it is a repository-authored
 ---
 
 ## 11. Prototype evidence
+
+### 11.1 Sampler prototype
 
 `engines/combined/prototypes/enemy-placement-sampler.mjs` implements batch A's core plus the curve modes and
 Type replacement for **regular enemies only** on the real catalog (1,703 slots, 86 types). 40 seeds per
@@ -565,6 +627,14 @@ What the prototype does **not** show: anything about bosses, NPCs, units, EMEVD,
 about how the game behaves with many repeated sources in one map; those need the batch-level sweeps. The
 class-evaluation figures in section 6.2 come from comparing the derived classes with the legacy table as a
 yardstick; the table is not stored in the repository.
+
+### 11.2 Drop-ownership measurements
+
+From the vanilla `GameParam` (NpcParam and ItemLotParam rows read with SoulsFormats) crossed with the catalog
+and FogMod's `fog.txt`: figures in 9.1. The duplication measurement runs the shipped engine 100 times per
+configuration with scaling `vanilla` and counts lots owned by a single vanilla slot that appear on two or more
+placements without a scaled row: permutation baseline 95/100 seeds (1.15 lots per seed), product defaults
+95/100 (1.25), product defaults with `area` scaling 0/100.
 
 To reproduce (needs a game-derived catalog from `DsrDataTool scan`, never committed):
 `node engines/combined/prototypes/enemy-placement-sampler.mjs <catalog.json> 40`.
@@ -610,3 +680,7 @@ To reproduce (needs a game-derived catalog from `DsrDataTool scan`, never commit
    variant occurs in the game.
 10. **Linked bosses as lone sources** (for example a Gaping Dragon in a normal slot) need synthetic parts;
     out of scope here, listed so the pool restriction is a conscious one.
+11. **Vanilla-scaling duplicate drops in `permutation-v1`** (9.1): leave as is (default `area` scaling is
+    unaffected) or give every changed placement a scaled row in a future fix? Doing so changes the packages of
+    existing `vanilla`-scaling presets (more NpcParam rows), so it is a compatibility decision, not a silent
+    fix.

@@ -199,9 +199,10 @@ export function plan(inputs, options) {
       }
       if (!chosen) { // legacy: not replaced
         const vanilla = typeByModel.get(slot.modelName);
-        if (!o.preventSame && (palette.has(slot.modelName) || palette.size < o.cap)) { chosen = vanilla; rung = 1; }
+        // Keeping the slot is allowed under Prevent same too: an unreplaced slot is unchanged, as in the legacy tool.
+        if (palette.has(slot.modelName) || palette.size < o.cap) { chosen = vanilla; rung = 1; }
         else {
-          if (!o.preventSame) diagnostics.keepVanillaBlocked += 1;
+          diagnostics.keepVanillaBlocked += 1;
           chosen = draw(types.filter((t) => palette.has(t.modelName) && t.size <= maxSize)); rung = 2;
           if (!chosen) { chosen = draw(types.filter((t) => palette.has(t.modelName))); rung = 3; }
         }
@@ -255,7 +256,7 @@ if (process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === imp
       errors += a.diagnostics.errors.length; notPart += a.diagnostics.notParticipating; blocked += a.diagnostics.keepVanillaBlocked; placedCount += a.placements.length;
       for (const p of a.placements) { // every placement is counted, whatever rung produced it
         if ((options.fit ?? 'fit') === 'fit' && p.size > p.slotSize) fitViol += 1;
-        if (options.preventSame && p.from === p.to) sameViol += 1;
+        if (options.preventSame && p.from === p.to && p.rung === 0) sameViol += 1; // kept-vanilla slots are not replacements
         if (options.difficultyMode === 'curve') { const d = p.difficulty - p.slotDifficulty; offsets[d] = (offsets[d] || 0) + 1; const k = p.phase === 'room' ? (p.emptiedClass ? 'room-class-empty' : 'room') : 'full'; phases[k] = phases[k] || [0, 0]; phases[k][d === 0 ? 0 : 1] += 1; }
       }
       const counts = new Map();

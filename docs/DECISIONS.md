@@ -21,13 +21,21 @@ reasoning, the algorithm and the plan are in `docs/ENEMY_PLACEMENT_MODEL.md`. No
   `permutation` instead of ignoring them.
 - **Per-slot streams** isolate how many draws a slot consumes. Outcomes remain order dependent inside a map;
   this is not claimed to be independence.
-- **Budget by construction.** DS1TR keeps counting every model present in a map (cap 30) because DsrDataTool
-  prunes unused models; a coverage reserve (the vanilla model of the smallest participating slot) guarantees
-  a fitting in-map type, replacing first-come luck. The prototype showed the failure it prevents (0.13% of
+- **Budget as an invariant with a checked precondition.** DS1TR keeps counting every model present in a map
+  (cap 30) because DsrDataTool prunes unused models. A per-class coverage reserve (the vanilla model of the
+  smallest participating slot of each class) guarantees a fitting in-map type; if the precondition cannot
+  hold, slots are demoted deterministically, and only a map already over the cap through the special plans
+  fails (as `permutation-v1` does). The prototype showed the failure the reserve prevents (0.13% of
   placements above their size class) and the fix (0 of 68,120).
-- **Fallback is bounded and ordered:** sampled, keep vanilla (the legacy outcome), in-set type that fits,
-  in-set type with fit relaxed (a recorded diagnostic, expected to be unreachable), then a typed retryable
-  error. No unbounded retries.
+- **Drops and team always follow the slot.** Every changed sampling placement carries a scaled NpcParam row
+  whatever the scaling mode; otherwise a sampled type's own drops are duplicated or lost. Measured on the
+  shipped engine: with scaling `vanilla`, single-owner equipment drops are already duplicated in 95 of 100
+  seeds (mostly the Titanite Demon group), with the default `area` scaling in none. Not fixed here.
+- **Fallback is bounded and ordered, and respects categories:** sampled, the legacy category fallback (only
+  in "both" modes), keep vanilla (allowed under Prevent same; the legacy outcome), a type of the slot's own
+  class that fits (a requested boss that cannot be placed downgrades to a normal enemy, never to a
+  vacancy; NPC slots stop at keep vanilla), fit relaxed for normal slots (a recorded diagnostic, expected to
+  be unreachable), then a typed retryable error. No unbounded retries.
 - **Classes are derived, not copied.** Size and difficulty classes come from catalog data. Against the legacy
   classes (used only as a yardstick) size agrees well (rank correlation 0.74) and difficulty only roughly
   (0.58); weights were deliberately not tuned against the legacy table.

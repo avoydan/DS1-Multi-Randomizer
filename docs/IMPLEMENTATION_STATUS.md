@@ -13,6 +13,13 @@ build on them. **No runtime behavior, default, preset, FogHost code or packaging
   0 non-deterministic runs, 6-8 ms per seed. Without it: 0.13% of placements end above their size class.
   Curve adherence inside a full model set is 30-31% under the literal legacy rule and 72-77% with the
   documented refinement.
+- **Finding (current engine, not fixed):** with Enemy scaling `vanilla` and drops not randomized,
+  `permutation-v1` duplicates single-owner equipment drops in 95 of 100 seeds (92 from the Titanite Demon
+  group's Titanite Catch Pole; the rest from archetype-duplicated bosses: Pinwheel's masks, Taurus's axe,
+  Super Ornstein's ring, Capra's weapon), because placements without a scaled row keep the replacement's own
+  drops. Gwyn nerf and Second Gargoyle add about 0.05-0.10 lots per seed. The default `area` scaling shows none
+  (0 of 100). None of FogMod's 27 tracked items is reachable through an NpcParam drop lot, so there is no Fog
+  or progression impact. The new design makes "drops follow the slot" a rule (model document 6.9).
 - **Derived classes** versus the legacy ones as a yardstick: size rank correlation 0.74 (79 of 82 within one
   class), difficulty 0.58 (73 of 82 within two).
 - **Open product questions** are listed in section 13 of the model document (default algorithm, model budget
