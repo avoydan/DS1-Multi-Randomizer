@@ -10,7 +10,7 @@ tables and the Easy Asylum cap are authored. A map that cannot be placed is repl
 neutral difficulty). Details, eligibility matrix, filtering order and results: model document 10.3. Patch `0008`.
 
 - **Proofs:** `permutation-v1` unchanged (24 hashes; 56/56 and 73/73 package files); 24 Part A synthetic hashes
-  identical; real catalog: 700 Part A outputs identical, all 14 Part A first-attempt failures solved by a map retry.
+  identical; real catalog: of 700 Part A outputs 681 are identical and the other 19 (the Part A first-attempt failures) are now solved by a map retry; none differs.
 - **Catalog sweep:** 13 variants x 100 seeds: 0 final failures, 0 sampler overflows, 0 fit / Prevent-same / Easy
   Asylum violations. **Real format:** 50 seeds (Items + Enemies + Fog + bosses) + 3 full proofs incl. retried Parish
   maps: all pass, 0 merge conflicts, same 15 overlay events, `verify-skips` 0 failures.

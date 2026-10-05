@@ -849,8 +849,8 @@ chance, baseline, effective cap and the terminal slot. That error is still retry
 combined seed also changes the baseline); structural errors stay non-retryable. The Fog retry is unchanged.
 
 **Part A compatibility (measured).** 24 synthetic placement hashes of the Part A planner are identical in Part B; on
-the real catalog, 100 seeds x 7 Part A variants: 0 outputs differ, and every Part A first-attempt failure (5 at 60%
-fits, 9 at 25% fits) is now solved by a map retry.
+the real catalog, 100 seeds x 7 Part A variants: 681 outputs are identical, 0 differ, and the 19 Part A
+first-attempt failures (5 + 5 at 60% fits, 9 at 25% fits) are now solved by a map retry.
 
 **Catalog-only validation (real catalog, 100 seeds per variant, bosses + dragons + Gwyn nerf + Second Gargoyle on).**
 
