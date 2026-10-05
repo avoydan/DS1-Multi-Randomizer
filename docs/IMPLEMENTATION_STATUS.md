@@ -1,5 +1,35 @@
 # Implementation status
 
+**Enemy placement Part C2: custom enemy pool for regular enemies (2026-10-05; contracts 0.12.0, backend 0.28.0, desktop 0.15.0).**
+`sampling-v1` gains the custom enemy pool (**PARTIAL**: regular enemies; the original's boss and NPC entries need later
+parts). A pool is a canonical sorted list of model ids (`null` = the full pool); it enters only through the candidate
+boundary, restricts replacements only (unselected enemies stay where they are, including as the vanilla fallback) and
+changes none of fit, Prevent same, Easy Asylum, Type replacement, drop ownership or determinism. Presets are version 9
+(1-8 migrate to `permutation-v1` with the full pool, a stale id is an error). The backend lists the regular enemies from the
+clean game data (`POST /api/enemy-pool`, cached per snapshot) and the desktop gets a filterable editor. Details: model
+document 10.5. Patch `0010`.
+
+- **Model budget (decided 2026-10-05):** nominal 30; the baseline rule `max(30, baseline)` is unchanged; a restricted pool may
+  use a **one-model grace to 31** only on a map whose base cap is 30, when 30 is proven impossible and 31 proven sufficient.
+  A baseline already above 30 is never raised and nothing above 31 is ever granted. Recorded per map (`nominalCap`,
+  `minimumFeasibleModels`, `customPoolModelGrace`). 31 is not a new general limit.
+- **Accounting fixes found by the 100-seed validation:** the pool never reached the coverage reserve; the reserve could pick a
+  model too big for the smallest slot; the Type ledger could not serve the first group of a map that starts above its cap.
+  A coverage witness (the fewest models that keep every participant servable) replaced the reserve of restricted pools;
+  slots no pool model can replace join the baseline. The retry bound (3) was not changed.
+- **Errors:** structural problems and, at replacement chance 100%, a map whose proven-minimal cover cannot fit even with the
+  grace (`map-infeasible`) raise the non-retryable `ENEMY_PLACEMENT_CUSTOM_POOL_INVALID`; a participation draw that does not fit is the
+  ordinary `ENEMY_PLACEMENT_INFEASIBLE` (at most 3 map attempts). No percentage or size heuristic rejects pools.
+- **Catalog sweep (100 seeds x 18 maps, many pools):** A, B, C, E, N 100/100 in every tested configuration; D at "anywhere"
+  100/100, D at "fits" 100% refused or served exactly where provable; 0 fit / Prevent-same / pool-membership / cap violations;
+  the grace was used only on Parish and Lost Izalith and ended at 31 models; no baseline above 30 was increased.
+- **Real format (Items + Enemies + Fog + bosses):** 50 seeds in 5 pool configurations + 3 full proofs: all pass, 0 merge
+  conflicts, same 15 overlay events, `verify-skips` 0 failures, live installation unchanged.
+- **Proofs:** `permutation-v1` unchanged (24 hashes, package files of combined-only and combined + Fog runs); the full pool
+  equals Part C1 (synthetic pins and 700 real-catalog outputs, same `classTableHash` and retry counts).
+- **Parish risk unchanged** (32-33-model baselines of 10.3 are separate and not worsened).
+- **Tests:** backend 282 (281 pass, 1 skipped); new `enemyCustomPool.test.mjs` (28 tests); typecheck and desktop build pass.
+
 **Enemy placement Part C1: Type replacement for regular enemies (2026-10-05; contracts 0.11.0, backend 0.27.0, desktop 0.14.0).**
 `sampling-v1` gains the legacy Type replacement (**FULL** for regular enemies: disabled = legacy default, enabled, enabled
 except roaming bosses = enabled until boss sources exist). The group is the original model within a map; it is decided once

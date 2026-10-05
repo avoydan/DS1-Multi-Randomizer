@@ -12,7 +12,7 @@ the legacy tool, enforces the 30-model map limit by construction, and falls back
 Implement it in small batches, selection-only options first and the event-touching ones (bosses in normal
 slots, NPCs) last.
 
-Status: **design, the Part 0 infrastructure (10.1), Part A (10.2) and Part B difficulty (10.3) and Part C1 Type replacement (10.4).** `sampling-v1` runs for regular enemy slots
+Status: **design, the Part 0 infrastructure (10.1), Part A (10.2) and Part B difficulty (10.3), Part C1 Type replacement (10.4) and Part C2 custom enemy pool (10.5).** `sampling-v1` runs for regular enemy slots
 only and is opt-in; `permutation-v1` stays the default. **Part A is complete: the whole replacement-chance range works under a
 non-worsening model budget (10.2).** One scratch prototype
 (`engines/combined/prototypes/enemy-placement-sampler.mjs`) validates the proposed core against a real
@@ -590,7 +590,7 @@ risk: data first, selection-only options next, event-touching options last.
 | **0** (done, see 10.1) | Infrastructure, no behavior change | `placement.js` (new repository-authored module in `vendor/src/core`, listed in the module-set test and the pin; patch `0005`); class derivation (size, difficulty, NPC/boss class); `classTableHash`; per-slot streams; ladder; diagnostics block | `enemies.placement.algorithm` (`permutation` only selectable), neutral-value rule, preset v5 migrating 1-4 | an "Enemy placement" group with the algorithm shown, read-only | class derivation vs fixtures; neutral-value rejection; preset v5 migration; permutation hash lock | none (output unchanged) | none |
 | **A** (built, one open conflict, see 10.2) | Sampler for regular enemies | `sampling-v1`: chance, normal mode {none, normals}, fit, difficulty `random`, Prevent same, mimic/mosquito/Pinwheel clones, coverage reserve, budget, ladder | add `sampling`, `replacementChance`, `normalReplacement`, `fit`, `difficultyMode=random` | sliders and selects, Replacement chance / Placement activated (remove the planned badges) | determinism, budget <= 30, zero fit violations, ladder rung counts, chance statistics, hash lock; **every changed placement has a scaled row; each drop lot is referenced by the same slots as in vanilla** | 20-seed Bosses + Fog sweep with `sampling`, **one with Enemy scaling `vanilla`**, `verify-skips`, `patch-enemies`, duplicates per map | low |
 | **B** (built, see 10.3) | Difficulty curve | class draw, strictness tables, D-1 refinement, Easy Asylum rule, curated overrides | `difficultyMode` curve values, `strictness`, `easyAsylum` | select + slider activation | offset distributions, same-class share, empty-class fallback | 20 seeds | none |
-| **C** (C1 Type replacement built, see 10.4; C2 custom pool open) | Type replacement and custom pool | type map with type-level participation and injectivity; pool filter | `typeReplacement`, `customPool` (named list of enabled types) | select, pool editor (largest UI piece) | injectivity, sentinel cases, pool filter | 10 seeds | none |
+| **C** (C1 Type replacement built, see 10.4; C2 custom pool built, see 10.5) | Type replacement and custom pool | type map with type-level participation and injectivity; pool filter | `typeReplacement`, `customPool` (named list of enabled types) | select, pool editor (largest UI piece) | injectivity, sentinel cases, pool filter | 10 seeds | none |
 | **D** | Boss class (bosses only) | boss sampler over the portable single-body pool, per-candidate Gwyn nerf, Unique bosses, unit participation | `bossReplacement` {none, bosses}, `uniqueBosses`, `bossChanceInBossSlots` | activation | boss repetition, unit swaps, hash lock | **40 seeds** Bosses + Fog (overlay set must remain the 15 events), `verify-skips` | medium |
 | **E** | Cross-class and roaming boss options | boss to normal slot, normal to boss slot, "both" modes, `getSoul` on the scaled row, respawn handling | modes `normals`/`both`, `bossChanceInNormalSlots`, `roamingBossSouls`, `respawningRoamingBosses` | activation | reward ownership, scaled row always present, boss bar rules | **40 seeds**, measure edited events against the overlay and FogMod; stop on any new overlap | **high** |
 | **F** | NPC class and hostile NPCs | NPC allowlist, talk preservation, hostile sources, allegiance events | `npcReplacement`, `hostileNpcs` | activation | NPC fit rules, talk preservation fixtures | event-set diff vs FogMod first, then 40 seeds | **high** |
@@ -1057,7 +1057,7 @@ catalog sweep predicts about 1 seed in 12 at 25%), so three full proofs were run
 retry (`parish-11`, `parish-34`, `parish-1`): byte-identical reruns, activation and restore pass. The final model count and
 the drop-ownership invariant were checked on the generated placement plans, not on the NpcParam regulation.
 
-**For Part C2 (custom enemy pool).** Pass the pool through `createCandidatePool(table, accept)` / `candidateFilter`; nothing
+**For Part C2 (custom enemy pool; built, see 10.5).** Pass the pool through `createCandidatePool(table, accept)` / `candidateFilter`; nothing
 else reads `table.types` for candidates (the in-set fallback and the shared rung filter by `pool.models`). A narrow pool
 makes rung 4 and group-level failures more likely, so re-measure retry pressure and the share of groups kept vanilla, and
 reject a pool that is empty for a size class that occurs in a map with a typed error before generation. The reserve
@@ -1067,6 +1067,174 @@ custom pool must not change (the pool restricts replacements, not originals).
 Batch 0 must also decide where `placement.js` lives: new code has to be inside `vendor/src` (that is what
 the packager copies and what the loader imports), so it is a repository-authored GPL file recorded in
 `UPSTREAM_PIN.md`, not an edit of an upstream file.
+
+---
+
+### 10.5 Part C2 as built (2026-10-05): custom enemy pool for regular enemies
+
+**Legacy semantics confirmed (pinned revision 83f008d, `enemy_rng.py` / `enemy_randomizer.py`).**
+
+| Item | Legacy behavior |
+|---|---|
+| Control | A named *enemy config*: a copy of `valid_new.txt` (`enemyRandomizerData/customConfigs/<name>.txt`) in which the third flag column of every row is rewritten by the editor (`SaveEnemyConfig`): `0` enabled, `1` ignored. "Default" is the shipped `valid_new.txt`. The selected config is read instead of `valid_new.txt` in `loadValidNew`. |
+| Granularity | One row per model id (`c2500`, ...), covering normal enemies, bosses and NPCs (type 0 / 1 / 2) in the **same** list. A row carries one or more (AI, NpcParam) variants. |
+| When it applies | Once, when the replacement lists are **built**: only rows with flag `0` (or `2` = Artorias DLC row on Remastered) enter the normal and boss candidate lists, the per-size lists and the per-difficulty lists. It is not a per-draw filter. |
+| What it restricts | **Replacement candidates only.** The slots to replace come from `valid_replacements.txt` and are unaffected: an enemy that is not selected is still in the game where it stands and is still replaced like any other. |
+| Size / difficulty lists | Built from the selected rows only, so a pool without a given size or difficulty class has empty lists there; the legacy fallbacks handle an empty list as for any other empty list (the sentinel results of 10.3/10.4). |
+| Unselected originals | Not removed from the model list of a map; a map keeps the models its non-replaced slots still use. |
+
+**Scope and parity.** The pool applies to **regular enemies** only. The legacy list is one global list that mixes bosses
+and NPCs with normal enemies; `sampling-v1` does not sample bosses or NPCs yet, so those entries are not offered and the
+editor shows no control for them. Parity is therefore **PARTIAL** (`FEATURE_PARITY.md`): the regular-enemy part of the
+legacy config is reproduced, the boss and NPC entries are the remaining gap (Part D and later). No fake control exists.
+
+**Identity and canonical form.** A pool is a set of stable model ids (`c2500`). The canonical form is the list sorted
+ascending; duplicates, an empty list, non-ids and `null` handled as: `null` = the full pool (the neutral default),
+duplicates / empty / malformed lists are refused with `ENEMY_PLACEMENT_CUSTOM_POOL_INVALID` (`duplicate`, `empty`,
+`format`); an id that is not a regular candidate of the game data is refused as `unknown` and **never silently
+dropped** (a stale selection after a game-data change is an error the user sees). Order is irrelevant; the hash is
+`SHA-256({version: "custom-pool-v1", models})`. Listing every regular model is the full pool and produces the same
+output as `null` (tested).
+
+**Where the pool enters.** Only at the candidate boundary: `createCandidatePool(table, accept)` builds the replacement types
+from the class table and `planSampledRegularEnemies` passes the pool as the accept predicate. Nothing else reads
+`table.types` for candidates: the in-set fallback and the shared rung filter by `pool.models`. Filtering order is unchanged
+(10.2): physical fit, Prevent same, Easy Asylum / difficulty, Type injectivity, model budget - the pool simply defines
+which types exist. Fit, Prevent same, Easy Asylum, the structural exclusions and the model budget are never relaxed for it.
+Originals outside the pool stay in the game and may be the vanilla fallback; **replacement** candidates (including the
+Type replacement shared fallback) always come from the pool.
+
+**Type replacement.** Groups draw from the same pool. The ladder of 10.4 is unchanged: sampled candidate, keep the group
+vanilla, smallest fitting model already present, a model another group holds (shared fallback), failure. Rungs 3-4
+(in-set / shared) only consider pool models; rung 2 (keep vanilla) may leave the group on an original that is not in the pool.
+
+**What the investigation found (and the accounting that came out of it).** The first real-catalog runs showed that
+restricted pools failed maps for which a valid final model set existed. A feasibility oracle (the exact smallest final
+distinct-model count for the sampled participation state, a bounded exact cover search) classified every failing attempt:
+
+| Pool | Cause | Class |
+|---|---|---|
+| B (43/85), 100% | the pool never reached the coverage reserve (`mapBudget` did not pass it on) | accounting |
+| E (29/85, 60%, strict curve) | the reserve could be a larger slot's model instead of one that fits the smallest slot | accounting |
+| C + Type (c2430 in Lost Izalith) | the map starts at 31 models against a cap of 30 (21 fixed + 10 original groups); the first group could neither stay (its model was released) nor take a pool model (the set was "full" of pending originals, none in the pool) | accounting (Type ledger) |
+| C at 25% / 60%, E, B | a unique single-slot model that participates on a map the quiet slots already fill to 30: every option adds a model, 31 is the smallest count | feasibility (stochastic by participation) |
+| D (2 large models), fits, 100% | the one replaceable slot (Parish `c2860_0000`) has no room, deterministically | structural |
+
+The slot-mode "ledger" tried first (every participant's original counted as a pending owner from the start) made
+results far worse (B at 100%: 7/100): it started most maps above the cap and then only admitted models that already had a
+solid owner. It was dropped. What was built instead is small and based on the final model set:
+
+- **Slots no pool model can ever replace** (nothing in the pool fits, or the only fit is the slot's own model under
+  Prevent same) stay vanilla and their models join the **baseline** of the map (the models the sampler cannot remove).
+  Restricted pools only; the full pool is treated as in Part C1.
+- **Coverage witness** (`coverWitnessSearch`): the fewest further models that let every participating slot (or Type
+  group) either keep its own model or take a fitting pool model (own model excluded as a replacement under Prevent same).
+  Exact for the maps involved (a bounded branch-and-bound over a greedy cover, never more than every subject keeping its
+  own model); it replaces the coverage reserve of a restricted pool. In slot mode the witness models are part of the
+  model set from the start; in Type mode they are *insurance* in the ledger (`reserve` / `dropReserve`): they occupy
+  capacity and may be taken at no cost, but are not owners and are not counted in the final set.
+
+**Model budget: nominal target, baseline overflow, and the controlled grace.**
+
+| Term | Meaning |
+|---|---|
+| nominal target | 30 distinct models per map (unchanged). |
+| baseline | the models the sampler cannot remove: fixed plans, vanilla models of slots left alone (chance, mode `none`), and slots no pool model can replace. |
+| base cap | `max(30, baseline)` (10.2). A map may already be above 30 before the sampler runs (Parish: 32-33 in a few seeds). |
+| minimum feasible | `baseline + size of the proven-minimal cover`: the fewest models the map can hold for this participation state. |
+| effective cap | the base cap, **except** the one-model grace below. |
+
+*Controlled grace (decision of 2026-10-05).* A restricted custom pool may use `effectiveCap = 31` on a map **only if all**
+of these hold: the base cap is the nominal 30 (baseline <= 30); the cover is proven minimal; the minimum feasible count is
+exactly 31 (30 is proven impossible, 31 proven sufficient). Anything else keeps the base cap: a map whose baseline is
+already above 30 gets **no** grace (baseline 31 stays 31, 32 stays 32, 33 stays 33, so the pool never creates a 32 / 33 /
+34), and no map is ever granted more than 31. It is evidence-driven, not a new limit: it is not consumed when 30 suffices,
+and 31 is a count `permutation-v1` already produces in valid output. 31 is **not** the new general model limit; the nominal
+target and the baseline rule are unchanged, and the Parish 32-33 baseline risk stays a separate, unchanged item. The pure
+function is `resolveModelCap`; per map the diagnostics record `nominalCap`, `minimumFeasibleModels`,
+`customPoolModelGrace` (and the counter `customPoolModelGraceMaps`), next to `baseline`, `effectiveCap`, `finalModels`.
+At a replacement chance of 100% every replaceable enemy takes part, so the verdict is exact before sampling: a map whose
+minimum feasible count exceeds its cap even with the grace is refused up front (see errors); below 100% the participation
+draw decides, and a draw that cannot fit is an ordinary map-local retry.
+
+**Validation and errors.**
+
+| Condition | Error | Retry |
+|---|---|---|
+| malformed / empty / duplicate list, unknown (stale) id, any pool under `permutation-v1` | `ENEMY_PLACEMENT_CUSTOM_POOL_INVALID` (`format`, `empty`, `duplicate`, `unknown`) or `ENEMY_PLACEMENT_OPTIONS_INVALID` | never |
+| no regular slot can take any selected enemy (fit + Prevent same) | `ENEMY_PLACEMENT_CUSTOM_POOL_INVALID` (`no-candidate`) | never |
+| chance 100% and a map's proven-minimal cover does not fit even with the grace | `ENEMY_PLACEMENT_CUSTOM_POOL_INVALID` (`map-infeasible`: map, baseline, effective cap, models needed, pool size, fit, Type) | never |
+| `ENEMY_PLACEMENT_BUDGET_UNSATISFIABLE`, `CLASS_UNDERIVABLE`, `OPTIONS_INVALID` | typed, structural | never |
+| a participation / draw state for which a map attempt does not fit | `ENEMY_PLACEMENT_INFEASIBLE` | at most 3 map-local attempts, then the typed error naming the pool hash and configuration |
+
+Validation rejects a pool only when the impossibility is *proven*. Heuristics such as "reject a pool serving fewer than X% of
+the slots" or "reject a pool whose smallest enemy is larger than some slot" were tried and discarded: the second rejects a
+perfectly healthy pool of 78 of 85 models (everything except size 0) that the planner serves 100/100. The map-local retry
+count stays 3.
+
+**Coverage analysis.** `analyzePoolCoverage` reports the selected types per size class (0-5) and difficulty class (0-7),
+the smallest selected size and the number of slots without a fitting candidate; `describeRegularEnemyPool` (and the
+backend `POST /api/enemy-pool`, cached per pristine snapshot) lists every regular model with size, difficulty, slot and map
+counts for the editor, computed from the clean game data. The renderer holds only the selection.
+
+**Preset and UI.** `enemies.placement.customPool` (`null` or a sorted list); preset version 9 (versions 1-8 migrate to
+`permutation-v1` with the full pool; a stale id is an error, never dropped silently). The editor offers search, All / None /
+Reset, selected-count and per-size summary, and the hint that unselected enemies stay as they are. It is disabled unless
+`sampling-v1` with regular enemies is active.
+
+**Diagnostics.** `placementDiagnostics.customPool`: `enabled`, `hash`, `total`, `selected`, size and difficulty coverage,
+`slotsWithoutFit`. Counters `candidatesOutsideCustomPool`, `keptByPool`, `typeGroupsKeptByPool`,
+`customPoolModelGraceMaps`; per map `nominalCap`, `minimumFeasibleModels`, `customPoolModelGrace` (restricted pools only).
+The log line names the pool as `custom pool X/Y (hash12)`.
+
+**Measurements (real catalog, 100 seeds per row, 18 maps, bosses on).**
+
+| Pool / configuration | success | map attempts 1 / 2 / 3 | grace maps | max final models |
+|---|---|---|---|---|
+| A full pool, 100% fits | 100 | 1800 / 0 / 0 | - | 30 |
+| B (43/85) 100% fits; Type; strict curve; Prevent same | 100 each | 1800 / 0 / 0 | 0 | 30 |
+| B 25% / 60% | 100 / 100 | 1796 / 3 / 1; 1798 / 2 / 0 | 6 / 3 (Parish) | 31 / 31 |
+| C (10/85) 100%; Type (100%, 60%); strict curve; Prevent same; Type + strict + Prevent same | 100 each | 1800 / 0 / 0 | 0 | 30 |
+| C 25% / 60% | 100 / 100 | 1796 / 3 / 1; 1798 / 2 / 0 | 11 / 6 (Parish, Lost Izalith) | 31 / 31 |
+| E (29/85) 60% fits, strict curve | 100 | 1797 / 3 / 0 | 9 (Parish, Lost Izalith) | 31 |
+| N (78/85: all but size 0) 100% fits; 25% + Type | 100 / 100 | 1800 / 0 / 0 | 0 | 30 / 32 (baseline) |
+| D (2 large models) fits 100% | 46 ok, 54 `map-infeasible` | 828 / 0 / 0 | 42 (Parish) | 31 |
+| D anywhere | 100 | 1800 / 0 / 0 | 0 | 23 |
+
+Full pool at the same chances retries more often (25%: 9 seeds, 60%: 5 seeds with a map retry). In every run: zero fit,
+Prevent-same and pool-membership violations; zero maps above their effective cap; zero changed placements without a
+scaled NpcParam row; boss plans identical to the reference; deterministic reruns; and **the cap invariant**: every map
+without the grace has `effectiveCap == max(30, baseline)`, every map with it has `baseline <= 30`, `effectiveCap == 31`,
+`minimumFeasibleModels == 31`, and no map with a baseline above 30 ended above that baseline (53 such maps in the 25% runs,
+18 in the N + Type run). The grace was used only on Parish (`m10_01_00_00`) and Lost Izalith (`m14_01_00_00`).
+
+**Real-format validation (Items + Enemies + Fog, bosses on, FogHost 0.5.0): 50 seeds + 3 full proofs, `fits`, custom pool.**
+
+| Configuration | seeds | generated | Fog retries (`FOG_UPSTREAM_INCOMPATIBLE`) | merge conflicts | boss overlay | `verify-skips` failures | sampler overflow | cap invariant / pool membership violations | changed without scaled row | groups / shared | max final models | grace maps |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| broad B (43/85), 100% | 10 | 10 | 2 | 0 | same 15 events | 0 / 12 | 0 | 0 / 0 | 0 | - | 30 | 0 |
+| small C (10/85), 60% | 10 | 10 | 1 | 0 | same 15 | 0 / 11 | 0 | 0 / 0 | 0 | - | 30 | 0 (1 map retry) |
+| small C, 25% (partial replacement) | 10 | 10 | 1 | 0 | same 15 | 0 / 11 | 0 | 0 / 0 | 0 | - | 33 (baseline) | 2: Parish in `c2-c25-4`, `c2-c25-9` (31 models) |
+| C + Type replacement, 100% | 10 | 10 | 3 | 0 | same 15 | 0 / 14 | 0 | 0 / 0 | 0 | 1,780 / 16 | 30 | 0 |
+| E (29/85), 60%, strict curve | 10 | 10 | 4 | 0 | same 15 | 0 / 14 | 0 | 0 / 0 | 0 | - | 31 | 4: Parish in `c2-e-1`, `c2-e-4`, Lost Izalith in `c2-e-6`, `c2-e-10` (31 models) |
+
+Mismatches in events the combined engine edited: 0; Fog-only (stock FogMod) event mismatches: 0; the 15 boss overlay events are
+identical to Part C1's; the live installation was unchanged in every run; every sweep ran with bosses enabled. The six
+real-format maps that used the grace ended at exactly 31 models, none of them had a baseline above 30; five maps with a
+baseline above 30 (25% sweep) kept it (33 at most) and did not grow. The drop-ownership invariant (every changed placement
+has a scaled row) and pool membership (every sampled placement is a pool model) were checked on the generated plans, not on
+the NpcParam regulation. Three full proofs (generation, byte-identical rerun, activation, restore) ran on the grace seeds
+`c2-c25-4` (Parish) and `c2-e-6` (Lost Izalith) and on the Type + pool seed `c2-ct-1`: byte-identical reruns, activation (72-73 files) and restore pass, and the live installation is unchanged.
+
+
+**Regression.** `permutation-v1`: the 24 lock hashes are identical to the pre-C2 values and the package files of the combined-only (56 files, two
+configurations) and combined + Fog (73 files) runs are unchanged. `sampling-v1` with the full pool or a listed full pool is byte-identical to Part C1
+(pins A, B, C1 and 700 real-catalog comparisons: output, `classTableHash`, retry counts).
+
+**Residual risk and notes for Part D.** The pool is regular-enemy only; boss / NPC pool entries need Part D. Heavily
+restricted pools leave many slots vanilla by design. Pools whose replaceable slots cannot fit a map at 100% are refused
+with `map-infeasible` (D at fits is the reference case). The Parish 32-33 baseline risk of 10.3 is unchanged and not
+worsened.
 
 ---
 

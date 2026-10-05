@@ -901,4 +901,23 @@ Decision: sampling-v1 uses a non-worsening model-budget policy. The normal targe
   thing to yield (shared-model rung): measured, it makes the Parish infeasible at high replacement chances under the
   DS1TR cap (93 of 100 seeds), deterministically, so retries cannot solve it. Fit, the budget and fixed entities never yield.
 - The map-local retry limit stays 3: Type replacement does not raise retry pressure above Part B.
-- A custom enemy pool enters through `createCandidatePool` / `candidateFilter`; it is not implemented.
+- A custom enemy pool enters through `createCandidatePool` / `candidateFilter` (implemented in Part C2, below).
+
+## sampling-v1 custom enemy pool: restricts replacements, provable validation, one-model grace (Part C2)
+
+- The pool is a set of model ids for **regular enemies**; the original's boss and NPC entries are a documented gap (parity
+  PARTIAL). It restricts replacement candidates only: unselected enemies stay in the game and may be the vanilla fallback;
+  fit, Prevent same, Easy Asylum, Type replacement, drop ownership and determinism are untouched. Presets move to version 9.
+- Validation rejects a pool only when the impossibility can be **proven** (malformed or stale ids, no slot can take any
+  selected enemy, or - at replacement chance 100% - a map whose proven-minimal model cover cannot fit). Percentage and
+  "smallest model larger than a slot" heuristics were measured to reject healthy pools and are not used. Structural errors
+  are never retried; a participation draw that does not fit stays a bounded map-local retry. The retry count stays 3.
+- Slots no pool model can ever replace stay vanilla and belong to the baseline; the coverage reserve of a restricted pool is the
+  fewest models that keep every participant servable (a coverage witness).
+- **Model grace:** the nominal target stays 30 and the baseline rule `max(30, baseline)` stays. A restricted pool may use an
+  effective cap of **31**, and only when the base cap is 30, 30 is proven impossible and 31 is proven sufficient. A baseline above 30
+  gets no grace (it may be kept or reduced, never raised: 31 stays 31, 32 stays 32, 33 stays 33), and nothing above 31 is ever
+  granted. Reason: without it a unique single-slot model that participates on a map already filled to 30 by the slots
+  left alone has no solution at any draw, a failure retries cannot remove (about 2 of 100 seeds at 25% for a small healthy
+  pool); 31 is a model count `permutation-v1` already produces in valid output. This is not a general raise of the limit and the
+  Parish 32-33 baseline risk stays a separate item. Use of the grace is recorded per map in the diagnostics.

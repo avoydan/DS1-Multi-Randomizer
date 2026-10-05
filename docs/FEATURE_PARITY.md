@@ -35,8 +35,8 @@ a scratch directory for this audit only. The commit ids above are the revisions 
 |---|---|
 | Original options audited (Item 11 + Enemy 27 + FogMod 16) | **54** |
 | FULL | 34 (21 + 4 in Batch 1 + 3 in Batch 2 + 1 Second Gargoyle + 2 in Part A: Placement fit, Replacement chance + 2 in Part B: Difficulty mode, Difficulty strictness + 1 in Part C1: Type replacement) |
-| UI_ONLY (engine gap) | 15 |
-| PARTIAL | 3 (I11 hintsheet; I5 Soul items, where Transposed is unavailable; E2 Normal enemy replacement, added in Part A) |
+| UI_ONLY (engine gap) | 14 |
+| PARTIAL | 4 (I11 hintsheet; I5 Soul items, where Transposed is unavailable; E2 Normal enemy replacement, added in Part A; E22 Custom enemy pool, added in Part C2: regular enemies only) |
 | INTENTIONALLY_UNSUPPORTED | 1 |
 | DUPLICATE | 1 |
 | Newly wired in the audit task | 2 (settings preset import/export; restore default settings) |
@@ -96,7 +96,7 @@ All 21 configuration fields map to one position in the original config string. T
 | E19 | Roaming boss respawn | 0 enabled, 1 disabled | toggle, enabled | placeholder | no | no | no | UI_ONLY |
 | E20 | Hostile NPCs | 1 enabled, 0 disabled | toggle, off | placeholder | no | no | no | UI_ONLY |
 | E21 | Replace respawning mosquitoes | 1 enabled, 0 disabled | toggle, on | yes (`enemies.replaceRespawningMosquitoes`) | yes | yes | yes (Batch 1) | FULL |
-| E22 | Custom enemy pool (config editor) | Per-enemy enable/disable lists with named, saved configs | picker, "Default" | read-only "Default" field | no | no | no | UI_ONLY |
+| E22 | Custom enemy pool (config editor) | Per-enemy enable/disable lists with named, saved configs | filterable list of the regular enemies of the clean game data, All / None / Reset, counts | yes (`enemies.placement.customPool`, `sampling-v1`; presets v9) | yes (`POST /api/enemy-pool`, typed `ENEMY_PLACEMENT_CUSTOM_POOL_INVALID`) | yes | yes (Part C2, regular enemies only; the pool restricts replacements, unselected enemies stay; proven-impossible pools are refused, a one-model grace to 31 models only when proven necessary, see `ENEMY_PLACEMENT_MODEL.md` 10.5) | PARTIAL |
 | E23 | Seed | free text | master seed | yes | yes | yes | yes | FULL |
 | E24 | Copy enemy placement from a reference game | Copies a placement from another install | n/a | no | no | n/a | n/a | DUPLICATE |
 | E25 | Config text import / export (config string) | Compact `/-/`-separated string | settings preset | yes | yes | n/a | n/a | FULL (new) |
@@ -233,7 +233,7 @@ mapped one-to-one.
 | G18 | Prevent same enemy (E17) | done | See 6a. |
 | G19 | Unique bosses (E18) | B | Each boss at most once. Boss planning currently uses `shuffledPortableBosses`, so this needs a no-duplicate constraint. |
 | G20 | Hostile NPCs (E20) | B-C | Needs NPC AI and event flag handling; shares G9's NPC difficulty. |
-| G21 | Custom enemy pool (E22) | C | Requires a named-pool data model, an editor UI (the original has a full scrolling editor with per-enemy toggles), persistence, and validation that every map keeps a feasible pool. Likely last. |
+| G21 | Custom enemy pool (E22) | done for regular enemies (Part C2) | Boss and NPC entries of the original list need Part D and later; saved configs are the settings presets. |
 
 ### 6a. Batch 1 (implemented)
 
