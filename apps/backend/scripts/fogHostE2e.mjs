@@ -9,10 +9,11 @@
 // output and FogMod data never enter the repository.
 //
 // Not part of `npm test`: needs a real installation, built DsrDataTool and FogHost, and
-// DS1TR_FOG_DATA_ROOT (folder containing FogMod 6e6dc78 `dist`).
+// network access for the one-time world data download (or DS1TR_FOG_DATA_ROOT as a developer override). By default the
+// run uses the application's own preparation (worldData.ts) in DS1TR_STATE_DIR, exactly like the packaged app.
 //
 // Usage (after `npm run build -w @ds1tr/backend` and building tools/fog-host in Release):
-//   DS1TR_FOG_DATA_ROOT=<fog data> node apps/backend/scripts/fogHostE2e.mjs "<live DSR directory>"
+//   node apps/backend/scripts/fogHostE2e.mjs "<live DSR directory>"   (set DS1TR_STATE_DIR to an empty folder to test the first-run download)
 //   DS1TR_E2E_KEEP=1 keeps the temp directory.
 //   DS1TR_E2E_ENEMIES=0 runs Items + Fog only; DS1TR_E2E_SEED sets the master seed.
 //   DS1TR_E2E_SWEEP=<n> runs <n> seeds (`<DS1TR_E2E_SEED>-<i>`) generation-only and prints
@@ -31,10 +32,12 @@ import path from 'node:path';
 
 import { GameStateAuthority, executableName, managedRoots } from '../dist/core/gameState.js';
 import { generateRun } from '../dist/core/generationPipeline.js';
+import { defaultWorldDataCacheRoot } from '../dist/adapters/fogPrerequisites.js';
+import { worldDataId } from '../dist/adapters/worldData.js';
 
 const livePath = process.argv[2] ?? process.env.DS1TR_E2E_GAME_PATH;
-if (!livePath || !process.env.DS1TR_FOG_DATA_ROOT) {
-  console.error('Usage: DS1TR_FOG_DATA_ROOT=<fog data> fogHostE2e.mjs <live DSR directory>');
+if (!livePath) {
+  console.error('Usage: fogHostE2e.mjs <live DSR directory>');
   process.exit(2);
 }
 
@@ -191,7 +194,7 @@ async function sweep(count, prefix) {
       // merge touched must be intact. Mismatches in events the combined engine never edited are
       // FogMod's own runtime edits (stock FogMod behavior) and are reported separately.
       const run = spawnSync(process.env.DS1TR_E2E_VERIFY_SKIPS,
-        ['verify-skips', path.join(process.env.DS1TR_FOG_DATA_ROOT, 'dist', 'DS1R', 'event'), path.join(result.packagePath, 'event')],
+        ['verify-skips', path.join(process.env.DS1TR_FOG_DATA_ROOT || path.join(defaultWorldDataCacheRoot(), worldDataId), 'dist', 'DS1R', 'event'), path.join(result.packagePath, 'event')],
         { encoding: 'utf8' });
       const mismatched = [...new Set(run.stdout.split(/\r?\n/).filter((l) => l.startsWith('MISMATCH '))
         .map((l) => l.slice(9).split(' ')[0]))];

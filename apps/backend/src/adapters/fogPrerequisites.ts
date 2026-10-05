@@ -3,10 +3,15 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { FogLanguage } from '@ds1tr/contracts';
 import { fogReadSet } from './fogCompatibility.js';
+import { prepareWorldData, type WorldDataProgress, type WorldDataResult } from './worldData.js';
+import { defaultStateRoot } from '../core/gameState.js';
 
 const repoRoot = process.env.DS1TR_RUNTIME_ROOT ?? path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../../');
 
-/** Folder that contains FogMod's `dist` at commit 6e6dc78 (never bundled; supplied by the user). */
+/**
+ * Developer/test override: a folder that contains FogMod's `dist` at commit 6e6dc78. Normal users never set it; the
+ * application prepares the data itself (worldData.ts).
+ */
 export const fogDataRootVariable = 'DS1TR_FOG_DATA_ROOT';
 /** Optional override for the FogHost executable. */
 export const fogHostVariable = 'DS1TR_FOG_HOST';
@@ -20,6 +25,21 @@ export interface FogPrerequisites {
   readSet: string[];
 }
 
+/** Why the world randomizer cannot run: a plain-language message for the person and the exact reason for diagnostics. */
+export interface FogPrerequisiteFailure {
+  failure: { code: string; userMessage: string; technical: string };
+}
+
+export interface FogPreparationContext {
+  /** Verified clean snapshot of the installation (source of the game-derived files). */
+  pristineDirectory: string;
+  cacheRoot?: string;
+  onProgress?: (progress: WorldDataProgress) => void;
+  prepare?: (options: Parameters<typeof prepareWorldData>[0]) => Promise<WorldDataResult>;
+}
+
+export const defaultWorldDataCacheRoot = (): string => path.join(defaultStateRoot(), 'world-data');
+
 async function names(directory: string): Promise<string[]> {
   try {
     return (await readdir(directory, { withFileTypes: true })).filter((entry) => entry.isFile()).map((entry) => entry.name);
@@ -30,19 +50,38 @@ async function names(directory: string): Promise<string[]> {
 }
 
 /**
- * Resolves FogHost and the externally supplied FogMod data root. The data root is only
- * located here; FogHost verifies it against its pinned hash manifest on every run.
- * Returns null when no data root is configured or the host has not been built.
+ * Resolves FogHost and its data root. Without an override the data root is the application's own prepared copy
+ * (derived from the pristine snapshot plus a verified one-time download, see worldData.ts); the user chooses nothing.
+ * FogHost still verifies the data against its pinned hash manifest on every run.
+ * Returns null only when there is neither an override nor a preparation context (callers that cannot prepare).
  */
 export async function resolveFogPrerequisites(
   language: FogLanguage,
   env: NodeJS.ProcessEnv = process.env,
-): Promise<FogPrerequisites | null> {
+  context?: FogPreparationContext,
+): Promise<FogPrerequisites | FogPrerequisiteFailure | null> {
   const configured = env[fogDataRootVariable];
-  if (!configured) return null;
+  if (!configured && !context) return null;
   const executablePath = path.resolve(env[fogHostVariable] || defaultFogHostExecutable);
-  try { await access(executablePath); } catch { return null; }
-  const dataRoot = path.resolve(configured);
+  try { await access(executablePath); } catch {
+    return { failure: {
+      code: 'FOG_HOST_MISSING',
+      userMessage: 'A part of the world randomizer is missing from this installation. Please download DS1 Triple Randomizer again.',
+      technical: `FogHost executable not found: ${executablePath}`,
+    } };
+  }
+  let dataRoot: string;
+  if (configured) {
+    dataRoot = path.resolve(configured);
+  } else {
+    const prepared = await (context!.prepare ?? prepareWorldData)({
+      cacheRoot: context!.cacheRoot ?? defaultWorldDataCacheRoot(),
+      pristineDirectory: context!.pristineDirectory,
+      onProgress: context!.onProgress,
+    });
+    if (!prepared.ok) return { failure: { code: prepared.code, userMessage: prepared.userMessage, technical: prepared.technical } };
+    dataRoot = prepared.root;
+  }
   const events = await names(path.join(dataRoot, 'dist', 'DS1R', 'event'));
   const maps = await names(path.join(dataRoot, 'dist', 'DS1R', 'map', 'MapStudio'));
   return { executablePath, dataRoot, readSet: fogReadSet(events, maps, language) };

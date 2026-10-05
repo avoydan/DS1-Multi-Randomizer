@@ -186,3 +186,43 @@ test('passes the Fog message language to the prerequisite provider', async () =>
   assert.equal(result.code, 'FOG_PREREQUISITES_MISSING');
   assert.equal(requested, 'POLISH');
 }));
+
+test('a world randomizer preparation failure is shown in plain language; the exact reason goes to the log and the manifest', async () => fixture(async ({ game, pristine, workspace }) => {
+  const events = [];
+  const result = await generateRun({ config: config(game, true), workspacePath: workspace }, (event) => events.push(event), {
+    getPristineSource: async () => ({ directory: pristine }),
+    getFogPrerequisites: async () => ({ failure: { code: 'WORLD_DATA_OFFLINE', userMessage: 'The world randomizer files could not be prepared. Check your internet connection and click Retry.', technical: 'https://raw.githubusercontent.com/x: ENOTFOUND' } }),
+    combined: async () => { throw new Error('unexpected'); },
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.code, 'WORLD_DATA_OFFLINE');
+  assert.match(result.message, /internet connection/u);
+  assert.doesNotMatch(result.message, /ENOTFOUND|githubusercontent|dist|FogMod|FogHost/u);
+  assert.ok(events.some((event) => event.type === 'log' && /ENOTFOUND/u.test(event.message)), 'details are logged');
+  assert.ok(result.manifest.validation.some((line) => /WORLD_DATA_OFFLINE.*ENOTFOUND/u.test(line)), 'details are kept in the manifest');
+}));
+
+test('the preparation step receives the verified pristine snapshot and reports progress in plain language', async () => fixture(async ({ game, pristine, workspace }) => {
+  const events = [];
+  let context = null;
+  await generateRun({ config: config(game, true), workspacePath: workspace }, (event) => events.push(event), {
+    getPristineSource: async () => ({ directory: pristine }),
+    getFogPrerequisites: async (_language, received) => { context = received; received.onProgress({ fraction: 0.5, message: 'Downloading required world randomizer data...' }); return null; },
+    combined: async () => { throw new Error('unexpected'); },
+  });
+  assert.equal(context.pristineDirectory, pristine);
+  assert.ok(events.some((event) => event.type === 'progress' && event.stage === 'fog' && /Downloading required world randomizer data/u.test(event.message)));
+}));
+
+test('technical failures are turned into plain messages while the code and detail stay available', async () => fixture(async ({ game, pristine, workspace }) => {
+  const events = [];
+  const result = await generateRun({ config: config(game, false), workspacePath: workspace }, (event) => events.push(event), {
+    getPristineSource: async () => ({ directory: pristine }),
+    combined: async () => ({ ok: false, code: 'COMBINED_PROCESS_CRASHED', message: 'DsrDataTool.exe exited with 0xC0000005 at C:/Users/x/runtime' }),
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.code, 'COMBINED_PROCESS_CRASHED');
+  assert.doesNotMatch(result.message, /DsrDataTool|0xC0000005|C:/u);
+  assert.match(result.message, /Something went wrong/u);
+  assert.ok(events.some((event) => /0xC0000005/u.test(event.message)));
+}));

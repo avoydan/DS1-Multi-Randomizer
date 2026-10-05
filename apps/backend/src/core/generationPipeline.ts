@@ -5,7 +5,8 @@ import type { EnemyPlacementAlgorithm, FogLanguage, RandomizerConfig } from '@ds
 import { executeCombinedGeneration, type CombinedGenerationResult } from '../adapters/combinedRandomizerBridge.js';
 import { buildFogCompatibility, decideFogRetry, defaultFogRetryBounds, planFogStaging } from '../adapters/fogCompatibility.js';
 import { FogHostProcess, type FogHostResponse } from '../adapters/fogHostProcess.js';
-import { fogDataRootVariable, resolveFogPrerequisites, type FogPrerequisites } from '../adapters/fogPrerequisites.js';
+import { userMessageFor } from './userMessages.js';
+import { resolveFogPrerequisites, type FogPreparationContext, type FogPrerequisiteFailure, type FogPrerequisites } from '../adapters/fogPrerequisites.js';
 import { effectiveCombinedEnabled, validateRandomizerConfig } from './configValidation.js';
 import { validateInstallation } from './installation.js';
 import { deriveAttemptSeeds } from './seeds.js';
@@ -59,7 +60,7 @@ export interface GenerationDependencies {
   /** Must return an independently verified, backend-owned pristine snapshot. */
   getPristineSource: (gamePath: string) => Promise<PristineSource | null>;
   /** The read set depends on the Fog message language. */
-  getFogPrerequisites: (language: FogLanguage) => Promise<FogPrerequisites | null>;
+  getFogPrerequisites: (language: FogLanguage, context?: FogPreparationContext) => Promise<FogPrerequisites | FogPrerequisiteFailure | null>;
   combined: typeof executeCombinedGeneration;
   fog: FogHostProcess;
 }
@@ -67,8 +68,9 @@ export interface GenerationDependencies {
 const defaults: GenerationDependencies = {
   // A caller-supplied directory is never accepted as proof of pristine data.
   getPristineSource: async () => null,
-  // FogHost from tools/fog-host plus a user-supplied FogMod data root (DS1TR_FOG_DATA_ROOT).
-  getFogPrerequisites: (language) => resolveFogPrerequisites(language),
+  // FogHost from tools/fog-host plus the world data the application prepares itself (worldData.ts);
+  // DS1TR_FOG_DATA_ROOT remains a developer override.
+  getFogPrerequisites: (language, context) => resolveFogPrerequisites(language, process.env, context),
   combined: executeCombinedGeneration,
   fog: new FogHostProcess(),
 };
@@ -109,7 +111,7 @@ export async function generateRun(
   const workspace = typeof request.workspacePath === 'string' && request.workspacePath
     ? path.resolve(request.workspacePath) : '';
   const manifest: GenerationManifest = {
-    schemaVersion: 1, appVersion: '0.28.0', game: 'DSR', masterSeed: config.masterSeed,
+    schemaVersion: 1, appVersion: '0.29.0', game: 'DSR', masterSeed: config.masterSeed,
     pristineSnapshotId: null, gameTreeRoot: '',
     options: { items: config.items, enemies: config.enemies, fog: config.fog, output: config.output },
     enemyPlacement: {
@@ -119,7 +121,13 @@ export async function generateRun(
     },
     attempts: [], engines: {}, validation: [], files: [],
   };
-  const fail = (stage: string, code: string, message: string): GenerationResult => {
+  // The primary message is plain language; the exact reason stays in the log and the manifest.
+  const fail = (stage: string, code: string, technical: string): GenerationResult => {
+    const message = userMessageFor(code, technical);
+    if (message !== technical) {
+      manifest.validation.push(`${stage}: ${code}: ${technical}`);
+      onEvent({ type: 'log', stage, level: 'info', message: `Details: ${code}: ${technical}` });
+    }
     onEvent({ type: 'log', stage, level: 'error', message });
     return { ok: false, stage, code, message, manifest };
   };
@@ -145,14 +153,24 @@ export async function generateRun(
   manifest.pristineSnapshotId = pristine.snapshotId ?? null;
   progress('import', 0.1, 'Verified pristine source available.');
 
-  const fogReady = config.fog.enabled ? await services.getFogPrerequisites(config.fog.language) : null;
-  if (config.fog.enabled && !fogReady) return fail('fog', 'FOG_PREREQUISITES_MISSING',
-    `Fog generation needs FogHost and a user-provided FogMod data root. Select the folder containing `
-    + '`dist/DS1R` for FogMod commit 6e6dc78 in the desktop app (or set '
-    + `${fogDataRootVariable}); FogHost verifies that data on every run.`);
-  if (fogReady) {
+  let fogReady: FogPrerequisites | null = null;
+  if (config.fog.enabled) {
+    progress('fog', 0.12, 'Preparing world randomizer...');
+    const prerequisites = await services.getFogPrerequisites(config.fog.language, {
+      pristineDirectory: pristine.directory,
+      onProgress: (event) => progress('fog', 0.12 + 0.03 * event.fraction, event.message),
+    });
+    if (!prerequisites) return fail('fog', 'FOG_PREREQUISITES_MISSING',
+      'The world randomizer is not available in this installation. Turn it off, or download DS1 Triple Randomizer again.');
+    if ('failure' in prerequisites) {
+      const { code, userMessage, technical } = prerequisites.failure;
+      manifest.validation.push(`world randomizer: ${code}: ${technical}`);
+      onEvent({ type: 'log', stage: 'fog', level: 'info', message: `Details: ${code}: ${technical}` });
+      return fail('fog', code === 'FOG_HOST_MISSING' ? 'FOG_PREREQUISITES_MISSING' : code, userMessage);
+    }
+    fogReady = prerequisites;
     try { await requireFile(fogReady.executablePath); await access(fogReady.dataRoot); }
-    catch { return fail('fog', 'FOG_PREREQUISITES_MISSING', 'FogHost executable or FogMod data root is unavailable.'); }
+    catch { return fail('fog', 'FOG_PREREQUISITES_MISSING', 'The world randomizer files could not be found. Click Retry; if it keeps failing, download DS1 Triple Randomizer again.'); }
   }
 
   const combinedEnabled = effectiveCombinedEnabled(config);

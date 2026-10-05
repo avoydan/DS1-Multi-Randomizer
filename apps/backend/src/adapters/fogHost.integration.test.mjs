@@ -36,9 +36,9 @@ function execution(root, fogDataRoot, mode) {
   };
 }
 
-test('prerequisites need DS1TR_FOG_DATA_ROOT and pass the message language into the read set', async () => temp(async (root) => {
+test('prerequisites (developer override) pass the message language into the read set', async () => temp(async (root) => {
   assert.equal(await resolveFogPrerequisites('ENGLISH', {}), null);
-  assert.equal(await resolveFogPrerequisites('ENGLISH', { DS1TR_FOG_DATA_ROOT: root, DS1TR_FOG_HOST: path.join(root, 'missing.exe') }), null);
+  assert.equal((await resolveFogPrerequisites('ENGLISH', { DS1TR_FOG_DATA_ROOT: root, DS1TR_FOG_HOST: path.join(root, 'missing.exe') })).failure.code, 'FOG_HOST_MISSING');
   const host = path.join(root, 'FogHost.exe');
   await writeFile(host, 'host');
   await mkdir(path.join(root, 'dist', 'DS1R', 'event'), { recursive: true });

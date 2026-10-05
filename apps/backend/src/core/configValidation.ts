@@ -120,7 +120,7 @@ export function validateRandomizerConfig(input: unknown): asserts input is Rando
   if (isObject(input.fog)) {
     validateBooleans(input.fog, fogKeys.filter((key) => key !== 'language'), 'config.fog', problems);
     if (typeof input.fog.language !== 'string' || !fogLanguages.has(input.fog.language)) {
-      problems.push('FogMod language is invalid.');
+      problems.push('Game language is invalid.');
     }
   }
   if (isObject(input.output)) validateBooleans(input.output, outputKeys, 'config.output', problems);

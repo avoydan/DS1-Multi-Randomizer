@@ -11,6 +11,9 @@ import { InvalidConfigurationError, validateRandomizerConfig } from './core/conf
 import { exportPreset, importPreset } from './core/preset.js';
 import { GameStateAuthority, defaultStateRoot } from './core/gameState.js';
 import { describeEnemyPool } from './adapters/enemyPool.js';
+import { discoverGameInstallations } from './core/gameDiscovery.js';
+import { prepareWorldData } from './adapters/worldData.js';
+import { defaultWorldDataCacheRoot } from './adapters/fogPrerequisites.js';
 
 const HOST = process.env.DS1TR_HOST ?? '127.0.0.1';
 const PORT = Number(process.env.DS1TR_PORT ?? 43177);
@@ -53,12 +56,26 @@ const server = http.createServer(async (req, res) => {
     const url = new URL(req.url ?? '/', `http://${HOST}:${PORT}`);
 
     if (req.method === 'GET' && url.pathname === '/api/health') {
-      return send(res, 200, { ok: true, service: 'ds1-triple-randomizer-backend', version: '0.28.0' });
+      return send(res, 200, { ok: true, service: 'ds1-triple-randomizer-backend', version: '0.29.0' });
     }
 
     if (req.method === 'POST' && url.pathname === '/api/installation/validate') {
       const body = await readJson<{ gamePath?: string }>(req);
       return send(res, 200, await validateInstallation(body.gamePath ?? ''));
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/game/detect') {
+      return send(res, 200, { installations: await discoverGameInstallations() });
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/world-data/prepare') {
+      const body = await readJson<{ gamePath?: string }>(req);
+      const pristine = body.gamePath ? await authority.getPristineSource(body.gamePath) : null;
+      if (!pristine) {
+        return send(res, 409, { ok: false, code: 'PRISTINE_IMPORT_REQUIRED', userMessage: 'Dark Souls Remastered has not been checked yet.', technical: 'No verified pristine snapshot for this installation.' });
+      }
+      const result = await prepareWorldData({ cacheRoot: defaultWorldDataCacheRoot(), pristineDirectory: pristine.directory });
+      return send(res, result.ok ? 200 : 409, result.ok ? { ok: true } : result);
     }
 
     if (req.method === 'POST' && url.pathname === '/api/pipeline/plan') {
