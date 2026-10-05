@@ -946,3 +946,22 @@ player) and the "Fog data root" blocker of the packaging notes.
    does not start with all .NET locations hidden.
 6. **Plain-language errors:** the primary message is for players; the code and exact reason go to the run log and manifest.
    `DS1TR_FOG_DATA_ROOT` stays as a developer override only.
+
+## The item shuffle keeps FogMod's key items where FogMod can follow them (backend 0.29.1)
+
+Date: 2026-10-06.
+
+1. **Cause, not seed luck.** FogMod derives the logic area of a key item from the annotated item lot that holds it
+   (`ItemReader.FindItems`), needs exactly one copy of each required item there and rejects a second copy in another area.
+   It cannot represent shops, NPC gifts or enemy drops that it does not annotate, nor the starting inventory. The combined
+   engine shuffled everything globally, so the failure was likely (up to 93% of the seeds) and identical on every reseed.
+2. **Fix in the planner, not in the user's settings.** The engine receives the key items and annotated lots from the verified
+   `fog.txt` and keeps the single copy of each required item inside annotated lots and every extra copy (shop duplicates of
+   the Crest of Artorias and Residence Key, Cast Light, non-required items) inside shops. The items still move; nothing is
+   duplicated; no item category is disabled and nothing is blocked in the UI. A shuffle that already satisfied the rule is
+   unchanged, so earlier working seeds keep their placement.
+3. **Retry classification:** `FOG_UPSTREAM_INCOMPATIBLE` is structural and not retried with another combined seed (the
+   shuffle already honors the rule, so a repeat means the data or the configuration cannot work). `FOG_SEED_UNSOLVABLE` stays
+   retryable with another Fog seed.
+4. **Message:** "These item and world settings cannot be combined yet ..." with no item or lot names; the exact reason stays in
+   the log and the manifest. The case should no longer occur.

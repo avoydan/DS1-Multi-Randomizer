@@ -1,5 +1,23 @@
 # Implementation status
 
+**World randomizer item tracking (2026-10-06; backend 0.29.1, desktop 0.16.1, FogHost 0.5.0, RANDOMIZER_VERSION 0.5.66).**
+Fixed a real failure of the packaged app: with more item categories on, Fog stopped with `Couldn't find darkmoon_seance_ring in item
+lots` after three identical combined attempts and the app said "try another seed". FogMod needs exactly one copy of each
+required key item in the item lots it annotates and at most one of any; the global item shuffle put the Seance Ring and the
+Peculiar Doll outside them (8% to 93% of the seeds depending on the categories) and put the shop copies of the Crest of
+Artorias, Residence Key and Cast Light inside them. The shuffle now gives every source of a tracked key item a role (the one
+copy: annotated lots only; extra copies: shops only) read from the verified `fog.txt`; nothing is duplicated and no item
+category is blocked. `FOG_UPSTREAM_INCOMPATIBLE` is structural (no combined reseeding) with a plain message. Details and
+evidence: `docs/FOG_ITEM_TRACKING.md`. Patch `0011`.
+
+- **Real format:** 40 seeds, all item categories, bosses on, Fog on: 40/40 on the first attempt, 0 merge conflicts, same 15 overlay
+  events, `verify-skips` clean, deterministic rerun, activation and restore; packaged 0.16.1 through its own UI: Randomize, Apply,
+  Restore succeed.
+- **Tests:** backend 327 (326 pass, 1 skipped); new `fogTrackedItems.test.mjs` (13) and pipeline tests.
+- **Test harness note:** the Fog end-to-end script reconstructs the game from the live installation. Once the app has applied a run to
+  the live game that copy is no longer clean (duplicate events in the boss-name patch), so the script can now take a clean copy
+  (`DS1TR_E2E_GAME_SOURCE`, for example the app's pristine snapshot).
+
 **User-friendly runtime / Fog bootstrap (2026-10-05; backend 0.29.0, desktop 0.16.0, contracts 0.12.0, FogHost 0.5.0).**
 A player no longer picks a FogMod folder or installs .NET. The app finds Dark Souls Remastered through Steam, checks it,
 imports the clean snapshot and prepares the world randomizer data itself: 19 of the 59 files are copied from the verified
