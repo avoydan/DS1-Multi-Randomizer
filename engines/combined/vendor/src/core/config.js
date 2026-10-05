@@ -35,6 +35,10 @@ export const defaultConfig = Object.freeze({
   startingItems: "mixed-pool",
   pinwheelChaos: false,
   gwynNerf: "none",
+  // Batch 3 (patches/0004). "single-boss" is the engine's earlier behavior
+  // (the extra Bell Gargoyle bodies are disabled); "replace" and "keep" are the
+  // legacy Replace second Gargoyle values 1 and 0.
+  secondGargoyle: "single-boss",
   useExtractedData: true,
   dryRun: true,
 });
@@ -87,6 +91,7 @@ export function normalizeConfig(input = {}) {
     ["soulItems", ["shuffled", "replaced"]],
     ["startingItems", ["shield-1h", "shield-2h", "mixed-pool"]],
     ["gwynNerf", ["none", "medium", "strong"]],
+    ["secondGargoyle", ["single-boss", "replace", "keep"]],
   ]) {
     if (!allowed.includes(config[key])) config[key] = defaultConfig[key];
   }

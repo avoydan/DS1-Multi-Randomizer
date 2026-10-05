@@ -3,8 +3,9 @@
 // replaceRespawningMosquitoes and preventSameEnemy (Batch 1, 2026-10-05, diff
 // in patches/0002-legacy-parity-batch-1.patch) and soulItems, startingItems,
 // pinwheelChaos and gwynNerf (Batch 2, diff in
-// patches/0003-legacy-parity-batch-2.patch). With every option at its engine
-// default the output is identical to the unmodified upstream core.
+// patches/0003-legacy-parity-batch-2.patch) and secondGargoyle (Batch 3, diff
+// in patches/0004-legacy-parity-second-gargoyle.patch). With every option at
+// its engine default the output is identical to the unmodified upstream core.
 import { createHash } from "node:crypto";
 import { createStream } from "./rng.js";
 import { normalizeConfig, validateConfig } from "./config.js";
@@ -72,6 +73,10 @@ const pinwheelModel = "c3320";
 // Legacy "Gwyn nerf": the chance that Lord Gwyn is rejected as a replacement.
 const gwynNerfRejection = Object.freeze({ none: 0, medium: 0.6, strong: 0.85 });
 const gwynModel = "c5370";
+// Legacy "Replace second Gargoyle": the second Bell Gargoyle body. The
+// legacy tool replaces exactly this part (`c5350_0001`, entity 1010801) as an
+// independent boss; its release is scripted by event 11015396.
+const secondGargoyleSlotId = "m10_01_00_00:c5350_0001";
 const staticBridgeDragonSpawn = Object.freeze({
   x: 9.144,
   y: 9.55,
@@ -894,6 +899,18 @@ function buildDragonPlan(config, catalog) {
         result.reservedSlotIds.add(slot.id),
       );
       target.bodies.forEach((targetBody, index) => {
+        if (
+          singleBellReplacement &&
+          index > 0 &&
+          targetBody.id === secondGargoyleSlotId &&
+          config.secondGargoyle !== "single-boss"
+        ) {
+          // Legacy "Replace second Gargoyle". "keep" leaves the body (and its
+          // tail) alone. "replace" lets the boss plan draw an independent boss
+          // for it, so no disabled placement is written here.
+          if (config.secondGargoyle === "replace") result.secondGargoyle = targetBody;
+          return;
+        }
         if (singleBellReplacement && index > 0) {
           result.enemies.push(enemyPlacement(
             config,
@@ -943,6 +960,13 @@ function buildDragonPlan(config, catalog) {
         (isBossSlot ? result.bosses : result.enemies).push(placement);
       });
       target.parts.forEach((targetPart, index) => {
+        if (
+          singleBellReplacement &&
+          index === 1 &&
+          config.secondGargoyle === "keep"
+        ) {
+          return;
+        }
         if (singleBellReplacement && index > 0) {
           result.enemies.push(enemyPlacement(
             config,
@@ -1364,11 +1388,10 @@ function randomizeExtractedBosses(config, catalog, dragonPlan) {
   archetypeKeys.forEach((archetypeKey, index) =>
     replacementsByModel.set(archetypeKey, shuffled[index]),
   );
-  const placements = sources.map((slot, index) => {
+  const buildBossPlacement = (slot, index, replacement, overrides = {}) => {
     const sourceArchetypeKey = bossArchetypeKey(slot);
     const sourceArchetypeIndex = archetypeKeys.indexOf(sourceArchetypeKey);
     const sourceModelName = sourceArchetypeKey.split(":")[0];
-    const replacement = replacementsByModel.get(sourceArchetypeKey);
     const originalBossName =
       bossArchetypeNames.get(sourceArchetypeKey) ||
       bossNames[sourceModelName] ||
@@ -1452,8 +1475,48 @@ function randomizeExtractedBosses(config, catalog, dragonPlan) {
             preserveBedOfChaosFloor: true,
           }
         : bossGrounding(slot, catalog)),
+      ...overrides,
     });
-  });
+  };
+  const placements = sources.map((slot, index) =>
+    buildBossPlacement(
+      slot,
+      index,
+      replacementsByModel.get(bossArchetypeKey(slot)),
+    ));
+  // Legacy "Replace second Gargoyle" = replace: the second Bell Gargoyle is
+  // replaced by a boss drawn independently of the first one (repeats allowed),
+  // from the same portable pool, honoring the Gwyn nerf and Pinwheel Chaos
+  // exclusions already applied to it. It is released by the vanilla event
+  // 11015396 once the first body drops to 60% health, so no forced combat
+  // activation is added (it would wake the body immediately).
+  // The body is not a catalogued boss slot, so (like the other secondary
+  // bodies) its placement lives in the regular list: it is appended to the
+  // linked-boss plan's enemy placements, which the enemy planner counts for the
+  // per-map model budget and appends to the enemy output.
+  if (dragonPlan.secondGargoyle) {
+    const pool = archetypes.filter(
+      (archetype) =>
+        !nonPortableBossReplacementModels.has(archetype.modelName) &&
+        !(gwynRejected && archetype.modelName === gwynModel),
+    );
+    if (pool.length === 0) {
+      throw new Error("SECOND_GARGOYLE_POOL_EMPTY: no portable boss can replace the second Bell Gargoyle.");
+    }
+    const replacement = pool[
+      createStream(config.seed, "second-gargoyle", config.version).int(pool.length)
+    ];
+    dragonPlan.enemies.push(buildBossPlacement(
+      dragonPlan.secondGargoyle,
+      sources.length,
+      replacement,
+      {
+        forceCombatActivation: false,
+        compatibility: "legacy-second-gargoyle-replacement",
+        linkedEnemyGroup: "bell-gargoyles",
+      },
+    ));
+  }
   return placements.concat(dragonPlan.bosses);
 }
 
@@ -2697,6 +2760,12 @@ export function generate(inputConfig, { gameCatalog = null } = {}) {
               : []),
             ...(config.gwynNerf !== "none" && config.randomizeBosses
               ? [`Gwyn nerf (${config.gwynNerf}): Lord Gwyn ${gwynNerfApplied(config) ? "was" : "was not"} excluded from the boss candidates for this seed.`]
+              : []),
+            ...(config.secondGargoyle === "replace" && config.randomizeBosses
+              ? ["Replace second Gargoyle: the second Bell Gargoyle was replaced by an independently drawn boss."]
+              : []),
+            ...(config.secondGargoyle === "keep" && config.randomizeBosses
+              ? ["Replace second Gargoyle off: the second Bell Gargoyle stays a Bell Gargoyle."]
               : []),
             ...(config.preventSameEnemy
               ? ["Prevent same enemy: no regular enemy slot received its own model (bosses never receive the same boss)."]

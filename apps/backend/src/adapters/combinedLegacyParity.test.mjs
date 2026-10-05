@@ -502,3 +502,111 @@ test('Pinwheel Chaos needs regular enemies', () => {
   const b = generate(bossBase({ seed: 'pin-z', randomizeEnemies: false, pinwheelChaos: true }), { gameCatalog: catalog });
   assert.equal(a.placementHash, b.placementHash);
 });
+
+// --- Batch 3: Replace second Gargoyle -----------------------------------------
+
+const G0 = 'm10_01_00_00:c5350_0000';
+const G1 = 'm10_01_00_00:c5350_0001';
+const G2 = 'm10_01_00_00:c5350_0002';
+const T0 = 'm10_01_00_00:c5352_0000';
+const T1 = 'm10_01_00_00:c5352_0001';
+
+function gargoyleCatalog() {
+  const catalog = bossCatalog();
+  const bell = ['0000', '0001', '0002'].map((n, i) => bossSlot('m10_01_00_00', `c5350_${n}`, 'c5350', 535000 + (n === '0001' ? 1 : 0), 200 + i));
+  const tails = ['0000', '0001'].map((n, i) => slot('m10_01_00_00', `c5352_${n}`, 'c5352', 535200, 210 + i, { entityId: 1010900 + i }));
+  const guardian = [bossSlot('m12_01_00_00', 'c3471_0000', 'c3471', 347100, 220)];
+  const guardianParts = [slot('m12_01_00_00', 'c3472_0000', 'c3472', 347200, 221, { entityId: 1210900 })];
+  const bossOnly = [bell[0], bell[2], guardian[0]];
+  catalog.enemySlots.push(...bell, ...tails, ...guardian, ...guardianParts);
+  catalog.bossSlots.push(...bossOnly);
+  catalog.maps.push({ id: 'm10_01_00_00', name: 'm10_01_00_00' }, { id: 'm12_01_00_00', name: 'm12_01_00_00' });
+  return catalog;
+}
+
+const gargoyleBase = (overrides = {}) => bossBase({ randomizeItems: false, ...overrides });
+const everyPlacement = (result) => [...result.placements.bosses, ...result.placements.enemies];
+const placementsFor = (result, id) => everyPlacement(result).filter((p) => p.slot === id);
+
+test('Second Gargoyle: the engine default keeps the earlier single-boss behavior', () => {
+  const catalog = gargoyleCatalog();
+  assert.equal(defaultConfig.secondGargoyle, 'single-boss');
+  for (let i = 0; i < 10; i += 1) {
+    const a = generate(gargoyleBase({ seed: `sg-${i}` }), { gameCatalog: catalog });
+    const b = generate(gargoyleBase({ seed: `sg-${i}`, secondGargoyle: 'single-boss' }), { gameCatalog: catalog });
+    assert.equal(a.placementHash, b.placementHash);
+    const second = placementsFor(a, G1);
+    assert.equal(second.length, 1);
+    assert.equal(second[0].disableEntity, true, 'the extra body is disabled, not replaced');
+    assert.equal(second[0].compatibility, 'disabled-extra-bell-gargoyle-body');
+  }
+});
+
+test('Second Gargoyle replace: the second body is replaced by an independently drawn boss', () => {
+  const catalog = gargoyleCatalog();
+  const drawn = new Set();
+  for (let i = 0; i < 40; i += 1) {
+    const config = gargoyleBase({ seed: `sg-${i}`, secondGargoyle: 'replace' });
+    const result = generate(config, { gameCatalog: catalog });
+    assert.equal(result.placementHash, generate(config, { gameCatalog: catalog }).placementHash, 'deterministic');
+    const second = placementsFor(result, G1);
+    assert.equal(second.length, 1, 'exactly one placement for the second body');
+    const [p] = second;
+    assert.notEqual(p.disableEntity, true);
+    assert.equal(p.compatibility, 'legacy-second-gargoyle-replacement');
+    assert.equal(p.entityId, catalog.enemySlots.find((q) => q.id === G1).entityId, 'the vanilla entity is reused, so no duplicate entity id appears');
+    assert.notEqual(p.targetModelName, 'c5350', 'a Bell Gargoyle is never drawn');
+    assert.notEqual(p.targetModelName, 'c3471', 'linked units are not drawn as a lone body');
+    assert.equal(p.portableBossSanitization, true);
+    assert.equal(p.forceCombatActivation, false, 'the vanilla event releases the body; forcing combat would wake it at once');
+    assert.deepEqual([p.groundX, p.groundY, p.groundZ], [10.69, 48.92, 124.35], 'legacy rooftop position');
+    assert.ok(result.placements.enemies.includes(p), 'the placement lives in the regular list (DsrDataTool rejects it as a boss entry)');
+    drawn.add(p.targetModelName);
+    // The first body keeps its own, separate source; the third body and the second tail stay disabled.
+    assert.equal(placementsFor(result, G0).length, 1);
+    assert.equal(placementsFor(result, G2)[0].disableEntity, true);
+    assert.equal(placementsFor(result, T1)[0].disableEntity, true);
+    assert.equal(placementsFor(result, T0).length, 1);
+    // No duplicate placements and no duplicate scaled NpcParam rows.
+    const slots = everyPlacement(result).map((q) => q.slot);
+    assert.equal(new Set(slots).size, slots.length);
+    const scaled = everyPlacement(result).map((q) => q.scaledNpcParamId).filter(Boolean);
+    assert.equal(new Set(scaled).size, scaled.length);
+    assert.ok(result.validation.notes.some((n) => n.startsWith('Replace second Gargoyle:')));
+  }
+  assert.ok(drawn.size >= 3, `the draw varies across seeds (${drawn.size} distinct bosses)`);
+});
+
+test('Second Gargoyle replace: the draw honors the Gwyn nerf and Pinwheel Chaos exclusions', () => {
+  const catalog = gargoyleCatalog();
+  for (let i = 0; i < 60; i += 1) {
+    const result = generate(gargoyleBase({ seed: `sgx-${i}`, secondGargoyle: 'replace', gwynNerf: 'strong', pinwheelChaos: true }), { gameCatalog: catalog });
+    const [p] = placementsFor(result, G1);
+    const note = result.validation.notes.find((n) => n.startsWith('Gwyn nerf'));
+    if (note.includes('was excluded')) assert.notEqual(p.targetModelName, 'c5370');
+    assert.notEqual(p.targetModelName, 'c3320');
+  }
+});
+
+test('Second Gargoyle keep: the second body and its tail stay vanilla', () => {
+  const catalog = gargoyleCatalog();
+  for (let i = 0; i < 20; i += 1) {
+    const config = gargoyleBase({ seed: `sg-${i}`, secondGargoyle: 'keep' });
+    const result = generate(config, { gameCatalog: catalog });
+    assert.equal(result.placementHash, generate(config, { gameCatalog: catalog }).placementHash, 'deterministic');
+    assert.equal(placementsFor(result, G1).length, 0, 'no placement for the second body');
+    assert.equal(placementsFor(result, T1).length, 0, 'no placement for its tail');
+    assert.equal(placementsFor(result, G2)[0].disableEntity, true, 'the third body is unchanged');
+    assert.equal(placementsFor(result, G0).length, 1, 'the first body is still replaced');
+    assert.ok(result.validation.notes.some((n) => n.startsWith('Replace second Gargoyle off')));
+  }
+});
+
+test('Second Gargoyle does nothing without boss randomization', () => {
+  const catalog = gargoyleCatalog();
+  const a = generate(gargoyleBase({ seed: 'sg-off', randomizeBosses: false }), { gameCatalog: catalog });
+  for (const mode of ['replace', 'keep']) {
+    const b = generate(gargoyleBase({ seed: 'sg-off', randomizeBosses: false, secondGargoyle: mode }), { gameCatalog: catalog });
+    assert.equal(a.placementHash, b.placementHash, mode);
+  }
+});
