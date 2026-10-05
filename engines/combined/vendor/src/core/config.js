@@ -39,6 +39,9 @@ export const defaultConfig = Object.freeze({
   // (the extra Bell Gargoyle bodies are disabled); "replace" and "keep" are the
   // legacy Replace second Gargoyle values 1 and 0.
   secondGargoyle: "single-boss",
+  // Part 0 of the sampling work (patches/0005). Not an enum fallback: an unknown or unimplemented
+  // value is refused by resolveEnemyPlacementAlgorithm() instead of being replaced by the default.
+  enemyPlacementAlgorithm: "permutation-v1",
   useExtractedData: true,
   dryRun: true,
 });

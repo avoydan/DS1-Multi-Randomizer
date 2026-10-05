@@ -10,6 +10,11 @@ import { createHash } from "node:crypto";
 import { createStream } from "./rng.js";
 import { normalizeConfig, validateConfig } from "./config.js";
 import {
+  EnemyPlacementUnavailableError,
+  permutationDiagnostics,
+  resolveEnemyPlacementAlgorithm,
+} from "./placement.js";
+import {
   enemies,
   enemySlots,
   bosses,
@@ -1066,6 +1071,15 @@ function buildMassOfSoulsPlan(config, catalog) {
     });
   });
   return { placements, reservedSlotIds };
+}
+
+// Narrow dispatch between the enemy placement algorithms (patches/0005). The only algorithm that can run is
+// permutation-v1, which is the unchanged function below; it consumes no stream of placement.js.
+function planExtractedEnemies(algorithm, config, catalog, dragonPlan, bossPlan) {
+  if (algorithm === "permutation-v1") {
+    return randomizeExtractedEnemies(config, catalog, dragonPlan, bossPlan);
+  }
+  throw new EnemyPlacementUnavailableError(algorithm, true);
 }
 
 function randomizeExtractedEnemies(config, catalog, dragonPlan, bossPlan) {
@@ -2657,6 +2671,7 @@ export function generate(inputConfig, { gameCatalog = null } = {}) {
   if (errors.length > 0) {
     throw new Error(errors.join("\n"));
   }
+  const enemyPlacementAlgorithm = resolveEnemyPlacementAlgorithm(config);
   if (gameCatalog && gameCatalog.schemaVersion !== 17) {
     throw new Error(
       `Catalog schema ${gameCatalog.schemaVersion} is obsolete. ` +
@@ -2687,7 +2702,8 @@ export function generate(inputConfig, { gameCatalog = null } = {}) {
     config,
     placements: {
       enemies: extractedData
-        ? randomizeExtractedEnemies(
+        ? planExtractedEnemies(
+            enemyPlacementAlgorithm,
             config,
             gameCatalog,
             dragonPlan,
@@ -2783,5 +2799,7 @@ export function generate(inputConfig, { gameCatalog = null } = {}) {
       guaranteedEnemyDrops: config.guaranteedEnemyDrops,
     }))
     .digest("hex");
+  // Identity of the algorithm that planned the enemies; not part of placementHash.
+  result.placementDiagnostics = permutationDiagnostics();
   return result;
 }
