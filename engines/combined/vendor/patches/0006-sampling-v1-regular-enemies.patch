@@ -1,0 +1,678 @@
+diff --git a/engines/combined/vendor/src/core/config.js b/engines/combined/vendor/src/core/config.js
+index dcbf164..f29201b 100644
+--- a/engines/combined/vendor/src/core/config.js
++++ b/engines/combined/vendor/src/core/config.js
+@@ -42,6 +42,13 @@ export const defaultConfig = Object.freeze({
+   // Part 0 of the sampling work (patches/0005). Not an enum fallback: an unknown or unimplemented
+   // value is refused by resolveEnemyPlacementAlgorithm() instead of being replaced by the default.
+   enemyPlacementAlgorithm: "permutation-v1",
++  // Part A (patches/0006): sampling-only options for regular enemy slots. The defaults are the values under which
++  // permutation-v1 behaves as it always did; any other value is refused there (resolveEnemyPlacementOptions).
++  enemyReplacementChance: 100,
++  enemyNormalReplacement: "normals",
++  enemyPlacementFit: "anywhere",
++  // "summary" keeps counters only; "detail" adds one record per slot (debugging).
++  placementDiagnosticsLevel: "summary",
+   useExtractedData: true,
+   dryRun: true,
+ });
+diff --git a/engines/combined/vendor/src/core/generator.js b/engines/combined/vendor/src/core/generator.js
+index 6b7b87f..3e7934f 100644
+--- a/engines/combined/vendor/src/core/generator.js
++++ b/engines/combined/vendor/src/core/generator.js
+@@ -11,9 +11,13 @@ import { createStream } from "./rng.js";
+ import { normalizeConfig, validateConfig } from "./config.js";
+ import {
+   EnemyPlacementUnavailableError,
++  assertSlotOwnedDrops,
++  createPlacementDiagnostics,
+   permutationDiagnostics,
+   resolveEnemyPlacementAlgorithm,
++  resolveEnemyPlacementOptions,
+ } from "./placement.js";
++import { planSampledRegularEnemies } from "./sampling.js";
+ import {
+   enemies,
+   enemySlots,
+@@ -314,6 +318,8 @@ function bossGrounding(slot, catalog) {
+ }
+ 
+ function enemyPlacement(config, target, source, scaledNpcParamId, extra = {}) {
++  // forceScaledNpcParam is an instruction to this function (sampling-v1 drop ownership), not a placement field.
++  const { forceScaledNpcParam: _forceScaledNpcParam, ...placementExtra } = extra;
+   const effectiveTargetThinkParamId =
+     extra.targetThinkParamId ?? source.thinkParamId;
+   const changed =
+@@ -344,7 +350,8 @@ function enemyPlacement(config, target, source, scaledNpcParamId, extra = {}) {
+       (config.enemyScaling === "vanilla" || !changed) &&
+       extra.makeTangible !== true &&
+       !requiresTeamOverride &&
+-      !(config.randomizeEnemyDrops && changed)
++      !(config.randomizeEnemyDrops && changed) &&
++      !(extra.forceScaledNpcParam === true && changed)
+         ? null
+         : scaledNpcParamId,
+     changed,
+@@ -352,7 +359,7 @@ function enemyPlacement(config, target, source, scaledNpcParamId, extra = {}) {
+     ...(requiresTeamOverride
+       ? { initialTeamType: desiredInitialTeamType }
+       : {}),
+-    ...extra,
++    ...placementExtra,
+   };
+ }
+ 
+@@ -1073,18 +1080,21 @@ function buildMassOfSoulsPlan(config, catalog) {
+   return { placements, reservedSlotIds };
+ }
+ 
+-// Narrow dispatch between the enemy placement algorithms (patches/0005). The only algorithm that can run is
+-// permutation-v1, which is the unchanged function below; it consumes no stream of placement.js.
+-function planExtractedEnemies(algorithm, config, catalog, dragonPlan, bossPlan) {
++// Narrow dispatch between the enemy placement algorithms (patches/0005, 0006). permutation-v1 is the unchanged
++// function below. sampling-v1 plans regular enemy slots only (planSampledRegularEnemies); bosses, units and every
++// placement decoration are shared with permutation-v1.
++function planExtractedEnemies(algorithm, config, catalog, dragonPlan, bossPlan, diagnostics) {
+   if (algorithm === "permutation-v1") {
+     return randomizeExtractedEnemies(config, catalog, dragonPlan, bossPlan);
+   }
++  if (algorithm === "sampling-v1") {
++    return sampleExtractedEnemies(config, catalog, dragonPlan, bossPlan, diagnostics);
++  }
+   throw new EnemyPlacementUnavailableError(algorithm, true);
+ }
+ 
+-function randomizeExtractedEnemies(config, catalog, dragonPlan, bossPlan) {
+-  if (!config.randomizeEnemies) return dragonPlan.enemies;
+-  const rng = createStream(config.seed, "enemies", config.version);
++// The slots, special plans and fixed models both algorithms start from.
++function regularEnemyContext(config, catalog, dragonPlan, bossPlan) {
+   const massOfSoulsPlan = buildMassOfSoulsPlan(config, catalog);
+   const bossSlotIds = new Set(effectiveBossSlots(catalog).map((slot) => slot.id));
+   const bossFamilyModels = new Set(
+@@ -1160,37 +1170,15 @@ function randomizeExtractedEnemies(config, catalog, dragonPlan, bossPlan) {
+   for (const placement of specialPlacements) {
+     addFixedModel(placement.map, placement.targetModelName);
+   }
++  return { massOfSoulsPlan, slots, pinwheelClones, pinwheelCloneIds, fixedModelsByMap };
++}
+ 
+-  const budgetedSources = limitUniqueEnemyModelsByMap(
+-    slots,
+-    shuffledWithoutFixedPoints(rng, slots),
+-    MAX_ENEMY_MODELS_PER_MAP,
+-    fixedModelsByMap,
+-  );
+-  const shuffledSources = config.preventSameEnemy
+-    ? separateSameModelSources(
+-        createStream(config.seed, "prevent-same-enemy", config.version),
+-        slots,
+-        budgetedSources,
+-        MAX_ENEMY_MODELS_PER_MAP,
+-        fixedModelsByMap,
+-      )
+-    : budgetedSources;
+-  const cloneSources = chooseChaosPinwheelSources(
+-    createStream(config.seed, "pinwheel-chaos", config.version),
+-    config,
+-    pinwheelClones,
+-    slots,
+-    shuffledSources,
+-    fixedModelsByMap,
+-  );
+-  const allSlots = [...slots, ...pinwheelClones];
+-  const assignment = new Map(
+-    allSlots.map((target, index) => [
+-      target.id,
+-      index < slots.length ? shuffledSources[index] : cloneSources[index - slots.length],
+-    ]),
+-  );
++// Placement decoration shared by both algorithms: special entities (passive, ghosts, butterflies, combat
++// activation), think-param clones and the placement record itself. Behavior for permutation-v1 is unchanged;
++// sampling-v1 only differs in the compatibility label and in always forcing a scaled NpcParam row, so the
++// destination slot's drops and team follow the slot (model document 6.9).
++function decorateEnemyPlacements(config, catalog, allSlots, assignment, pinwheelCloneIds, algorithm) {
++  const sampling = algorithm === "sampling-v1";
+   const newLondoGroundAnchors = catalog.enemySlots
+     .filter((slot) =>
+       slot.mapId === "m16_00_00_00" &&
+@@ -1280,6 +1268,7 @@ function randomizeExtractedEnemies(config, catalog, dragonPlan, bossPlan) {
+       // Replaced clones keep their own combat stats (normal HP) instead of
+       // inheriting the clone's 1 HP; drops and team still follow the slot.
+       ...(isChaosPinwheelClone ? { scaling: "vanilla" } : {}),
++      ...(sampling ? { forceScaledNpcParam: true } : {}),
+       ...(groundedGhostSpawn
+         ? {
+             groundX: groundedGhostSpawn.x,
+@@ -1301,7 +1290,19 @@ function randomizeExtractedEnemies(config, catalog, dragonPlan, bossPlan) {
+             initialTeamType: 2,
+           }
+         : {}),
+-      compatibility: isChaosPinwheelClone
++      compatibility: sampling
++        ? isChaosPinwheelClone
++          ? "pinwheel-chaos-clone"
++          : passiveUntilAttacked
++            ? "passive-until-attacked-sampled"
++            : groundedGhostSpawn
++              ? "grounded-new-londo-ghost-slot-sampled"
++              : darkrootButterflyPath
++                ? "active-darkroot-butterfly-path-sampled"
++                : changed
++                  ? "sampled-regular-replacement"
++                  : "sampled-kept-vanilla"
++        : isChaosPinwheelClone
+         ? "pinwheel-chaos-clone"
+         : passiveUntilAttacked
+         ? asylumPassiveSlots.has(slot.id)
+@@ -1320,6 +1321,74 @@ function randomizeExtractedEnemies(config, catalog, dragonPlan, bossPlan) {
+                 : "count-preserving-fixed-point",
+     });
+   });
++  return randomized;
++}
++
++function randomizeExtractedEnemies(config, catalog, dragonPlan, bossPlan) {
++  if (!config.randomizeEnemies) return dragonPlan.enemies;
++  const rng = createStream(config.seed, "enemies", config.version);
++  const { massOfSoulsPlan, slots, pinwheelClones, pinwheelCloneIds, fixedModelsByMap } =
++    regularEnemyContext(config, catalog, dragonPlan, bossPlan);
++
++  const budgetedSources = limitUniqueEnemyModelsByMap(
++    slots,
++    shuffledWithoutFixedPoints(rng, slots),
++    MAX_ENEMY_MODELS_PER_MAP,
++    fixedModelsByMap,
++  );
++  const shuffledSources = config.preventSameEnemy
++    ? separateSameModelSources(
++        createStream(config.seed, "prevent-same-enemy", config.version),
++        slots,
++        budgetedSources,
++        MAX_ENEMY_MODELS_PER_MAP,
++        fixedModelsByMap,
++      )
++    : budgetedSources;
++  const cloneSources = chooseChaosPinwheelSources(
++    createStream(config.seed, "pinwheel-chaos", config.version),
++    config,
++    pinwheelClones,
++    slots,
++    shuffledSources,
++    fixedModelsByMap,
++  );
++  const allSlots = [...slots, ...pinwheelClones];
++  const assignment = new Map(
++    allSlots.map((target, index) => [
++      target.id,
++      index < slots.length ? shuffledSources[index] : cloneSources[index - slots.length],
++    ]),
++  );
++  const randomized = decorateEnemyPlacements(config, catalog, allSlots, assignment, pinwheelCloneIds, "permutation-v1");
++  return randomized
++    .concat(massOfSoulsPlan.placements)
++    .concat(dragonPlan.enemies);
++}
++
++// sampling-v1 for regular enemy slots (Part A). Everything that is not a regular slot - bosses, linked units,
++// Mass of Souls, special entities - is planned exactly as in permutation-v1; their models are the fixed models
++// of each map. The sampler's assignment goes through the same placement decoration.
++function sampleExtractedEnemies(config, catalog, dragonPlan, bossPlan, diagnostics) {
++  if (!config.randomizeEnemies) return dragonPlan.enemies;
++  const options = resolveEnemyPlacementOptions(config, "sampling-v1");
++  const { massOfSoulsPlan, slots, pinwheelClones, pinwheelCloneIds, fixedModelsByMap } =
++    regularEnemyContext(config, catalog, dragonPlan, bossPlan);
++  const { assignment } = planSampledRegularEnemies({
++    seed: config.seed,
++    options,
++    preventSame: config.preventSameEnemy,
++    slots,
++    extraSlots: pinwheelClones,
++    fixedModelsByMap,
++    diagnostics,
++  });
++  const allSlots = [...slots, ...pinwheelClones];
++  // Decoration (and its index-based ids) is computed over every slot so ids stay stable, but only slots the
++  // sampler assigned get a placement: the others stay exactly vanilla (model document 5, decision 2).
++  const randomized = decorateEnemyPlacements(config, catalog, allSlots, assignment, pinwheelCloneIds, "sampling-v1")
++    .filter((placement) => assignment.has(placement.slot));
++  assertSlotOwnedDrops(randomized);
+   return randomized
+     .concat(massOfSoulsPlan.placements)
+     .concat(dragonPlan.enemies);
+@@ -2672,6 +2741,9 @@ export function generate(inputConfig, { gameCatalog = null } = {}) {
+     throw new Error(errors.join("\n"));
+   }
+   const enemyPlacementAlgorithm = resolveEnemyPlacementAlgorithm(config);
++  const placementDiagnostics = enemyPlacementAlgorithm === "sampling-v1"
++    ? createPlacementDiagnostics({ algorithm: "sampling-v1", level: config.placementDiagnosticsLevel })
++    : null;
+   if (gameCatalog && gameCatalog.schemaVersion !== 17) {
+     throw new Error(
+       `Catalog schema ${gameCatalog.schemaVersion} is obsolete. ` +
+@@ -2708,6 +2780,7 @@ export function generate(inputConfig, { gameCatalog = null } = {}) {
+             gameCatalog,
+             dragonPlan,
+             bossPlan,
++            placementDiagnostics,
+           )
+         : randomizePrototypeEnemies(config),
+       bosses: extractedData
+@@ -2799,7 +2872,7 @@ export function generate(inputConfig, { gameCatalog = null } = {}) {
+       guaranteedEnemyDrops: config.guaranteedEnemyDrops,
+     }))
+     .digest("hex");
+-  // Identity of the algorithm that planned the enemies; not part of placementHash.
+-  result.placementDiagnostics = permutationDiagnostics();
++  // Identity (and, for sampling-v1, the summary) of the planner; not part of placementHash.
++  result.placementDiagnostics = placementDiagnostics ? placementDiagnostics.toJSON() : permutationDiagnostics();
+   return result;
+ }
+diff --git a/engines/combined/vendor/src/core/placement.js b/engines/combined/vendor/src/core/placement.js
+index f4c0119..264c3b5 100644
+--- a/engines/combined/vendor/src/core/placement.js
++++ b/engines/combined/vendor/src/core/placement.js
+@@ -12,8 +12,8 @@ import { DeterministicRng, deriveSeed } from "./rng.js";
+ 
+ export const ENEMY_PLACEMENT_ALGORITHMS = Object.freeze(["permutation-v1", "sampling-v1"]);
+ 
+-/** Algorithms that can run. Part A adds "sampling-v1" here and implements its planner; nothing else changes. */
+-export const IMPLEMENTED_ENEMY_PLACEMENT_ALGORITHMS = Object.freeze(["permutation-v1"]);
++/** Algorithms that can run. "sampling-v1" was enabled by Part A (regular enemy slots only). */
++export const IMPLEMENTED_ENEMY_PLACEMENT_ALGORITHMS = Object.freeze(["permutation-v1", "sampling-v1"]);
+ 
+ export const DEFAULT_ENEMY_PLACEMENT_ALGORITHM = "permutation-v1";
+ 
+@@ -44,9 +44,72 @@ export function resolveEnemyPlacementAlgorithm(config) {
+   if (!known || !IMPLEMENTED_ENEMY_PLACEMENT_ALGORITHMS.includes(algorithm)) {
+     throw new EnemyPlacementUnavailableError(algorithm, known);
+   }
++  resolveEnemyPlacementOptions(config, algorithm);
+   return algorithm;
+ }
+ 
++// ---- sampling-only options (Part A: regular enemy slots) -----------------------------------------------------------
++
++/** Legacy "Normal enemy replacement" values the regular-slot sampler can honor (the others need boss slots). */
++export const NORMAL_REPLACEMENT_MODES = Object.freeze(["none", "normals"]);
++
++/** Legacy "Placement" values: 0 only where they fit, 1 anywhere, 2 anywhere except when replacing NPCs. */
++export const PLACEMENT_FIT_MODES = Object.freeze(["fits", "anywhere", "anywhere-except-npcs"]);
++
++/** Values under which permutation-v1 behaves exactly as it always did; anything else is refused there. */
++export const SAMPLING_NEUTRAL_OPTIONS = Object.freeze({
++  enemyReplacementChance: 100,
++  enemyNormalReplacement: "normals",
++  enemyPlacementFit: "anywhere",
++});
++
++/** Typed refusal: a sampling-only option has an invalid value, or a non-neutral one under permutation-v1. */
++export class EnemyPlacementOptionsError extends Error {
++  constructor(problems) {
++    super(`ENEMY_PLACEMENT_OPTIONS_INVALID: ${problems.join(" ")}`);
++    this.name = "EnemyPlacementOptionsError";
++    this.code = "ENEMY_PLACEMENT_OPTIONS_INVALID";
++    this.problems = problems;
++  }
++}
++
++/** Typed failure: no placement exists for a slot after the whole fallback ladder. Retryable with another seed. */
++export class EnemyPlacementInfeasibleError extends Error {
++  constructor(mapId, slotId, detail) {
++    super(`ENEMY_PLACEMENT_INFEASIBLE: no placement for ${slotId} in ${mapId} (${detail}).`);
++    this.name = "EnemyPlacementInfeasibleError";
++    this.code = "ENEMY_PLACEMENT_INFEASIBLE";
++    this.mapId = mapId;
++    this.slotId = slotId;
++  }
++}
++
++/** Validates the sampling-only options of a normalized config; never replaces a value silently. */
++export function resolveEnemyPlacementOptions(config, algorithm = config.enemyPlacementAlgorithm) {
++  const problems = [];
++  const chance = config.enemyReplacementChance;
++  if (!Number.isInteger(chance) || chance < 0 || chance > 100) {
++    problems.push(`enemyReplacementChance must be an integer from 0 to 100 (got ${String(chance)}).`);
++  }
++  if (!NORMAL_REPLACEMENT_MODES.includes(config.enemyNormalReplacement)) {
++    problems.push(`enemyNormalReplacement must be ${NORMAL_REPLACEMENT_MODES.join(" or ")} (got ${String(config.enemyNormalReplacement)}).`);
++  }
++  if (!PLACEMENT_FIT_MODES.includes(config.enemyPlacementFit)) {
++    problems.push(`enemyPlacementFit must be ${PLACEMENT_FIT_MODES.join(", ")} (got ${String(config.enemyPlacementFit)}).`);
++  }
++  if (problems.length === 0 && algorithm === "permutation-v1") {
++    for (const [key, neutral] of Object.entries(SAMPLING_NEUTRAL_OPTIONS)) {
++      if (config[key] !== neutral) problems.push(`${key} only applies to sampling-v1; it must be ${JSON.stringify(neutral)} with permutation-v1.`);
++    }
++  }
++  if (problems.length > 0) throw new EnemyPlacementOptionsError(problems);
++  return {
++    replacementChance: chance,
++    normalReplacement: config.enemyNormalReplacement,
++    fit: config.enemyPlacementFit,
++  };
++}
++
+ // ---- stable slot identity and RNG substreams ----------------------------------------------------------------------
+ 
+ /**
+@@ -208,12 +271,23 @@ export function createPlacementDiagnostics({ algorithm, level = "summary" }) {
+     rejections: Object.fromEntries(REJECTION_REASONS.map((reason) => [reason, 0])),
+     categoryDowngrades: 0,
+     terminalFailures: [],
++    counters: {},
++    maps: {},
+   };
+   const slots = [];
+   return {
+     algorithm,
+     rngVersion: algorithm === "sampling-v1" ? SAMPLING_RNG_VERSION : null,
+     level,
++    classTableHash: null,
++    /** Named counters of the planner (for example how many slots the replacement chance left alone). */
++    count(name, amount = 1) {
++      summary.counters[name] = (summary.counters[name] ?? 0) + amount;
++    },
++    /** Per-map totals (model count, replaced slots, ...); keys are map ids. */
++    setMap(mapId, values) {
++      summary.maps[mapId] = { ...values };
++    },
+     /**
+      * @param {object} record
+      * @param {string} record.slotId
+@@ -245,13 +319,16 @@ export function createPlacementDiagnostics({ algorithm, level = "summary" }) {
+       if (level === "detail") slots.push({ ...record, slotId: id });
+     },
+     toJSON() {
+-      return { algorithm: this.algorithm, rngVersion: this.rngVersion, level, summary, ...(level === "detail" ? { slots } : {}) };
++      return {
++        algorithm: this.algorithm, rngVersion: this.rngVersion, level, classTableHash: this.classTableHash, summary,
++        ...(level === "detail" ? { slots } : {}),
++      };
+     },
+   };
+ }
+ 
+ /** The one-line identity recorded for the frozen algorithm: no counters, no streams. */
+-export const permutationDiagnostics = () => ({ algorithm: "permutation-v1", rngVersion: null, level: "summary", summary: null });
++export const permutationDiagnostics = () => ({ algorithm: "permutation-v1", rngVersion: null, level: "summary", classTableHash: null, summary: null });
+ 
+ // ---- drop ownership -----------------------------------------------------------------------------------------------
+ 
+diff --git a/engines/combined/vendor/src/core/sampling.js b/engines/combined/vendor/src/core/sampling.js
+new file mode 100644
+index 0000000..1bdb152
+--- /dev/null
++++ b/engines/combined/vendor/src/core/sampling.js
+@@ -0,0 +1,271 @@
++// DS1 Triple Randomizer - repository-authored module (GPL-3.0-only); not part of upstream ds-randomizer.
++//
++// The `sampling-v1` enemy placement planner for REGULAR enemy slots (docs/ENEMY_PLACEMENT_MODEL.md, Part A).
++// It is a pure function of the slots it is given: no I/O, no catalog access, no global state. Bosses, NPCs,
++// linked units, special entities and every placement decoration stay with the callers in generator.js.
++//
++// Per slot (in stable id order inside a stable map order):
++//   1. replacement chance - the slot's first draw from its own stream (`slot:<id>`, "enemy-placement-v1");
++//   2. candidate = uniform draw over the surviving TYPES (size fit, Prevent same, model budget) with list shrink;
++//   3. bounded fallback ladder when nothing survives: keep vanilla, in-set fitting type, relaxed fit, failure;
++//   4. variant = uniform draw among the type's (NpcParam, think-param) variants.
++// The model set of a map is a ModelBudget: fixed and vanilla-kept models are in it from the start, together with
++// a coverage reserve that gives every participating slot an in-set type that fits it.
++
++import { createHash } from "node:crypto";
++import {
++  EnemyPlacementInfeasibleError,
++  MODEL_BUDGET_CAP,
++  ModelBudget,
++  ModelBudgetError,
++  createSlotStream,
++} from "./placement.js";
++
++const compare = (left, right) => (left < right ? -1 : left > right ? 1 : 0);
++
++// ---- derived classes ----------------------------------------------------------------------------------------------
++
++export const CLASS_TABLE_VERSION = "regular-size-v1";
++
++/** Footprint edges (game units) between the size classes 0-5. Derived scale, not a copy of any tool's table. */
++export const SIZE_EDGES = Object.freeze([0.9, 1.7, 2.6, 4.2, 7]);
++
++/** Size class given to a slot whose capsule is unknown (it accepts any type). */
++export const UNKNOWN_SLOT_SIZE = SIZE_EDGES.length;
++
++export class EnemyPlacementClassError extends Error {
++  constructor(model) {
++    super(`ENEMY_PLACEMENT_CLASS_UNDERIVABLE: no usable hit capsule for any regular slot of ${model}.`);
++    this.name = "EnemyPlacementClassError";
++    this.code = "ENEMY_PLACEMENT_CLASS_UNDERIVABLE";
++    this.model = model;
++  }
++}
++
++/** Footprint of a catalog slot: the larger of the capsule diameter and height; null when the capsule is unusable. */
++export function slotFootprint(slot) {
++  const height = slot.hitHeight;
++  const radius = slot.hitRadius;
++  if (!(Number.isFinite(height) && height > 0 && Number.isFinite(radius) && radius > 0)) return null;
++  return Math.max(2 * radius, height);
++}
++
++/** Size class 0-5: the number of edges the footprint reaches. */
++export function sizeClassOfFootprint(footprint) {
++  return SIZE_EDGES.filter((edge) => footprint >= edge).length;
++}
++
++/**
++ * The effective class table of one run: for every model that occurs in a regular slot, its size class and its
++ * variants. A model's footprint is the largest usable footprint among its regular slots, so the result does not
++ * depend on catalog order. The hash covers the derivation version, the edges and (model, size) pairs.
++ */
++export function deriveRegularClassTable(slots) {
++  const byModel = new Map();
++  for (const slot of slots) {
++    if (!byModel.has(slot.modelName)) byModel.set(slot.modelName, []);
++    byModel.get(slot.modelName).push(slot);
++  }
++  const types = [];
++  for (const model of [...byModel.keys()].sort(compare)) {
++    const members = byModel.get(model).sort((left, right) => compare(left.id, right.id));
++    const footprints = members.map(slotFootprint).filter((value) => value !== null);
++    if (footprints.length === 0) throw new EnemyPlacementClassError(model);
++    const footprint = Math.max(...footprints);
++    const variants = new Map();
++    for (const member of members) {
++      const key = `${member.npcParamId}:${member.thinkParamId}:${member.battleGoalId}`;
++      if (!variants.has(key)) variants.set(key, { key, npcParamId: member.npcParamId, thinkParamId: member.thinkParamId, source: member });
++    }
++    types.push({
++      model,
++      size: sizeClassOfFootprint(footprint),
++      footprint,
++      variants: [...variants.values()].sort((left, right) => compare(left.key, right.key)),
++    });
++  }
++  const hash = createHash("sha256")
++    .update(JSON.stringify({ version: CLASS_TABLE_VERSION, edges: SIZE_EDGES, types: types.map((type) => [type.model, type.size]) }))
++    .digest("hex");
++  return { version: CLASS_TABLE_VERSION, hash, types, byModel: new Map(types.map((type) => [type.model, type])) };
++}
++
++/** Size class of a slot: its model's class, or its own capsule (any type fits a slot whose capsule is unknown). */
++export function slotSizeClass(table, slot) {
++  const type = table.byModel.get(slot.modelName);
++  if (type) return type.size;
++  const footprint = slotFootprint(slot);
++  return footprint === null ? UNKNOWN_SLOT_SIZE : sizeClassOfFootprint(footprint);
++}
++
++// ---- model budget with a coverage reserve ----------------------------------------------------------------------------
++
++/**
++ * The initial model set of one map (model document 6.6): fixed models, vanilla models of slots that do not
++ * participate, and a coverage reserve of vanilla models of the smallest participating slots - enough that every
++ * participating slot has an in-set type that fits it (two distinct ones under Prevent same). A reserve entry is
++ * skipped when the set already holds a fitting type. If the reserve would push the set over the cap, the entries
++ * that do not fit are dropped (`trimmed`) and the fallback ladder is the safety net; demoting slots to
++ * non-participants cannot help, because a demoted slot keeps its vanilla model in the set. A map whose fixed and
++ * non-participating models alone exceed the cap cannot be repaired and fails with
++ * ENEMY_PLACEMENT_BUDGET_UNSATISFIABLE.
++ */
++export function buildMapModelSet({ mapId, cap, fixedModels, participants, sizeOf, fitSize, preventSame, table }) {
++  const base = new Set(fixedModels);
++  if (base.size > cap) throw new ModelBudgetError(mapId, cap, [...base]);
++  const active = [...participants].sort((left, right) => sizeOf(left) - sizeOf(right) || compare(left.id, right.id));
++  const wanted = [];
++  if (active.length > 0) {
++    const ceiling = fitSize(active[0]);
++    const needed = preventSame ? 2 : 1;
++    const fitting = [...base].filter((model) => table.byModel.has(model) && table.byModel.get(model).size <= ceiling).length;
++    for (const slot of active) {
++      if (fitting + wanted.length >= needed) break;
++      if (!base.has(slot.modelName) && !wanted.includes(slot.modelName) && table.byModel.has(slot.modelName)) wanted.push(slot.modelName);
++    }
++  }
++  const reserve = wanted.slice(0, Math.max(0, cap - base.size));
++  return {
++    budget: new ModelBudget({ mapId, cap, fixedModels: [...base, ...reserve] }),
++    reserve,
++    trimmed: wanted.length - reserve.length,
++    kept: active,
++  };
++}
++
++// ---- fallback ladder -----------------------------------------------------------------------------------------------
++
++/**
++ * What a slot receives when the sampled draw found no candidate (model document 6.7, regular slots). Pure and
++ * bounded: every rung is a scan over a sorted list, nothing draws again.
++ *   kept-vanilla - the slot's own model is in the set or the set has room (allowed under Prevent same);
++ *   in-set-fit   - the smallest in-set type that fits the slot (and is not its own model under Prevent same);
++ *   fit-relaxed  - with Placement fit "fits" only: the smallest in-set type whatever its size;
++ *   infeasible   - nothing is left; the caller raises ENEMY_PLACEMENT_INFEASIBLE.
++ * `chosen` is null for kept-vanilla and infeasible.
++ */
++export function fallbackLadder({ slot, budget, table, maxSize, fit, preventSame }) {
++  if (budget.evaluate(slot.modelName).admitted) return { stage: "kept-vanilla", chosen: null };
++  const inSet = budget.models().map((model) => table.byModel.get(model)).filter(Boolean)
++    .filter((type) => !(preventSame && type.model === slot.modelName))
++    .sort((left, right) => left.size - right.size || compare(left.model, right.model));
++  const fitting = inSet.find((type) => type.size <= maxSize);
++  if (fitting) return { stage: "in-set-fit", chosen: fitting };
++  if (fit === "fits" && inSet.length > 0) return { stage: "fit-relaxed", chosen: inSet[0] };
++  return { stage: "infeasible", chosen: null };
++}
++
++// ---- the planner ------------------------------------------------------------------------------------------------------
++
++/**
++ * Plans sampling-v1 for regular slots. Returns `assignment`: slot id -> chosen variant source (a catalog slot)
++ * for slots that receive a placement; a slot that stays vanilla has no entry.
++ *
++ * @param {object} input
++ * @param {string} input.seed                    combined seed (the stream seed of the whole run)
++ * @param {{replacementChance:number, normalReplacement:string, fit:string}} input.options
++ * @param {boolean} input.preventSame
++ * @param {Array<object>} input.slots            regular catalog slots (class table is derived from these)
++ * @param {Array<object>} [input.extraSlots]     further regular-class slots with no type of their own (Pinwheel clones)
++ * @param {Map<string, Set<string>>} input.fixedModelsByMap
++ * @param {object} input.diagnostics             from createPlacementDiagnostics
++ */
++export function planSampledRegularEnemies({
++  seed, options, preventSame, slots, extraSlots = [], fixedModelsByMap, diagnostics, cap = MODEL_BUDGET_CAP,
++}) {
++  const table = deriveRegularClassTable(slots);
++  diagnostics.classTableHash = table.hash;
++  const sizeOf = (slot) => slotSizeClass(table, slot);
++  const fitSize = (slot) => (options.fit === "fits" ? sizeOf(slot) : UNKNOWN_SLOT_SIZE);
++  const assignment = new Map();
++  const all = [...slots, ...extraSlots];
++  const mapIds = [...new Set(all.map((slot) => slot.mapId))].sort(compare);
++
++  for (const mapId of mapIds) {
++    const mapSlots = all.filter((slot) => slot.mapId === mapId).sort((left, right) => compare(left.id, right.id));
++    const streams = new Map(mapSlots.map((slot) => [slot.id, createSlotStream(seed, slot.id)]));
++    const participates = new Map();
++    for (const slot of mapSlots) {
++      if (options.normalReplacement === "none") {
++        participates.set(slot.id, false);
++        diagnostics.count("keptByMode");
++      } else {
++        // The replacement chance is always the slot's first draw: 1..100 <= chance, so 100 always passes.
++        const draw = streams.get(slot.id).int(100) + 1;
++        const passes = draw <= options.replacementChance;
++        participates.set(slot.id, passes);
++        if (!passes) diagnostics.count("keptByChance");
++      }
++    }
++    const fixedModels = new Set(fixedModelsByMap.get(mapId) ?? []);
++    for (const slot of mapSlots) if (!participates.get(slot.id)) fixedModels.add(slot.modelName);
++    const { budget, kept, trimmed } = buildMapModelSet({
++      mapId, cap, fixedModels, participants: mapSlots.filter((slot) => participates.get(slot.id)), sizeOf, fitSize, preventSame, table,
++    });
++    if (trimmed > 0) diagnostics.count("reserveTrimmed", trimmed);
++    const active = new Set(kept.map((slot) => slot.id));
++    const modelOfSlot = new Map();
++
++    for (const slot of mapSlots) {
++      if (!active.has(slot.id)) {
++        modelOfSlot.set(slot.id, slot.modelName);
++        diagnostics.record({ slotId: slot.id, slotClass: "normal", participates: false });
++        continue;
++      }
++      const rng = streams.get(slot.id);
++      const maxSize = fitSize(slot);
++      const pool = table.types.filter((type) => type.size <= maxSize);
++      const rejected = [];
++      let chosen = null;
++      let stage = "sampled";
++      const list = [...pool];
++      while (list.length > 0) {
++        const index = rng.int(list.length);
++        const candidate = list[index];
++        if (preventSame && candidate.model === slot.modelName) {
++          rejected.push({ model: candidate.model, reason: "prevent-same" });
++        } else if (!budget.evaluate(candidate.model).admitted) {
++          rejected.push({ model: candidate.model, reason: "model-budget" });
++        } else {
++          chosen = candidate;
++          break;
++        }
++        list.splice(index, 1);
++      }
++      const sizeRejections = table.types.length - pool.length;
++      if (sizeRejections > 0) diagnostics.count("candidatesOverSize", sizeRejections);
++
++      if (!chosen) {
++        const fallback = fallbackLadder({ slot, budget, table, maxSize, fit: options.fit, preventSame });
++        stage = fallback.stage;
++        chosen = fallback.chosen;
++        if (stage === "infeasible") {
++          diagnostics.record({ slotId: slot.id, slotClass: "normal", participates: true, category: "normal", stage, rejected });
++          throw new EnemyPlacementInfeasibleError(mapId, slot.id, `model ${slot.modelName}, in-set models ${budget.size}/${budget.cap}, fit ${options.fit}, prevent same ${preventSame}`);
++        }
++        if (stage === "kept-vanilla") budget.admit(slot.modelName);
++      }
++
++      if (chosen) {
++        const variant = chosen.variants[rng.int(chosen.variants.length)];
++        budget.admit(chosen.model);
++        assignment.set(slot.id, variant.source);
++        modelOfSlot.set(slot.id, chosen.model);
++        diagnostics.record({ slotId: slot.id, slotClass: "normal", participates: true, category: "normal", selected: chosen.model, stage, rejected });
++      } else {
++        modelOfSlot.set(slot.id, slot.modelName);
++        diagnostics.record({ slotId: slot.id, slotClass: "normal", participates: true, category: "normal", selected: slot.modelName, stage, rejected });
++      }
++    }
++
++    // Post-condition: the models the map really holds after the run (what DsrDataTool keeps) fit the cap.
++    const finalModels = new Set(fixedModelsByMap.get(mapId) ?? []);
++    for (const slot of mapSlots) finalModels.add(modelOfSlot.get(slot.id));
++    if (finalModels.size > cap) throw new ModelBudgetError(mapId, cap, [...finalModels].sort(compare));
++    const replaced = mapSlots.filter((slot) => assignment.has(slot.id)).length;
++    diagnostics.setMap(mapId, {
++      slots: mapSlots.length, replaced, finalModels: finalModels.size, modelSet: budget.size,
++    });
++  }
++  return { assignment, table };
++}

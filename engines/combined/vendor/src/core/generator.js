@@ -11,9 +11,13 @@ import { createStream } from "./rng.js";
 import { normalizeConfig, validateConfig } from "./config.js";
 import {
   EnemyPlacementUnavailableError,
+  assertSlotOwnedDrops,
+  createPlacementDiagnostics,
   permutationDiagnostics,
   resolveEnemyPlacementAlgorithm,
+  resolveEnemyPlacementOptions,
 } from "./placement.js";
+import { planSampledRegularEnemies } from "./sampling.js";
 import {
   enemies,
   enemySlots,
@@ -314,6 +318,8 @@ function bossGrounding(slot, catalog) {
 }
 
 function enemyPlacement(config, target, source, scaledNpcParamId, extra = {}) {
+  // forceScaledNpcParam is an instruction to this function (sampling-v1 drop ownership), not a placement field.
+  const { forceScaledNpcParam: _forceScaledNpcParam, ...placementExtra } = extra;
   const effectiveTargetThinkParamId =
     extra.targetThinkParamId ?? source.thinkParamId;
   const changed =
@@ -344,7 +350,8 @@ function enemyPlacement(config, target, source, scaledNpcParamId, extra = {}) {
       (config.enemyScaling === "vanilla" || !changed) &&
       extra.makeTangible !== true &&
       !requiresTeamOverride &&
-      !(config.randomizeEnemyDrops && changed)
+      !(config.randomizeEnemyDrops && changed) &&
+      !(extra.forceScaledNpcParam === true && changed)
         ? null
         : scaledNpcParamId,
     changed,
@@ -352,7 +359,7 @@ function enemyPlacement(config, target, source, scaledNpcParamId, extra = {}) {
     ...(requiresTeamOverride
       ? { initialTeamType: desiredInitialTeamType }
       : {}),
-    ...extra,
+    ...placementExtra,
   };
 }
 
@@ -1073,18 +1080,21 @@ function buildMassOfSoulsPlan(config, catalog) {
   return { placements, reservedSlotIds };
 }
 
-// Narrow dispatch between the enemy placement algorithms (patches/0005). The only algorithm that can run is
-// permutation-v1, which is the unchanged function below; it consumes no stream of placement.js.
-function planExtractedEnemies(algorithm, config, catalog, dragonPlan, bossPlan) {
+// Narrow dispatch between the enemy placement algorithms (patches/0005, 0006). permutation-v1 is the unchanged
+// function below. sampling-v1 plans regular enemy slots only (planSampledRegularEnemies); bosses, units and every
+// placement decoration are shared with permutation-v1.
+function planExtractedEnemies(algorithm, config, catalog, dragonPlan, bossPlan, diagnostics) {
   if (algorithm === "permutation-v1") {
     return randomizeExtractedEnemies(config, catalog, dragonPlan, bossPlan);
+  }
+  if (algorithm === "sampling-v1") {
+    return sampleExtractedEnemies(config, catalog, dragonPlan, bossPlan, diagnostics);
   }
   throw new EnemyPlacementUnavailableError(algorithm, true);
 }
 
-function randomizeExtractedEnemies(config, catalog, dragonPlan, bossPlan) {
-  if (!config.randomizeEnemies) return dragonPlan.enemies;
-  const rng = createStream(config.seed, "enemies", config.version);
+// The slots, special plans and fixed models both algorithms start from.
+function regularEnemyContext(config, catalog, dragonPlan, bossPlan) {
   const massOfSoulsPlan = buildMassOfSoulsPlan(config, catalog);
   const bossSlotIds = new Set(effectiveBossSlots(catalog).map((slot) => slot.id));
   const bossFamilyModels = new Set(
@@ -1160,37 +1170,15 @@ function randomizeExtractedEnemies(config, catalog, dragonPlan, bossPlan) {
   for (const placement of specialPlacements) {
     addFixedModel(placement.map, placement.targetModelName);
   }
+  return { massOfSoulsPlan, slots, pinwheelClones, pinwheelCloneIds, fixedModelsByMap };
+}
 
-  const budgetedSources = limitUniqueEnemyModelsByMap(
-    slots,
-    shuffledWithoutFixedPoints(rng, slots),
-    MAX_ENEMY_MODELS_PER_MAP,
-    fixedModelsByMap,
-  );
-  const shuffledSources = config.preventSameEnemy
-    ? separateSameModelSources(
-        createStream(config.seed, "prevent-same-enemy", config.version),
-        slots,
-        budgetedSources,
-        MAX_ENEMY_MODELS_PER_MAP,
-        fixedModelsByMap,
-      )
-    : budgetedSources;
-  const cloneSources = chooseChaosPinwheelSources(
-    createStream(config.seed, "pinwheel-chaos", config.version),
-    config,
-    pinwheelClones,
-    slots,
-    shuffledSources,
-    fixedModelsByMap,
-  );
-  const allSlots = [...slots, ...pinwheelClones];
-  const assignment = new Map(
-    allSlots.map((target, index) => [
-      target.id,
-      index < slots.length ? shuffledSources[index] : cloneSources[index - slots.length],
-    ]),
-  );
+// Placement decoration shared by both algorithms: special entities (passive, ghosts, butterflies, combat
+// activation), think-param clones and the placement record itself. Behavior for permutation-v1 is unchanged;
+// sampling-v1 only differs in the compatibility label and in always forcing a scaled NpcParam row, so the
+// destination slot's drops and team follow the slot (model document 6.9).
+function decorateEnemyPlacements(config, catalog, allSlots, assignment, pinwheelCloneIds, algorithm) {
+  const sampling = algorithm === "sampling-v1";
   const newLondoGroundAnchors = catalog.enemySlots
     .filter((slot) =>
       slot.mapId === "m16_00_00_00" &&
@@ -1280,6 +1268,7 @@ function randomizeExtractedEnemies(config, catalog, dragonPlan, bossPlan) {
       // Replaced clones keep their own combat stats (normal HP) instead of
       // inheriting the clone's 1 HP; drops and team still follow the slot.
       ...(isChaosPinwheelClone ? { scaling: "vanilla" } : {}),
+      ...(sampling ? { forceScaledNpcParam: true } : {}),
       ...(groundedGhostSpawn
         ? {
             groundX: groundedGhostSpawn.x,
@@ -1301,7 +1290,19 @@ function randomizeExtractedEnemies(config, catalog, dragonPlan, bossPlan) {
             initialTeamType: 2,
           }
         : {}),
-      compatibility: isChaosPinwheelClone
+      compatibility: sampling
+        ? isChaosPinwheelClone
+          ? "pinwheel-chaos-clone"
+          : passiveUntilAttacked
+            ? "passive-until-attacked-sampled"
+            : groundedGhostSpawn
+              ? "grounded-new-londo-ghost-slot-sampled"
+              : darkrootButterflyPath
+                ? "active-darkroot-butterfly-path-sampled"
+                : changed
+                  ? "sampled-regular-replacement"
+                  : "sampled-kept-vanilla"
+        : isChaosPinwheelClone
         ? "pinwheel-chaos-clone"
         : passiveUntilAttacked
         ? asylumPassiveSlots.has(slot.id)
@@ -1320,6 +1321,74 @@ function randomizeExtractedEnemies(config, catalog, dragonPlan, bossPlan) {
                 : "count-preserving-fixed-point",
     });
   });
+  return randomized;
+}
+
+function randomizeExtractedEnemies(config, catalog, dragonPlan, bossPlan) {
+  if (!config.randomizeEnemies) return dragonPlan.enemies;
+  const rng = createStream(config.seed, "enemies", config.version);
+  const { massOfSoulsPlan, slots, pinwheelClones, pinwheelCloneIds, fixedModelsByMap } =
+    regularEnemyContext(config, catalog, dragonPlan, bossPlan);
+
+  const budgetedSources = limitUniqueEnemyModelsByMap(
+    slots,
+    shuffledWithoutFixedPoints(rng, slots),
+    MAX_ENEMY_MODELS_PER_MAP,
+    fixedModelsByMap,
+  );
+  const shuffledSources = config.preventSameEnemy
+    ? separateSameModelSources(
+        createStream(config.seed, "prevent-same-enemy", config.version),
+        slots,
+        budgetedSources,
+        MAX_ENEMY_MODELS_PER_MAP,
+        fixedModelsByMap,
+      )
+    : budgetedSources;
+  const cloneSources = chooseChaosPinwheelSources(
+    createStream(config.seed, "pinwheel-chaos", config.version),
+    config,
+    pinwheelClones,
+    slots,
+    shuffledSources,
+    fixedModelsByMap,
+  );
+  const allSlots = [...slots, ...pinwheelClones];
+  const assignment = new Map(
+    allSlots.map((target, index) => [
+      target.id,
+      index < slots.length ? shuffledSources[index] : cloneSources[index - slots.length],
+    ]),
+  );
+  const randomized = decorateEnemyPlacements(config, catalog, allSlots, assignment, pinwheelCloneIds, "permutation-v1");
+  return randomized
+    .concat(massOfSoulsPlan.placements)
+    .concat(dragonPlan.enemies);
+}
+
+// sampling-v1 for regular enemy slots (Part A). Everything that is not a regular slot - bosses, linked units,
+// Mass of Souls, special entities - is planned exactly as in permutation-v1; their models are the fixed models
+// of each map. The sampler's assignment goes through the same placement decoration.
+function sampleExtractedEnemies(config, catalog, dragonPlan, bossPlan, diagnostics) {
+  if (!config.randomizeEnemies) return dragonPlan.enemies;
+  const options = resolveEnemyPlacementOptions(config, "sampling-v1");
+  const { massOfSoulsPlan, slots, pinwheelClones, pinwheelCloneIds, fixedModelsByMap } =
+    regularEnemyContext(config, catalog, dragonPlan, bossPlan);
+  const { assignment } = planSampledRegularEnemies({
+    seed: config.seed,
+    options,
+    preventSame: config.preventSameEnemy,
+    slots,
+    extraSlots: pinwheelClones,
+    fixedModelsByMap,
+    diagnostics,
+  });
+  const allSlots = [...slots, ...pinwheelClones];
+  // Decoration (and its index-based ids) is computed over every slot so ids stay stable, but only slots the
+  // sampler assigned get a placement: the others stay exactly vanilla (model document 5, decision 2).
+  const randomized = decorateEnemyPlacements(config, catalog, allSlots, assignment, pinwheelCloneIds, "sampling-v1")
+    .filter((placement) => assignment.has(placement.slot));
+  assertSlotOwnedDrops(randomized);
   return randomized
     .concat(massOfSoulsPlan.placements)
     .concat(dragonPlan.enemies);
@@ -2672,6 +2741,9 @@ export function generate(inputConfig, { gameCatalog = null } = {}) {
     throw new Error(errors.join("\n"));
   }
   const enemyPlacementAlgorithm = resolveEnemyPlacementAlgorithm(config);
+  const placementDiagnostics = enemyPlacementAlgorithm === "sampling-v1"
+    ? createPlacementDiagnostics({ algorithm: "sampling-v1", level: config.placementDiagnosticsLevel })
+    : null;
   if (gameCatalog && gameCatalog.schemaVersion !== 17) {
     throw new Error(
       `Catalog schema ${gameCatalog.schemaVersion} is obsolete. ` +
@@ -2708,6 +2780,7 @@ export function generate(inputConfig, { gameCatalog = null } = {}) {
             gameCatalog,
             dragonPlan,
             bossPlan,
+            placementDiagnostics,
           )
         : randomizePrototypeEnemies(config),
       bosses: extractedData
@@ -2799,7 +2872,7 @@ export function generate(inputConfig, { gameCatalog = null } = {}) {
       guaranteedEnemyDrops: config.guaranteedEnemyDrops,
     }))
     .digest("hex");
-  // Identity of the algorithm that planned the enemies; not part of placementHash.
-  result.placementDiagnostics = permutationDiagnostics();
+  // Identity (and, for sampling-v1, the summary) of the planner; not part of placementHash.
+  result.placementDiagnostics = placementDiagnostics ? placementDiagnostics.toJSON() : permutationDiagnostics();
   return result;
 }

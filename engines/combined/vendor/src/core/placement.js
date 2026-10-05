@@ -12,8 +12,8 @@ import { DeterministicRng, deriveSeed } from "./rng.js";
 
 export const ENEMY_PLACEMENT_ALGORITHMS = Object.freeze(["permutation-v1", "sampling-v1"]);
 
-/** Algorithms that can run. Part A adds "sampling-v1" here and implements its planner; nothing else changes. */
-export const IMPLEMENTED_ENEMY_PLACEMENT_ALGORITHMS = Object.freeze(["permutation-v1"]);
+/** Algorithms that can run. "sampling-v1" was enabled by Part A (regular enemy slots only). */
+export const IMPLEMENTED_ENEMY_PLACEMENT_ALGORITHMS = Object.freeze(["permutation-v1", "sampling-v1"]);
 
 export const DEFAULT_ENEMY_PLACEMENT_ALGORITHM = "permutation-v1";
 
@@ -44,7 +44,70 @@ export function resolveEnemyPlacementAlgorithm(config) {
   if (!known || !IMPLEMENTED_ENEMY_PLACEMENT_ALGORITHMS.includes(algorithm)) {
     throw new EnemyPlacementUnavailableError(algorithm, known);
   }
+  resolveEnemyPlacementOptions(config, algorithm);
   return algorithm;
+}
+
+// ---- sampling-only options (Part A: regular enemy slots) -----------------------------------------------------------
+
+/** Legacy "Normal enemy replacement" values the regular-slot sampler can honor (the others need boss slots). */
+export const NORMAL_REPLACEMENT_MODES = Object.freeze(["none", "normals"]);
+
+/** Legacy "Placement" values: 0 only where they fit, 1 anywhere, 2 anywhere except when replacing NPCs. */
+export const PLACEMENT_FIT_MODES = Object.freeze(["fits", "anywhere", "anywhere-except-npcs"]);
+
+/** Values under which permutation-v1 behaves exactly as it always did; anything else is refused there. */
+export const SAMPLING_NEUTRAL_OPTIONS = Object.freeze({
+  enemyReplacementChance: 100,
+  enemyNormalReplacement: "normals",
+  enemyPlacementFit: "anywhere",
+});
+
+/** Typed refusal: a sampling-only option has an invalid value, or a non-neutral one under permutation-v1. */
+export class EnemyPlacementOptionsError extends Error {
+  constructor(problems) {
+    super(`ENEMY_PLACEMENT_OPTIONS_INVALID: ${problems.join(" ")}`);
+    this.name = "EnemyPlacementOptionsError";
+    this.code = "ENEMY_PLACEMENT_OPTIONS_INVALID";
+    this.problems = problems;
+  }
+}
+
+/** Typed failure: no placement exists for a slot after the whole fallback ladder. Retryable with another seed. */
+export class EnemyPlacementInfeasibleError extends Error {
+  constructor(mapId, slotId, detail) {
+    super(`ENEMY_PLACEMENT_INFEASIBLE: no placement for ${slotId} in ${mapId} (${detail}).`);
+    this.name = "EnemyPlacementInfeasibleError";
+    this.code = "ENEMY_PLACEMENT_INFEASIBLE";
+    this.mapId = mapId;
+    this.slotId = slotId;
+  }
+}
+
+/** Validates the sampling-only options of a normalized config; never replaces a value silently. */
+export function resolveEnemyPlacementOptions(config, algorithm = config.enemyPlacementAlgorithm) {
+  const problems = [];
+  const chance = config.enemyReplacementChance;
+  if (!Number.isInteger(chance) || chance < 0 || chance > 100) {
+    problems.push(`enemyReplacementChance must be an integer from 0 to 100 (got ${String(chance)}).`);
+  }
+  if (!NORMAL_REPLACEMENT_MODES.includes(config.enemyNormalReplacement)) {
+    problems.push(`enemyNormalReplacement must be ${NORMAL_REPLACEMENT_MODES.join(" or ")} (got ${String(config.enemyNormalReplacement)}).`);
+  }
+  if (!PLACEMENT_FIT_MODES.includes(config.enemyPlacementFit)) {
+    problems.push(`enemyPlacementFit must be ${PLACEMENT_FIT_MODES.join(", ")} (got ${String(config.enemyPlacementFit)}).`);
+  }
+  if (problems.length === 0 && algorithm === "permutation-v1") {
+    for (const [key, neutral] of Object.entries(SAMPLING_NEUTRAL_OPTIONS)) {
+      if (config[key] !== neutral) problems.push(`${key} only applies to sampling-v1; it must be ${JSON.stringify(neutral)} with permutation-v1.`);
+    }
+  }
+  if (problems.length > 0) throw new EnemyPlacementOptionsError(problems);
+  return {
+    replacementChance: chance,
+    normalReplacement: config.enemyNormalReplacement,
+    fit: config.enemyPlacementFit,
+  };
 }
 
 // ---- stable slot identity and RNG substreams ----------------------------------------------------------------------
@@ -208,12 +271,23 @@ export function createPlacementDiagnostics({ algorithm, level = "summary" }) {
     rejections: Object.fromEntries(REJECTION_REASONS.map((reason) => [reason, 0])),
     categoryDowngrades: 0,
     terminalFailures: [],
+    counters: {},
+    maps: {},
   };
   const slots = [];
   return {
     algorithm,
     rngVersion: algorithm === "sampling-v1" ? SAMPLING_RNG_VERSION : null,
     level,
+    classTableHash: null,
+    /** Named counters of the planner (for example how many slots the replacement chance left alone). */
+    count(name, amount = 1) {
+      summary.counters[name] = (summary.counters[name] ?? 0) + amount;
+    },
+    /** Per-map totals (model count, replaced slots, ...); keys are map ids. */
+    setMap(mapId, values) {
+      summary.maps[mapId] = { ...values };
+    },
     /**
      * @param {object} record
      * @param {string} record.slotId
@@ -245,13 +319,16 @@ export function createPlacementDiagnostics({ algorithm, level = "summary" }) {
       if (level === "detail") slots.push({ ...record, slotId: id });
     },
     toJSON() {
-      return { algorithm: this.algorithm, rngVersion: this.rngVersion, level, summary, ...(level === "detail" ? { slots } : {}) };
+      return {
+        algorithm: this.algorithm, rngVersion: this.rngVersion, level, classTableHash: this.classTableHash, summary,
+        ...(level === "detail" ? { slots } : {}),
+      };
     },
   };
 }
 
 /** The one-line identity recorded for the frozen algorithm: no counters, no streams. */
-export const permutationDiagnostics = () => ({ algorithm: "permutation-v1", rngVersion: null, level: "summary", summary: null });
+export const permutationDiagnostics = () => ({ algorithm: "permutation-v1", rngVersion: null, level: "summary", classTableHash: null, summary: null });
 
 // ---- drop ownership -----------------------------------------------------------------------------------------------
 

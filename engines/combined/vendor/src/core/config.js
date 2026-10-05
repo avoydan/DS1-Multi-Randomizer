@@ -42,6 +42,13 @@ export const defaultConfig = Object.freeze({
   // Part 0 of the sampling work (patches/0005). Not an enum fallback: an unknown or unimplemented
   // value is refused by resolveEnemyPlacementAlgorithm() instead of being replaced by the default.
   enemyPlacementAlgorithm: "permutation-v1",
+  // Part A (patches/0006): sampling-only options for regular enemy slots. The defaults are the values under which
+  // permutation-v1 behaves as it always did; any other value is refused there (resolveEnemyPlacementOptions).
+  enemyReplacementChance: 100,
+  enemyNormalReplacement: "normals",
+  enemyPlacementFit: "anywhere",
+  // "summary" keeps counters only; "detail" adds one record per slot (debugging).
+  placementDiagnosticsLevel: "summary",
   useExtractedData: true,
   dryRun: true,
 });
