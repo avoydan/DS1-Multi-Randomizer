@@ -12,7 +12,7 @@ the legacy tool, enforces the 30-model map limit by construction, and falls back
 Implement it in small batches, selection-only options first and the event-touching ones (bosses in normal
 slots, NPCs) last.
 
-Status: **design, the Part 0 infrastructure (10.1), Part A (10.2) and Part B difficulty (10.3).** `sampling-v1` runs for regular enemy slots
+Status: **design, the Part 0 infrastructure (10.1), Part A (10.2) and Part B difficulty (10.3) and Part C1 Type replacement (10.4).** `sampling-v1` runs for regular enemy slots
 only and is opt-in; `permutation-v1` stays the default. **Part A is complete: the whole replacement-chance range works under a
 non-worsening model budget (10.2).** One scratch prototype
 (`engines/combined/prototypes/enemy-placement-sampler.mjs`) validates the proposed core against a real
@@ -315,7 +315,7 @@ Further deviations, all named in the option documentation when each batch ships:
   placed), cap 30, because DsrDataTool prunes unused models. Legacy counts only newly introduced types
   (30; 50 for Remastered Blighttown). DS1TR's rule is stricter. Whether Blighttown may exceed 30 is open.
 - **D-3 type-level participation** for Type replacement (above), and reuse of a type entry still respects
-  fit and the hard pair rejections (legacy bypasses them).
+  fit and the hard pair rejections (legacy bypasses them). Built in Part C1 (10.4), with the injectivity relaxation described there.
 - **D-4 per-slot streams** instead of one shared stream (section 7).
 - **D-5 derived classes** instead of curated tables; **D-6** NPC and hostile-NPC allowlists authored here.
 - **D-7 roaming boss souls and respawn** become properties of the placement's scaled NpcParam row (and, if
@@ -590,7 +590,7 @@ risk: data first, selection-only options next, event-touching options last.
 | **0** (done, see 10.1) | Infrastructure, no behavior change | `placement.js` (new repository-authored module in `vendor/src/core`, listed in the module-set test and the pin; patch `0005`); class derivation (size, difficulty, NPC/boss class); `classTableHash`; per-slot streams; ladder; diagnostics block | `enemies.placement.algorithm` (`permutation` only selectable), neutral-value rule, preset v5 migrating 1-4 | an "Enemy placement" group with the algorithm shown, read-only | class derivation vs fixtures; neutral-value rejection; preset v5 migration; permutation hash lock | none (output unchanged) | none |
 | **A** (built, one open conflict, see 10.2) | Sampler for regular enemies | `sampling-v1`: chance, normal mode {none, normals}, fit, difficulty `random`, Prevent same, mimic/mosquito/Pinwheel clones, coverage reserve, budget, ladder | add `sampling`, `replacementChance`, `normalReplacement`, `fit`, `difficultyMode=random` | sliders and selects, Replacement chance / Placement activated (remove the planned badges) | determinism, budget <= 30, zero fit violations, ladder rung counts, chance statistics, hash lock; **every changed placement has a scaled row; each drop lot is referenced by the same slots as in vanilla** | 20-seed Bosses + Fog sweep with `sampling`, **one with Enemy scaling `vanilla`**, `verify-skips`, `patch-enemies`, duplicates per map | low |
 | **B** (built, see 10.3) | Difficulty curve | class draw, strictness tables, D-1 refinement, Easy Asylum rule, curated overrides | `difficultyMode` curve values, `strictness`, `easyAsylum` | select + slider activation | offset distributions, same-class share, empty-class fallback | 20 seeds | none |
-| **C** | Type replacement and custom pool | type map with type-level participation and injectivity; pool filter | `typeReplacement`, `customPool` (named list of enabled types) | select, pool editor (largest UI piece) | injectivity, sentinel cases, pool filter | 10 seeds | none |
+| **C** (C1 Type replacement built, see 10.4; C2 custom pool open) | Type replacement and custom pool | type map with type-level participation and injectivity; pool filter | `typeReplacement`, `customPool` (named list of enabled types) | select, pool editor (largest UI piece) | injectivity, sentinel cases, pool filter | 10 seeds | none |
 | **D** | Boss class (bosses only) | boss sampler over the portable single-body pool, per-candidate Gwyn nerf, Unique bosses, unit participation | `bossReplacement` {none, bosses}, `uniqueBosses`, `bossChanceInBossSlots` | activation | boss repetition, unit swaps, hash lock | **40 seeds** Bosses + Fog (overlay set must remain the 15 events), `verify-skips` | medium |
 | **E** | Cross-class and roaming boss options | boss to normal slot, normal to boss slot, "both" modes, `getSoul` on the scaled row, respawn handling | modes `normals`/`both`, `bossChanceInNormalSlots`, `roamingBossSouls`, `respawningRoamingBosses` | activation | reward ownership, scaled row always present, boss bar rules | **40 seeds**, measure edited events against the overlay and FogMod; stop on any new overlap | **high** |
 | **F** | NPC class and hostile NPCs | NPC allowlist, talk preservation, hostile sources, allegiance events | `npcReplacement`, `hostileNpcs` | activation | NPC fit rules, talk preservation fixtures | event-set diff vs FogMod first, then 40 seeds | **high** |
@@ -910,6 +910,159 @@ checked on the generated placement plans, not on the NpcParam regulation of the 
 **Remaining risk.** A Parish with 31-33 models has not been tried in the running game; use the seeds above. For Part C
 (type replacement, custom pool) note that both reduce the candidate pool further, so the per-map retry bound (3) and
 the nearest-class lapse should be re-measured; the class table is shared (`regular-class-v2`).
+
+### 10.4 Part C1 as built (2026-10-05): Type replacement for regular enemies
+
+**Legacy semantics confirmed (pinned revision 83f008d, `enemy_rng.py` / `enemy_randomizer.py`).**
+
+| Item | Legacy behavior |
+|---|---|
+| Control | GUI "Type replacement": 0 "Enabled", 2 "Enabled, except roaming bosses.", 1 "Disabled" (**default**); config position 14. |
+| Key | `creatureTypeId = creatureId.split('_')[0]`, the **original model** of the slot (`c2500`). `typeReplaceMap` maps it to the chosen replacement and is **reset for every map**, so the group is the original model **within one map**. |
+| When | For every eligible slot the normal pipeline runs first: the replace-chance roll, the category, the candidate draw. Only afterwards, `if typeSub and creatureTypeId in typeReplaceMap and creatureType != "1"`, the result is **overwritten** by the stored value; otherwise the result of this slot is stored for the type. The first slot of a type in the map therefore decides for all later slots. |
+| Chance | The roll that counts is the first slot's. Later slots still roll (RNG is consumed) but their result is overwritten, so a later slot whose own roll failed is replaced when the first one succeeded, and the reverse. |
+| First slot not replaced | The stored value is the sentinel (`-2` chance, `-6` empty difficulty list, `-4` all candidates rejected): **every later slot of the type in the map is left alone**. |
+| Same replacement | All slots of the group receive the same replacement model. The variant (AI / NpcParam) is still drawn **per slot**. |
+| Constraints | Later slots **bypass** fit, difficulty, pair rejections and Easy Asylum: they take the stored model whatever their own size, destination class or map position. Only the first slot's context is checked. |
+| Injectivity | `isCombinationInvalid`: with Type replacement on, a candidate whose id is already a stored value of the map is rejected ("avoid replacing multiple enemy types in one area with the same enemy"). The check indexes `validNew` with the stored value, so a stored sentinel (negative) indexes from the end of the list: an undefined quirk. |
+| Prevent same | Applies to the first slot's draw only (the candidate must not contain the slot's own id). |
+| Map limit | The type is counted in `uniqueIndices` once, when first introduced. |
+| "Except roaming bosses" (2) | Stores nothing when the new type is a boss; it concerns boss sources only. |
+
+**Group identity.** `map:<stable-map-id>:model:<original-model>`: map-specific like the original. Groups are built from
+the regular slots of the map and ordered by model id, never by catalog position or array index. The same model in two
+maps is two groups with independent decisions (tested).
+
+**RNG.** Type replacement has its own namespace, disjoint from the slot streams: `enemy-placement-v1 / type:<map>:<model>`,
+and for a map-local retry `attempt:<n>:type:<map>:<model>` (`placement.js`: `typeStreamName`, `createTypeStream`). The
+group stream is drawn in the order: replacement chance (`int(100) + 1 <= chance`), difficulty class (curve modes),
+candidate draws. Each member slot draws only its variant from its own slot stream. With the option off none of this
+runs: the Part B code path, its draws and its output are untouched (tested against pinned hashes and, on the real catalog,
+against the Part B planner over 700 outputs).
+
+**Participation.** Replacement chance is evaluated **once per group**, as the original's first slot does (here the group
+decides, so a later member can no longer contradict it). A group that is not replaced stays vanilla as a whole and its
+model is pinned in the map (baseline). Mode `none` leaves every group alone without a draw.
+
+**Candidate for the whole group (intersection).** The pool is the replacement types that fit **every** member (the smallest
+member fit), then the difficulty class draw and pools of Part B, then per candidate: Prevent same, injectivity, budget.
+Under `regular-class-v2` the size and the destination difficulty of a slot are functions of its model, so the members of a
+real group have identical constraints and the intersection is trivial; slots whose model is not a regular type
+(Pinwheel clones) are sized by their own capsule and the group takes the smallest (tested). The original lets later
+members bypass the checks; DS1TR never builds a placement that a member cannot take. Nothing is relaxed: an empty
+fit intersection means the group stays vanilla or the attempt fails.
+
+**Difficulty across a group.** One class draw per group from the destination class of the group's model (the original: the
+first slot's class); Easy Asylum caps every group of the Asylum map; the nearest-class lapse of Part B applies only under
+budget pressure. No change to `regular-class-v2`, so `classTableHash` is unchanged.
+
+**Prevent same.** Group level: replacement model != original model, rejected candidate by candidate with list shrink from
+the group stream (no per-slot rejection draws). Off allows the identity replacement.
+
+**Budget (reference counted).** A group moves one model for many slots, so the set is counted by owners (`ModelLedger`).
+Pinned (solid) owners: fixed plans and groups left alone. Every participating group still *owns its original model* until it
+is decided (pending). Deciding a group releases that ownership; the replacement gets a solid owner; keeping the group
+re-takes the original. A model leaves the map with its last owner (an original model with no other reference is freed; one a
+fixed plan still holds stays and counts); a replacement already present costs nothing; a new one is admitted only below the
+cap; a model held only by pending groups counts as new (choosing it does not shrink the map). The effective cap is the
+unchanged `max(30, baseline)` with the baseline = fixed plans plus groups left alone. A map may start above its cap (the
+Parish with 32 models) and can then only shrink. The coverage reserve of slot mode is not needed: keeping the original
+model is the fallback while the map is within its cap.
+
+**Fallback sequence per group (bounded, nothing relaxed except one preference).**
+(1) sampled candidate (class pools, Prevent same, injectivity, budget); (2) keep the group vanilla if its model is
+admissible (the legacy outcome of "no candidate"); (3) the smallest in-set fitting model not used by another group;
+(4) **shared model**: a model already in the map that fits every member, even if another group has it (solid owners first,
+then nearest difficulty class, then model id, ties by one draw); (5) the attempt fails, the map is rebuilt with the next
+attempt streams (at most 3), then `ENEMY_PLACEMENT_INFEASIBLE` with the group, map, attempts, settings, baseline and cap.
+Fit, the budget and the fixed entities are never relaxed.
+
+**Why rung 4 exists (measurement, not preference).** Without it, 93 of 100 seeds failed at 100% replacement chance in
+every variant: the Parish holds 15-16 fixed models and 17 groups, which are 32 models before the run, and distinct
+replacements cannot reduce a map (each group frees one model and takes one other). The failure was deterministic (100%
+chance draws the same participation in every attempt), so no retry count could help; the retry budget was not
+touched. Legacy injectivity is a variety preference of an engine that does not cap the total model count; the DS1TR cap is
+a safety limit, so injectivity yields only when the alternative is a failed map (about 1.6 groups per seed at 100%, 0.01
+at 60%, 0 at 25%).
+
+**Other deviations.** (a) The sentinel indexing quirk of injectivity is not reproduced: only groups that were actually
+replaced block a model. (b) A later member of the original can be replaced although its own roll failed; here the group
+decides. (c) "Enabled, except roaming bosses" equals "Enabled" for regular enemies (no boss source exists), exactly as
+Placement fit "anywhere, fit NPCs" equals "anywhere". (d) The hook for a custom pool is `createCandidatePool(table, accept)` /
+`candidateFilter`: groups, slot sampling and every fallback read the pool from there.
+
+**Parity.** E15 Type replacement: FULL for regular enemies (all three values; the roaming-boss exception has no effect
+until boss sources exist).
+
+**Diagnostics.** Counters: `typeGroups`, `typeGroupsReplaced`, `typeGroupsKeptByChance`, `typeGroupsKeptVanilla`,
+`typeGroupsFallback`, `typeGroupsShared`, `typePreventSameRejections`, `typeInjectivityRejections`,
+`typeFitRejections`, `typeDifficultyRejections`, `typeMapAttemptsFailed`, `typeMapsStartedOverCap`; per map `typeGroups`.
+Detail level: one record per group (id, model, member count, participation, selection, stage, member fit, classes,
+attempt) in `groups`, and the group id on every member slot record.
+
+**Catalog-only validation (real catalog, 100 seeds per variant, bosses + dragons + Gwyn nerf + Second Gargoyle on;
+"Part B" columns are the same seeds with Type replacement off).**
+
+| Variant | final failures | seeds ok on attempt 0 | seeds with a map retry (Part B) | failed attempts (Part B) | map attempts 1 / 2 / 3 | groups replaced | slots in replaced groups | kept vanilla | shared-model fallbacks | fit viol. | Prevent-same viol. | above effective cap | difficulty lapses | max models | ms/seed |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| T 100% fits, default difficulty | 0 | 100 / 100 | 0 (0) | 0 (0) | 1800 / 0 / 0 | 99.5% | 100.0% | 97 | 164 | 0 | 0 | 0 | 0 | 30 | 14 |
+| T 60% fits, default difficulty | 0 | 100 / 100 | 0 (5) | 0 (5) | 1800 / 0 / 0 | 60.4% | 60.5% | 0 | 1 | 0 | 0 | 0 | 0 | 30 | 12 |
+| T 25% fits, default difficulty | 0 | 92 / 100 | 8 (9) | 9 (11) | 1792 / 7 / 1 | 25.2% | 25.5% | 0 | 0 | 0 | 0 | 0 | 0 | 32 | 10 |
+| T 100% anywhere, fully random | 0 | 100 / 100 | 0 (0) | 0 (0) | 1800 / 0 / 0 | 99.5% | 100.0% | 97 | 164 | 0 | 0 | 0 | 0 | 30 | 13 |
+| T 100% fits, strict curve | 0 | 100 / 100 | 0 (0) | 0 (0) | 1800 / 0 / 0 | 99.0% | 100.0% | 177 | 164 | 0 | 0 | 0 | 175 | 30 | 15 |
+| T 60% fits, strict curve + Prevent same | 0 | 100 / 100 | 0 (5) | 0 (5) | 1800 / 0 / 0 | 58.1% | 60.5% | 417 | 1 | 0 | 0 | 0 | 73 | 30 | 12 |
+| T 100% fits, strict curve + Prevent same | 0 | 100 / 100 | 0 (0) | 0 (0) | 1800 / 0 / 0 | 95.6% | 100.0% | 787 | 164 | 0 | 0 | 0 | 226 | 30 | 14 |
+| T 25% fits, strict curve + Prevent same | 0 | 92 / 100 | 8 (9) | 9 (11) | 1792 / 7 / 1 | 24.3% | 25.5% | 165 | 0 | 0 | 0 | 0 | 44 | 32 | 10 |
+| T 100% fits, very-loose curve | 0 | 100 / 100 | 0 (0) | 0 (0) | 1800 / 0 / 0 | 99.0% | 100.0% | 186 | 164 | 0 | 0 | 0 | 175 | 30 | 14 |
+| T 60% fits + Prevent same, default difficulty | 0 | 100 / 100 | 0 (5) | 0 (5) | 1800 / 0 / 0 | 60.4% | 60.5% | 0 | 1 | 0 | 0 | 0 | 0 | 30 | 11 |
+
+Reading the table: 0 final failures in 10 variants x 100 seeds, 0 fit violations, 0 Prevent-same violations, every group
+coherent (all members one model), 0 effective-cap violations, bosses and units identical to `permutation-v1`, repeated runs
+identical. **Retry pressure is not higher than in Part B**: at 25% a map needed a retry in 8 of 100 seeds (9 in Part B), at 60%
+in 0 (5 in Part B), at 100% in 0 (0); no map needed a third attempt more than once in 1,800 maps. The map-local limit of 3 attempts is
+sufficient and was not changed. The cost of Type replacement is not in retries but in the deliberate fallbacks: at 100%
+about 1 group per seed stays vanilla (no candidate that fits and is distinct) and about 1.6 groups per seed share a
+replacement (see "Why rung 4 exists"); at 25% neither happens.
+
+Type replacement also lowers the Parish model count: one decision moves many slots to one model and frees the original, so
+at 25% the Parish ended at 28-32 models (28: 15, 29: 92, 30: 276, 31: 11, 32: 6 of 400 seeds) against 30-33 without it.
+
+**Parish (`m10_01`) seeds for manual in-game validation with Type replacement** (bosses on, Enemy scaling area, Gwyn nerf
+medium, Second Gargoyle replace, `sampling-v1`, 25% replacement, fits, difficulty `random-easy-asylum`/`loose`, Type
+replacement enabled; attempt-0 combined seed; checked through `generateRun`):
+
+| Parish final models | master seed | notes |
+|---|---|---|
+| 31 | `parish-26` | baseline 31 |
+| 32 | `parish-1` | baseline 32 |
+| 30 (retry) | `parish-11` | the Parish was planned with attempt 2 (a map retry); Fog needed one extra combined attempt |
+| 29 (retry) | `parish-34` | the Parish was planned with attempt 2 |
+
+33 models does not occur with Type replacement at 25%; the 33-model seeds of 10.3 (`parish-28`, `parish-92`) are for the
+non-type configuration.
+
+**Real-format validation (Items + Enemies + Fog, bosses on, FogHost 0.5.0): 50 seeds + 3 full proofs, Type replacement enabled, `fits`.**
+
+| Configuration | seeds | generated | Fog retries (`FOG_UPSTREAM_INCOMPATIBLE`) | merge conflicts | boss overlay | `verify-skips` failures | sampler overflow | changed without scaled row | groups / shared | max final models |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 100%, default difficulty | 10 | 10 | 0 | 0 | same 15 events | 0 / 10 | 0 | 0 | 1,780 / 14 | 30 |
+| 60%, default difficulty | 10 | 10 | 2 | 0 | same 15 | 0 / 12 | 0 | 0 | 1,780 / 0 | 30 |
+| 25%, strict curve + Prevent same | 10 | 10 | 0 | 0 | same 15 | 0 / 10 | 0 | 0 | 1,780 / 0 | 30 |
+| 100%, strict curve + Prevent same | 10 | 10 | 2 | 0 | same 15 | 0 / 12 | 0 | 0 | 1,780 / 17 | 30 |
+| 60%, very-loose curve | 10 | 10 | 1 | 0 | same 15 | 0 / 11 | 0 | 0 | 1,780 / 1 | 30 |
+
+Mismatches in events the combined engine edited: 0; the live installation was unchanged in every run. Every sweep ran with
+bosses enabled, and their plans and the 15 overlay events are those of Part B. No map retry fell inside the 50 seeds (the
+catalog sweep predicts about 1 seed in 12 at 25%), so three full proofs were run on seeds with and without a Parish
+retry (`parish-11`, `parish-34`, `parish-1`): byte-identical reruns, activation and restore pass. The final model count and
+the drop-ownership invariant were checked on the generated placement plans, not on the NpcParam regulation.
+
+**For Part C2 (custom enemy pool).** Pass the pool through `createCandidatePool(table, accept)` / `candidateFilter`; nothing
+else reads `table.types` for candidates (the in-set fallback and the shared rung filter by `pool.models`). A narrow pool
+makes rung 4 and group-level failures more likely, so re-measure retry pressure and the share of groups kept vanilla, and
+reject a pool that is empty for a size class that occurs in a map with a typed error before generation. The reserve
+logic of slot mode and the ledger of group mode both assume that the original model stays available as a fallback, which a
+custom pool must not change (the pool restricts replacements, not originals).
 
 Batch 0 must also decide where `placement.js` lives: new code has to be inside `vendor/src` (that is what
 the packager copies and what the loader imports), so it is a repository-authored GPL file recorded in

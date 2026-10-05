@@ -149,6 +149,8 @@ async function sweep(count, prefix) {
         mapsRetried: placementInfo.summary.counters.mapsRetried ?? 0,
         mapAttemptsFailed: placementInfo.summary.counters.mapAttemptsFailed ?? 0,
         difficultyLapses: placementInfo.summary.counters.difficultyLapses ?? 0,
+        typeGroups: placementInfo.summary.counters.typeGroups ?? 0,
+        typeGroupsShared: placementInfo.summary.counters.typeGroupsShared ?? 0,
         retries: placementInfo.summary.retries ?? [],
       };
       const last = (await readdir(workspace).catch(() => [])).filter((d) => d.startsWith('combined-')).sort().pop();
@@ -204,6 +206,8 @@ async function sweep(count, prefix) {
     instructionMerges: tally(results.flatMap((r) => r.merges)),
     bossOverlays: tally(results.flatMap((r) => r.overlays)),
     mapsRetried: results.reduce((total, r) => total + (r.placement?.mapsRetried ?? 0), 0),
+    typeGroups: results.reduce((total, r) => total + (r.placement?.typeGroups ?? 0), 0),
+    typeGroupsShared: results.reduce((total, r) => total + (r.placement?.typeGroupsShared ?? 0), 0),
     seedsWithMapRetry: results.filter((r) => r.placement?.mapsRetried).length,
     samplerOverflow: results.reduce((total, r) => total + (r.placement?.samplerOverflow ?? 0), 0),
     changedWithoutScaledRow: results.reduce((total, r) => total + (r.placement?.changedWithoutScaledRow ?? 0), 0),

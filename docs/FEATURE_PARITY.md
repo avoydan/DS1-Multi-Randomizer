@@ -34,8 +34,8 @@ a scratch directory for this audit only. The commit ids above are the revisions 
 | | Count |
 |---|---|
 | Original options audited (Item 11 + Enemy 27 + FogMod 16) | **54** |
-| FULL | 33 (21 + 4 in Batch 1 + 3 in Batch 2 + 1 Second Gargoyle + 2 in Part A: Placement fit, Replacement chance + 2 in Part B: Difficulty mode, Difficulty strictness) |
-| UI_ONLY (engine gap) | 16 |
+| FULL | 34 (21 + 4 in Batch 1 + 3 in Batch 2 + 1 Second Gargoyle + 2 in Part A: Placement fit, Replacement chance + 2 in Part B: Difficulty mode, Difficulty strictness + 1 in Part C1: Type replacement) |
+| UI_ONLY (engine gap) | 15 |
 | PARTIAL | 3 (I11 hintsheet; I5 Soul items, where Transposed is unavailable; E2 Normal enemy replacement, added in Part A) |
 | INTENTIONALLY_UNSUPPORTED | 1 |
 | DUPLICATE | 1 |
@@ -89,7 +89,7 @@ All 21 configuration fields map to one position in the original config string. T
 | E12 | T-pose behavior | 0 enabled, 1 disabled | toggle, enabled | placeholder | no | no | no | UI_ONLY |
 | E13 | Roaming boss soul percentage | 0-100 % | slider, 50 | placeholder | no | no | no | UI_ONLY |
 | E14 | Pinwheel Chaos | 0 enabled, 1 disabled | toggle, disabled (default off) | yes (`enemies.pinwheelChaos`) | yes | yes | yes (Batch 2) | FULL |
-| E15 | Type replacement | 0 enabled, 2 enabled except roaming bosses, 1 disabled | select, disabled | placeholder | no | no | no | UI_ONLY |
+| E15 | Type replacement | 0 enabled, 2 enabled except roaming bosses, 1 disabled | select, disabled | yes (`enemies.placement.typeReplacement`, `sampling-v1`) | yes | yes | yes (Part C1, regular enemies; map-level groups, see `ENEMY_PLACEMENT_MODEL.md` 10.4) | FULL |
 | E16 | Gwyn spawn nerf | 0 strong, 1 medium, 2 none | select, medium (legacy default) | yes (`enemies.gwynNerf`) | yes | yes | yes (Batch 2) | FULL |
 | E17 | Prevent replacement by the same enemy | 0 enabled, 1 disabled | toggle, disabled (default off) | yes (`enemies.preventSameEnemy`) | yes | yes | yes (Batch 1) | FULL |
 | E18 | Unique bosses | 1 enabled, 0 disabled | toggle, off | placeholder | no | no | no | UI_ONLY |
@@ -229,7 +229,7 @@ mapped one-to-one.
 | G14 | T-pose behavior (E12) | B | Relates to Anor Londo / New Londo event scripts. It needs an event-level change and interacts with the Fog EMEVD merge. |
 | G15 | Roaming boss souls % (E13) and roaming boss respawn (E19) | B | Edit NpcParam/ItemLot soul values and event flags. NpcParam is preserved across Fog, so the merge must be checked. |
 | G16 | Pinwheel Chaos, Gwyn nerf (E14, E16) | done | See 6b. |
-| G17 | Type replacement (E15) | B | Sub-mode of G9. |
+| G17 | Type replacement (E15) | done for regular enemies (Part C1) | Sub-mode of G9. |
 | G18 | Prevent same enemy (E17) | done | See 6a. |
 | G19 | Unique bosses (E18) | B | Each boss at most once. Boss planning currently uses `shuffledPortableBosses`, so this needs a no-duplicate constraint. |
 | G20 | Hostile NPCs (E20) | B-C | Needs NPC AI and event flag handling; shares G9's NPC difficulty. |

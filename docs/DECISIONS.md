@@ -887,3 +887,18 @@ Decision: sampling-v1 uses a non-worsening model-budget policy. The normal targe
   unchanged `slot:<id>` stream), at most 3 attempts; after that `ENEMY_PLACEMENT_INFEASIBLE` carries map, attempts,
   settings, baseline and effective cap and stays retryable at the pipeline level. Structural errors stay non-retryable.
 - Residual risk, deliberately not addressed here: a Parish with 31-33 models has not been tried in the game.
+
+## sampling-v1 Type replacement: map-level groups, injectivity yields to the model budget (Part C1)
+
+- Type replacement keeps the legacy values and default (disabled; `permutation-v1` requires disabled). Presets move to
+  version 8. For regular enemies "enabled, except roaming bosses" behaves as "enabled" (no boss source exists yet).
+- The group is the original model within one map (the original resets its type map per map), decided once from its own
+  stream (`type:<map>:<model>`, attempt-aware); the group candidate must satisfy every member. Later members never
+  bypass fit or difficulty as they do in the original.
+- The model count of a group decision is reference counted (`ModelLedger`): a replaced group frees its original model unless
+  something else still owns it. `effectiveCap = max(30, baseline)` is unchanged.
+- The original's rule that two kinds in one map never get the same replacement is kept as a preference. It is the last
+  thing to yield (shared-model rung): measured, it makes the Parish infeasible at high replacement chances under the
+  DS1TR cap (93 of 100 seeds), deterministically, so retries cannot solve it. Fit, the budget and fixed entities never yield.
+- The map-local retry limit stays 3: Type replacement does not raise retry pressure above Part B.
+- A custom enemy pool enters through `createCandidatePool` / `candidateFilter`; it is not implemented.

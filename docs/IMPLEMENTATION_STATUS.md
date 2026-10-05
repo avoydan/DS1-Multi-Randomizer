@@ -1,5 +1,27 @@
 # Implementation status
 
+**Enemy placement Part C1: Type replacement for regular enemies (2026-10-05; contracts 0.11.0, backend 0.27.0, desktop 0.14.0).**
+`sampling-v1` gains the legacy Type replacement (**FULL** for regular enemies: disabled = legacy default, enabled, enabled
+except roaming bosses = enabled until boss sources exist). The group is the original model within a map; it is decided once
+(replacement chance, difficulty class, candidate) from its own stream `type:<map>:<model>` (attempt-aware), every member
+slot gets the same replacement and draws only its variant; the candidate fits every member and differs from the
+other groups of the map. The model budget is now reference counted for groups (`ModelLedger`: a replaced group frees its
+original model). Presets are version 8 (1-7 migrate to `permutation-v1` with Type replacement disabled). Details: model
+document 10.4. Patch `0009`. Custom pool (C2) is not started; the candidate pool is an injectable boundary.
+
+- **Measured conflict and decision inside the task:** with strict legacy injectivity 93 of 100 seeds failed at 100% chance
+  (the Parish: 15-16 fixed + 17 groups = 32 models, cap 30, deterministic, retries cannot help). Injectivity is now the last
+  rung to yield (`shared model`, about 1.6 groups per seed at 100%, 0.01 at 60%, 0 at 25%); fit, budget and fixed entities
+  are never relaxed. The retry budget (3) was not changed.
+- **Proofs:** `permutation-v1` unchanged (24 hashes; 56/56 and 73/73 package files); with Type replacement off the output
+  equals Part B (32 synthetic pins, and 700 real-catalog outputs with identical `classTableHash` and retry counts).
+- **Catalog sweep:** 10 variants x 100 seeds, 0 final failures, 0 fit / Prevent-same / cap violations, retry pressure
+  at or below Part B. **Real format:** 50 seeds (Items + Enemies + Fog + bosses) + 3 full proofs: all pass, 0 merge
+  conflicts, same 15 overlay events, `verify-skips` 0 failures.
+- **Parish risk unchanged** (not solved here): with Type replacement the Parish ends at 28-32 models; seeds `parish-26` (31),
+  `parish-1` (32), `parish-11`/`parish-34` (map retry) in 10.4.
+- **Tests:** backend 253 (252 pass, 1 skipped); new `enemyTypeReplacement.test.mjs` (24 tests); typecheck and desktop build pass.
+
 **Enemy placement Part B: difficulty and map-local retries for regular enemies (2026-10-05; contracts 0.10.0, backend 0.26.0, desktop 0.13.0).**
 `sampling-v1` gains Difficulty mode (curve, fully random, and both easy-Asylum modes: legacy default random +
 easy Asylum) and Difficulty strictness (strict, a bit loose, very loose), both **FULL** for regular enemies. Classes are
