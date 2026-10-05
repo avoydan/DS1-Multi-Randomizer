@@ -59,10 +59,7 @@ export function formatPlacementDiagnostics(diagnostics: PlacementDiagnosticsSumm
   const options = diagnostics.options ?? {};
   const retried = summary.counters.mapsRetried ?? 0;
   const pool = diagnostics.customPool;
-  const lifted = summary.counters.mapsCapLiftedByPool ?? 0;
-  const poolText = pool && pool.enabled
-    ? `custom pool ${String(pool.selected)}/${String(pool.total)} (${String(pool.hash).slice(0, 12)})${lifted > 0 ? `, model cap lifted on ${lifted} map(s) by what the pool makes unavoidable` : ''}, `
-    : '';
+  const poolText = pool && pool.enabled ? `custom pool ${String(pool.selected)}/${String(pool.total)} (${String(pool.hash).slice(0, 12)}), ` : '';
   const typeMode = String(options.typeReplacement ?? 'disabled');
   const groups = typeMode === 'disabled' ? '' : `type replacement ${typeMode} (${summary.counters.typeGroupsReplaced ?? 0}/${summary.counters.typeGroups ?? 0} groups replaced), `;
   return `Enemy placement sampling-v1 (difficulty ${String(options.difficultyMode ?? 'random')}/${String(options.difficultyStrictness ?? 'loose')}): ${poolText}${groups}${summary.slots} regular slots, ${replaced} sampled, `
