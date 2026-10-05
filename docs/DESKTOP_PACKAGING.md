@@ -15,3 +15,5 @@ Electron starts the backend as a child using its bundled Node mode, an argument 
 First run needs no DSR installation. Select the DSR directory and validate it before import. Missing DSR paths return explicit validation problems; missing Fog data returns a visible prerequisite message. A backend startup failure is shown in the app. The executable is unsigned and currently uses the default Electron icon; public GPL corresponding source and a matching release tag remain prerequisites before any external release.
 
 The build uses a minimal staged Electron app with no runtime npm dependencies: React is bundled by Vite, and the backend is separate in `extraResources`. The full source repository and its pre-existing orchestrator files are not copied into the package.
+
+The backend imports `@ds1tr/contracts` at run time. electron-builder never copies a `node_modules` directory through `extraResources`, so `scripts/stage-runtime-modules.cjs` (`afterPack`) places the staged contracts package into `resources/runtime/node_modules` before the portable target is built. Desktop 0.15.0 lacked it and its backend exited with `ERR_MODULE_NOT_FOUND`; 0.15.1 fixes that.

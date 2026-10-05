@@ -43,6 +43,9 @@ for (const [project, output] of [
   await copy(path.join(root, path.dirname(project), 'bin', 'Release', 'net8.0'), output);
 }
 await copy(path.join(root, 'apps/backend/dist'), path.join(runtime, 'apps/backend/dist'));
+// The backend imports @ds1tr/contracts at run time; the packaged runtime has no workspace node_modules, so it is staged where Node resolves it.
+await copy(path.join(root, 'packages/contracts/dist'), path.join(runtime, 'node_modules/@ds1tr/contracts/dist'));
+await copy(path.join(root, 'packages/contracts/package.json'), path.join(runtime, 'node_modules/@ds1tr/contracts/package.json'));
 await copy(path.join(root, 'engines/combined/vendor/src'), path.join(runtime, 'engines/combined/vendor/src'));
 await copy(path.join(root, 'engines/combined/vendor/package.json'), path.join(runtime, 'engines/combined/vendor/package.json'));
 const notices = path.join(runtime, 'licenses');
@@ -68,7 +71,7 @@ await rm(packageApp, { recursive: true, force: true });
 await copy(path.join(desktop, 'dist'), path.join(packageApp, 'dist'));
 await copy(path.join(desktop, 'dist-electron'), path.join(packageApp, 'dist-electron'));
 await writeFile(path.join(packageApp, 'package.json'), JSON.stringify({
-  name: 'ds1-triple-randomizer-desktop', version: '0.15.0', main: 'dist-electron/main.js',
+  name: 'ds1-triple-randomizer-desktop', version: '0.15.1', main: 'dist-electron/main.js',
   type: 'module', license: 'GPL-3.0-only', description: 'Dark Souls Remastered triple randomizer',
 }, null, 2));
 await run(process.execPath, [path.join(root, 'node_modules', 'electron-builder', 'cli.js'), '--win', 'portable', '--x64', '--config', 'electron-builder.yml', '--publish', 'never'], desktop,

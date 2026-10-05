@@ -18,4 +18,5 @@ win:
         - x64
   signAndEditExecutable: false
 beforeBuild: ./scripts/skip-node-modules.cjs
+afterPack: ./scripts/stage-runtime-modules.cjs
 asar: true
