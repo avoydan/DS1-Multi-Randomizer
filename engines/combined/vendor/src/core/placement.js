@@ -56,11 +56,22 @@ export const NORMAL_REPLACEMENT_MODES = Object.freeze(["none", "normals"]);
 /** Legacy "Placement" values: 0 only where they fit, 1 anywhere, 2 anywhere except when replacing NPCs. */
 export const PLACEMENT_FIT_MODES = Object.freeze(["fits", "anywhere", "anywhere-except-npcs"]);
 
+/**
+ * Legacy "Difficulty mode": 1 curve, 2 fully random, 3 fully random + easy Asylum, 4 curve + easy Asylum.
+ * Legacy default 3. Every value is supported for regular enemies.
+ */
+export const DIFFICULTY_MODES = Object.freeze(["curve", "random", "random-easy-asylum", "curve-easy-asylum"]);
+
+/** Legacy "Difficulty strictness": 0 strict, 1 a bit loose (default), 2 very loose. Only effective in the curve modes. */
+export const DIFFICULTY_STRICTNESS = Object.freeze(["strict", "loose", "very-loose"]);
+
 /** Values under which permutation-v1 behaves exactly as it always did; anything else is refused there. */
 export const SAMPLING_NEUTRAL_OPTIONS = Object.freeze({
   enemyReplacementChance: 100,
   enemyNormalReplacement: "normals",
   enemyPlacementFit: "anywhere",
+  enemyDifficultyMode: "random",
+  enemyDifficultyStrictness: "loose",
 });
 
 /** Typed refusal: a sampling-only option has an invalid value, or a non-neutral one under permutation-v1. */
@@ -75,12 +86,14 @@ export class EnemyPlacementOptionsError extends Error {
 
 /** Typed failure: no placement exists for a slot after the whole fallback ladder. Retryable with another seed. */
 export class EnemyPlacementInfeasibleError extends Error {
-  constructor(mapId, slotId, detail) {
+  constructor(mapId, slotId, detail, context = {}) {
     super(`ENEMY_PLACEMENT_INFEASIBLE: no placement for ${slotId} in ${mapId} (${detail}).`);
     this.name = "EnemyPlacementInfeasibleError";
     this.code = "ENEMY_PLACEMENT_INFEASIBLE";
     this.mapId = mapId;
     this.slotId = slotId;
+    // Set when every map-local attempt failed: attempts, baseline, effectiveCap, difficultyMode, fit, ...
+    Object.assign(this, context);
   }
 }
 
@@ -97,6 +110,12 @@ export function resolveEnemyPlacementOptions(config, algorithm = config.enemyPla
   if (!PLACEMENT_FIT_MODES.includes(config.enemyPlacementFit)) {
     problems.push(`enemyPlacementFit must be ${PLACEMENT_FIT_MODES.join(", ")} (got ${String(config.enemyPlacementFit)}).`);
   }
+  if (!DIFFICULTY_MODES.includes(config.enemyDifficultyMode)) {
+    problems.push(`enemyDifficultyMode must be ${DIFFICULTY_MODES.join(", ")} (got ${String(config.enemyDifficultyMode)}).`);
+  }
+  if (!DIFFICULTY_STRICTNESS.includes(config.enemyDifficultyStrictness)) {
+    problems.push(`enemyDifficultyStrictness must be ${DIFFICULTY_STRICTNESS.join(", ")} (got ${String(config.enemyDifficultyStrictness)}).`);
+  }
   if (problems.length === 0 && algorithm === "permutation-v1") {
     for (const [key, neutral] of Object.entries(SAMPLING_NEUTRAL_OPTIONS)) {
       if (config[key] !== neutral) problems.push(`${key} only applies to sampling-v1; it must be ${JSON.stringify(neutral)} with permutation-v1.`);
@@ -107,6 +126,8 @@ export function resolveEnemyPlacementOptions(config, algorithm = config.enemyPla
     replacementChance: chance,
     normalReplacement: config.enemyNormalReplacement,
     fit: config.enemyPlacementFit,
+    difficultyMode: config.enemyDifficultyMode,
+    difficultyStrictness: config.enemyDifficultyStrictness,
   };
 }
 
@@ -126,18 +147,26 @@ export function stableSlotId(slotOrId) {
   return id;
 }
 
-export const slotStreamName = (slotOrId) => `slot:${stableSlotId(slotOrId)}`;
+/**
+ * Stream name of a slot. Attempt 0 is the original `slot:<id>` (so it never changes an earlier output); a map-local
+ * retry `n` uses `attempt:<n>:slot:<id>`. The slot id already carries the stable map id, so the namespace is
+ * enemy-placement-v1 / map / attempt / slot without any array index.
+ */
+export const slotStreamName = (slotOrId, attempt = 0) => {
+  if (!Number.isInteger(attempt) || attempt < 0) throw new RangeError("attempt must be a non-negative integer.");
+  return attempt === 0 ? `slot:${stableSlotId(slotOrId)}` : `attempt:${attempt}:slot:${stableSlotId(slotOrId)}`;
+};
 
 let slotStreamDerivations = 0;
 
 /** 32-bit seed of the stream that owns one slot: master/combined seed + "enemy-placement-v1" + "slot:<id>". */
-export function deriveSlotStreamSeed(seed, slotOrId) {
+export function deriveSlotStreamSeed(seed, slotOrId, attempt = 0) {
   slotStreamDerivations += 1;
-  return deriveSeed(seed, slotStreamName(slotOrId), SAMPLING_RNG_VERSION);
+  return deriveSeed(seed, slotStreamName(slotOrId, attempt), SAMPLING_RNG_VERSION);
 }
 
-export function createSlotStream(seed, slotOrId) {
-  return new DeterministicRng(deriveSlotStreamSeed(seed, slotOrId));
+export function createSlotStream(seed, slotOrId, attempt = 0) {
+  return new DeterministicRng(deriveSlotStreamSeed(seed, slotOrId, attempt));
 }
 
 /** Diagnostic counter used by tests to prove that `permutation-v1` never derives a sampling stream. */
@@ -273,6 +302,7 @@ export function createPlacementDiagnostics({ algorithm, level = "summary" }) {
     terminalFailures: [],
     counters: {},
     maps: {},
+    retries: [],
   };
   const slots = [];
   return {
@@ -280,6 +310,34 @@ export function createPlacementDiagnostics({ algorithm, level = "summary" }) {
     rngVersion: algorithm === "sampling-v1" ? SAMPLING_RNG_VERSION : null,
     level,
     classTableHash: null,
+    /** The effective sampling options of the run (mode, strictness, fit, chance, ...). */
+    options: null,
+    /** Highest value seen for a named quantity (for example the highest map attempt used). */
+    peak(name, value) {
+      summary.counters[name] = Math.max(summary.counters[name] ?? 0, value);
+    },
+    /** A failed map attempt that was retried. */
+    addRetry(entry) {
+      summary.retries.push({ ...entry });
+    },
+    /**
+     * Adds the summary (and detail) of another diagnostics object, for a successful map attempt planned with a
+     * scratch object. The scratch object of a failed attempt is simply dropped.
+     */
+    absorb(other) {
+      const json = other.toJSON();
+      const from = json.summary;
+      summary.slots += from.slots;
+      summary.participating += from.participating;
+      summary.notParticipating += from.notParticipating;
+      for (const key of Object.keys(from.stages)) summary.stages[key] += from.stages[key];
+      for (const key of Object.keys(from.rejections)) summary.rejections[key] += from.rejections[key];
+      summary.categoryDowngrades += from.categoryDowngrades;
+      summary.terminalFailures.push(...from.terminalFailures);
+      for (const [key, value] of Object.entries(from.counters)) summary.counters[key] = (summary.counters[key] ?? 0) + value;
+      Object.assign(summary.maps, from.maps);
+      if (level === "detail") slots.push(...(json.slots ?? []));
+    },
     /** Named counters of the planner (for example how many slots the replacement chance left alone). */
     count(name, amount = 1) {
       summary.counters[name] = (summary.counters[name] ?? 0) + amount;
@@ -320,7 +378,7 @@ export function createPlacementDiagnostics({ algorithm, level = "summary" }) {
     },
     toJSON() {
       return {
-        algorithm: this.algorithm, rngVersion: this.rngVersion, level, classTableHash: this.classTableHash, summary,
+        algorithm: this.algorithm, rngVersion: this.rngVersion, level, classTableHash: this.classTableHash, options: this.options, summary,
         ...(level === "detail" ? { slots } : {}),
       };
     },
@@ -328,7 +386,7 @@ export function createPlacementDiagnostics({ algorithm, level = "summary" }) {
 }
 
 /** The one-line identity recorded for the frozen algorithm: no counters, no streams. */
-export const permutationDiagnostics = () => ({ algorithm: "permutation-v1", rngVersion: null, level: "summary", classTableHash: null, summary: null });
+export const permutationDiagnostics = () => ({ algorithm: "permutation-v1", rngVersion: null, level: "summary", classTableHash: null, options: null, summary: null });
 
 // ---- drop ownership -----------------------------------------------------------------------------------------------
 

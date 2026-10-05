@@ -47,6 +47,9 @@ export const defaultConfig = Object.freeze({
   enemyReplacementChance: 100,
   enemyNormalReplacement: "normals",
   enemyPlacementFit: "anywhere",
+  // Part B (patches/0008): difficulty. "random" (legacy mode 2) and "loose" are neutral: permutation-v1 requires them.
+  enemyDifficultyMode: "random",
+  enemyDifficultyStrictness: "loose",
   // "summary" keeps counters only; "detail" adds one record per slot (debugging).
   placementDiagnosticsLevel: "summary",
   useExtractedData: true,
