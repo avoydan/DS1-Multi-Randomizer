@@ -16,6 +16,8 @@ const itemOptions = {
   guaranteedEnemyDrops: true,
   randomizeShops: true,
   fashionSouls: false,
+  soulItems: 'replaced',
+  startingItems: 'shield-1h',
 };
 
 const enemyOptions = {
@@ -26,6 +28,8 @@ const enemyOptions = {
   replaceMimics: false,
   replaceRespawningMosquitoes: false,
   preventSameEnemy: true,
+  pinwheelChaos: true,
+  gwynNerf: 'strong',
 };
 
 function createRequest(overrides = {}) {
@@ -97,6 +101,10 @@ test('maps both enabled capabilities deterministically', () => {
       replaceMimics: false,
       replaceRespawningMosquitoes: false,
       preventSameEnemy: true,
+      soulItems: 'replaced',
+      startingItems: 'shield-1h',
+      pinwheelChaos: true,
+      gwynNerf: 'strong',
       generateSpoilerLog: true,
     },
   });
@@ -149,6 +157,8 @@ test('rejects enabled parent options when only non-category safeguards are selec
       randomizeEnemyDrops: false,
       randomizeShops: false,
       fashionSouls: true,
+      soulItems: 'shuffled',
+      startingItems: 'shield-2h',
     },
     enemies: {
       ...enemyOptions,
@@ -195,11 +205,54 @@ test('legacy-parity options fall back to the legacy defaults when their parent i
 
 test('legacy-parity options are forwarded when their parents are on', () => {
   const result = mapCombinedRandomizerConfig(createRequest({
-    items: { ...itemOptions, fashionSouls: true },
-    enemies: { ...enemyOptions, replaceMimics: true, replaceRespawningMosquitoes: true, preventSameEnemy: false },
+    items: { ...itemOptions, fashionSouls: true, soulItems: 'shuffled', startingItems: 'shield-2h' },
+    enemies: { ...enemyOptions, replaceMimics: true, replaceRespawningMosquitoes: true, preventSameEnemy: false, pinwheelChaos: false, gwynNerf: 'medium' },
   }));
   assert.equal(result.config.fashionSouls, true);
   assert.equal(result.config.replaceMimics, true);
   assert.equal(result.config.replaceRespawningMosquitoes, true);
   assert.equal(result.config.preventSameEnemy, false);
+});
+
+test('Batch 2 options map through when their parents are on', () => {
+  const result = mapCombinedRandomizerConfig(createRequest());
+  assert.equal(result.config.soulItems, 'replaced');
+  assert.equal(result.config.startingItems, 'shield-1h');
+  assert.equal(result.config.pinwheelChaos, true);
+  assert.equal(result.config.gwynNerf, 'strong');
+});
+
+test('Batch 2 options fall back to the behavior-preserving values when their parent is off', () => {
+  // Starting items need starting equipment; soul items need a pool that holds souls.
+  const noEquipment = mapCombinedRandomizerConfig(createRequest({
+    items: { ...itemOptions, randomizeStartingEquipment: false },
+  }));
+  assert.equal(noEquipment.config.startingItems, 'mixed-pool');
+  assert.equal(noEquipment.config.soulItems, 'replaced');
+
+  const shopsOnly = mapCombinedRandomizerConfig(createRequest({
+    items: { ...itemOptions, randomizeWorldItems: false, randomizeGifts: false, randomizeEnemyDrops: false },
+  }));
+  assert.equal(shopsOnly.config.soulItems, 'shuffled');
+
+  const noItems = mapCombinedRandomizerConfig(createRequest({ items: { ...itemOptions, enabled: false } }));
+  assert.equal(noItems.config.soulItems, 'shuffled');
+  assert.equal(noItems.config.startingItems, 'mixed-pool');
+
+  // Pinwheel Chaos needs regular enemies; the Gwyn nerf needs boss randomization.
+  const noRegular = mapCombinedRandomizerConfig(createRequest({
+    enemies: { ...enemyOptions, randomizeRegularEnemies: false },
+  }));
+  assert.equal(noRegular.config.pinwheelChaos, false);
+  assert.equal(noRegular.config.gwynNerf, 'strong');
+
+  const noBosses = mapCombinedRandomizerConfig(createRequest({
+    enemies: { ...enemyOptions, randomizeBosses: false },
+  }));
+  assert.equal(noBosses.config.gwynNerf, 'none');
+  assert.equal(noBosses.config.pinwheelChaos, true);
+
+  const noEnemies = mapCombinedRandomizerConfig(createRequest({ enemies: { ...enemyOptions, enabled: false } }));
+  assert.equal(noEnemies.config.pinwheelChaos, false);
+  assert.equal(noEnemies.config.gwynNerf, 'none');
 });

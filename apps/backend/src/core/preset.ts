@@ -2,11 +2,23 @@ import { PRESET_FORMAT, PRESET_VERSION } from '@ds1tr/contracts';
 import type { PresetDocument, PresetImportResult, RandomizerConfig } from '@ds1tr/contracts';
 import { InvalidConfigurationError, validateRandomizerConfig } from './configValidation.js';
 
-/** Version-1 presets predate the Batch 1 options; these are the legacy defaults that reproduce their output. */
-const batch1Defaults = {
+type SectionDefaults = Record<string, Record<string, unknown>>;
+
+/** Older presets predate these options; the values reproduce the output the old preset had. */
+const batch1Defaults: SectionDefaults = {
   items: { fashionSouls: true },
   enemies: { replaceMimics: true, replaceRespawningMosquitoes: true, preventSameEnemy: false },
-} as const;
+};
+/** Batch 2 values that keep the pre-Batch-2 engine behavior (not the new legacy defaults). */
+const batch2Defaults: SectionDefaults = {
+  items: { soulItems: 'shuffled', startingItems: 'mixed-pool' },
+  enemies: { pinwheelChaos: false, gwynNerf: 'none' },
+};
+/** What each older preset version lacks, newest additions last. */
+const missingByVersion: Record<number, SectionDefaults[]> = {
+  1: [batch1Defaults, batch2Defaults],
+  2: [batch2Defaults],
+};
 
 const presetKeys = ['format', 'presetVersion', 'masterSeed', 'items', 'enemies', 'fog', 'output'];
 
@@ -32,8 +44,8 @@ export function importPreset(text: string): PresetImportResult {
   const record = parsed as Record<string, unknown>;
   const problems: string[] = [];
   if (record.format !== PRESET_FORMAT) problems.push(`Preset format must be "${PRESET_FORMAT}".`);
-  if (record.presetVersion !== PRESET_VERSION && record.presetVersion !== 1) {
-    problems.push(`Preset version must be ${PRESET_VERSION} (version 1 is migrated).`);
+  if (record.presetVersion !== PRESET_VERSION && !(typeof record.presetVersion === 'number' && missingByVersion[record.presetVersion])) {
+    problems.push(`Preset version must be ${PRESET_VERSION} (versions 1 and 2 are migrated).`);
   }
   for (const key of Object.keys(record)) {
     if (!presetKeys.includes(key)) problems.push(`preset.${key} is not supported.`);
@@ -41,14 +53,16 @@ export function importPreset(text: string): PresetImportResult {
   if (problems.length > 0) return { ok: false, problems };
 
   const { format: _format, presetVersion, ...settings } = record;
-  if (presetVersion === 1) {
-    for (const [section, defaults] of Object.entries(batch1Defaults)) {
-      const current = settings[section];
-      if (!current || typeof current !== 'object' || Array.isArray(current)) continue;
-      for (const key of Object.keys(defaults)) {
-        if (Object.hasOwn(current, key)) problems.push(`preset.${section}.${key} is not supported in version 1.`);
+  if (typeof presetVersion === 'number' && missingByVersion[presetVersion]) {
+    for (const defaultsSet of missingByVersion[presetVersion]) {
+      for (const [section, defaults] of Object.entries(defaultsSet)) {
+        const current = settings[section];
+        if (!current || typeof current !== 'object' || Array.isArray(current)) continue;
+        for (const key of Object.keys(defaults)) {
+          if (Object.hasOwn(current, key)) problems.push(`preset.${section}.${key} is not supported in version ${presetVersion}.`);
+        }
+        settings[section] = { ...defaults, ...(current as Record<string, unknown>) };
       }
-      settings[section] = { ...defaults, ...current };
     }
     if (problems.length > 0) return { ok: false, problems };
   }

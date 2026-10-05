@@ -1,5 +1,14 @@
 export type EngineName = 'combined' | 'fog';
 
+/** Legacy "Soul items": shuffled with the pool (default) or replaced by other consumables. "Transposed" needs boss-soul data the catalog lacks. */
+export type SoulItemsMode = 'shuffled' | 'replaced';
+
+/** Legacy "Starting items": right-hand weapon rule and left-hand pool. 'shield-2h' is the legacy default. */
+export type StartingItemsMode = 'shield-1h' | 'shield-2h' | 'mixed-pool';
+
+/** Legacy "Gwyn nerf": the chance that Lord Gwyn is rejected as a boss replacement (strong 85%, medium 60%). */
+export type GwynNerfMode = 'none' | 'medium' | 'strong';
+
 export interface ItemOptions {
   enabled: boolean;
   randomizeWorldItems: boolean;
@@ -18,6 +27,10 @@ export interface ItemOptions {
    * individually; off exchanges complete world armor sets between set locations.
    */
   fashionSouls: boolean;
+  /** Legacy default: shuffled. */
+  soulItems: SoulItemsMode;
+  /** Legacy default: shield-2h. Acts only with starting equipment on. */
+  startingItems: StartingItemsMode;
 }
 
 export type EnemyScaling = 'vanilla' | 'area' | 'progressive';
@@ -33,6 +46,10 @@ export interface EnemyOptions {
   replaceRespawningMosquitoes: boolean;
   /** Legacy "Prevent same enemy" (default off). On: no regular enemy slot receives its own model. */
   preventSameEnemy: boolean;
+  /** Legacy "Pinwheel Chaos" (default off): the main Pinwheel stays and its clones are replaced. */
+  pinwheelChaos: boolean;
+  /** Legacy default: medium. Acts only with boss randomization on. */
+  gwynNerf: GwynNerfMode;
 }
 
 export type FogLanguage =
@@ -129,7 +146,7 @@ export type GenerationResult =
   | { ok: false; code: string; message: string; stage: string };
 
 export const PRESET_FORMAT = 'ds1tr-preset';
-export const PRESET_VERSION = 2;
+export const PRESET_VERSION = 3;
 
 /** Shareable settings: everything in RandomizerConfig except the machine-specific game path. */
 export interface PresetDocument {

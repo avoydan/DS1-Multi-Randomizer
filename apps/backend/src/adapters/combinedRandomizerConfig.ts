@@ -1,4 +1,4 @@
-import type { EnemyScaling } from '@ds1tr/contracts';
+import type { EnemyScaling, GwynNerfMode, SoulItemsMode, StartingItemsMode } from '@ds1tr/contracts';
 import type { CombinedRandomizerRequest } from './combinedRandomizerAdapter.js';
 
 export interface UpstreamCombinedRandomizerConfig {
@@ -23,6 +23,10 @@ export interface UpstreamCombinedRandomizerConfig {
   replaceMimics: boolean;
   replaceRespawningMosquitoes: boolean;
   preventSameEnemy: boolean;
+  soulItems: SoulItemsMode;
+  startingItems: StartingItemsMode;
+  pinwheelChaos: boolean;
+  gwynNerf: GwynNerfMode;
   generateSpoilerLog: boolean;
 }
 
@@ -34,6 +38,10 @@ export function mapCombinedRandomizerConfig(
   request: CombinedRandomizerRequest,
 ): CombinedRandomizerConfigMappingResult {
   const regularEnemies = request.enemies.enabled && request.enemies.randomizeRegularEnemies;
+  // Lesser souls sit in world lots, NPC gifts and enemy drops; shops hold none.
+  const itemPoolsWithSouls = request.items.enabled && (
+    request.items.randomizeWorldItems || request.items.randomizeGifts || request.items.randomizeEnemyDrops
+  );
   const config: UpstreamCombinedRandomizerConfig = {
     seed: request.combinedSeed,
     gameDirectory: request.gamePath,
@@ -58,6 +66,14 @@ export function mapCombinedRandomizerConfig(
     replaceMimics: !regularEnemies || request.enemies.replaceMimics,
     replaceRespawningMosquitoes: !regularEnemies || request.enemies.replaceRespawningMosquitoes,
     preventSameEnemy: regularEnemies && request.enemies.preventSameEnemy,
+    soulItems: itemPoolsWithSouls ? request.items.soulItems : 'shuffled',
+    // 'mixed-pool' is the engine's behavior without the option; it is also what the option
+    // falls back to while starting equipment is not randomized.
+    startingItems: request.items.enabled && request.items.randomizeStartingEquipment
+      ? request.items.startingItems
+      : 'mixed-pool',
+    pinwheelChaos: regularEnemies && request.enemies.pinwheelChaos,
+    gwynNerf: request.enemies.enabled && request.enemies.randomizeBosses ? request.enemies.gwynNerf : 'none',
     generateSpoilerLog: request.generateSpoilerLog,
   };
 

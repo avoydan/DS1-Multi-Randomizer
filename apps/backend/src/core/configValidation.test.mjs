@@ -24,6 +24,8 @@ function validConfig() {
       guaranteedEnemyDrops: false,
       randomizeShops: false,
       fashionSouls: true,
+      soulItems: 'shuffled',
+      startingItems: 'shield-2h',
     },
     enemies: {
       enabled: true,
@@ -33,6 +35,8 @@ function validConfig() {
       replaceMimics: true,
       replaceRespawningMosquitoes: true,
       preventSameEnemy: false,
+      pinwheelChaos: false,
+      gwynNerf: 'medium',
     },
     fog: {
       enabled: true,
@@ -120,4 +124,36 @@ test('requires the Batch 1 legacy-parity options as booleans', () => {
   nonDefault.enemies.replaceRespawningMosquitoes = false;
   nonDefault.enemies.preventSameEnemy = true;
   assert.doesNotThrow(() => validateRandomizerConfig(nonDefault));
+});
+
+test('requires the Batch 2 options and validates their values', () => {
+  for (const [section, key] of [
+    ['items', 'soulItems'], ['items', 'startingItems'], ['enemies', 'pinwheelChaos'], ['enemies', 'gwynNerf'],
+  ]) {
+    const missing = validConfig();
+    delete missing[section][key];
+    assert.throws(() => validateRandomizerConfig(missing), new RegExp(`config\\.${section}\\.${key} is required`));
+  }
+  const wrongBoolean = validConfig();
+  wrongBoolean.enemies.pinwheelChaos = 'yes';
+  assert.throws(() => validateRandomizerConfig(wrongBoolean), /config\.enemies\.pinwheelChaos must be a boolean/);
+  for (const [section, key, bad] of [
+    ['items', 'soulItems', 'transposed'], ['items', 'startingItems', 'shield-1h-2h'], ['enemies', 'gwynNerf', 'weak'],
+  ]) {
+    const invalid = validConfig();
+    invalid[section][key] = bad;
+    assert.throws(() => validateRandomizerConfig(invalid), /mode is invalid/, `${key}=${bad}`);
+  }
+  const valid = validConfig();
+  valid.items.soulItems = 'replaced';
+  valid.items.startingItems = 'mixed-pool';
+  valid.enemies.pinwheelChaos = true;
+  valid.enemies.gwynNerf = 'none';
+  assert.doesNotThrow(() => validateRandomizerConfig(valid));
+});
+
+test('refuses to silently ignore Include DLC being turned off', () => {
+  const config = validConfig();
+  config.output.includeDlc = false;
+  assert.throws(() => validateRandomizerConfig(config), /Excluding DLC content is not supported yet/);
 });

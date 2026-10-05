@@ -5,11 +5,11 @@ const itemKeys = [
   'enabled', 'randomizeWorldItems', 'randomizeProtectedItems', 'progressionLogic',
   'guaranteeEarlyWeapon', 'balancedEarlyLoot', 'randomizeStartingClass',
   'randomizeStartingEquipment', 'randomizeGifts', 'randomizeEnemyDrops',
-  'guaranteedEnemyDrops', 'randomizeShops', 'fashionSouls',
+  'guaranteedEnemyDrops', 'randomizeShops', 'fashionSouls', 'soulItems', 'startingItems',
 ] as const;
 const enemyKeys = [
   'enabled', 'randomizeRegularEnemies', 'randomizeBosses', 'scaling',
-  'replaceMimics', 'replaceRespawningMosquitoes', 'preventSameEnemy',
+  'replaceMimics', 'replaceRespawningMosquitoes', 'preventSameEnemy', 'pinwheelChaos', 'gwynNerf',
 ] as const;
 const fogKeys = [
   'enabled', 'traversableFogs', 'bossFogs', 'areaWarps', 'majorPvpFogs',
@@ -18,6 +18,9 @@ const fogKeys = [
   'pacifistMode', 'language',
 ] as const;
 const outputKeys = ['includeDlc', 'generateSpoilerLog'] as const;
+const soulItemModes = new Set(['shuffled', 'replaced']);
+const startingItemModes = new Set(['shield-1h', 'shield-2h', 'mixed-pool']);
+const gwynNerfModes = new Set(['none', 'medium', 'strong']);
 const fogLanguages = new Set([
   'ENGLISH', 'FRENCH', 'GERMAN', 'ITALIAN', 'JAPANESE', 'KOREAN',
   'NSPANISH', 'POLISH', 'PORTUGUESE', 'RUSSIAN', 'SCHINESE', 'SPANISH',
@@ -98,9 +101,14 @@ export function validateRandomizerConfig(input: unknown): asserts input is Rando
     validateKeys(section, expected, `config.${key}`, problems);
   }
 
-  if (isObject(input.items)) validateBooleans(input.items, itemKeys, 'config.items', problems);
+  if (isObject(input.items)) {
+    validateBooleans(input.items, itemKeys.filter((key) => key !== 'soulItems' && key !== 'startingItems'), 'config.items', problems);
+    if (!soulItemModes.has(String(input.items.soulItems))) problems.push('Soul items mode is invalid.');
+    if (!startingItemModes.has(String(input.items.startingItems))) problems.push('Starting items mode is invalid.');
+  }
   if (isObject(input.enemies)) {
-    validateBooleans(input.enemies, enemyKeys.filter((key) => key !== 'scaling'), 'config.enemies', problems);
+    validateBooleans(input.enemies, enemyKeys.filter((key) => key !== 'scaling' && key !== 'gwynNerf'), 'config.enemies', problems);
+    if (!gwynNerfModes.has(String(input.enemies.gwynNerf))) problems.push('Gwyn nerf mode is invalid.');
     if (!['vanilla', 'area', 'progressive'].includes(String(input.enemies.scaling))) {
       problems.push('Enemy scaling mode is invalid.');
     }
@@ -118,6 +126,11 @@ export function validateRandomizerConfig(input: unknown): asserts input is Rando
   const config = input as unknown as RandomizerConfig;
   if (config.items.randomizeProtectedItems) {
     problems.push('Protected-item randomization is blocked until progression safety is proven.');
+  }
+  if (!config.output.includeDlc) {
+    // The engines have no DLC switch: nothing reads this flag, so accepting `false`
+    // would silently ignore it.
+    problems.push('Excluding DLC content is not supported yet; Include DLC must stay on.');
   }
   if (config.fog.randomStart && !config.fog.bossFogs && !config.fog.traversableFogs) {
     problems.push('A random start requires boss or traversable fog gates.');

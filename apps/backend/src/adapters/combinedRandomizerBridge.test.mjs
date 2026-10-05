@@ -107,6 +107,8 @@ function request(overrides = {}) {
       guaranteedEnemyDrops: false,
       randomizeShops: false,
       fashionSouls: true,
+      soulItems: 'shuffled',
+      startingItems: 'shield-2h',
     },
     enemies: {
       enabled: true,
@@ -116,6 +118,8 @@ function request(overrides = {}) {
       replaceMimics: true,
       replaceRespawningMosquitoes: true,
       preventSameEnemy: false,
+      pinwheelChaos: false,
+      gwynNerf: 'medium',
     },
     generateSpoilerLog: false,
     ...overrides,

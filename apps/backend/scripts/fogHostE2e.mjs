@@ -85,12 +85,16 @@ const config = (gamePath, masterSeed = process.env.DS1TR_E2E_SEED ?? 'foghost-e2
     randomizeStartingEquipment: false, randomizeGifts: false, randomizeEnemyDrops: false,
     guaranteedEnemyDrops: false, randomizeShops: false,
     fashionSouls: process.env.DS1TR_E2E_FASHION !== '0',
+    soulItems: process.env.DS1TR_E2E_SOULS === 'replaced' ? 'replaced' : 'shuffled',
+    startingItems: process.env.DS1TR_E2E_STARTING ?? 'shield-2h',
   },
   // DS1TR_E2E_ENEMIES=0 runs Items + Fog only.
   enemies: { enabled: process.env.DS1TR_E2E_ENEMIES !== '0', randomizeRegularEnemies: true, randomizeBosses: process.env.DS1TR_E2E_BOSSES === '1', scaling: 'area',
     replaceMimics: process.env.DS1TR_E2E_MIMICS !== '0',
     replaceRespawningMosquitoes: process.env.DS1TR_E2E_MOSQUITOES !== '0',
-    preventSameEnemy: process.env.DS1TR_E2E_PREVENT_SAME === '1' },
+    preventSameEnemy: process.env.DS1TR_E2E_PREVENT_SAME === '1',
+    pinwheelChaos: process.env.DS1TR_E2E_PINWHEEL === '1',
+    gwynNerf: process.env.DS1TR_E2E_GWYN ?? 'medium' },
   fog: {
     enabled: process.env.DS1TR_E2E_FOG !== '0', traversableFogs: true, bossFogs: true, areaWarps: true, majorPvpFogs: false,
     minorPvpFogs: false, lordvesselGates: false, randomStart: false, disconnectedFogs: false,

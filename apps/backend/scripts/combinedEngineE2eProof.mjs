@@ -115,8 +115,10 @@ function makeRequest(masterSeed, workspacePath) {
       guaranteedEnemyDrops: false,
       randomizeShops: true,
       fashionSouls: true,
+      soulItems: 'shuffled',
+      startingItems: 'shield-2h',
     },
-    enemies: { enabled: true, randomizeRegularEnemies: true, randomizeBosses: true, scaling: 'area', replaceMimics: true, replaceRespawningMosquitoes: true, preventSameEnemy: false },
+    enemies: { enabled: true, randomizeRegularEnemies: true, randomizeBosses: true, scaling: 'area', replaceMimics: true, replaceRespawningMosquitoes: true, preventSameEnemy: false, pinwheelChaos: false, gwynNerf: 'medium' },
     generateSpoilerLog: true,
   };
 }
