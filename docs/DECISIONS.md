@@ -1,5 +1,47 @@
 # Decisions
 
+## Enemy placement: a second, explicit sampling algorithm beside a frozen permutation
+
+Date: 2026-10-05
+
+Chosen for the next legacy-parity group (Replacement chance, the Boss / Normal enemy / NPC modes, Boss
+chance, Placement fit, Difficulty mode and strictness, Type replacement and what depends on them). Full
+reasoning, the algorithm and the plan are in `docs/ENEMY_PLACEMENT_MODEL.md`. Nothing is implemented yet.
+
+- **Two cores, one frozen.** The current count-preserving permutation becomes `permutation-v1` and is not
+  edited again; every existing preset keeps it. A new slot-by-slot planner, `sampling-v1`, implements the
+  group. The legacy tool is not count preserving and decides per slot, so the group cannot be expressed on a
+  bijection (a boss in a normal slot needs a duplicate; a partial replacement leaves nothing to permute).
+  Approaches that emulate the options around the permutation, or replace it outright, were rejected: the
+  first cannot reproduce the options, the second breaks every old preset.
+- **Algorithm identity is explicit and separate from product versions.** Sampling draws use their own stream
+  version string (`enemy-placement-v1`), so `RANDOMIZER_VERSION` stays 0.5.66 and no existing stream moves.
+  The contract carries `enemies.placement.algorithm`; presets move to version 5 and migrate versions 1-4 to
+  `permutation` with the neutral value of every new option. The backend rejects non-neutral values under
+  `permutation` instead of ignoring them.
+- **Per-slot streams** isolate how many draws a slot consumes. Outcomes remain order dependent inside a map;
+  this is not claimed to be independence.
+- **Budget by construction.** DS1TR keeps counting every model present in a map (cap 30) because DsrDataTool
+  prunes unused models; a coverage reserve (the vanilla model of the smallest participating slot) guarantees
+  a fitting in-map type, replacing first-come luck. The prototype showed the failure it prevents (0.13% of
+  placements above their size class) and the fix (0 of 68,120).
+- **Fallback is bounded and ordered:** sampled, keep vanilla (the legacy outcome), in-set type that fits,
+  in-set type with fit relaxed (a recorded diagnostic, expected to be unreachable), then a typed retryable
+  error. No unbounded retries.
+- **Classes are derived, not copied.** Size and difficulty classes come from catalog data. Against the legacy
+  classes (used only as a yardstick) size agrees well (rank correlation 0.74) and difficulty only roughly
+  (0.58); weights were deliberately not tuned against the legacy table.
+- **Deviation D-1:** the difficulty filter stays active inside a full model set. Taken literally, the legacy
+  rule drops it, which left 30-31% of full-set placements on the slot's own class against 72-77% with the
+  refinement.
+- **Linked and multi-body bosses stay units.** They participate as a whole and swap with other units; they
+  are not sampled into normal slots.
+
+Not decided here, listed in section 13 of the model document for a later task: whether `sampling` becomes the
+default for new presets, the model-budget definition and a Blighttown exception, curated difficulty
+overrides, how bosses placed in normal slots interact with Enemy scaling, the NPC and hostile-NPC allowlists,
+the Easy Asylum rule, and the in-game behavior of respawning roaming bosses.
+
 ## Replace second Gargoyle follows the legacy tool; three engine values; no FogHost overlay
 
 Date: 2026-10-05

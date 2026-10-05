@@ -1,5 +1,25 @@
 # Implementation status
 
+**Enemy placement design (2026-10-05).** `docs/ENEMY_PLACEMENT_MODEL.md` reconstructs the legacy Enemy
+Randomizer's per-slot placement model, documents the current permutation engine, compares four
+architectures and fixes the target: a new `sampling-v1` planner beside the frozen `permutation-v1`
+(`docs/DECISIONS.md`), with an incremental plan (batches 0, A-G) for Replacement chance, the replacement
+modes, Boss chance, Placement fit, Difficulty mode and strictness, Type replacement, and the options that
+build on them. **No runtime behavior, default, preset, FogHost code or packaging changed.**
+
+- **Prototype** (`engines/combined/prototypes/enemy-placement-sampler.mjs`, scratch, not packaged: the packager
+  copies only `engines/combined/vendor/src`): regular-enemy sampler on the real catalog, 1,703 slots, 40 seeds
+  per variant, every run repeated for determinism. With a coverage reserve: 0 fit violations, 0 budget errors,
+  0 non-deterministic runs, 6-8 ms per seed. Without it: 0.13% of placements end above their size class.
+  Curve adherence inside a full model set is 30-31% under the literal legacy rule and 72-77% with the
+  documented refinement.
+- **Derived classes** versus the legacy ones as a yardstick: size rank correlation 0.74 (79 of 82 within one
+  class), difficulty 0.58 (73 of 82 within two).
+- **Open product questions** are listed in section 13 of the model document (default algorithm, model budget
+  definition, difficulty overrides, boss scaling, NPC allowlist).
+- **Verification:** unchanged runtime, so no new runtime tests were needed; the prototype is not part of
+  `npm test`. The earlier backend (152), FogHost (74), typecheck and desktop-build results stand.
+
 **Replace second Gargoyle (2026-10-05; backend 0.22.0, contracts 0.7.0, desktop 0.10.0).**
 The option now follows the legacy Enemy Randomizer: legacy default Replace; the second Bell Gargoyle
 (`m10_01_00_00:c5350_0001`) is replaced by an independently drawn boss, or left alone with Do not
