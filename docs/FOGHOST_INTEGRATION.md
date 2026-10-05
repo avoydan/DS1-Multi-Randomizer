@@ -894,3 +894,67 @@ Full proofs for seeds `bossfog-2`, `-17` and `-33` (manifest, hashes, byte-ident
 activation and restore on a temp copy) all pass. Regressions: Items + Enemies + Fog 5/5 and
 Items + Fog 5/5, clean.
 
+## Second Gargoyle events (11015396 / 11015382): no FogHost overlay
+
+Added with the legacy "Replace second Gargoyle" option (2026-10-05). Earlier notes called these two
+events a FogMod rewrite outside the 15-event boss overlay. Reading FogMod and measuring real events
+showed that was wrong: **FogMod makes no edit of its own to either event.**
+
+- **Why.** `GameDataWriter` lists `11205382`, `11015382`, `11015396` (and five more) in
+  `copyRandoEvents` with the comment "have no modifications in fog rando, so they can be copied over".
+  For each file it sets `evt.Instructions = other.Instructions; evt.Parameters = other.Parameters`
+  from the **game directory**, i.e. from the combined package. FogMod's own `dist/DS1R` template for
+  these two events is instruction-for-instruction the vanilla form (opcodes and argument bytes).
+- **Merge path.** For a vanilla event edited by the combined engine, rule 3 of `EmevdMerge` first checks
+  `SameEvent(fog, combined)` ("Already identical") and takes it unchanged. Both events take this path
+  today and are not listed under `instructionMerges` or `bossOverlays` in any sweep.
+- **Rule for the code.** The existing 15-event boss overlay (`BossOverlay.BossEvents`) handles
+  combined boss mutations *on top of FogMod's own boss-gate rewrites*. These two events need no such
+  layer. They are deliberately **not** added to it, and a test pins the set to the original 15.
+
+Semantic comparison (instruction data from real DS1R dumps; `bank[id]`):
+
+**11015396**, the release of the second Bell Gargoyle body (entity 1010801); it has no SKIP, no
+parameters, one condition (`4[02]`), no jumps; initialized once from event 0 (`2000[00]`, slot 0).
+
+| # | Vanilla / FogMod template (A, C before copy) | Legacy template (B) | Combined output for a replaced body (B′ = D) |
+|---|---|---|---|
+| 0 | `1003[02]` end if flag 3 (multiplayer client) | kept | kept |
+| 1 | `2004[01]` AI off | kept | kept |
+| 2 | `2004[09]` standby anim 7000 | kept | removed (model-specific) |
+| 3 | `2004[15]` invincible on | kept | kept |
+| 4 | `2004[30]` hide health bar | kept | removed (portable-boss sanitization) |
+| 5 | `4[02]` wait: 1010800 health ratio <= 0.6 | kept | kept |
+| 6 | `2004[09]` clear standby | kept | removed |
+| 7 | `2004[41]` model-specific (1010801, 1, 1012650) | **removed** | removed |
+| 8 | `2003[18]` model-specific animation 7001 | **removed** | removed |
+| 9 | `2004[15]` invincible off | kept | kept |
+| 10 | `2004[01]` AI on | kept | kept |
+| 11 | `2003[11]` boss bar, name 5350 | kept | kept, name rewritten to the new boss |
+| - | - | - | plus the new boss's own wake-up instructions where it needs them (`2004[01]`, `2004[20]`, `2003[18]`) |
+
+The legacy template (`ApplyGargoyle2Fix` loads it from `eventTemplates.dkscript` at pin `83f008d`)
+is the vanilla event minus rows 7 and 8. The combined engine's generic replaced-entity edit removes
+those two (and a few more standby/health-bar rows, as it does for every replaced boss) and keeps the
+hold-then-release structure: AI off and invincible, wait for 60% health of 1010800, release, show bar.
+
+**11015382**, the Taurus Demon intro (entity 1010700). The legacy tool applies its template (vanilla
+minus the one model-specific `2003[18]`, entity 1010700, animation 9061) together with the Gargoyle
+fix; DS1TR does not couple them. The combined engine edits it whenever the Taurus slot is replaced,
+independent of the Gargoyle option: it removes the three standby rows, the health-bar row and the
+`2003[18]`, and shortens the leading `1003[01]` SKIP from 2 to 1 so it still skips exactly the
+following `1000[04]`. Output: 11 instructions instead of 16.
+
+Fog's changes and the Gargoyle change do not overlap because Fog has none: nothing to commute, no
+semantic anchor needed, no parameter layout to preserve (parameters: 0 on every side).
+
+Verification (all on real-format data):
+
+- Unit tests (`FogHost.Tests`, 74/74): both events pass through `EmevdMerge` unchanged without the
+  overlay; the release event keeps its hold / 60% wait / release order; the overlay set is exactly
+  the original 15; five divergent FogMod forms (added control flow, missing anchor, duplicate anchor,
+  added parameter, changed threshold) are refused by the normal merge; vanilla forms merge to nothing;
+  and a real FogMod run writes both legacy forms out unchanged.
+- Proof run (generate, byte-identical rerun, activate, restore): the two events in the final Fog
+  package are identical to the combined package's; all checks pass; the live install is untouched.
+- Sweeps and `verify-skips`: see `docs/IMPLEMENTATION_STATUS.md`.

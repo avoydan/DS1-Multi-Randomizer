@@ -1,5 +1,36 @@
 # Decisions
 
+## Replace second Gargoyle follows the legacy tool; three engine values; no FogHost overlay
+
+Date: 2026-10-05
+
+Product decision (user): the authoritative target is the original Enemy Randomizer behavior, not the
+combined engine's earlier approximation. This supersedes the Batch 1 stop for this option.
+
+- **The Batch 1 premise was wrong.** It said FogMod rewrites events `11015396` and `11015382`, so
+  supporting the legacy edits would need a new FogHost overlay. FogMod's own source says the opposite:
+  both events "have no modifications in fog rando" and are copied from the game directory. FogMod's
+  template for them is the vanilla form, and the normal merge (rule 3, "already identical") takes
+  the combined form unchanged. **No FogHost code changed.** The 15-event boss overlay is untouched and
+  a test pins its exact membership; the two events are explicitly not part of it. The comparison is
+  in `docs/FOGHOST_INTEGRATION.md`.
+- **Three engine values.** `replace` (legacy 1, the product default), `keep` (legacy 0) and
+  `single-boss` (the earlier behavior). `single-boss` is not a legacy value; it exists so that
+  older presets keep reproducing their output, and it is the vendored engine's own default so the
+  Batch 1 and 2 hash locks still hold. The UI shows it as "Single boss (earlier DS1TR behavior)".
+- **Product default changes default output.** With bosses on, the default Bell Gargoyle fight now has
+  two independently drawn bosses instead of one. That is the legacy default and the requested target.
+  Presets of versions 1 to 3 migrate to `single-boss`; presets are now version 4.
+- **No forced combat activation for the replaced body.** The generic forced-activation event would set
+  its AI on at map load and defeat the vanilla hold (event `11015396` switches it off and invincible
+  until the first body reaches 60% health). The release uses the vanilla event plus the combined engine's
+  usual wake-up rows for the bosses that need them.
+- **Placement list.** The replaced body is not a catalogued boss slot, so DsrDataTool refuses it in the
+  boss list (`A boss placement targets a protected slot`). Its placement is appended to the regular
+  list through the linked-boss plan, which also counts its model in the per-map budget.
+- **Untestable here:** whether every portable boss's AI wakes correctly from the vanilla release needs
+  the game; that is the one accepted residual risk.
+
 ## Legacy-parity Batch 2: legacy product defaults, behavior-preserving engine defaults, honest scope
 
 Date: 2026-10-05

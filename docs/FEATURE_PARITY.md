@@ -1,8 +1,8 @@
 # Feature parity matrix
 
 Audit date: 2026-10-05. Scope: every user-visible option of the supported original
-applications, for Dark Souls Remastered. Updated for Batch 2 (backend 0.21.0, desktop
-0.9.0, contracts 0.6.0).
+applications, for Dark Souls Remastered. Updated for the Second Gargoyle batch (backend 0.22.0, desktop
+0.10.0, contracts 0.7.0).
 
 ## Sources audited
 
@@ -34,14 +34,15 @@ a scratch directory for this audit only. The commit ids above are the revisions 
 | | Count |
 |---|---|
 | Original options audited (Item 11 + Enemy 27 + FogMod 16) | **54** |
-| FULL | 28 (21 + 4 in Batch 1 + 3 in Batch 2) |
-| UI_ONLY (engine gap) | 22 (one of them, E10, is blocked rather than merely unbuilt) |
+| FULL | 29 (21 + 4 in Batch 1 + 3 in Batch 2 + 1 Second Gargoyle) |
+| UI_ONLY (engine gap) | 21 |
 | PARTIAL | 2 (I11 hintsheet; I5 Soul items, where Transposed is unavailable) |
 | INTENTIONALLY_UNSUPPORTED | 1 |
 | DUPLICATE | 1 |
 | Newly wired in the audit task | 2 (settings preset import/export; restore default settings) |
 | Newly wired in Batch 1 | 4 (Fashion Souls, Replace mimics, Replace respawning mosquitoes, Prevent same enemy) |
 | Newly wired in Batch 2 | 4 (Soul items: Shuffled and Replaced; Starting items; Pinwheel Chaos; Gwyn nerf) |
+| Newly wired for Second Gargoyle | 1 (Replace second Gargoyle) |
 | Combined-engine native options audited (separate table) | 16 (15 FULL, 1 INTENTIONALLY_UNSUPPORTED) |
 
 Every `UI_ONLY` option is an engine-level gap. The vendored combined engine had no
@@ -83,7 +84,7 @@ All 21 configuration fields map to one position in the original config string. T
 | E7 | Replacement chance | 0-100 % | slider, 100 | placeholder | no | no | no | UI_ONLY |
 | E8 | Boss chance for normal-enemy slots | 0-100 % | slider, 10 | placeholder | no | no | no | UI_ONLY |
 | E9 | Boss chance for boss slots | 0-100 % | slider, 90 | placeholder | no | no | no | UI_ONLY |
-| E10 | Replace second Gargoyle | 0 no, 1 yes | toggle, on (placeholder shows the legacy default) | placeholder | no | no | no | UI_ONLY (blocked, see 6a) |
+| E10 | Replace second Gargoyle | 0 no, 1 yes | select, Replace (legacy default); also Do not replace and Single boss (earlier DS1TR behavior) | yes (`enemies.secondGargoyle`) | yes | yes | yes | FULL |
 | E11 | Difficulty strictness | 0 strict, 1 a bit loose, 2 very loose | select, `1` | placeholder | no | no | no | UI_ONLY |
 | E12 | T-pose behavior | 0 enabled, 1 disabled | toggle, enabled | placeholder | no | no | no | UI_ONLY |
 | E13 | Roaming boss soul percentage | 0-100 % | slider, 50 | placeholder | no | no | no | UI_ONLY |
@@ -107,8 +108,8 @@ Notes:
 - Batch 1 restored the original defaults for the options it made real (mimics on,
   mosquitoes on, prevent-same off, Fashion Souls on). Placeholders still showing a
   different default than the original: "Allow T-pose behavior" and "Respawning roaming
-  bosses" (both on in the original). "Replace second Gargoyle" now displays the original
-  default (on).
+  bosses" (both on in the original). "Replace second Gargoyle" is now real and uses the
+  original default (Replace).
 - Original value 1 means "off" for several options whose label reads "Disabled"
   (E12, E14, E17, E19). The inverted numbering is an original quirk. The DS1TR contract
   should use booleans named for the behavior (`allowTPose`, `pinwheelChaos`,
@@ -224,7 +225,7 @@ mapped one-to-one.
 | G10 | Boss chance for normal / boss slots (E8, E9) | B | Cross-class sampling probabilities. Depends on G9. |
 | G11 | Placement fit (E5) | B | The engine already checks compatibility via `pickCompatibleEnemy` and `bossGrounding`; "anywhere" requires relaxing these and accepting the crash and softlock risk, which the 40/40 sweeps do not cover. |
 | G12 | Difficulty mode and strictness (E6, E11) | B | Needs a per-enemy tier table and area tiers. The prototype data shows tiers, but the real catalog needs them for all enemies. |
-| G13 | Mimics, second Gargoyle, mosquitoes (E4, E10, E21) | done (mimics, mosquitoes) / blocked (Gargoyle) | See 6a. |
+| G13 | Mimics, second Gargoyle, mosquitoes (E4, E10, E21) | done | See 6a. |
 | G14 | T-pose behavior (E12) | B | Relates to Anor Londo / New Londo event scripts. It needs an event-level change and interacts with the Fog EMEVD merge. |
 | G15 | Roaming boss souls % (E13) and roaming boss respawn (E19) | B | Edit NpcParam/ItemLot soul values and event flags. NpcParam is preserved across Fog, so the merge must be checked. |
 | G16 | Pinwheel Chaos, Gwyn nerf (E14, E16) | done | See 6b. |
@@ -252,27 +253,54 @@ Parent gating: all four act only while their parent is on (`items.randomizeWorld
 `enemies.randomizeRegularEnemies`). Otherwise the backend sends the legacy defaults, and
 the UI shows the controls inactive.
 
-#### Blocked: Replace second Gargoyle (E10)
+#### Replace second Gargoyle (E10) - implemented
 
-Not implemented, by the Batch 1 stop condition.
+Batch 1 stopped on this option because it appeared to need a change to events `11015396` and
+`11015382` that FogMod "also rewrites". That premise was wrong: FogMod makes no edit of its own to
+either event (it copies the game directory's instructions into them), so there is no Fog change to
+reconcile. No FogHost overlay was added. Evidence and the instruction-level comparison:
+`docs/FOGHOST_INTEGRATION.md`, "Second Gargoyle events".
 
-- **Controlled entity:** `m10_01_00_00:c5350_0001` (NPC 535001, entity 1010801), the second
-  Bell Gargoyle. Legacy mode 0 leaves it; mode 1 replaces it, moves it to
-  `(10.69, 48.92, 124.35)` and runs `ApplyGargoyle2Fix`, which **replaces events
-  `11015396` and `11015382`** with templates.
-- **Engine reality:** the combined engine treats the Bell Gargoyles as one linked unit
-  (`bell-gargoyles`). When another unit replaces it, bodies after the first (`_0001` and
-  `_0002`) are *disabled*, not replaced. So the engine matches neither legacy value.
-  Adopting the legacy default ("replaced") would change default Bosses + Fog output.
-- **Fog conflict:** `11015382` and `11015396` are in FogMod's `copyRandoEvents`, so FogMod
-  itself rewrites them. They are not in the 15-event boss overlay whitelist
-  (`11005392, 11010000, 11210001, 11405392, 11415342, 11415373, 11415382, 11515392,
-  11600001, 11700000, 11810000, 11810310, 11815382, 11815390, 11815394`). Implementing the
-  legacy fix means editing events that both engines touch outside the measured set. That
-  is a new event/semantic overlap, so the task stopped instead of broadening the whitelist.
-- **What it needs:** a product decision on the target behavior (legacy "two independent
-  replacements" vs. the engine's single boss), then measuring `11015382`/`11015396` the way
-  the 15 whitelisted events were measured.
+Legacy semantics (pinned `83f008d`; `randomizer_rng.py`, `event_tools.py`, `eventTemplates.dkscript`):
+
+- **Controlled entity:** `m10_01_00_00:c5350_0001` (entity 1010801, NPC 535001), the second Bell
+  Gargoyle, which joins the fight when the first (`c5350_0000`, 1010800) falls to 60% health. In the
+  legacy data all three Bell bodies are type 1 (boss), size large, difficulty 3.
+- **Values:** `0` Do not replace, `1` Replace. **Legacy default: 1** (GUI `IntVar` set to 1, the
+  "Restore default settings" string, and the user's own `lastConfig.txt` all agree).
+- **Mode 0:** the slot is skipped (`specialCase`); the Gargoyle and the vanilla events stay.
+- **Mode 1:** the slot is replaced like any boss slot, **independently of the first body** (its own draw;
+  with the default "bosses replaced with bosses" it is another boss, repeats allowed), moved to
+  `(10.69, 48.92, 124.35)` / `(0, 1.84, 0)`; and when the replacement is not a `c5350`,
+  `ApplyGargoyle2Fix` swaps events `11015396` and `11015382` for the templates in
+  `eventTemplates.dkscript`. Those equal the vanilla events minus `2004[41]` + `2003[18]`
+  (11015396, entity 1010801) and minus one `2003[18]` (11015382, entity 1010700, the Taurus intro).
+  No other MSB or event edit belongs to the option.
+
+DS1TR behavior (`secondGargoyle`, contract values `replace` default, `keep`, `single-boss`):
+
+| Value | Behavior |
+|---|---|
+| `replace` (legacy 1, product default) | When the Bell unit is swapped for another linked unit, body `_0001` is drawn an independent boss from the portable boss pool (own stream `second-gargoyle`; Gwyn nerf and Pinwheel Chaos exclusions honored; repeats allowed) and placed at the legacy rooftop position. The vanilla event `11015396` releases it when the first body drops to 60%; the combined engine's standard replaced-boss edit leaves the hold / wait / release structure intact and renames the boss bar. No forced combat activation is added, because it would wake the body at once. The third body (`_0002`) and the second tail stay disabled as before. |
+| `keep` (legacy 0) | The body and its tail get no placement; event `11015396` stays byte-identical to vanilla. |
+| `single-boss` | The earlier DS1TR behavior: the extra Bell bodies are disabled so the fight has one boss. Not a legacy value. Kept so older presets reproduce their output; the UI offers it as "Single boss (earlier DS1TR behavior)". |
+
+Deviations from the legacy tool:
+
+- The legacy tool's pool for the draw is its own catalog (and difficulty settings); DS1TR draws from the
+  boss pool the combined engine already uses. Linked and dragon bosses (for example Sanctuary Guardian,
+  Centipede Demon, Seath, Gaping Dragon) cannot be placed as a lone body and are not offered.
+- The combined engine's replaced-boss edit removes a few more Gargoyle-specific rows than the legacy
+  template (standby animations, the overhead health-bar hide) and may add wake-up rows for bosses that
+  need them; the structure is the legacy one. Event `11015382` is edited by the generic Taurus handling
+  whenever Taurus is replaced, independent of this option (the legacy tool bundles it with the fix).
+- The release depends on the new boss's AI waking up from `set_ai(on)`; the combined engine adds its
+  usual wake-up rows for the bosses that need them. This cannot be verified without running the game.
+- Needs boss randomization on (the Bell fight is a boss encounter); otherwise the value is ignored and
+  the backend sends `single-boss`.
+
+Older presets: versions 1 to 3 migrate `secondGargoyle` to `single-boss`, because that is what they
+produced; presets are now version 4.
 
 ### 6b. Batch 2 (implemented)
 
@@ -328,5 +356,4 @@ presets migrate to the values that reproduce their old output.
 | Protected items (native) | INTENTIONALLY_UNSUPPORTED | Backend rejects it until progression safety is proven. A product-safety decision. |
 | FogMod debug flags | not user options | Not in the pinned `MainForm`. |
 | I11 hintsheet | PARTIAL | The format is known, but it reports shuffled key locations, and DS1TR does not shuffle key items. Needs G2 first. |
-| E10 Replace second Gargoyle | UI_ONLY (blocked) | Would edit events `11015382`/`11015396` outside the 15-event overlay whitelist, and the engine's linked-unit design matches neither legacy value. See 6a. |
 | Legacy config string compatibility | not supported | Legacy `/-/` strings are not imported. DS1TR has its own versioned preset. |

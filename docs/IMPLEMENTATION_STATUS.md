@@ -1,5 +1,46 @@
 # Implementation status
 
+**Replace second Gargoyle (2026-10-05; backend 0.22.0, contracts 0.7.0, desktop 0.10.0).**
+The option now follows the legacy Enemy Randomizer: legacy default Replace; the second Bell Gargoyle
+(`m10_01_00_00:c5350_0001`) is replaced by an independently drawn boss, or left alone with Do not
+replace. A third value, Single boss, is the earlier DS1TR behavior and exists only so older presets
+reproduce their output. Semantics: `docs/FEATURE_PARITY.md` 6a; policy: `docs/DECISIONS.md`;
+patch `engines/combined/vendor/patches/0004-legacy-parity-second-gargoyle.patch`. Presets are version 4
+(versions 1 to 3 migrate to Single boss). Parity is now 29 FULL of 54.
+
+- **No FogHost change (FogHost stays 0.5.0).** The Batch 1 stop was based on a wrong premise: FogMod makes
+  no edit of its own to events `11015396` and `11015382` (it copies the game directory's instructions
+  into them), so the normal merge passes the combined forms through. The 15-event boss overlay is
+  unchanged. Instruction-level comparison: `docs/FOGHOST_INTEGRATION.md`, "Second Gargoyle events".
+- **FogHost tests:** 74/74 (68 existing + 6 new), run with a manually compiled test assembly because no
+  .NET SDK is installed: pass-through of both events without the overlay, hold / 60% / release order,
+  exact 15-event overlay set, five divergent FogMod forms refused (added control flow, missing anchor,
+  duplicate anchor, added parameter, changed threshold), vanilla forms merge to nothing, and a real FogMod
+  run writes both legacy forms out unchanged.
+- **Engine checks (real catalog, in-process):** over 40 seeds Replace drew 16 distinct bosses, was
+  deterministic, produced no duplicate slot, entity or scaled-NpcParam ids, kept the Parish model count
+  at most 30, never drew a Bell Gargoyle, linked unit, excluded Gwyn or (with Chaos on) Pinwheel, left the
+  third body and second tail disabled, and added no forced combat activation. Keep produced no placement for
+  the body or its tail. Single boss (the engine default) leaves the 24 baseline placement hashes identical.
+- **Real `patch-enemies` / `verify-skips`:** Replace, Keep and Single boss accepted, 0 skip mismatches.
+  Event `11015396` with Replace holds the body (AI off, invincible), waits for 1010800 at 60%, releases
+  it and renames the boss bar; with Keep it is byte-identical to vanilla.
+- **Proof run** (generate, byte-identical rerun, activate, restore): all pass, and events `11015396`
+  and `11015382` in the final Fog package are identical to the combined package's. Live install untouched.
+- **Fog sweeps** (Items + Enemies + Bosses + Fog, live install unchanged, `verify-skips` on every attempt):
+
+  | Option | Seeds | Success | Merge conflicts | Key-item retries | Skip checks | Mismatches |
+  |---|---|---|---|---|---|---|
+  | Replace | 20 | 20 | 0 | 0 of 20 seeds | 20 | 0 |
+  | Do not replace | 8 | 8 | 0 | 2 of 8 seeds | 10 | 0 |
+  | Single boss (regression) | 8 | 8 | 0 | 0 of 8 seeds | 8 | 0 |
+
+  Boss overlays stayed on the 15 known events; neither Gargoyle event appears under merges or overlays.
+- **Tests:** backend 152 passed, 0 failed, 1 skipped (needs a user Fog data root); root typecheck clean;
+  desktop build passed. The portable EXE was not rebuilt.
+- **Residual risk:** whether each portable boss's AI wakes correctly from the vanilla release (`set_ai(on)`,
+  plus the combined engine's usual wake-up rows) cannot be checked without running the game.
+
 **Legacy parity Batch 2 (2026-10-05; backend 0.21.0, contracts 0.6.0, desktop 0.9.0).**
 Soul items (Shuffled and Replaced), Starting items, Pinwheel Chaos and Gwyn nerf are functional end
 to end with their legacy defaults (soul items shuffled, starting items Shield + 1H/2H, Pinwheel Chaos
