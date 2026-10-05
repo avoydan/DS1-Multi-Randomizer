@@ -1,8 +1,10 @@
 // DS1 Triple Randomizer local modification (GPL-3.0-only section 5(a)):
 // legacy-parity options fashionSouls, replaceMimics,
-// replaceRespawningMosquitoes and preventSameEnemy. Modified 2026-10-05; the
-// diff is kept in patches/0002-legacy-parity-batch-1.patch. With every option
-// at its default the output is identical to the unmodified upstream core.
+// replaceRespawningMosquitoes and preventSameEnemy (Batch 1, 2026-10-05, diff
+// in patches/0002-legacy-parity-batch-1.patch) and soulItems, startingItems,
+// pinwheelChaos and gwynNerf (Batch 2, diff in
+// patches/0003-legacy-parity-batch-2.patch). With every option at its engine
+// default the output is identical to the unmodified upstream core.
 import { createHash } from "node:crypto";
 import { createStream } from "./rng.js";
 import { normalizeConfig, validateConfig } from "./config.js";
@@ -62,6 +64,14 @@ const respawningMosquitoSlots = new Set(
     (index) => `m14_00_00_00:c3090_${index}`,
   ),
 );
+// Legacy "Pinwheel Chaos": the fight's main Pinwheel keeps its place and the
+// fourteen clone bodies join the regular enemy pool.
+const pinwheelMainSlot = "m13_00_00_00:c3320_0000";
+const pinwheelCloneMap = "m13_00_00_00";
+const pinwheelModel = "c3320";
+// Legacy "Gwyn nerf": the chance that Lord Gwyn is rejected as a replacement.
+const gwynNerfRejection = Object.freeze({ none: 0, medium: 0.6, strong: 0.85 });
+const gwynModel = "c5370";
 const staticBridgeDragonSpawn = Object.freeze({
   x: 9.144,
   y: 9.55,
@@ -1067,7 +1077,24 @@ function randomizeExtractedEnemies(config, catalog, dragonPlan, bossPlan) {
       !internalHelperModels.has(slot.modelName),
   );
 
-  const regularSlotIds = new Set(slots.map((slot) => slot.id));
+  const pinwheelClones = config.pinwheelChaos
+    ? catalog.enemySlots.filter(
+        (slot) =>
+          slot.mapId === pinwheelCloneMap &&
+          slot.modelName === pinwheelModel &&
+          slot.id !== pinwheelMainSlot &&
+          !bossSlotIds.has(slot.id) &&
+          !slot.dummy &&
+          slot.teamType === 0 &&
+          slot.npcParamId > 0 &&
+          slot.thinkParamId > 0 &&
+          slot.baseHp > 0,
+      )
+    : [];
+  const pinwheelCloneIds = new Set(pinwheelClones.map((slot) => slot.id));
+  const regularSlotIds = new Set(
+    [...slots, ...pinwheelClones].map((slot) => slot.id),
+  );
   const specialPlacements = [
     ...massOfSoulsPlan.placements,
     ...dragonPlan.enemies,
@@ -1111,8 +1138,20 @@ function randomizeExtractedEnemies(config, catalog, dragonPlan, bossPlan) {
         fixedModelsByMap,
       )
     : budgetedSources;
+  const cloneSources = chooseChaosPinwheelSources(
+    createStream(config.seed, "pinwheel-chaos", config.version),
+    config,
+    pinwheelClones,
+    slots,
+    shuffledSources,
+    fixedModelsByMap,
+  );
+  const allSlots = [...slots, ...pinwheelClones];
   const assignment = new Map(
-    slots.map((target, index) => [target.id, shuffledSources[index]]),
+    allSlots.map((target, index) => [
+      target.id,
+      index < slots.length ? shuffledSources[index] : cloneSources[index - slots.length],
+    ]),
   );
   const newLondoGroundAnchors = catalog.enemySlots
     .filter((slot) =>
@@ -1154,8 +1193,9 @@ function randomizeExtractedEnemies(config, catalog, dragonPlan, bossPlan) {
     };
   }
 
-  const randomized = slots.map((slot, index) => {
+  const randomized = allSlots.map((slot, index) => {
     const replacement = assignment.get(slot.id) ?? slot;
+    const isChaosPinwheelClone = pinwheelCloneIds.has(slot.id);
     const passiveUntilAttacked =
       asylumPassiveSlots.has(slot.id) ||
       newLondoPassiveSlots.has(slot.id) ||
@@ -1199,6 +1239,9 @@ function randomizeExtractedEnemies(config, catalog, dragonPlan, bossPlan) {
             targetThinkParamId: replacementThinkParamId,
           }),
       ...(makeTangible ? { makeTangible: true } : {}),
+      // Replaced clones keep their own combat stats (normal HP) instead of
+      // inheriting the clone's 1 HP; drops and team still follow the slot.
+      ...(isChaosPinwheelClone ? { scaling: "vanilla" } : {}),
       ...(groundedGhostSpawn
         ? {
             groundX: groundedGhostSpawn.x,
@@ -1220,7 +1263,9 @@ function randomizeExtractedEnemies(config, catalog, dragonPlan, bossPlan) {
             initialTeamType: 2,
           }
         : {}),
-      compatibility: passiveUntilAttacked
+      compatibility: isChaosPinwheelClone
+        ? "pinwheel-chaos-clone"
+        : passiveUntilAttacked
         ? asylumPassiveSlots.has(slot.id)
           ? "passive-asylum-source-ai-permutation"
           : newLondoPassiveSlots.has(slot.id)
@@ -1247,10 +1292,11 @@ const canonicalBossModel = new Map([
 ]);
 const nonPortableBossReplacementModels = new Set();
 
-function shuffledPortableBosses(rng, archetypeKeys, archetypes) {
+function shuffledPortableBosses(rng, archetypeKeys, archetypes, excludedModels = new Set()) {
   const portable = archetypes.filter(
     (archetype) =>
-      !nonPortableBossReplacementModels.has(archetype.modelName),
+      !nonPortableBossReplacementModels.has(archetype.modelName) &&
+      !excludedModels.has(archetype.modelName),
   );
   if (portable.length === 0) return [...archetypes];
   const candidates = [...portable];
@@ -1289,6 +1335,7 @@ function randomizeExtractedBosses(config, catalog, dragonPlan) {
   const sources = effectiveSlots.filter(
     (slot) =>
       !dragonPlan.reservedSlotIds.has(slot.id) &&
+      !(config.pinwheelChaos && config.randomizeEnemies && slot.id === pinwheelMainSlot) &&
       slot.id !== "m14_01_00_00:c5230_0000" &&
       slot.npcParamId >= 0 &&
       slot.thinkParamId >= 0,
@@ -1299,7 +1346,20 @@ function randomizeExtractedBosses(config, catalog, dragonPlan) {
   const archetypes = archetypeKeys.map((archetypeKey) =>
     sources.find((slot) => bossArchetypeKey(slot) === archetypeKey),
   );
-  const shuffled = shuffledPortableBosses(rng, archetypeKeys, archetypes);
+  // Legacy "Gwyn nerf": with the legacy rejection chance Lord Gwyn is not a
+  // candidate for any boss slot, the Kiln included. Another boss fills the gap
+  // (a boss may then appear twice). Drawn from its own stream, and only when
+  // the nerf is on, so the default stream usage is unchanged.
+  const gwynRejected =
+    (gwynNerfRejection[config.gwynNerf] ?? 0) > 0 &&
+    createStream(config.seed, "gwyn-nerf", config.version).next() <
+      gwynNerfRejection[config.gwynNerf];
+  const shuffled = shuffledPortableBosses(
+    rng,
+    archetypeKeys,
+    archetypes,
+    gwynRejected ? new Set([gwynModel]) : new Set(),
+  );
   const replacementsByModel = new Map();
   archetypeKeys.forEach((archetypeKey, index) =>
     replacementsByModel.set(archetypeKey, shuffled[index]),
@@ -1596,6 +1656,13 @@ function randomizeExtractedItemLots(config, catalog) {
     progression: false,
   }));
   const shopOnlyTargets = shopTargets.filter(isBulkShopConsumable);
+  // Legacy "Soul items" = Replaced: lesser souls become other consumables.
+  if (config.soulItems === "replaced") {
+    replaceLesserSouls(
+      createStream(config.seed, "soul-items", config.version),
+      lotTargets,
+    );
+  }
   // Legacy "Fashion Souls" off: world armor sets move as whole sets.
   const armorSetHomes = config.fashionSouls ? [] : findArmorSetHomes(lotTargets);
   const armorSetTargets = new Set(armorSetHomes.flat());
@@ -1654,7 +1721,7 @@ function randomizeExtractedItemLots(config, catalog) {
       ...(target.kind === "shop"
         ? { shopQuantity: shopPurchaseLimit(source) }
         : {}),
-      from: target.name,
+      from: target.originalName ?? target.name,
       to: source.name,
       itemName: source.name,
       sourcePool: source.pool,
@@ -1665,7 +1732,8 @@ function randomizeExtractedItemLots(config, catalog) {
       preserved:
         target.kind === source.kind &&
         target.rowId === source.rowId &&
-        target.slot === source.slot,
+        target.slot === source.slot &&
+        !source.transmuted,
     };
     if (target.pool === "world") {
       placement.location = `itemlot:${target.rowId}`;
@@ -1700,6 +1768,70 @@ function randomizeExtractedItemLots(config, catalog) {
     }
   }
   return result;
+}
+
+// Legacy "Soul items" Replaced: the lesser souls (goods 400-409, the Soul of
+// a Lost Undead line up to the Soul of a Great Hero) are replaced in place by
+// other consumables before the shuffle. Boss souls are not part of the item
+// catalog and Fire Keeper Souls (390-396) are not lesser souls, so neither is
+// touched. The replacement pool is derived from the catalog's own unprotected
+// world goods (never legacy tables) with their vanilla quantities, in item-id
+// order. Only goods that already occur in at least two distinct lots qualify:
+// unique items (keys, the Peculiar Doll, the Lordvessel) must never be
+// duplicated because FogMod tracks them by id and needs exactly one copy.
+// Ammunition is excluded because it is not a goods item.
+const isLesserSoul = (entry) =>
+  entry.equipType === 3 && entry.itemId >= 400 && entry.itemId <= 409;
+
+function replaceLesserSouls(rng, lotTargets) {
+  const lotsByItem = new Map();
+  for (const entry of lotTargets) {
+    if (entry.equipType !== 3) continue;
+    if (!lotsByItem.has(entry.itemId)) lotsByItem.set(entry.itemId, new Set());
+    lotsByItem.get(entry.itemId).add(`${entry.pool}:${entry.rowId}`);
+  }
+  const pool = new Map();
+  for (const entry of lotTargets) {
+    if (
+      (lotsByItem.get(entry.itemId)?.size ?? 0) < 2 ||
+      entry.pool !== "world" ||
+      entry.progression ||
+      entry.equipType !== 3 ||
+      (entry.itemId >= 390 && entry.itemId <= 409)
+    ) {
+      continue;
+    }
+    if (!pool.has(entry.itemId)) {
+      pool.set(entry.itemId, { entry, quantities: new Set() });
+    }
+    pool.get(entry.itemId).quantities.add(Math.max(1, Number(entry.quantity) || 1));
+  }
+  const candidates = [...pool.entries()]
+    .sort((left, right) => left[0] - right[0])
+    .map(([, value]) => ({
+      entry: value.entry,
+      quantities: [...value.quantities].sort((left, right) => left - right),
+    }));
+  lotTargets.forEach((entry, index) => {
+    if (!isLesserSoul(entry)) return;
+    if (candidates.length === 0) {
+      throw new Error(
+        "SOUL_ITEMS_POOL_EMPTY: the catalog has no consumables to replace lesser souls with.",
+      );
+    }
+    const pick = candidates[rng.int(candidates.length)];
+    const quantity = pick.quantities[rng.int(pick.quantities.length)];
+    lotTargets[index] = {
+      ...entry,
+      itemId: pick.entry.itemId,
+      category: pick.entry.category,
+      equipType: pick.entry.equipType,
+      quantity,
+      name: pick.entry.name,
+      originalName: entry.originalName ?? entry.name,
+      transmuted: true,
+    };
+  });
 }
 
 // Vanilla world armor sets are runs of consecutive item-lot rows in one map,
@@ -1846,6 +1978,43 @@ function shuffledWithoutFixedPoints(rng, values) {
     if (shuffled.every((value, index) => value !== values[index])) return shuffled;
   }
   return [...values.slice(1), values[0]];
+}
+
+// Legacy "Pinwheel Chaos": the clone bodies are replaced independently, so a
+// source may be used by more than one clone. Sources come from the regular
+// permutation, models are limited to the per-map budget, and the draw is
+// bounded and deterministic.
+function chooseChaosPinwheelSources(
+  rng,
+  config,
+  clones,
+  regularSlots,
+  regularSources,
+  fixedModelsByMap,
+) {
+  if (clones.length === 0) return [];
+  const models = new Set(fixedModelsByMap.get(pinwheelCloneMap) ?? []);
+  regularSlots.forEach((slot, index) => {
+    if (slot.mapId === pinwheelCloneMap) models.add(regularSources[index].modelName);
+  });
+  const chosen = [];
+  for (const clone of clones) {
+    const candidates = regularSources.filter(
+      (source) =>
+        (models.has(source.modelName) || models.size < MAX_ENEMY_MODELS_PER_MAP) &&
+        source.id !== clone.id &&
+        !(config.preventSameEnemy && source.modelName === clone.modelName),
+    );
+    if (candidates.length === 0) {
+      throw new Error(
+        "PINWHEEL_CHAOS_NO_CANDIDATE: no enemy fits the Catacombs model budget.",
+      );
+    }
+    const source = candidates[rng.int(candidates.length)];
+    models.add(source.modelName);
+    chosen.push(source);
+  }
+  return chosen;
 }
 
 // Legacy "Prevent same enemy": no slot may receive a source of its own
@@ -2073,6 +2242,11 @@ function limitUniqueEnemyModelsByMap(
   throw new Error("Enemy model-budget balancing did not converge.");
 }
 
+// Shields occupy EquipParamWeapon ids 1,400,000-1,599,999 (Buckler through the
+// Greatshield of Artorias); whips start at 1,600,000.
+const isShieldWeapon = (weapon) =>
+  weapon.id >= 1_400_000 && weapon.id < 1_600_000;
+
 function randomizeStartingClasses(config, catalog) {
   if (
     (!config.randomizeStartingClass && !config.randomizeStartingEquipment) ||
@@ -2167,16 +2341,27 @@ function randomizeStartingClasses(config, catalog) {
       const twoHandCompatibleWeapons = otherwiseUsableWeapons.filter(
         (weapon) => weapon.strength <= Math.floor(baseStrength * 1.5),
       );
+      // Legacy "Starting items": the right-hand weapon is one-handed usable in
+      // "shield-1h" and may need two-handing otherwise; the left hand is a
+      // shield in both shield modes and any usable weapon in "mixed-pool".
+      const primaryPool =
+        config.startingItems === "shield-1h"
+          ? oneHandedWeapons
+          : twoHandCompatibleWeapons;
+      const offhandPool =
+        config.startingItems === "mixed-pool"
+          ? oneHandedWeapons
+          : oneHandedWeapons.filter(isShieldWeapon);
       const roles = specialIds.has(target.id)
         ? ["primary", "offhand", "special"]
         : ["primary", "offhand"];
       for (const role of roles) {
         const candidates =
           role === "primary"
-            ? twoHandCompatibleWeapons.filter(
-                (weapon) => weapon.isPrimaryWeapon === true,
-              )
-            : oneHandedWeapons;
+            ? primaryPool.filter((weapon) => weapon.isPrimaryWeapon === true)
+            : role === "offhand"
+              ? offhandPool
+              : oneHandedWeapons;
         if (candidates.length === 0) {
           throw new Error(
             `Not enough compatible equipment for ${target.name}:${role}.`,
@@ -2395,6 +2580,14 @@ function randomizeItems(config) {
   });
 }
 
+function gwynNerfApplied(config) {
+  return (
+    (gwynNerfRejection[config.gwynNerf] ?? 0) > 0 &&
+    createStream(config.seed, "gwyn-nerf", config.version).next() <
+      gwynNerfRejection[config.gwynNerf]
+  );
+}
+
 export function generate(inputConfig, { gameCatalog = null } = {}) {
   const config = normalizeConfig(inputConfig);
   const errors = validateConfig(config);
@@ -2493,6 +2686,18 @@ export function generate(inputConfig, { gameCatalog = null } = {}) {
             ...(config.replaceRespawningMosquitoes
               ? []
               : ["The six respawning Blighttown mosquitoes were left in place and kept out of the enemy pool."]),
+            ...(config.soulItems === "replaced"
+              ? ["Soul items replaced: lesser souls (goods 400-409) were swapped for other consumables before shuffling."]
+              : []),
+            ...(config.randomizeStartingEquipment && config.startingItems !== "mixed-pool"
+              ? [`Starting items (${config.startingItems}): left-hand pickups are shields${config.startingItems === "shield-1h" ? " and right-hand weapons are one-handed usable" : ""}.`]
+              : []),
+            ...(config.pinwheelChaos
+              ? ["Pinwheel Chaos: the main Pinwheel stays; its clones join the enemy pool with their own stats."]
+              : []),
+            ...(config.gwynNerf !== "none" && config.randomizeBosses
+              ? [`Gwyn nerf (${config.gwynNerf}): Lord Gwyn ${gwynNerfApplied(config) ? "was" : "was not"} excluded from the boss candidates for this seed.`]
+              : []),
             ...(config.preventSameEnemy
               ? ["Prevent same enemy: no regular enemy slot received its own model (bosses never receive the same boss)."]
               : []),

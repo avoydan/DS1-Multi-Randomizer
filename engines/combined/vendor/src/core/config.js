@@ -30,6 +30,11 @@ export const defaultConfig = Object.freeze({
   replaceMimics: true,
   replaceRespawningMosquitoes: true,
   preventSameEnemy: false,
+  // Batch 2 (patches/0003). Engine defaults reproduce the unmodified behavior.
+  soulItems: "shuffled",
+  startingItems: "mixed-pool",
+  pinwheelChaos: false,
+  gwynNerf: "none",
   useExtractedData: true,
   dryRun: true,
 });
@@ -54,6 +59,7 @@ const booleanKeys = [
   "replaceMimics",
   "replaceRespawningMosquitoes",
   "preventSameEnemy",
+  "pinwheelChaos",
   "useExtractedData",
   "dryRun",
 ];
@@ -76,6 +82,14 @@ export function normalizeConfig(input = {}) {
   config.enemyScaling = ["vanilla", "area", "progressive"].includes(config.enemyScaling)
     ? config.enemyScaling
     : defaultConfig.enemyScaling;
+
+  for (const [key, allowed] of [
+    ["soulItems", ["shuffled", "replaced"]],
+    ["startingItems", ["shield-1h", "shield-2h", "mixed-pool"]],
+    ["gwynNerf", ["none", "medium", "strong"]],
+  ]) {
+    if (!allowed.includes(config[key])) config[key] = defaultConfig[key];
+  }
 
   for (const key of booleanKeys) {
     config[key] = Boolean(config[key]);
