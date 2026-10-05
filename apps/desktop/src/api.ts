@@ -1,5 +1,8 @@
 import type { EnemyPoolDescription, GameStateReport, GenerationEvent, GenerationResult, InstallationValidation, OperationResult, PipelinePlan, PresetDocument, PresetImportResult, RandomizerConfig } from '@ds1tr/contracts';
 
+export interface DetectedInstallation { gamePath: string; label: string; valid: boolean; problems: string[] }
+export type WorldDataPreparation = { ok: true } | { ok: false; code: string; userMessage: string };
+
 async function connection(): Promise<{ apiBase: string; token: string }> {
   const result = await window.desktop?.connection();
   if (!result?.apiBase) throw new Error(result?.error ?? 'Backend is unavailable. Restart the desktop app.');
@@ -59,6 +62,8 @@ export const api = {
       return false;
     }
   },
+  detectGame: () => post<{ installations: DetectedInstallation[] }>('/game/detect', {}),
+  prepareWorldData: (gamePath: string) => post<WorldDataPreparation>('/world-data/prepare', { gamePath }, true),
   validateInstallation: (gamePath: string) => post<InstallationValidation>('/installation/validate', { gamePath }),
   plan: (config: RandomizerConfig) => post<PipelinePlan>('/pipeline/plan', config),
   state: (gamePath: string) => post<GameStateReport>('/game/state', { gamePath }),

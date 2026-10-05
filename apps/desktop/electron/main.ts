@@ -1,9 +1,10 @@
 import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 import { spawn, execFile, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { readFile, writeFile, mkdir, access } from 'node:fs/promises';
+import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { migrateSettings, type StoredSettings } from './settings.js';
 
 const currentDirectory = path.dirname(fileURLToPath(import.meta.url));
 const runtimeRoot = path.join(process.resourcesPath, 'runtime');
@@ -12,14 +13,22 @@ let backend: ChildProcess | null = null;
 let backendUrl: string | null = null;
 let backendError: string | null = null;
 let sessionToken = '';
-let fogDataRoot = '';
+let settings: StoredSettings = {};
 let quitting = false;
+
+async function saveSettings(): Promise<void> {
+  try {
+    await mkdir(app.getPath('userData'), { recursive: true });
+    await writeFile(settingsPath(), JSON.stringify(settings, null, 2));
+  } catch { /* settings are a convenience; the app works without them */ }
+}
 
 async function loadSettings(): Promise<void> {
   try {
-    const settings = JSON.parse(await readFile(settingsPath(), 'utf8')) as { fogDataRoot?: string };
-    fogDataRoot = settings.fogDataRoot ?? '';
-  } catch { fogDataRoot = ''; }
+    const migrated = migrateSettings(JSON.parse(await readFile(settingsPath(), 'utf8')));
+    settings = migrated.settings;
+    if (migrated.changed) await saveSettings();
+  } catch { settings = {}; }
 }
 
 async function stopBackend(): Promise<void> {
@@ -60,7 +69,6 @@ async function startBackend(): Promise<void> {
       DS1TR_RUNTIME_ROOT: runtimeRoot,
       DS1TR_DOTNET_PATH: dataTool,
       DS1TR_DATA_TOOL_EXE: dataTool,
-      DS1TR_FOG_DATA_ROOT: fogDataRoot,
       DS1TR_STATE_DIR: path.join(app.getPath('userData'), 'state'),
     },
     stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
@@ -114,32 +122,18 @@ async function createWindow(): Promise<void> {
 }
 
 ipcMain.handle('dialog:select-game-directory', async () => {
-  const result = await dialog.showOpenDialog({ properties: ['openDirectory'] });
-  return result.canceled ? null : result.filePaths[0];
+  const result = await dialog.showOpenDialog({ title: 'Select the Dark Souls Remastered folder', properties: ['openDirectory'] });
+  if (result.canceled) return null;
+  settings = { ...settings, gamePath: result.filePaths[0] };
+  await saveSettings();
+  return result.filePaths[0];
 });
 ipcMain.handle('runtime:connection', () => ({
   apiBase: app.isPackaged ? backendUrl : 'http://127.0.0.1:43177/api',
   token: app.isPackaged ? sessionToken : '',
   error: backendError,
-  fogDataRoot,
+  gamePath: settings.gamePath ?? '',
 }));
-ipcMain.handle('dialog:select-fog-data-root', async () => {
-  const result = await dialog.showOpenDialog({ properties: ['openDirectory'] });
-  if (result.canceled) return null;
-  const selected = result.filePaths[0];
-  try {
-    await access(path.join(selected, 'dist', 'DS1R', 'event'));
-    await access(path.join(selected, 'dist', 'DS1R', 'map', 'MapStudio'));
-  } catch {
-    return { path: fogDataRoot, error: 'This folder is missing dist/DS1R/event or dist/DS1R/map/MapStudio. Select the FogMod data root.' };
-  }
-  fogDataRoot = selected;
-  await mkdir(app.getPath('userData'), { recursive: true });
-  await writeFile(settingsPath(), JSON.stringify({ fogDataRoot }, null, 2));
-  await startBackend();
-  return { path: fogDataRoot, error: backendError };
-});
-
 app.whenReady().then(async () => {
   await loadSettings();
   await startBackend();

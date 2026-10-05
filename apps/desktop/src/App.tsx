@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { EnemyPoolEditor } from './EnemyPoolEditor';
-import type { EnemyPlacementAlgorithm, FogLanguage, GameStateReport, GwynNerfMode, SecondGargoyleMode, SoulItemsMode, StartingItemsMode, GenerationResult, InstallationValidation, PipelinePlan, RandomizerConfig } from '@ds1tr/contracts';
+import { Readiness } from './Readiness';
+import type { EnemyPlacementAlgorithm, FogLanguage, GameStateReport, GwynNerfMode, SecondGargoyleMode, SoulItemsMode, StartingItemsMode, GenerationResult, PipelinePlan, RandomizerConfig } from '@ds1tr/contracts';
 import { api } from './api';
 
 const initialConfig: RandomizerConfig = {
@@ -101,15 +102,36 @@ function RangeOption({ label, value, onChange, disabled = false, inactive = fals
   );
 }
 
+function stateText(state: GameStateReport | null): string {
+  switch (state?.state) {
+    case 'vanilla': return 'Your game is original and ready to be randomized.';
+    case 'active': return 'A randomized game is applied. Restore the original game before making a new one.';
+    case 'interrupted': return 'A previous change was interrupted. Click "Restore original game" to repair it.';
+    case 'version-changed': return 'Dark Souls Remastered was updated. Restore the original game files, then try again.';
+    case 'modified': return 'Some game files were changed by another tool. Verify the game files in Steam first.';
+    case 'invalid': return 'This folder is not a Dark Souls Remastered installation.';
+    case 'no-snapshot': return 'Checking your game...';
+    default: return 'Looking for your game...';
+  }
+}
+
+function progressLabel(stage: string): string {
+  switch (stage) {
+    case 'verify': case 'import': return 'Checking your game';
+    case 'combined': return 'Randomizing items and enemies';
+    case 'fog': return 'Randomizing the world';
+    default: return 'Working';
+  }
+}
+
 export function App() {
   const [config, setConfig] = useState(initialConfig);
   const [backendOnline, setBackendOnline] = useState<boolean | null>(null);
   const [startupError, setStartupError] = useState<string | null>(null);
-  const [fogDataRoot, setFogDataRoot] = useState('');
-  const [validation, setValidation] = useState<InstallationValidation | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
   const [plan, setPlan] = useState<PipelinePlan | null>(null);
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState('Ready to configure.');
+  const [message, setMessage] = useState('Choose your settings, then click Randomize.');
   const [gameState, setGameState] = useState<GameStateReport | null>(null);
   const [generation, setGeneration] = useState<GenerationResult | null>(null);
   const [progress, setProgress] = useState(0);
@@ -122,10 +144,7 @@ export function App() {
 
   useEffect(() => {
     api.health().then(setBackendOnline);
-    window.desktop?.connection().then((state) => {
-      setStartupError(state.error);
-      setFogDataRoot(state.fogDataRoot);
-    });
+    window.desktop?.connection().then((state) => setStartupError(state.error));
   }, []);
 
   useEffect(() => {
@@ -140,8 +159,9 @@ export function App() {
 
   const reportError = (error: unknown) => {
     const detail = error instanceof Error ? error.message : String(error);
-    setErrorMessage(detail);
-    setMessage(detail);
+    setLogs((current) => [...current, `error: ${detail}`]);
+    setErrorMessage('Something went wrong. Please try again; the details are under Advanced.');
+    setMessage('Something went wrong.');
   };
 
   const setItem = <K extends keyof RandomizerConfig['items']>(key: K, value: RandomizerConfig['items'][K]) =>
@@ -164,44 +184,16 @@ export function App() {
   const setFog = <K extends keyof RandomizerConfig['fog']>(key: K, value: RandomizerConfig['fog'][K]) =>
     setConfig((current) => ({ ...current, fog: { ...current.fog, [key]: value } }));
 
-  const selectGame = async () => {
-    const selected = await window.desktop?.selectGameDirectory();
-    if (selected) {
-      setConfig((current) => ({ ...current, gamePath: selected }));
-      setValidation(null);
-      setPlan(null);
-      setGameState(null);
-      setGeneration(null);
-      setGeneratedConfig(null);
-      setErrorMessage(null);
-    }
-  };
-
-  const validate = async () => {
-    setBusy(true);
-    setProgressStage('');
-    setErrorMessage(null);
-    try {
-      const result = await api.validateInstallation(config.gamePath);
-      setValidation(result);
-      setGameState(await api.state(config.gamePath));
-      setMessage(result.valid ? 'Dark Souls Remastered installation looks valid.' : 'Installation needs attention.');
-    } catch (error) {
-      reportError(error);
-    } finally {
-      setBusy(false);
-    }
-  };
-
   const importPristine = async () => {
     setBusy(true);
     setProgressStage('');
     setErrorMessage(null);
     try {
       const result = await api.importPristine(config.gamePath);
-      setMessage(result.ok ? 'Pristine snapshot imported.' : `${result.code}: ${result.message}`);
-      if (!result.ok) setErrorMessage(`${result.code}: ${result.message}${result.problems.length ? ` ${result.problems.join(' ')}` : ''}`);
+      setMessage(result.ok ? 'Dark Souls Remastered checked.' : result.message);
+      if (!result.ok) setErrorMessage(result.message);
       setGameState(await api.state(config.gamePath));
+      setRefreshKey((value) => value + 1);
     } catch (error) { reportError(error); }
     finally { setBusy(false); }
   };
@@ -222,8 +214,11 @@ export function App() {
       });
       setGeneration(result);
       if (result.ok) setGeneratedConfig(submittedConfig);
-      else setErrorMessage(`Generation failed at ${result.stage}: ${result.code}: ${result.message}`);
-      setMessage(result.ok ? `Package generated: ${result.packagePath}` : `${result.code}: ${result.message}`);
+      else {
+        setErrorMessage(result.message);
+        setLogs((current) => [...current, `[${result.stage}] failed: ${result.code}`]);
+      }
+      setMessage(result.ok ? 'Your randomized game is ready. Click "Apply to game".' : result.message);
     } catch (error) { reportError(error); }
     finally { setBusy(false); }
   };
@@ -235,9 +230,10 @@ export function App() {
     setErrorMessage(null);
     try {
       const result = await api.activate(config.gamePath, generation.packagePath);
-      setMessage(result.ok ? 'Generated package activated.' : `${result.code}: ${result.message}`);
-      if (!result.ok) setErrorMessage(`${result.code}: ${result.message}${result.problems.length ? ` ${result.problems.join(' ')}` : ''}`);
+      setMessage(result.ok ? 'Applied. Start Dark Souls Remastered from Steam and play offline.' : result.message);
+      if (!result.ok) setErrorMessage(`${result.message}${result.problems.length ? ` ${result.problems.join(' ')}` : ''}`);
       setGameState(await api.state(config.gamePath));
+      setRefreshKey((value) => value + 1);
     } catch (error) { reportError(error); }
     finally { setBusy(false); }
   };
@@ -248,9 +244,10 @@ export function App() {
     setErrorMessage(null);
     try {
       const result = await api.restore(config.gamePath);
-      setMessage(result.ok ? `Vanilla files restored (${result.restored}).` : `${result.code}: ${result.message}`);
-      if (!result.ok) setErrorMessage(`${result.code}: ${result.message}${result.problems.length ? ` ${result.problems.join(' ')}` : ''}`);
+      setMessage(result.ok ? 'The original game files are back.' : result.message);
+      if (!result.ok) setErrorMessage(`${result.message}${result.problems.length ? ` ${result.problems.join(' ')}` : ''}`);
       setGameState(await api.state(config.gamePath));
+      setRefreshKey((value) => value + 1);
     } catch (error) { reportError(error); }
     finally { setBusy(false); }
   };
@@ -297,36 +294,23 @@ export function App() {
   return (
     <div className="app-shell">
       <header>
-        <div><div className="eyebrow">DARK SOULS REMASTERED</div><h1>Triple Randomizer</h1><p>Items + Enemies + Fog Gates, one deterministic pipeline.</p></div>
-        <div className={`status ${backendOnline ? 'online' : 'offline'}`}><span /> Backend {backendOnline === null ? 'checking' : backendOnline ? 'online' : 'offline'}</div>
+        <div><div className="eyebrow">DARK SOULS REMASTERED</div><h1>Triple Randomizer</h1><p>Randomize items, enemies and the world of Dark Souls Remastered.</p></div>
+        <div className={`status ${backendOnline ? 'online' : 'offline'}`}><span /> {backendOnline === null ? 'Starting...' : backendOnline ? 'Ready' : 'Not running'}</div>
       </header>
 
       <main>
-        {startupError && <div className="notice error">Backend startup failed: {startupError}</div>}
-        {!config.gamePath && <div className="notice">Select your Dark Souls Remastered installation to begin. The app can start without the game installed.</div>}
+        {startupError && <div className="notice error">DS1 Triple Randomizer could not start its engine. Close and reopen the app; if it keeps happening, download the app again.<details><summary>Details</summary>{startupError}</details></div>}
         <section className="card setup-card">
-          <div className="section-title"><span>01</span><h2>Game, seed & output</h2></div>
-          <label className="field-label">Dark Souls Remastered directory</label>
-          <div className="path-row">
-            <input value={config.gamePath} onChange={(event) => { setConfig({ ...config, gamePath: event.target.value }); setGameState(null); setGeneration(null); setGeneratedConfig(null); setValidation(null); }} placeholder="C:\\Program Files (x86)\\Steam\\steamapps\\common\\DARK SOULS REMASTERED" />
-            <button className="secondary" onClick={selectGame}>Browse</button>
-            <button className="secondary" onClick={validate} disabled={busy || !config.gamePath}>Validate</button>
-          </div>
-          {validation && <div className={validation.valid ? 'notice success' : 'notice error'}>{validation.valid ? 'Installation validated.' : validation.problems.join(' ')}</div>}
-          <label className="field-label">FogMod data root (folder containing dist/DS1R)</label>
-          <div className="path-row">
-            <input value={fogDataRoot} readOnly placeholder="Required for Fog generation; supplied by you" />
-            <button className="secondary" disabled={busy} onClick={async () => {
-              const selected = await window.desktop?.selectFogDataRoot();
-              if (selected) {
-                setFogDataRoot(selected.path);
-                setStartupError(selected.error);
-                setBackendOnline(await api.health());
-                setPlan(null);
-              }
-            }}>Browse</button>
-          </div>
-          {!fogDataRoot && <div className="notice">Fog generation needs the FogMod 6e6dc78 data folder. Select it here before generating with Fog enabled.</div>}
+          <div className="section-title"><span>01</span><h2>Your game and seed</h2></div>
+          <Readiness
+            gamePath={config.gamePath}
+            backendReady={backendOnline === true}
+            worldNeeded={config.fog.enabled}
+            busy={busy}
+            refreshKey={refreshKey}
+            onPath={(path) => { setConfig((current) => ({ ...current, gamePath: path })); setGameState(null); setGeneration(null); setGeneratedConfig(null); setErrorMessage(null); }}
+            onState={setGameState}
+          />
           <label className="field-label">Master seed</label>
           <div className="seed-row">
             <input value={config.masterSeed} onChange={(event) => setConfig({ ...config, masterSeed: event.target.value })} />
@@ -346,7 +330,7 @@ export function App() {
         <div className="grid-3">
           <section className={`card engine-card ${config.items.enabled ? '' : 'disabled-card'}`}>
             <div className="engine-heading"><div><span className="engine-index">ITEMS</span><h2>Item settings</h2></div><input type="checkbox" checked={config.items.enabled} onChange={(event) => setItem('enabled', event.target.checked)} /></div>
-            <div className="option-group"><h3>Combined engine</h3>
+            <div className="option-group"><h3>Main options</h3>
               <Toggle label="World items" checked={config.items.randomizeWorldItems} onChange={(value) => setItem('randomizeWorldItems', value)} />
               <Toggle disabled label="Protected items (unsafe: may softlock)" checked={config.items.randomizeProtectedItems} onChange={(value) => setItem('randomizeProtectedItems', value)} />
               <Toggle label="Protect selected gift/shop progression entries" checked={config.items.progressionLogic} onChange={(value) => setItem('progressionLogic', value)} />
@@ -375,7 +359,7 @@ export function App() {
 
           <section className={`card engine-card ${config.enemies.enabled ? '' : 'disabled-card'}`}>
             <div className="engine-heading"><div><span className="engine-index">ENEMIES</span><h2>Enemy settings</h2></div><input type="checkbox" checked={config.enemies.enabled} onChange={(event) => setEnemy('enabled', event.target.checked)} /></div>
-            <div className="option-group"><h3>Combined engine</h3>
+            <div className="option-group"><h3>Main options</h3>
               <Toggle label="Regular enemies" checked={config.enemies.randomizeRegularEnemies} onChange={(value) => setEnemy('randomizeRegularEnemies', value)} />
               <Toggle label="Bosses" checked={config.enemies.randomizeBosses} onChange={(value) => setEnemy('randomizeBosses', value)} />
               <label className="field-label">Scaling</label><select value={config.enemies.scaling} onChange={(event) => setEnemy('scaling', event.target.value as RandomizerConfig['enemies']['scaling'])}><option value="vanilla">Vanilla</option><option value="area">Area</option><option value="progressive">Progressive</option></select>
@@ -419,7 +403,7 @@ export function App() {
           </section>
 
           <section className={`card engine-card ${config.fog.enabled ? '' : 'disabled-card'}`}>
-            <div className="engine-heading"><div><span className="engine-index">WORLD</span><h2>FogMod settings</h2></div><input type="checkbox" checked={config.fog.enabled} onChange={(event) => setFog('enabled', event.target.checked)} /></div>
+            <div className="engine-heading"><div><span className="engine-index">WORLD</span><h2>World settings</h2></div><input type="checkbox" checked={config.fog.enabled} onChange={(event) => setFog('enabled', event.target.checked)} /></div>
             <div className="option-group"><h3>Entrances</h3>
               <Toggle label="Traversable non-boss fogs" checked={config.fog.traversableFogs} onChange={(value) => setFog('traversableFogs', value)} />
               <Toggle label="Boss fog gates" checked={config.fog.bossFogs} onChange={(value) => setFog('bossFogs', value)} />
@@ -441,21 +425,26 @@ export function App() {
           </section>
         </div>
 
-        <section className="card action-card"><div><div className="eyebrow">PIPELINE</div><h2>{enabledCount} engines enabled</h2><p role="status">{message}</p>{errorMessage && <div className="notice error" role="alert">{errorMessage}</div>}</div><button className="primary" onClick={previewPlan} disabled={busy || !config.masterSeed.trim()}>Preview randomization plan</button></section>
+        <section className="card action-card"><div><div className="eyebrow">YOUR SELECTION</div><h2>{enabledCount} of 3 parts switched on</h2><p role="status">{message}</p>{errorMessage && <div className="notice error" role="alert">{errorMessage}</div>}</div></section>
 
         <section className="card run-card">
-          <div className="section-title"><span>02</span><h2>Run and game state</h2></div>
-          <p>Installation: <strong>{gameState?.state ?? 'not checked'}</strong>{gameState?.problems.length ? ` — ${gameState.problems.join(' ')}` : ''}</p>
-          {gameState?.activePackage && <p>Active package: {gameState.activePackage}</p>}
+          <div className="section-title"><span>02</span><h2>Randomize</h2></div>
+          <p>{stateText(gameState)}</p>
           <div className="run-actions">
-            <button className="secondary" onClick={importPristine} disabled={busy || !config.gamePath || gameState?.state !== 'no-snapshot'}>Import pristine data</button>
-            <button className="primary" onClick={generateRun} disabled={busy || !config.gamePath || !config.masterSeed.trim() || gameState?.state !== 'vanilla' || enabledCount === 0}>Generate run</button>
-            <button className="secondary" onClick={activate} disabled={busy || !generation?.ok || !generationMatchesConfig || gameState?.state !== 'vanilla'}>Activate generated run</button>
-            <button className="secondary" onClick={restore} disabled={busy || !gameState || !['active', 'interrupted'].includes(gameState.state)}>Restore vanilla</button>
+            <button className="primary" onClick={generateRun} disabled={busy || !config.gamePath || !config.masterSeed.trim() || gameState?.state !== 'vanilla' || enabledCount === 0}>Randomize</button>
+            <button className="secondary" onClick={activate} disabled={busy || !generation?.ok || !generationMatchesConfig || gameState?.state !== 'vanilla'}>Apply to game</button>
+            <button className="secondary" onClick={restore} disabled={busy || !gameState || !['active', 'interrupted'].includes(gameState.state)}>Restore original game</button>
           </div>
-          {busy && progressStage && <div className="progress-status"><span>{progressStage}: {Math.round(progress * 100)}%</span><progress value={progress} max={1} aria-label="Generation progress" /></div>}
-          {generation?.ok && <div className="generated-status" role="status"><strong>Generated run ready</strong><span>Seed: {generation.manifest.masterSeed} · {generation.manifest.files.length} files</span><code>{generation.packagePath}</code>{!generationMatchesConfig && <span className="stale-warning">Settings changed since generation. Regenerate to activate these settings.</span>}</div>}
-          <details className="log-panel" open={logs.length > 0}><summary>Generation logs ({logs.length})</summary><pre className="run-logs" aria-label="Generation logs">{logs.length ? logs.join('\n') : 'No generation logs yet.'}</pre></details>
+          {busy && progressStage && <div className="progress-status"><span>{progressLabel(progressStage)}: {Math.round(progress * 100)}%</span><progress value={progress} max={1} aria-label="Progress" /></div>}
+          {generation?.ok && <div className="generated-status" role="status"><strong>Your randomized game is ready</strong><span>Seed: {generation.manifest.masterSeed}</span>{!generationMatchesConfig && <span className="stale-warning">Settings changed since then. Click Randomize again to use these settings.</span>}</div>}
+          <details className="log-panel" open={logs.length > 0}><summary>Advanced</summary>
+            <div className="run-actions">
+              <button className="secondary" onClick={previewPlan} disabled={busy || !config.masterSeed.trim()}>Preview randomization plan</button>
+              <button className="secondary" onClick={importPristine} disabled={busy || !config.gamePath}>Check game files again</button>
+            </div>
+            {generation?.ok && <p>Files: <code>{generation.packagePath}</code> ({generation.manifest.files.length} files)</p>}
+            <pre className="run-logs" aria-label="Details">{logs.length ? logs.join('\n') : 'Nothing to show yet.'}</pre>
+          </details>
         </section>
 
         {plan && <section className="card plan-card"><div className="section-title"><span>02</span><h2>Pipeline preview</h2></div><div className="seed-grid">{plan.stages.map((stage) => <div key={stage.engine}><span>{stage.engine}</span><strong>{stage.enabled ? stage.seed : 'disabled'}</strong></div>)}</div><div className="engine-status-list">{plan.engineStatus.map((status) => <div key={status.name} className="engine-status"><strong>{status.name}</strong><span className={`pill ${status.ready ? 'ready' : ''}`}>{status.mode}</span><p>{status.detail}</p></div>)}</div></section>}

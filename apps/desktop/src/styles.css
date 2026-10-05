@@ -90,3 +90,11 @@ input:focus, select:focus { border-color: #8e7043; box-shadow: 0 0 0 3px #8e7043
 .legal-card p { max-width: 960px; font-size: 12px; line-height: 1.55; }
 .legal-card a { color: #d9a95f; font-size: 12px; font-weight: 700; }
 @media (max-width: 1050px) { .grid-3 { grid-template-columns: 1fr; } .engine-card { min-height: auto; } }
+.readiness { display: grid; gap: 10px; }
+.readiness-row { display: grid; grid-template-columns: 30px 1fr auto; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid #29303b; border-radius: 11px; background: #131821; }
+.readiness-row p { margin: 3px 0 0; font-size: 12px; }
+.readiness-row small { display: block; margin-top: 3px; overflow-wrap: anywhere; }
+.readiness-mark { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: #272e39; color: #929cac; font-weight: 800; }
+.readiness-row.ready .readiness-mark { background: #173322; color: #8ed0a5; }
+.readiness-row.problem .readiness-mark, .readiness-row.failed .readiness-mark, .readiness-row.missing .readiness-mark { background: #4a2a1d; color: #e0a37a; }
+.readiness-choices { display: grid; gap: 6px; margin-top: 8px; }
