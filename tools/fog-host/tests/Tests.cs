@@ -92,6 +92,11 @@ namespace FogHost.Tests
                 Test("instruction merge: ambiguous alignment whose span the other side edits is refused", AmbiguousAlignmentRefused);
                 Test("instruction merge: parameters are re-indexed", ParametersReindexed);
                 Test("instruction merge: deleting a parameterized instruction is refused", ParameterizedDeletionRefused);
+                Test("second Gargoyle: events 11015396 and 11015382 carried over by FogMod merge unchanged, without the overlay", SecondGargoyleCarriedOver);
+                Test("second Gargoyle: the replaced release event keeps the hold / wait for 60% / release structure", SecondGargoyleReleaseSemantics);
+                Test("second Gargoyle: the 15-event boss overlay is unchanged and excludes both events", SecondGargoyleNotInOverlay);
+                Test("second Gargoyle: a FogMod form that diverges (control flow, anchors, parameters, threshold) is refused", SecondGargoyleDivergenceRefused);
+                Test("second Gargoyle: vanilla forms (option off) merge to nothing", SecondGargoyleUntouchedWhenOptionOff);
                 DataTest("altered or extended data root is FOG_DATA_MISSING", AlteredDataRoot);
                 DataTest("CRLF text files in data root still verify", CrlfDataRoot);
                 DataTest("staging with DarkSoulsRemastered.exe is FOG_STAGING_UNSAFE", UnsafeStaging);
@@ -102,6 +107,7 @@ namespace FogHost.Tests
                 DataTest("combined NpcParam rows, MSB parts and events survive (scale off)", () => CombinedSurvives(false));
                 DataTest("preserving a vanilla NpcParam row is FOG_REQUEST_INVALID", PreservedVanilla);
                 DataTest("combined hash mismatch is FOG_REQUEST_INVALID", CombinedHashMismatch);
+                DataTest("second Gargoyle: both legacy forms survive a real FogMod run", SecondGargoyleSurvivesFogMod);
             }
             finally
             {
@@ -1167,6 +1173,247 @@ namespace FogHost.Tests
             }
             Check(runs[0].Run.ResponseBytes.AsSpan().SequenceEqual(runs[1].Run.ResponseBytes), "responses differ between processes");
             Check(TreeHash(Path.Combine(runs[0].Dir, "game")) == TreeHash(Path.Combine(runs[1].Dir, "game")), "staging trees differ between processes");
+        }
+
+        // ---------------------------------------------------------------- Replace second Gargoyle (events 11015396 / 11015382)
+        //
+        // FogMod makes no edit of its own to these two events: GameDataWriter copies the game directory's
+        // instruction list into them ("11205382, 11015382, 11015396 have no modifications in fog rando, so they
+        // can be copied over"). The combined engine's legacy "Replace second Gargoyle" forms therefore reach the
+        // normal three-way merge as "FogMod output identical to the combined event", which rule 3 takes
+        // unchanged. No boss-overlay entry is involved, and none is added (docs/FOGHOST_INTEGRATION.md).
+        // Instruction data below is taken from real dumps of the DS1R events (vanilla, and the combined engine's
+        // output for a replaced second Gargoyle).
+
+        private const long GargoyleRelease = 11015396; // releases body 1010801 when 1010800 drops to 60%
+        private const long TaurusIntro = 11015382;     // holds entity 1010700 until the player enters volume 1012701
+        private const int SecondGargoyle = 1010801;
+        private const int FirstGargoyle = 1010800;
+        private const int Taurus = 1010700;
+
+        private static EMEVD.Event Restart(long id, params EMEVD.Instruction[] instructions)
+        {
+            var evt = new EMEVD.Event(id, EMEVD.Event.RestBehaviorType.Restart);
+            evt.Instructions.AddRange(instructions);
+            return evt;
+        }
+
+        private static EMEVD.Event VanillaGargoyleRelease() => Restart(GargoyleRelease,
+            Ins(1003, 2, 0x100, 3),
+            Ins(2004, 1, SecondGargoyle, 0),
+            Ins(2004, 9, SecondGargoyle, 7000, -1, -1, -1, -1),
+            Ins(2004, 15, SecondGargoyle, 1),
+            Ins(2004, 30, SecondGargoyle, 0),
+            Ins(4, 2, 0, FirstGargoyle, 5, 0x3F19999A),
+            Ins(2004, 9, SecondGargoyle, -1, -1, -1, -1, -1),
+            Ins(2004, 41, SecondGargoyle, 1, 1012650, -1),
+            Ins(2003, 18, SecondGargoyle, 7001, 0x100),
+            Ins(2004, 15, SecondGargoyle, 0),
+            Ins(2004, 1, SecondGargoyle, 1),
+            Ins(2003, 11, 1, SecondGargoyle, 0x14E60001));
+
+        // Combined engine output for a replaced second Gargoyle: the held-then-released structure of the legacy
+        // template stays; the Gargoyle-specific instructions go; the boss bar carries the new boss's name.
+        private static EMEVD.Event ReplacedGargoyleRelease() => Restart(GargoyleRelease,
+            Ins(1003, 2, 0x100, 3),
+            Ins(2004, 1, SecondGargoyle, 0),
+            Ins(2004, 15, SecondGargoyle, 1),
+            Ins(4, 2, 0, FirstGargoyle, 5, 0x3F19999A),
+            Ins(2004, 15, SecondGargoyle, 0),
+            Ins(2004, 1, SecondGargoyle, 1),
+            Ins(2003, 11, 1, SecondGargoyle, 0x14640001),
+            Ins(2004, 1, SecondGargoyle, 1),
+            Ins(2004, 20, SecondGargoyle));
+
+        private static EMEVD.Event VanillaTaurusIntro() => Restart(TaurusIntro,
+            Ins(1003, 1, 0x00010002, 0),
+            Ins(2004, 9, Taurus, -1, -1, -1, -1, -1),
+            Ins(1000, 4, 0),
+            Ins(2004, 1, Taurus, 0),
+            Ins(2004, 9, Taurus, 9001, -1, -1, -1, -1),
+            Ins(2004, 30, Taurus, 0),
+            Ins(4, 1, 1, Taurus, 10000),
+            Ins(3, 6, 2),
+            Ins(3, 2, 0x102, 10000, 1012701),
+            Ins(0, 0, 0x000101FF),
+            Ins(0, 0, 0x000201FF),
+            Ins(0, 0, 0x00FF0100),
+            Ins(2003, 2, 11010005, 1),
+            Ins(2004, 9, Taurus, -1, -1, -1, -1, -1),
+            Ins(2003, 18, Taurus, 9061, 0x100),
+            Ins(2004, 1, Taurus, 1));
+
+        // The combined engine's standard replaced-boss edit of the same event (independent of the Gargoyle option).
+        private static EMEVD.Event ReplacedTaurusIntro() => Restart(TaurusIntro,
+            Ins(1003, 1, 0x00010001, 0),
+            Ins(1000, 4, 0),
+            Ins(2004, 1, Taurus, 0),
+            Ins(4, 1, 1, Taurus, 10000),
+            Ins(3, 6, 2),
+            Ins(3, 2, 0x102, 10000, 1012701),
+            Ins(0, 0, 0x000101FF),
+            Ins(0, 0, 0x000201FF),
+            Ins(0, 0, 0x00FF0100),
+            Ins(2003, 2, 11010005, 1),
+            Ins(2004, 1, Taurus, 1));
+
+        private static EMEVD.Event Event0() => Restart(0,
+            Ins(2000, 0, 0, (int)GargoyleRelease, 0),
+            Ins(2000, 0, 0, (int)TaurusIntro, 0));
+
+        /// <summary>Base = vanilla; combined = legacy forms; FogMod output = base with the game's instruction lists copied in.</summary>
+        private static (EMEVD B, EMEVD C, EMEVD T) GargoyleTrio()
+        {
+            EMEVD b = Evd(Event0(), VanillaGargoyleRelease(), VanillaTaurusIntro());
+            EMEVD c = Evd(Event0(), ReplacedGargoyleRelease(), ReplacedTaurusIntro());
+            EMEVD t = Evd(Event0(), VanillaGargoyleRelease(), VanillaTaurusIntro());
+            foreach (long id in new[] { GargoyleRelease, TaurusIntro })
+            {
+                EMEVD.Event fog = t.Events.Single(e => e.ID == id);
+                EMEVD.Event game = c.Events.Single(e => e.ID == id);
+                fog.Instructions = game.Instructions.Select(i => new EMEVD.Instruction(i.Bank, i.ID, i.ArgData.ToArray())).ToList();
+                fog.Parameters = new List<EMEVD.Parameter>(game.Parameters);
+            }
+            return (b, c, t);
+        }
+
+        private static void SecondGargoyleCarriedOver()
+        {
+            var (b, c, t) = GargoyleTrio();
+            var merge = new EmevdMerge(new() { ["m10_01_00_00.emevd.dcx"] = (b, c) });
+            merge.Merge("m10_01_00_00.emevd.dcx", t);
+            merge.ThrowIfConflicts();
+            Check(merge.Conflicts.Count == 0, "unexpected conflicts");
+            Check(merge.BossOverlays.Count == 0, "the boss overlay must not be involved");
+            Check(merge.InstructionMerges.Count == 0, "no instruction-level merge is needed");
+            foreach (long id in new[] { GargoyleRelease, TaurusIntro })
+            {
+                EMEVD.Event written = t.Events.Single(e => e.ID == id);
+                Check(EmevdMerge.SameEvent(written, c.Events.Single(e => e.ID == id)), $"event {id} differs from the combined form");
+                Check(!EmevdMerge.SameEvent(written, b.Events.Single(e => e.ID == id)), $"event {id} still has the vanilla form");
+                Check(merge.ExpectedEvents["m10_01_00_00.emevd.dcx"].Any(e => e.ID == id), $"event {id} is not an invariant-4 expectation");
+            }
+            // Fog's own logic stays authoritative: event 0 keeps the initializations of both events.
+            Check(t.Events.Single(e => e.ID == 0).Instructions.Count(i => i.Bank == 2000 && i.ID == 0) == 2, "event 0 initializations changed");
+        }
+
+        private static void SecondGargoyleReleaseSemantics()
+        {
+            // The held-then-released structure of the legacy template: the body is switched off and invincible,
+            // a wait on the first body's 60% health follows, and only then is it released and its bar shown.
+            EMEVD.Event e = ReplacedGargoyleRelease();
+            int Index(int bank, int id, int a0, int a1 = int.MinValue)
+            {
+                for (int i = 0; i < e.Instructions.Count; i++)
+                {
+                    EMEVD.Instruction ins = e.Instructions[i];
+                    if (ins.Bank == bank && ins.ID == id && BitConverter.ToInt32(ins.ArgData, 0) == a0
+                        && (a1 == int.MinValue || BitConverter.ToInt32(ins.ArgData, 4) == a1)) return i;
+                }
+                return -1;
+            }
+            int aiOff = Index(2004, 1, SecondGargoyle, 0), invOn = Index(2004, 15, SecondGargoyle, 1);
+            int wait = Index(4, 2, 0, FirstGargoyle), invOff = Index(2004, 15, SecondGargoyle, 0), bar = Index(2003, 11, 1, SecondGargoyle);
+            Check(aiOff >= 0 && aiOff < invOn && invOn < wait && wait < invOff && invOff < bar, "hold / wait / release order is wrong");
+            Check(BitConverter.ToSingle(e.Instructions[wait].ArgData, 12) == 0.6f, "release threshold is not 60%");
+            Check(e.Instructions[0].Bank == 1003 && e.Instructions[0].ID == 2, "the multiplayer-client guard (flag 3) was lost");
+            // Every Gargoyle-specific animation instruction of the vanilla event is gone.
+            Check(!e.Instructions.Any(i => i.Bank == 2004 && (i.ID == 9 || i.ID == 41)) && !e.Instructions.Any(i => i.Bank == 2003 && i.ID == 18),
+                "model-specific instructions remain");
+            // The Taurus event differs from vanilla only by the combined engine's removals, with its SKIP count adjusted.
+            EMEVD.Event taurus = ReplacedTaurusIntro();
+            Check(BitConverter.ToInt32(VanillaTaurusIntro().Instructions[0].ArgData, 0) == 0x00010002 && BitConverter.ToInt32(taurus.Instructions[0].ArgData, 0) == 0x00010001,
+                "the Taurus SKIP range was not shortened with the removal inside it");
+        }
+
+        private static void SecondGargoyleNotInOverlay()
+        {
+            var expected = new HashSet<long> { 11005392, 11010000, 11210001, 11405392, 11415342, 11415373, 11415382, 11515392,
+                11600001, 11700000, 11810000, 11810310, 11815382, 11815390, 11815394 };
+            Check(BossOverlay.BossEvents.SetEquals(expected), "the 15-event boss overlay set changed");
+            Check(!BossOverlay.BossEvents.Contains(GargoyleRelease) && !BossOverlay.BossEvents.Contains(TaurusIntro),
+                "the Gargoyle events must not be in the boss overlay");
+        }
+
+        private static void SecondGargoyleDivergenceRefused()
+        {
+            // If FogMod ever stopped copying these events unchanged, the normal merge (and no overlay) must decide.
+            var variants = new Dictionary<string, Action<EMEVD.Event>>
+            {
+                ["control flow: an unconditional end is added"] = e => e.Instructions.Insert(1, Ins(1000, 4, 0)),
+                ["missing anchor: the release instruction is gone"] = e => e.Instructions.RemoveAt(e.Instructions.FindIndex(i => i.Bank == 2004 && i.ID == 1 && BitConverter.ToInt32(i.ArgData, 4) == 1)),
+                ["duplicate anchor: the health condition appears twice"] = e => e.Instructions.Insert(4, Ins(4, 2, 0, FirstGargoyle, 5, 0x3F19999A)),
+                ["changed parameter layout: a parameter is added"] = e => e.Parameters.Add(new EMEVD.Parameter(0, 0, 0, 4)),
+                ["changed threshold: another health ratio"] = e => e.Instructions[e.Instructions.FindIndex(i => i.Bank == 4 && i.ID == 2)] = Ins(4, 2, 0, FirstGargoyle, 5, 0x3F000000),
+            };
+            foreach (var (name, mutate) in variants)
+            {
+                var (b, c, t) = GargoyleTrio();
+                mutate(t.Events.Single(e => e.ID == GargoyleRelease));
+                try
+                {
+                    var merge = new EmevdMerge(new() { ["m10_01_00_00.emevd.dcx"] = (b, c) });
+                    merge.Merge("m10_01_00_00.emevd.dcx", t);
+                    merge.ThrowIfConflicts();
+                }
+                catch (FogHostException e) when (e.Code == "FOG_MERGE_CONFLICT")
+                {
+                    continue;
+                }
+                throw new Exception($"silently merged a divergent FogMod event ({name})");
+            }
+        }
+
+        private static void SecondGargoyleUntouchedWhenOptionOff()
+        {
+            // "Do not replace" / no boss randomization: the combined engine leaves both events vanilla and FogMod
+            // copies them back unchanged. Nothing to merge, nothing written.
+            EMEVD b = Evd(Event0(), VanillaGargoyleRelease(), VanillaTaurusIntro());
+            EMEVD c = Evd(Event0(), VanillaGargoyleRelease(), VanillaTaurusIntro());
+            EMEVD t = Evd(Event0(), VanillaGargoyleRelease(), VanillaTaurusIntro());
+            var merge = new EmevdMerge(new() { ["m10_01_00_00.emevd.dcx"] = (b, c) });
+            merge.Merge("m10_01_00_00.emevd.dcx", t);
+            merge.ThrowIfConflicts();
+            Check(merge.ExpectedEvents["m10_01_00_00.emevd.dcx"].Count == 0, "unexpected expectations for untouched events");
+            Check(EmevdMerge.SameEvent(t.Events.Single(e => e.ID == GargoyleRelease), VanillaGargoyleRelease()), "vanilla form changed");
+        }
+
+        /// <summary>Real FogMod run: both legacy forms written by the combined engine survive FogMod's own game-data pass.</summary>
+        private static void SecondGargoyleSurvivesFogMod()
+        {
+            string dir = MakeStaging("second-gargoyle");
+            string game = Path.Combine(dir, "game");
+            string baseDir = Path.Combine(dir, "base");
+            string target = Path.Combine(baseDir, EventPath.Replace('/', Path.DirectorySeparatorChar));
+            Directory.CreateDirectory(Path.GetDirectoryName(target));
+            string eventFile = Path.Combine(game, EventPath.Replace('/', Path.DirectorySeparatorChar));
+            File.Copy(eventFile, target);
+
+            EMEVD evd = EMEVD.Read(eventFile);
+            EMEVD.Event release = evd.Events.Single(e => e.ID == GargoyleRelease);
+            EMEVD.Event taurus = evd.Events.Single(e => e.ID == TaurusIntro);
+            // FogMod's own DS1R events are the vanilla forms for these two events.
+            Check(EmevdMerge.SameEvent(release, VanillaGargoyleRelease()) && EmevdMerge.SameEvent(taurus, VanillaTaurusIntro()),
+                "FogMod's template for these events is no longer the vanilla form");
+            release.Instructions = ReplacedGargoyleRelease().Instructions;
+            taurus.Instructions = ReplacedTaurusIntro().Instructions;
+            evd.Write(eventFile);
+
+            JsonObject request = Request(dir, dataRoot);
+            request["compatibility"]!["combinedFiles"] = new JsonArray(new JsonObject
+            {
+                ["path"] = EventPath,
+                ["baseSha256"] = Sha(target),
+                ["combinedSha256"] = Sha(eventFile),
+            });
+            ExpectOk(Run(dir, request));
+
+            EMEVD written = EMEVD.Read(eventFile);
+            Check(EmevdMerge.SameEvent(written.Events.Single(e => e.ID == GargoyleRelease), ReplacedGargoyleRelease()), "11015396 was changed by FogMod");
+            Check(EmevdMerge.SameEvent(written.Events.Single(e => e.ID == TaurusIntro), ReplacedTaurusIntro()), "11015382 was changed by FogMod");
+            Check(written.Events.First(e => e.ID == 0).Instructions.Count(i => i.Bank == 2000 && i.ID == 0
+                && (BitConverter.ToInt32(i.ArgData, 4) == GargoyleRelease || BitConverter.ToInt32(i.ArgData, 4) == TaurusIntro)) == 2,
+                "event-0 initializations of the two events were lost");
         }
 
         // ---------------------------------------------------------------- combined fixture
