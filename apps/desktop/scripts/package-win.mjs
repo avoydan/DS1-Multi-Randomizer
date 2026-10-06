@@ -83,7 +83,7 @@ await rm(packageApp, { recursive: true, force: true });
 await copy(path.join(desktop, 'dist'), path.join(packageApp, 'dist'));
 await copy(path.join(desktop, 'dist-electron'), path.join(packageApp, 'dist-electron'));
 await writeFile(path.join(packageApp, 'package.json'), JSON.stringify({
-  name: 'ds1-triple-randomizer-desktop', version: '0.19.1', main: 'dist-electron/main.js',
+  name: 'ds1-triple-randomizer-desktop', version: '0.20.0', main: 'dist-electron/main.js',
   type: 'module', license: 'GPL-3.0-only', description: 'Dark Souls Remastered triple randomizer',
 }, null, 2));
 await run(process.execPath, [path.join(root, 'node_modules', 'electron-builder', 'cli.js'), '--win', 'portable', '--x64', '--config', 'electron-builder.yml', '--publish', 'never'], desktop,

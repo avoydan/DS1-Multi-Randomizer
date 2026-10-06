@@ -1,6 +1,11 @@
 import type { DecodedSeedPayload, EnemyPoolDescription, GenerationSettings, PersistedSettings, RunHistoryEntry, GameStateReport, GenerationEvent, GenerationResult, InstallationValidation, OperationResult, PipelinePlan, PresetDocument, PresetImportResult, RandomizerConfig } from '@ds1tr/contracts';
 
 export interface DetectedInstallation { gamePath: string; label: string; valid: boolean; problems: string[] }
+export interface SmokeTestList {
+  worlds: Array<{ id: string; title: string; purpose: string; seedCode: string; settings: unknown; observe: string[] }>;
+  checklist: string[];
+}
+
 export type WorldDataPreparation = { ok: true } | { ok: false; code: string; userMessage: string };
 
 async function connection(): Promise<{ apiBase: string; token: string }> {
@@ -67,6 +72,7 @@ export const api = {
   history: () => post<{ entries: RunHistoryEntry[] }>('/history/list', {}),
   deleteHistoryEntry: (id: string) => post<{ ok: boolean }>('/history/delete', { id }),
   spoiler: (id: string) => post<{ ok: true; text: string } | { ok: false; message: string }>('/history/spoiler', { id }),
+  smokeTests: () => post<SmokeTestList>('/smoke/list', {}),
   loadSettings: () => post<{ found: boolean; persisted: PersistedSettings | null; warning: string | null }>('/settings/load', {}),
   saveSettings: (settings: GenerationSettings, generateSpoilerLog: boolean) => post<{ ok: boolean }>('/settings/save', { settings, generateSpoilerLog }, true),
   detectGame: () => post<{ installations: DetectedInstallation[] }>('/game/detect', {}),

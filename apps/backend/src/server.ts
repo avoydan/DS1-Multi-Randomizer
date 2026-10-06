@@ -18,6 +18,7 @@ import { RunHistory } from './core/runHistory.js';
 import { loadPersistedSettings, savePersistedSettings } from './core/settingsStore.js';
 import { prepareRun, type RunRequestBody } from './core/seededRun.js';
 import { decodeSeedCode } from './core/seedCode.js';
+import { smokeTestWorlds } from './core/smokeTests.js';
 import { supportedGenerationProfiles } from './core/generationProfiles.js';
 import { defaultWorldDataCacheRoot } from './adapters/fogPrerequisites.js';
 
@@ -52,7 +53,7 @@ async function findSpoiler(workspacePath: string, packagePath: string): Promise<
   return null;
 }
 
-const APP_VERSION = '0.32.1';
+const APP_VERSION = '0.33.0';
 const runDependencies = { ...generationDependencies, appVersion: APP_VERSION };
 
 function send(res: http.ServerResponse, status: number, body: unknown): void {
@@ -165,6 +166,10 @@ const server = http.createServer(async (req, res) => {
       return send(res, decoded.ok ? 200 : 400, decoded.ok
         ? { ok: true, seedCode: decoded.seedCode, profile: decoded.envelope.profile, masterSeed: decoded.envelope.masterSeed, settings: decoded.envelope.settings }
         : { ok: false, code: decoded.code, message: decoded.message, technical: decoded.technical });
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/smoke/list') {
+      return send(res, 200, smokeTestWorlds());
     }
 
     if (req.method === 'POST' && url.pathname === '/api/history/list') {

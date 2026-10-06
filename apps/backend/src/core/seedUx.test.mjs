@@ -22,7 +22,7 @@ test('Apply and Restore end with the explicit success messages, and Apply offers
 
 test('the master seed is not made at startup: the form starts empty and only Randomize creates one', async () => {
   const app = await read('App.tsx');
-  assert.match(app, /masterSeed: ''/u);
+  assert.match(app, /joinConfig\(structuredClone\(DEFAULT_GENERATION_SETTINGS\), '', '', true\)/u);
   assert.doesNotMatch(app, /randomSeed|Math\.random\(\)/u, 'the renderer never invents a master seed; the backend makes it when a run starts');
   assert.match(app, />Randomize<\/button>/u);
   assert.match(app, />Load seed<\/button>/u);

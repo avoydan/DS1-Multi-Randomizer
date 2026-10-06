@@ -145,3 +145,6 @@ input:focus, select:focus { border-color: #8e7043; box-shadow: 0 0 0 3px #8e7043
 .menu button { padding: 8px 10px; border: 0; border-radius: 7px; background: none; color: #e5e9ef; font-size: 13px; text-align: left; }
 .menu button:hover:not(:disabled) { background: #272e39; }
 .menu button.danger { color: #dd9999; }
+.smoke-details { display: grid; gap: 6px; margin-top: 8px; }
+.smoke-details ul { margin: 2px 0 8px; padding-left: 18px; color: #b4bcc9; font-size: 12px; line-height: 1.5; }
+.smoke-details p { margin: 0; }

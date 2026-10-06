@@ -1,5 +1,14 @@
 # Implementation status
 
+**Runtime smoke-test worlds (2026-10-06; backend 0.33.0, desktop 0.20.0, contracts 0.18.0).**
+Advanced has a collapsed "Test worlds for playtesting" panel: eight fixed, reproducible worlds (classic full Triple, sampling of regular enemies,
+the second Bell Gargoyle, the Undead Parish, boss sampling, a boss repeated in several places, Unique bosses, partial boss replacement) with a
+Seed Code, what to look at in that world and a checklist (model, AI, navigation, floor, health bar, kill, fog exit, progression, rewards, respawn,
+crashes). They are created through the normal Load seed path and pinned to `ds1tr-gen-v1`. `docs/SMOKE_TESTS.md` is generated from the same data
+(`node apps/backend/scripts/smokeTestCatalog.mjs docs docs/SMOKE_TESTS.md`) and a test fails when a documented code differs from the app's.
+Nothing is checked automatically and nothing is marked as passed: the worlds exist so a person can play them. The main screen now starts from
+the same `DEFAULT_GENERATION_SETTINGS` as the test worlds (one definition in contracts).
+
 **The game folder you chose is remembered (2026-10-06; desktop 0.19.1, contracts 0.17.0).**
 After a restart the app used the Steam copy whenever Steam detection found one, even if the person had chosen another folder, because
 the saved choice was honoured only when it was among the detected installations (and a typed folder was never saved at all). Now a folder

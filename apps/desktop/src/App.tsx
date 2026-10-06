@@ -3,71 +3,16 @@ import { EnemyPoolEditor } from './EnemyPoolEditor';
 import { Readiness } from './Readiness';
 import { SeedPanel, SummaryChips, shortSeedCode, type LoadedSeed } from './SeedPanel';
 import { RunHistoryPanel } from './RunHistoryPanel';
-import { OUTCOME_MESSAGES, deriveRunPhase, isLoadedSeedModified, joinConfig, splitConfig } from '@ds1tr/contracts';
+import { SmokeTestPanel } from './SmokeTestPanel';
+import { DEFAULT_GENERATION_SETTINGS, OUTCOME_MESSAGES, deriveRunPhase, isLoadedSeedModified, joinConfig, splitConfig } from '@ds1tr/contracts';
 import type { RunPhase, RunHistoryEntry, EnemyPlacementAlgorithm, FogLanguage, GameStateReport, GwynNerfMode, SecondGargoyleMode, SoulItemsMode, StartingItemsMode, GenerationResult, PipelinePlan, RandomizerConfig } from '@ds1tr/contracts';
 import { api } from './api';
 import ludos from './assets/branding/ludos.png';
 
+// The same defaults the smoke-test worlds are built from (contracts): one definition, so the screen and the tests cannot drift apart.
+// The master seed stays empty on purpose: it is made when Randomize is clicked and travels inside the Seed Code.
 const initialConfig: RandomizerConfig = {
-  gamePath: '',
-  // Empty on purpose: the master seed is made when Randomize is clicked and travels inside the Seed Code.
-  masterSeed: '',
-  items: {
-    enabled: true,
-    randomizeWorldItems: true,
-    randomizeProtectedItems: false,
-    progressionLogic: true,
-    guaranteeEarlyWeapon: true,
-    balancedEarlyLoot: true,
-    randomizeStartingClass: false,
-    randomizeStartingEquipment: false,
-    randomizeGifts: false,
-    randomizeEnemyDrops: false,
-    guaranteedEnemyDrops: false,
-    randomizeShops: false,
-    // Legacy Item Randomizer default: armor pieces are shuffled individually.
-    fashionSouls: true,
-    soulItems: 'shuffled',
-    startingItems: 'shield-2h',
-  },
-  enemies: {
-    enabled: true,
-    randomizeRegularEnemies: true,
-    // Boss randomization + Fog is supported since FogHost 0.5.0 (boss-event overlay).
-    randomizeBosses: true,
-    scaling: 'area',
-    // Legacy Enemy Randomizer defaults.
-    replaceMimics: true,
-    replaceRespawningMosquitoes: true,
-    preventSameEnemy: false,
-    pinwheelChaos: false,
-    gwynNerf: 'medium',
-    // Legacy Enemy Randomizer default: the second Bell Gargoyle is replaced.
-    secondGargoyle: 'replace',
-    // Classic permutation is the default; sampling-v1 is opt-in. The other values are the neutral ones for the classic mode.
-    placement: { algorithm: 'permutation-v1', replacementChance: 100, normalReplacement: 'normals', fit: 'anywhere', difficultyMode: 'random', difficultyStrictness: 'loose', typeReplacement: 'disabled', customPool: null, bossReplacement: 'classic', uniqueBosses: false },
-  },
-  fog: {
-    enabled: true,
-    traversableFogs: true,
-    bossFogs: true,
-    areaWarps: true,
-    majorPvpFogs: false,
-    minorPvpFogs: false,
-    lordvesselGates: false,
-    randomStart: false,
-    disconnectedFogs: false,
-    noFallBedOfChaos: false,
-    scaling: true,
-    glitchedLogic: false,
-    requireLordSouls: true,
-    pacifistMode: false,
-    language: 'ENGLISH',
-  },
-  output: {
-    includeDlc: true,
-    generateSpoilerLog: true,
-  },
+  ...joinConfig(structuredClone(DEFAULT_GENERATION_SETTINGS), '', '', true),
 };
 
 interface ToggleProps {
@@ -542,7 +487,7 @@ export function App() {
               <label className="field-label">Type replacement</label>
               <select value={config.enemies.placement.typeReplacement} disabled={!config.enemies.randomizeRegularEnemies || config.enemies.placement.algorithm !== 'sampling-v1'} title="Legacy-style sampling only. Enabled: all enemies of one kind in a map (every Hollow in the Parish) are replaced by the same new kind, and two kinds in one map never get the same replacement. The replacement chance then applies to the kind, not to each enemy. The exception for roaming bosses only matters for boss replacements, which are not available yet." onChange={(event) => setPlacement('typeReplacement', event.target.value as RandomizerConfig['enemies']['placement']['typeReplacement'])}><option value="enabled">Enabled</option><option value="enabled-except-roaming-bosses">Enabled, except roaming bosses</option><option value="disabled">Disabled</option></select>
               <label className="field-label">Boss replacement</label>
-              <select value={config.enemies.placement.bossReplacement} disabled={!config.enemies.randomizeBosses || config.enemies.placement.algorithm !== 'sampling-v1'} title="Legacy-style sampling only. Classic shuffle: the bosses are shuffled among the boss slots as before. Random bosses: every single-body boss slot draws its own replacement from the boss pool, so a boss can appear more than once; the replacement chance applies to each boss slot. Dragons, Gargoyles, the Four Kings and the other multi-part bosses keep the classic shuffle. Lord Gwyn follows the Gwyn spawn nerf." onChange={(event) => setPlacement('bossReplacement', event.target.value as RandomizerConfig['enemies']['placement']['bossReplacement'])}><option value="classic">Classic shuffle</option><option value="bosses">Random bosses (legacy-style)</option></select>
+              <select value={config.enemies.placement.bossReplacement} disabled={!config.enemies.randomizeBosses || config.enemies.placement.algorithm !== 'sampling-v1'} title="Legacy-style sampling only. Classic shuffle: the bosses are shuffled among the boss slots as before. Random bosses: every single-body boss slot draws its own replacement from the boss pool, so a boss can appear more than once; the replacement chance applies to each boss slot. The dragons, Seath, Priscilla, the Sanctuary Guardian, the Bell Gargoyles and the Centipede Demon keep the classic shuffle. Lord Gwyn follows the Gwyn spawn nerf." onChange={(event) => setPlacement('bossReplacement', event.target.value as RandomizerConfig['enemies']['placement']['bossReplacement'])}><option value="classic">Classic shuffle</option><option value="bosses">Random bosses (legacy-style)</option></select>
               <Toggle inactive={!config.enemies.randomizeBosses || config.enemies.placement.algorithm !== 'sampling-v1' || config.enemies.placement.bossReplacement !== 'bosses'} label="Unique bosses" hint="Needs Random bosses. Every boss of the pool is used once before any boss appears a second time." checked={config.enemies.placement.uniqueBosses} onChange={(value) => setPlacement('uniqueBosses', value)} />
               <EnemyPoolEditor gamePath={config.gamePath} active={config.enemies.randomizeRegularEnemies && config.enemies.placement.algorithm === 'sampling-v1'} fit={config.enemies.placement.fit} customPool={config.enemies.placement.customPool} onChange={(pool) => setPlacement('customPool', pool)} />
             </div>
@@ -681,6 +626,7 @@ export function App() {
             </div>
             {lastRun && <p>Internal master seed: <code>{lastRun.masterSeed}</code> - generation profile: <code>{lastRun.profile}</code></p>}
             {generation?.ok && <p>Files: <code>{generation.packagePath}</code> ({generation.manifest.files.length} files)</p>}
+            <SmokeTestPanel busy={busy} onCreate={(seed) => void loadSeed(seed)} />
             <pre className="run-logs" aria-label="Details">{logs.length ? logs.join('\n') : 'Nothing to show yet.'}</pre>
           </details>
         </section>
