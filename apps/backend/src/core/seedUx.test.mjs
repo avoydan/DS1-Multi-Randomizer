@@ -83,3 +83,19 @@ test('Boss replacement and Unique bosses are real controls (not planned placehol
   assert.doesNotMatch(app, /'Allow T-pose behavior', 'Unique bosses'/u);
   assert.match(app, /bossReplacement: 'classic', uniqueBosses: false/u);
 });
+
+test('bosses in regular slots (Part E1): the options are real, appear only when they apply, and are reset when they stop applying', async () => {
+  const app = await read('App.tsx');
+  assert.doesNotMatch(app, /Only bosses \(planned\)|Bosses or normal enemies \(planned\)/u, 'the two modes are no longer placeholders');
+  assert.match(app, /<option value="bosses">Only bosses<\/option><option value="both">Bosses or normal enemies<\/option>/u);
+  // Progressive disclosure: the boss chance only with "both", souls and respawn with either boss mode; nothing is shown as a dead control.
+  assert.match(app, /normalReplacement === 'both' && \(\s*<RangeOption label="Boss chance in normal slots"/u);
+  assert.match(app, /\(config\.enemies\.placement\.normalReplacement === 'bosses' \|\| config\.enemies\.placement\.normalReplacement === 'both'\) && \(/u);
+  assert.match(app, /label="Roaming boss souls"/u);
+  assert.match(app, /label="Roaming bosses stay dead"/u);
+  // Leaving a mode puts the settings that only it needed back to their defaults (a hidden setting never stays in the world).
+  assert.match(app, /if \(mode !== 'both'\) placement\.bossChanceInNormalSlots = 10;/u);
+  assert.match(app, /if \(!roaming\) \{ placement\.roamingBossSouls = 50; placement\.roamingBossesStayDead = false; \}/u);
+  // Plain language: no engine vocabulary in the visible labels.
+  for (const label of ['Boss chance in normal slots', 'Roaming boss souls', 'Roaming bosses stay dead']) assert.doesNotMatch(label, /NpcParam|getSoul|entity|EMEVD/u);
+});
