@@ -1,4 +1,4 @@
-import type { EnemyPoolDescription, GameStateReport, GenerationEvent, GenerationResult, InstallationValidation, OperationResult, PipelinePlan, PresetDocument, PresetImportResult, RandomizerConfig } from '@ds1tr/contracts';
+import type { DecodedSeedPayload, EnemyPoolDescription, GenerationSettings, PersistedSettings, RunHistoryEntry, GameStateReport, GenerationEvent, GenerationResult, InstallationValidation, OperationResult, PipelinePlan, PresetDocument, PresetImportResult, RandomizerConfig } from '@ds1tr/contracts';
 
 export interface DetectedInstallation { gamePath: string; label: string; valid: boolean; problems: string[] }
 export type WorldDataPreparation = { ok: true } | { ok: false; code: string; userMessage: string };
@@ -24,11 +24,12 @@ async function post<T>(path: string, body: unknown, allowFailure = false): Promi
   return response.json() as Promise<T>;
 }
 
-export async function generate(config: RandomizerConfig, onEvent: (event: GenerationEvent) => void): Promise<GenerationResult> {
+export async function generate(config: RandomizerConfig, onEvent: (event: GenerationEvent) => void, seedCode?: string): Promise<GenerationResult> {
   const { apiBase, token } = await connection();
   const response = await fetch(`${apiBase}/runs/generate`, {
     method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream', 'X-DS1TR-Token': token },
-    body: JSON.stringify(config),
+    // The master seed is made by the backend when Randomize is clicked; a Seed Code, when given, decides the whole world.
+    body: JSON.stringify({ ...config, masterSeed: '', ...(seedCode ? { seedCode } : {}) }),
   });
   if (!response.ok || !response.body) throw new Error(`${response.status}: ${await response.text()}`);
   const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
@@ -62,6 +63,10 @@ export const api = {
       return false;
     }
   },
+  decodeSeed: (seedCode: string) => post<DecodedSeedPayload>('/seed/decode', { seedCode }, true),
+  history: () => post<{ entries: RunHistoryEntry[] }>('/history/list', {}),
+  loadSettings: () => post<{ found: boolean; persisted: PersistedSettings | null; warning: string | null }>('/settings/load', {}),
+  saveSettings: (settings: GenerationSettings, generateSpoilerLog: boolean) => post<{ ok: boolean }>('/settings/save', { settings, generateSpoilerLog }, true),
   detectGame: () => post<{ installations: DetectedInstallation[] }>('/game/detect', {}),
   prepareWorldData: (gamePath: string) => post<WorldDataPreparation>('/world-data/prepare', { gamePath }, true),
   validateInstallation: (gamePath: string) => post<InstallationValidation>('/installation/validate', { gamePath }),

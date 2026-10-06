@@ -1,12 +1,16 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { EnemyPoolEditor } from './EnemyPoolEditor';
 import { Readiness } from './Readiness';
-import type { EnemyPlacementAlgorithm, FogLanguage, GameStateReport, GwynNerfMode, SecondGargoyleMode, SoulItemsMode, StartingItemsMode, GenerationResult, PipelinePlan, RandomizerConfig } from '@ds1tr/contracts';
+import { LoadedSeedSummary, SeedPanel, type LoadedSeed } from './SeedPanel';
+import { RunHistoryPanel } from './RunHistoryPanel';
+import { OUTCOME_MESSAGES, isLoadedSeedModified, joinConfig, splitConfig } from '@ds1tr/contracts';
+import type { RunHistoryEntry, EnemyPlacementAlgorithm, FogLanguage, GameStateReport, GwynNerfMode, SecondGargoyleMode, SoulItemsMode, StartingItemsMode, GenerationResult, PipelinePlan, RandomizerConfig } from '@ds1tr/contracts';
 import { api } from './api';
 
 const initialConfig: RandomizerConfig = {
   gamePath: '',
-  masterSeed: String(Math.floor(Math.random() * 4_294_967_295)),
+  // Empty on purpose: the master seed is made when Randomize is clicked and travels inside the Seed Code.
+  masterSeed: '',
   items: {
     enabled: true,
     randomizeWorldItems: true,
@@ -138,9 +142,17 @@ export function App() {
   const [progressStage, setProgressStage] = useState('');
   const [logs, setLogs] = useState<string[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [generatedConfig, setGeneratedConfig] = useState<string | null>(null);
   const [presetText, setPresetText] = useState('');
   const [presetProblems, setPresetProblems] = useState<string[]>([]);
+  const [loadedSeed, setLoadedSeed] = useState<LoadedSeed | null>(null);
+  const [seedPanelOpen, setSeedPanelOpen] = useState(false);
+  const [lastRun, setLastRun] = useState<{ seedCode: string; profile: string; masterSeed: string } | null>(null);
+  const [notice, setNotice] = useState<{ text: string; sub: string } | null>(null);
+  const [history, setHistory] = useState<RunHistoryEntry[]>([]);
+  const [settingsReady, setSettingsReady] = useState(false);
+  const [settingsWarning, setSettingsWarning] = useState<string | null>(null);
+  const [launchMessage, setLaunchMessage] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     api.health().then(setBackendOnline);
@@ -151,11 +163,42 @@ export function App() {
     setPlan(null);
   }, [config]);
 
+  const refreshHistory = useCallback(async () => {
+    try { setHistory((await api.history()).entries); } catch { /* the list is a convenience */ }
+  }, []);
+
+  // Settings survive a restart: load them once the backend is up, then save every change (debounced).
+  useEffect(() => {
+    if (backendOnline !== true) return;
+    void (async () => {
+      try {
+        const loaded = await api.loadSettings();
+        if (loaded.found && loaded.persisted) {
+          const persisted = loaded.persisted;
+          setConfig((current) => joinConfig(persisted.settings, current.gamePath, '', persisted.generateSpoilerLog));
+        }
+        setSettingsWarning(loaded.warning);
+      } catch { /* start from the defaults */ }
+      setSettingsReady(true);
+      await refreshHistory();
+    })();
+  }, [backendOnline, refreshHistory]);
+
+  const currentSettings = useMemo(() => splitConfig(config).settings, [config]);
+  const settingsKey = JSON.stringify(currentSettings);
+  useEffect(() => {
+    if (!settingsReady) return undefined;
+    const timer = setTimeout(() => { void api.saveSettings(currentSettings, config.output.generateSpoilerLog); }, 400);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settingsReady, settingsKey, config.output.generateSpoilerLog]);
+
+  const seedModified = loadedSeed !== null && isLoadedSeedModified(loadedSeed.settings, currentSettings);
+
   const enabledCount = useMemo(
     () => Number(config.items.enabled || config.enemies.enabled) + Number(config.fog.enabled),
     [config],
   );
-  const generationMatchesConfig = generatedConfig === JSON.stringify(config);
 
   const reportError = (error: unknown) => {
     const detail = error instanceof Error ? error.message : String(error);
@@ -198,23 +241,29 @@ export function App() {
     finally { setBusy(false); }
   };
 
-  const generateRun = async () => {
+  /** `seedCode` reproduces that exact world; without it a new world (a fresh master seed and a new Seed Code) is made. */
+  const generateRun = async (seedCode?: string) => {
     setBusy(true);
     setProgress(0);
     setProgressStage('Preparing generation');
     setLogs([]);
     setGeneration(null);
-    setGeneratedConfig(null);
     setErrorMessage(null);
-    const submittedConfig = JSON.stringify(config);
+    setNotice(null);
+    setLaunchMessage(null);
+    setCopied(false);
     try {
       const result = await api.generate(config, (event) => {
         if (event.type === 'progress') { setProgress(event.progress); setProgressStage(event.stage); setMessage(event.message); }
         else setLogs((current) => [...current, `[${event.stage}] ${event.level}: ${event.message}`]);
-      });
+      }, seedCode);
       setGeneration(result);
-      if (result.ok) setGeneratedConfig(submittedConfig);
-      else {
+      if (result.ok) {
+        const detail = result as typeof result & { masterSeed?: string };
+        setLastRun({ seedCode: result.seedCode, profile: result.profile, masterSeed: detail.masterSeed ?? result.manifest.masterSeed });
+        if (!seedCode) setLoadedSeed(null);
+        void refreshHistory();
+      } else {
         setErrorMessage(result.message);
         setLogs((current) => [...current, `[${result.stage}] failed: ${result.code}`]);
       }
@@ -223,39 +272,88 @@ export function App() {
     finally { setBusy(false); }
   };
 
-  const activate = async () => {
-    if (!generation?.ok || !generationMatchesConfig) return;
+  const applyPackage = async (packagePath: string) => {
     setBusy(true);
     setProgressStage('');
     setErrorMessage(null);
+    setNotice(null);
+    setLaunchMessage(null);
     try {
-      const result = await api.activate(config.gamePath, generation.packagePath);
-      setMessage(result.ok ? 'Applied. Start Dark Souls Remastered from Steam and play offline.' : result.message);
-      if (!result.ok) setErrorMessage(`${result.message}${result.problems.length ? ` ${result.problems.join(' ')}` : ''}`);
+      const result = await api.activate(config.gamePath, packagePath);
+      if (result.ok) {
+        setNotice({ ...OUTCOME_MESSAGES.applied });
+        setMessage(OUTCOME_MESSAGES.applied.text);
+      } else {
+        setMessage(result.message);
+        setErrorMessage(`${result.message}${result.problems.length ? ` ${result.problems.join(' ')}` : ''}`);
+      }
       setGameState(await api.state(config.gamePath));
       setRefreshKey((value) => value + 1);
+      void refreshHistory();
     } catch (error) { reportError(error); }
     finally { setBusy(false); }
+  };
+
+  const activate = async () => {
+    if (generation?.ok) await applyPackage(generation.packagePath);
   };
 
   const restore = async () => {
     setBusy(true);
     setProgressStage('');
     setErrorMessage(null);
+    setNotice(null);
+    setLaunchMessage(null);
     try {
       const result = await api.restore(config.gamePath);
-      setMessage(result.ok ? 'The original game files are back.' : result.message);
-      if (!result.ok) setErrorMessage(`${result.message}${result.problems.length ? ` ${result.problems.join(' ')}` : ''}`);
+      if (result.ok) {
+        setNotice({ ...OUTCOME_MESSAGES.restored });
+        setMessage(OUTCOME_MESSAGES.restored.text);
+      } else {
+        setMessage(result.message);
+        setErrorMessage(`${result.message}${result.problems.length ? ` ${result.problems.join(' ')}` : ''}`);
+      }
       setGameState(await api.state(config.gamePath));
       setRefreshKey((value) => value + 1);
+      void refreshHistory();
     } catch (error) { reportError(error); }
     finally { setBusy(false); }
+  };
+
+  const launch = async () => {
+    setLaunchMessage(null);
+    try {
+      const result = await window.desktop?.launchGame(config.gamePath);
+      if (!result) { setLaunchMessage('Start Dark Souls Remastered from Steam.'); return; }
+      setLaunchMessage(result.message);
+      if (result.technical) setLogs((current) => [...current, `launch (${result.method}): ${result.technical}`]);
+    } catch (error) {
+      setLaunchMessage('Dark Souls Remastered could not be started. Please start it from Steam.');
+      setLogs((current) => [...current, `launch: ${error instanceof Error ? error.message : String(error)}`]);
+    }
+  };
+
+  const copySeed = async (code: string) => {
+    try { await navigator.clipboard.writeText(code); setCopied(true); setMessage('Seed code copied.'); } catch { setMessage('Select the seed code and copy it with Ctrl+C.'); }
+  };
+
+  /** Puts the settings of a world into the controls and remembers that they came from a Seed Code. */
+  const adoptSeed = (seed: LoadedSeed) => {
+    setConfig((current) => joinConfig(seed.settings, current.gamePath, '', current.output.generateSpoilerLog));
+    setLoadedSeed(seed);
+    setSeedPanelOpen(false);
+    setMessage('Shared world loaded. Click "Generate this world" to create it.');
+  };
+
+  const recreate = async (entry: RunHistoryEntry) => {
+    adoptSeed({ code: entry.seedCode, settings: entry.settings });
+    await generateRun(entry.seedCode);
   };
 
   const exportPreset = async () => {
     setPresetProblems([]);
     try {
-      setPresetText(JSON.stringify(await api.exportPreset(config), null, 2));
+      setPresetText(JSON.stringify(await api.exportPreset({ ...config, masterSeed: 'preset' }), null, 2));
       setMessage('Preset exported. Copy the text to share these settings.');
     } catch (error) { reportError(error); }
   };
@@ -265,16 +363,16 @@ export function App() {
     try {
       const result = await api.importPreset(presetText);
       if (!result.ok) { setPresetProblems(result.problems); return; }
-      const { format: _format, presetVersion: _version, ...settings } = result.preset;
+      const { format: _format, presetVersion: _version, masterSeed: _ignoredSeed, ...settings } = result.preset;
       setConfig((current) => ({ ...current, ...settings }));
-      setMessage('Preset applied. Review the settings, then regenerate.');
+      setMessage('Preset applied. Review the settings, then click Randomize.');
     } catch (error) { reportError(error); }
   };
 
   const resetSettings = () => {
-    setConfig((current) => ({ ...initialConfig, gamePath: current.gamePath, masterSeed: current.masterSeed }));
+    setConfig((current) => ({ ...initialConfig, gamePath: current.gamePath }));
     setPresetProblems([]);
-    setMessage('Settings restored to defaults (game path and master seed kept).');
+    setMessage('Settings restored to the defaults.');
   };
 
   const previewPlan = async () => {
@@ -282,7 +380,7 @@ export function App() {
     setProgressStage('');
     setErrorMessage(null);
     try {
-      setPlan(await api.plan(config));
+      setPlan(await api.plan({ ...config, masterSeed: lastRun?.masterSeed ?? 'preview' }));
       setMessage('Pipeline plan generated. Planned extensions remain disabled until implemented.');
     } catch (error) {
       reportError(error);
@@ -299,6 +397,7 @@ export function App() {
       </header>
 
       <main>
+        {settingsWarning && <div className="notice">{settingsWarning}</div>}
         {startupError && <div className="notice error">DS1 Triple Randomizer could not start its engine. Close and reopen the app; if it keeps happening, download the app again.<details><summary>Details</summary>{startupError}</details></div>}
         <section className="card setup-card">
           <div className="section-title"><span>01</span><h2>Your game and seed</h2></div>
@@ -308,14 +407,9 @@ export function App() {
             worldNeeded={config.fog.enabled}
             busy={busy}
             refreshKey={refreshKey}
-            onPath={(path) => { setConfig((current) => ({ ...current, gamePath: path })); setGameState(null); setGeneration(null); setGeneratedConfig(null); setErrorMessage(null); }}
+            onPath={(path) => { setConfig((current) => ({ ...current, gamePath: path })); setGameState(null); setGeneration(null); setErrorMessage(null); }}
             onState={setGameState}
           />
-          <label className="field-label">Master seed</label>
-          <div className="seed-row">
-            <input value={config.masterSeed} onChange={(event) => setConfig({ ...config, masterSeed: event.target.value })} />
-            <button className="secondary" onClick={() => setConfig({ ...config, masterSeed: String(Math.floor(Math.random() * 4_294_967_295)) })}>Random</button>
-          </div>
           <div className="inline-options">
             <Toggle disabled label="Include DLC" checked hint="Excluding the DLC is not implemented; the DLC is always included." onChange={() => undefined} />
             <Toggle label="Generate spoiler log" checked={config.output.generateSpoilerLog} onChange={(value) => setConfig({ ...config, output: { ...config.output, generateSpoilerLog: value } })} />
@@ -431,17 +525,35 @@ export function App() {
           <div className="section-title"><span>02</span><h2>Randomize</h2></div>
           <p>{stateText(gameState)}</p>
           <div className="run-actions">
-            <button className="primary" onClick={generateRun} disabled={busy || !config.gamePath || !config.masterSeed.trim() || gameState?.state !== 'vanilla' || enabledCount === 0}>Randomize</button>
-            <button className="secondary" onClick={activate} disabled={busy || !generation?.ok || !generationMatchesConfig || gameState?.state !== 'vanilla'}>Apply to game</button>
+            <button className="primary" onClick={() => void generateRun()} disabled={busy || !config.gamePath || gameState?.state !== 'vanilla' || enabledCount === 0}>Randomize</button>
+            <button className="secondary" onClick={() => setSeedPanelOpen((open) => !open)} disabled={busy}>Load seed</button>
+            <button className="secondary" onClick={() => void activate()} disabled={busy || !generation?.ok || gameState?.state !== 'vanilla'}>Apply to game</button>
             <button className="secondary" onClick={restore} disabled={busy || !gameState || !['active', 'interrupted'].includes(gameState.state)}>Restore original game</button>
+            {(gameState?.state === 'active' || notice !== null) && <button className="primary" onClick={() => void launch()} disabled={busy || !config.gamePath}>Launch game</button>}
           </div>
+          {seedPanelOpen && <SeedPanel busy={busy} onLoaded={adoptSeed} onClose={() => setSeedPanelOpen(false)} />}
+          {loadedSeed && <LoadedSeedSummary settings={loadedSeed.settings} modified={seedModified} busy={busy || gameState?.state !== 'vanilla'} onGenerate={() => void generateRun(loadedSeed.code)} />}
+          {notice && <div className="notice success apply-notice" role="status"><strong>{notice.text}</strong><span>{notice.sub}</span></div>}
+          {launchMessage && <div className="notice" role="status">{launchMessage}</div>}
           {busy && progressStage && <div className="progress-status"><span>{progressLabel(progressStage)}: {Math.round(progress * 100)}%</span><progress value={progress} max={1} aria-label="Progress" /></div>}
-          {generation?.ok && <div className="generated-status" role="status"><strong>Your randomized game is ready</strong><span>Seed: {generation.manifest.masterSeed}</span>{!generationMatchesConfig && <span className="stale-warning">Settings changed since then. Click Randomize again to use these settings.</span>}</div>}
+          {generation?.ok && <div className="generated-status" role="status">
+            <strong>Your randomized game is ready</strong>
+            <span>Seed code - share it to give someone the same world:</span>
+            <textarea className="run-logs seed-output" readOnly rows={3} aria-label="Seed code" value={generation.seedCode} onFocus={(event) => event.currentTarget.select()} />
+            <div className="run-actions"><button className="secondary" onClick={() => void copySeed(generation.seedCode)}>{copied ? 'Copied' : 'Copy seed'}</button></div>
+          </div>}
+          <h3 className="history-title">History</h3>
+          <RunHistoryPanel
+            entries={history} gameState={gameState} busy={busy}
+            onApply={(entry) => void applyPackage(entry.packagePath)} onRecreate={(entry) => void recreate(entry)}
+            onCopy={(entry) => void copySeed(entry.seedCode)} onLaunch={() => void launch()}
+          />
           <details className="log-panel" open={logs.length > 0}><summary>Advanced</summary>
             <div className="run-actions">
-              <button className="secondary" onClick={previewPlan} disabled={busy || !config.masterSeed.trim()}>Preview randomization plan</button>
+              <button className="secondary" onClick={previewPlan} disabled={busy}>Preview randomization plan</button>
               <button className="secondary" onClick={importPristine} disabled={busy || !config.gamePath}>Check game files again</button>
             </div>
+            {lastRun && <p>Internal master seed: <code>{lastRun.masterSeed}</code> - generation profile: <code>{lastRun.profile}</code></p>}
             {generation?.ok && <p>Files: <code>{generation.packagePath}</code> ({generation.manifest.files.length} files)</p>}
             <pre className="run-logs" aria-label="Details">{logs.length ? logs.join('\n') : 'Nothing to show yet.'}</pre>
           </details>

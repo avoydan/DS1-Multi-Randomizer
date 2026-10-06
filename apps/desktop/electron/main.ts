@@ -1,10 +1,11 @@
-import { app, BrowserWindow, dialog, ipcMain } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import { spawn, execFile, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, access } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { migrateSettings, type StoredSettings } from './settings.js';
+import { launchGame } from './launchGame.js';
 
 const currentDirectory = path.dirname(fileURLToPath(import.meta.url));
 const runtimeRoot = path.join(process.resourcesPath, 'runtime');
@@ -134,6 +135,15 @@ ipcMain.handle('runtime:connection', () => ({
   error: backendError,
   gamePath: settings.gamePath ?? '',
 }));
+ipcMain.handle('game:launch', (_event, gamePath: string) => launchGame(typeof gamePath === 'string' ? gamePath : '', {
+  openExternal: (url) => shell.openExternal(url),
+  startDetached: async (executable, directory) => {
+    const child = spawn(executable, [], { cwd: directory, detached: true, stdio: 'ignore' });
+    child.unref();
+  },
+  exists: (target) => access(target).then(() => true, () => false),
+}));
+
 app.whenReady().then(async () => {
   await loadSettings();
   await startBackend();

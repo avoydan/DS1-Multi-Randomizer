@@ -98,3 +98,19 @@ input:focus, select:focus { border-color: #8e7043; box-shadow: 0 0 0 3px #8e7043
 .readiness-row.ready .readiness-mark { background: #173322; color: #8ed0a5; }
 .readiness-row.problem .readiness-mark, .readiness-row.failed .readiness-mark, .readiness-row.missing .readiness-mark { background: #4a2a1d; color: #e0a37a; }
 .readiness-choices { display: grid; gap: 6px; margin-top: 8px; }
+.seed-panel, .loaded-seed { margin-top: 12px; padding: 12px 14px; border: 1px solid #29303b; border-radius: 11px; background: #131821; display: grid; gap: 8px; }
+.loaded-seed.modified { border-color: #6b5430; }
+.loaded-seed p { margin: 0; font-size: 12px; }
+.seed-input, .seed-output { width: 100%; resize: vertical; font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
+.summary-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.summary-chip { padding: 3px 9px; border-radius: 100px; border: 1px solid #2a303b; font-size: 11px; color: #929cac; }
+.summary-chip.on { color: #8ed0a5; border-color: #28583a; }
+.apply-notice { display: grid; gap: 3px; }
+.apply-notice strong { font-size: 14px; }
+.history-title { margin: 22px 0 8px; font-size: 14px; }
+.history-list { display: grid; gap: 8px; }
+.history-row { display: grid; gap: 8px; padding: 10px 12px; border: 1px solid #29303b; border-radius: 10px; background: #131821; }
+.history-main { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.history-status { font-size: 11px; padding: 2px 8px; border-radius: 100px; background: #272e39; color: #b4bcc9; }
+.history-status.applied { background: #173322; color: #8ed0a5; }
+
