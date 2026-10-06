@@ -1,5 +1,21 @@
 # Implementation status
 
+**Enemy placement Part D: boss sampling (2026-10-06; backend 0.32.0, desktop 0.19.0, contracts 0.16.0, patch 0012; RANDOMIZER_VERSION 0.5.66 and FogHost 0.5.0 unchanged; generation profile `ds1tr-gen-v1` unchanged).**
+`sampling-v1` can draw a replacement for every single-body boss slot from the boss pool (`Boss replacement: Random bosses`), with the
+replacement chance per boss slot, the Gwyn nerf per candidate and an optional `Unique bosses` cycle; the controls replace two PLANNED
+placeholders. Linked units (dragons, Gargoyles, Four Kings, ...) stay with their classic planners (unit participation is not built). Details,
+evidence and open points: `docs/ENEMY_PLACEMENT_MODEL.md` 10.6. The two new options are **extension keys** of the Seed Code (stored only when
+non-neutral), so no existing code changed and none can decode to another world (`docs/SEED_FORMAT.md`, `docs/DECISIONS.md`); presets are version 10.
+
+- **Real format:** 100 boss-sampling seeds with Fog (40 chance 100, 40 Unique at chance 60, 20 with Enemy scaling `vanilla`): 100/100 success,
+  boss overlay set unchanged (the same 15 events), 12 instruction merges as before, 0 conflicts, `verify-skips` clean on every package, maximum 30
+  models per map; 40/40 for the classic reference. A first run failed 36/40 (`Conflicting custom NpcThinkParam definition`); fixed (per-slot ids).
+- **Compatibility:** 24 permutation lock hashes and the sampling pins identical; the 10 original golden fixtures, the two sampling-v1 + classic-boss baselines
+  recorded before this change and the two new boss-sampling fixtures reproduce from their Seed Codes (also with a simulated future app version).
+- **Found, not fixed:** `sampling-v1` with Type replacement `enabled` and Placement fit `anywhere` fails for some seeds in `patch-enemies`
+  ("Randomizer event ID is already used: 11419980", a Bed of Chaos floor event registered twice); present before this change.
+- **Tests:** new boss sampler tests, Seed Code extension-key tests, preset v10 migration.
+
 **State-based run area, branding, Fog wording (2026-10-06; desktop 0.18.0, backend 0.31.0, contracts 0.13.0; generation profile ds1tr-gen-v1 unchanged).**
 The run area now follows the state of the game (`deriveRunPhase`): original game shows Randomize and Load seed; a generated world shows
 Apply to game with Copy seed secondary; an applied game shows Launch game with Restore original game secondary; an interrupted change

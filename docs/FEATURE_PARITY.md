@@ -75,7 +75,7 @@ All 21 configuration fields map to one position in the original config string. T
 
 | # | Original option | Original values | Proposed DS1TR control / default | UI | Contract | Backend | Engine | Status |
 |---|---|---|---|---|---|---|---|---|
-| E1 | Replace bosses | 0 don't, 1 only with bosses, 2 only with normal enemies, 3 either | select, `1` | placeholder | no | no | no | UI_ONLY |
+| E1 | Replace bosses | 0 don't, 1 only with bosses, 2 only with normal enemies, 3 either | select: Classic shuffle / Random bosses | yes (`enemies.placement.bossReplacement`, `sampling-v1`) | yes | yes | yes for "only with bosses" on single-body bosses (Part D); linked units stay classic; the cross-class values need Part E | PARTIAL |
 | E2 | Replace normal enemies | same four values | select, `2` | yes (`enemies.placement.normalReplacement`, `sampling-v1`) | yes | yes | yes (Part A: `none`, `normals`; `bosses` and `both` need boss sources) | PARTIAL |
 | E3 | Replace NPCs | same four values | select, `0` | placeholder | no | no | no | UI_ONLY |
 | E4 | Replace mimics | 0 no, 1 yes | toggle, on | yes (`enemies.replaceMimics`) | yes | yes | yes (Batch 1) | FULL |
@@ -92,7 +92,7 @@ All 21 configuration fields map to one position in the original config string. T
 | E15 | Type replacement | 0 enabled, 2 enabled except roaming bosses, 1 disabled | select, disabled | yes (`enemies.placement.typeReplacement`, `sampling-v1`) | yes | yes | yes (Part C1, regular enemies; map-level groups, see `ENEMY_PLACEMENT_MODEL.md` 10.4) | FULL |
 | E16 | Gwyn spawn nerf | 0 strong, 1 medium, 2 none | select, medium (legacy default) | yes (`enemies.gwynNerf`) | yes | yes | yes (Batch 2) | FULL |
 | E17 | Prevent replacement by the same enemy | 0 enabled, 1 disabled | toggle, disabled (default off) | yes (`enemies.preventSameEnemy`) | yes | yes | yes (Batch 1) | FULL |
-| E18 | Unique bosses | 1 enabled, 0 disabled | toggle, off | placeholder | no | no | no | UI_ONLY |
+| E18 | Unique bosses | 1 enabled, 0 disabled | toggle, off | yes (`enemies.placement.uniqueBosses`, needs Random bosses) | yes | yes | yes (cycle over the single-body boss pool) | FULL for single-body bosses |
 | E19 | Roaming boss respawn | 0 enabled, 1 disabled | toggle, enabled | placeholder | no | no | no | UI_ONLY |
 | E20 | Hostile NPCs | 1 enabled, 0 disabled | toggle, off | placeholder | no | no | no | UI_ONLY |
 | E21 | Replace respawning mosquitoes | 1 enabled, 0 disabled | toggle, on | yes (`enemies.replaceRespawningMosquitoes`) | yes | yes | yes (Batch 1) | FULL |

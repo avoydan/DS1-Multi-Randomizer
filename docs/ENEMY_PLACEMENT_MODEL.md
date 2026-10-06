@@ -12,7 +12,7 @@ the legacy tool, enforces the 30-model map limit by construction, and falls back
 Implement it in small batches, selection-only options first and the event-touching ones (bosses in normal
 slots, NPCs) last.
 
-Status: **design, the Part 0 infrastructure (10.1), Part A (10.2) and Part B difficulty (10.3), Part C1 Type replacement (10.4) and Part C2 custom enemy pool (10.5).** `sampling-v1` runs for regular enemy slots
+Status: **design, the Part 0 infrastructure (10.1), Part A (10.2) and Part B difficulty (10.3), Part C1 Type replacement (10.4) and Part C2 custom enemy pool (10.5) and Part D boss sampling for single-body bosses (10.6).** `sampling-v1` runs for regular enemy slots
 only and is opt-in; `permutation-v1` stays the default. **Part A is complete: the whole replacement-chance range works under a
 non-worsening model budget (10.2).** One scratch prototype
 (`engines/combined/prototypes/enemy-placement-sampler.mjs`) validates the proposed core against a real
@@ -591,7 +591,7 @@ risk: data first, selection-only options next, event-touching options last.
 | **A** (built, one open conflict, see 10.2) | Sampler for regular enemies | `sampling-v1`: chance, normal mode {none, normals}, fit, difficulty `random`, Prevent same, mimic/mosquito/Pinwheel clones, coverage reserve, budget, ladder | add `sampling`, `replacementChance`, `normalReplacement`, `fit`, `difficultyMode=random` | sliders and selects, Replacement chance / Placement activated (remove the planned badges) | determinism, budget <= 30, zero fit violations, ladder rung counts, chance statistics, hash lock; **every changed placement has a scaled row; each drop lot is referenced by the same slots as in vanilla** | 20-seed Bosses + Fog sweep with `sampling`, **one with Enemy scaling `vanilla`**, `verify-skips`, `patch-enemies`, duplicates per map | low |
 | **B** (built, see 10.3) | Difficulty curve | class draw, strictness tables, D-1 refinement, Easy Asylum rule, curated overrides | `difficultyMode` curve values, `strictness`, `easyAsylum` | select + slider activation | offset distributions, same-class share, empty-class fallback | 20 seeds | none |
 | **C** (C1 Type replacement built, see 10.4; C2 custom pool built, see 10.5) | Type replacement and custom pool | type map with type-level participation and injectivity; pool filter | `typeReplacement`, `customPool` (named list of enabled types) | select, pool editor (largest UI piece) | injectivity, sentinel cases, pool filter | 10 seeds | none |
-| **D** | Boss class (bosses only) | boss sampler over the portable single-body pool, per-candidate Gwyn nerf, Unique bosses, unit participation | `bossReplacement` {none, bosses}, `uniqueBosses`, `bossChanceInBossSlots` | activation | boss repetition, unit swaps, hash lock | **40 seeds** Bosses + Fog (overlay set must remain the 15 events), `verify-skips` | medium |
+| **D** (built, see 10.6) | Boss class (bosses only) | boss sampler over the portable single-body pool, per-candidate Gwyn nerf, Unique bosses, unit participation | `bossReplacement` {none, bosses}, `uniqueBosses`, `bossChanceInBossSlots` | activation | boss repetition, unit swaps, hash lock | **40 seeds** Bosses + Fog (overlay set must remain the 15 events), `verify-skips` | medium |
 | **E** | Cross-class and roaming boss options | boss to normal slot, normal to boss slot, "both" modes, `getSoul` on the scaled row, respawn handling | modes `normals`/`both`, `bossChanceInNormalSlots`, `roamingBossSouls`, `respawningRoamingBosses` | activation | reward ownership, scaled row always present, boss bar rules | **40 seeds**, measure edited events against the overlay and FogMod; stop on any new overlap | **high** |
 | **F** | NPC class and hostile NPCs | NPC allowlist, talk preservation, hostile sources, allegiance events | `npcReplacement`, `hostileNpcs` | activation | NPC fit rules, talk preservation fixtures | event-set diff vs FogMod first, then 40 seeds | **high** |
 | **G** | Default flip (product decision) | none | default `sampling`, docs, migration notes | default values | n/a | full 40-seed default sweep | low once A-F passed |
@@ -1235,6 +1235,62 @@ configurations) and combined + Fog (73 files) runs are unchanged. `sampling-v1` 
 restricted pools leave many slots vanilla by design. Pools whose replaceable slots cannot fit a map at 100% are refused
 with `map-infeasible` (D at fits is the reference case). The Parish 32-33 baseline risk of 10.3 is unchanged and not
 worsened.
+
+---
+
+### 10.6 Part D as built (2026-10-06): boss sampling for single-body bosses
+
+**Scope.** `sampling-v1` with `enemies.placement.bossReplacement: "bosses"` draws a replacement for every *single-body* boss slot
+(24 on the real catalog) from the portable boss pool: the boss archetypes the classic planner already shuffles (the same `sources`
+list, `nonPortableBossReplacementModels` empty). A boss may appear any number of times. `"classic"` (the neutral value and the default)
+runs the existing archetype permutation byte for byte. **Linked units stay classic in both modes** (dragons, Bell Gargoyles, Four
+Kings, Centipede Demon, Bed of Chaos units, Mass of Souls, Anor Londo Gargoyles): chance-based unit participation and unit sampling
+are not built; the "unit participation" item of the plan is deferred. The cross-class modes, `bossChanceInBossSlots`, roaming-boss souls and
+respawn belong to Part E and are not exposed.
+
+| Option | Contract | Neutral | Rule |
+|---|---|---|---|
+| Boss replacement | `enemies.placement.bossReplacement` `classic` / `bosses` | `classic` | sampling-v1 only; needs Bosses on to have an effect |
+| Unique bosses | `enemies.placement.uniqueBosses` | `false` | needs `bossReplacement: "bosses"`; refused otherwise |
+| Replacement chance | `enemies.placement.replacementChance` (existing) | 100 | now also decides, per boss slot, whether it takes part (first draw of its own stream) |
+| Gwyn spawn nerf | `enemies.gwynNerf` (existing) | - | per candidate: Lord Gwyn is rejected with 60% (medium) / 85% (strong), a draw per evaluation from the slot's stream; the classic per-seed coin and the Second Gargoyle draw are unchanged |
+
+**Planner** (`planSampledBosses`, `sampling.js`). Per slot in stable id order, each with its own stream (`slot:<id>`, `enemy-placement-v1`,
+disjoint from regular slots): (1) replacement chance - a slot that fails it stays vanilla and gets no placement; (2) candidates = the
+portable archetypes except the slot's own boss and the authored unsafe pair (a Ceaseless Discharge slot never receives the c5250
+archetype, the rule of the permutation); (3) uniform draw with list shrink; rejected: Gwyn by the nerf, an already used boss while an
+unused candidate remains (Unique bosses; the cycle restarts when every boss of the pool was used; the legacy 22 is not copied); (4) nothing
+left: the slot stays vanilla (`bossesKeptVanilla`). Every sampled placement is slot-owned (`forceScaledNpcParam`, rule 6.9) and carries the
+tag `sampled-boss-replacement`. Boss counters are separate from the regular-slot summary (`bossSlots`, `bossesReplaced`,
+`bossesKeptVanilla`, `bossSlotsNotParticipating`, `bossRejections:<reason>`); the log line gains "bosses sampled x/y".
+
+**Model budget.** No boss cap exists (legacy: bosses are exempt). The models of the boss placements are fixed models of their maps for the
+regular-enemy planner (`regularEnemyContext`), so the regular sampler respects them exactly as before; unchanged boss slots count with their
+vanilla model.
+
+**Defect found and fixed while building.** The first sweep failed 36 of 40 seeds in `patch-enemies` with "Conflicting custom NpcThinkParam
+definition: 9700002": a boss slot with deferred activation names its think-param row `9,700,000 + source archetype index`, which was only
+consistent because the permutation gives every slot of an archetype the same replacement. Sampled bosses differ per slot, so each slot now
+uses its own id (`9,750,000 + index`), only in the sampled path.
+
+**Evidence.** Real format (clean game copy, Items + Enemies + Bosses + Fog, Gwyn nerf strong, Second Gargoyle replace, `verify-skips` on every
+combined attempt and on the final Fog package):
+
+| Sweep | Seeds | Result | Boss overlay events | Instruction merges | `verify-skips` |
+|---|---|---|---|---|---|
+| classic bosses under sampling-v1 (reference) | 40 | 40 success, first attempt | the 15 known events, each in 40 seeds | 12 events | 40/40 clean |
+| `bosses`, chance 100 | 40 | 40 success, first attempt | the same 15 events, each in 40 seeds | the same 12 | 40/40 clean |
+| `bosses` + Unique, chance 60 | 40 | 40 success | the same 15 events, 17-27 seeds each (a boss slot left vanilla does not edit its event) | the same 12 | 40/40 clean |
+| `bosses`, Enemy scaling `vanilla` | 20 | 20 success | the same 15 events, each in 20 seeds | the same 12 | 20/20 clean |
+
+0 merge conflicts, 0 changed placements without a scaled row, 0 maps above the cap (maximum 30 models), no event outside the known set.
+Neutral identity: the 24 permutation lock hashes and the sampling pins A/B/C1 are identical to the values before the change; all
+golden fixtures (the original 10, the two recorded before Part D with sampling-v1 and the classic boss planner, and the two boss-sampling
+cases) reproduce from their Seed Codes, also under a different application version.
+
+**Open.** (a) Unit participation by chance and unit sampling (Part D2). (b) Whether a map can reach more than 30 models through repeated
+bosses was not observed (maximum 30 in 100 seeds). (c) In-game behaviour of repeated bosses (two copies of one boss in different maps, a
+boss in an arena built for another) is covered by the same compatibility rules as the permutation but has not been played.
 
 ---
 

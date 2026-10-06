@@ -992,3 +992,28 @@ Date: 2026-10-06.
    fails if an option is added without a decision).
 8. **Launch game** is a desktop (Electron) concern: Steam `steam://rungameid/570940` first, the game executable as a fallback,
    and the method used is reported. The renderer never starts processes.
+
+## Boss sampling (Part D) and extension keys (backend 0.32.0, desktop 0.19.0, contracts 0.16.0)
+
+Date: 2026-10-06.
+
+1. **Scope.** `sampling-v1` gains `enemies.placement.bossReplacement` (`classic` = the existing archetype shuffle, the neutral value; `bosses`
+   = every single-body boss slot draws its own replacement from the portable boss pool, with repeats) and `uniqueBosses` (the pool is
+   used up before a boss repeats). The replacement chance applies to every boss slot; Gwyn follows the Gwyn spawn nerf per candidate.
+   **Linked units (dragons, Gargoyles, Four Kings, Bed of Chaos, Mass of Souls) stay with their own planners in both modes**: unit
+   participation by chance and unit sampling are not part of this step. `bossChanceInBossSlots` and the cross-class modes belong to
+   Part E and are not exposed (a control without an effect is a bug).
+2. **No new generation profile.** The new options default to a neutral value that reproduces the earlier behavior exactly, and the
+   engine change was proven byte-neutral (10 + 2 golden fixtures from the Seed Codes alone, 24 permutation lock hashes, the sampling
+   pins). Rule for such options: **extension keys**. The canonical settings are complete in memory; a Seed Code stores an extension key
+   only when it is non-neutral, so no existing code changes its text and none can decode to a different world. The profile id stays
+   `ds1tr-gen-v1`; worlds that use a non-neutral value are frozen from the moment they are shared and have their own golden fixtures
+   (`ds1tr-gen-v1.boss-sampling.json`).
+3. **Unique bosses** is defined as a cycle over the boss pool (restarts once every boss was used); the legacy reset after 22 uses is tied
+   to its own pool size and is not copied. The Second Gargoyle independent draw keeps its own stream and its per-seed Gwyn coin.
+4. **A boss slot that takes part draws from its own stream** (`slot:<id>`, `enemy-placement-v1`), the chance is its first draw, so lowering
+   the chance only removes slots and never changes the boss another slot gets. Boss slots left vanilla emit no placement (their events
+   are not edited).
+5. **Known defect found (not part of this change):** `sampling-v1` with Type replacement `enabled` and Placement fit `anywhere` fails for
+   some seeds in `DsrDataTool patch-enemies` with "Randomizer event ID is already used: 11419980". Logged in `IMPLEMENTATION_STATUS.md`.
+

@@ -45,7 +45,7 @@ const initialConfig: RandomizerConfig = {
     // Legacy Enemy Randomizer default: the second Bell Gargoyle is replaced.
     secondGargoyle: 'replace',
     // Classic permutation is the default; sampling-v1 is opt-in. The other values are the neutral ones for the classic mode.
-    placement: { algorithm: 'permutation-v1', replacementChance: 100, normalReplacement: 'normals', fit: 'anywhere', difficultyMode: 'random', difficultyStrictness: 'loose', typeReplacement: 'disabled', customPool: null },
+    placement: { algorithm: 'permutation-v1', replacementChance: 100, normalReplacement: 'normals', fit: 'anywhere', difficultyMode: 'random', difficultyStrictness: 'loose', typeReplacement: 'disabled', customPool: null, bossReplacement: 'classic', uniqueBosses: false },
   },
   fog: {
     enabled: true,
@@ -234,8 +234,8 @@ export function App() {
       enemies: {
         ...current.enemies,
         placement: algorithm === 'sampling-v1'
-          ? { algorithm, replacementChance: 100, normalReplacement: 'normals', fit: 'fits', difficultyMode: 'random-easy-asylum', difficultyStrictness: 'loose', typeReplacement: 'disabled', customPool: null }
-          : { algorithm, replacementChance: 100, normalReplacement: 'normals', fit: 'anywhere', difficultyMode: 'random', difficultyStrictness: 'loose', typeReplacement: 'disabled', customPool: null },
+          ? { algorithm, replacementChance: 100, normalReplacement: 'normals', fit: 'fits', difficultyMode: 'random-easy-asylum', difficultyStrictness: 'loose', typeReplacement: 'disabled', customPool: null, bossReplacement: 'classic', uniqueBosses: false }
+          : { algorithm, replacementChance: 100, normalReplacement: 'normals', fit: 'anywhere', difficultyMode: 'random', difficultyStrictness: 'loose', typeReplacement: 'disabled', customPool: null, bossReplacement: 'classic', uniqueBosses: false },
       },
     }));
   const setPlacement = <K extends keyof RandomizerConfig['enemies']['placement']>(key: K, value: RandomizerConfig['enemies']['placement'][K]) =>
@@ -541,6 +541,9 @@ export function App() {
               <select value={config.enemies.placement.difficultyStrictness} disabled={!config.enemies.randomizeRegularEnemies || config.enemies.placement.algorithm !== 'sampling-v1' || !config.enemies.placement.difficultyMode.startsWith('curve')} title="Only used by the difficulty-curve modes. Strict: mostly the same difficulty class, harder ones are rare. A bit loose: harder enemies appear more often. Very loose: any difficulty can appear anywhere." onChange={(event) => setPlacement('difficultyStrictness', event.target.value as RandomizerConfig['enemies']['placement']['difficultyStrictness'])}><option value="strict">Strict</option><option value="loose">A bit loose</option><option value="very-loose">Very loose</option></select>
               <label className="field-label">Type replacement</label>
               <select value={config.enemies.placement.typeReplacement} disabled={!config.enemies.randomizeRegularEnemies || config.enemies.placement.algorithm !== 'sampling-v1'} title="Legacy-style sampling only. Enabled: all enemies of one kind in a map (every Hollow in the Parish) are replaced by the same new kind, and two kinds in one map never get the same replacement. The replacement chance then applies to the kind, not to each enemy. The exception for roaming bosses only matters for boss replacements, which are not available yet." onChange={(event) => setPlacement('typeReplacement', event.target.value as RandomizerConfig['enemies']['placement']['typeReplacement'])}><option value="enabled">Enabled</option><option value="enabled-except-roaming-bosses">Enabled, except roaming bosses</option><option value="disabled">Disabled</option></select>
+              <label className="field-label">Boss replacement</label>
+              <select value={config.enemies.placement.bossReplacement} disabled={!config.enemies.randomizeBosses || config.enemies.placement.algorithm !== 'sampling-v1'} title="Legacy-style sampling only. Classic shuffle: the bosses are shuffled among the boss slots as before. Random bosses: every single-body boss slot draws its own replacement from the boss pool, so a boss can appear more than once; the replacement chance applies to each boss slot. Dragons, Gargoyles, the Four Kings and the other multi-part bosses keep the classic shuffle. Lord Gwyn follows the Gwyn spawn nerf." onChange={(event) => setPlacement('bossReplacement', event.target.value as RandomizerConfig['enemies']['placement']['bossReplacement'])}><option value="classic">Classic shuffle</option><option value="bosses">Random bosses (legacy-style)</option></select>
+              <Toggle inactive={!config.enemies.randomizeBosses || config.enemies.placement.algorithm !== 'sampling-v1' || config.enemies.placement.bossReplacement !== 'bosses'} label="Unique bosses" hint="Needs Random bosses. Every boss of the pool is used once before any boss appears a second time." checked={config.enemies.placement.uniqueBosses} onChange={(value) => setPlacement('uniqueBosses', value)} />
               <EnemyPoolEditor gamePath={config.gamePath} active={config.enemies.randomizeRegularEnemies && config.enemies.placement.algorithm === 'sampling-v1'} fit={config.enemies.placement.fit} customPool={config.enemies.placement.customPool} onChange={(pool) => setPlacement('customPool', pool)} />
             </div>
             <div className="option-group"><h3>Legacy options</h3>
@@ -554,11 +557,11 @@ export function App() {
               <select value={config.enemies.gwynNerf} disabled={!config.enemies.randomizeBosses} title="Chance that Lord Gwyn is rejected as a boss replacement: strong 85%, medium 60%." onChange={(event) => setEnemy('gwynNerf', event.target.value as GwynNerfMode)}><option value="strong">Strong</option><option value="medium">Medium</option><option value="none">None</option></select>
             </div>
             <div className="option-group planned-group"><h3>Legacy parity <span>planned</span></h3>
-              {['Boss replacement', 'NPC replacement'].map((label) => <div key={label}><label className="field-label">{label}</label><select defaultValue="disabled" disabled><option value="disabled">Disabled</option><option value="bosses">Only bosses</option><option value="enemies">Only normal enemies</option><option value="all">Bosses or normal enemies</option></select></div>)}
+              {['NPC replacement'].map((label) => <div key={label}><label className="field-label">{label}</label><select defaultValue="disabled" disabled><option value="disabled">Disabled</option><option value="bosses">Only bosses</option><option value="enemies">Only normal enemies</option><option value="all">Bosses or normal enemies</option></select></div>)}
               <RangeOption disabled label="Boss chance: normal slots" value={10} onChange={() => undefined} />
               <RangeOption disabled label="Boss chance: boss slots" value={90} onChange={() => undefined} />
               <RangeOption disabled label="Roaming boss souls" value={100} onChange={() => undefined} />
-              {['Allow T-pose behavior', 'Unique bosses', 'Respawning roaming bosses', 'Hostile NPCs'].map((label) => <Toggle key={label} disabled label={label} checked={false} onChange={() => undefined} />)}
+              {['Allow T-pose behavior', 'Respawning roaming bosses', 'Hostile NPCs'].map((label) => <Toggle key={label} disabled label={label} checked={false} onChange={() => undefined} />)}
             </div>
           </section>
 

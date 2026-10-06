@@ -41,6 +41,12 @@ world cannot be forgotten in the Seed Code.
 1. Envelope JSON, fixed key order: `{"profile":..., "masterSeed":..., "settings":{items, enemies{... placement{...}}, fog, output{includeDlc}}}`.
    All keys of the settings are present in a fixed order (`canonicalSettings.ts`); the custom enemy pool is a list of stable model
    ids sorted lexicographically (`null` = full pool). Same configuration, same bytes, whatever order the UI or a preset built it in.
+   **Extension keys.** An option added after format 1 existed (the first ones are `enemies.placement.bossReplacement` and
+   `uniqueBosses`, Part D) is complete in memory, in history and in the settings file, but a Seed Code stores it **only when it
+   differs from its neutral value**, appended after `customPool` in a fixed order (`CANONICAL_PLACEMENT_EXTENSION_KEYS`). The neutral
+   value is "what the world did before the option existed" and is frozen forever. So every code made before the option keeps its exact
+   text, decoding fills the neutral value back in, and re-encoding gives the identical code. A code that uses a non-neutral extension
+   value is refused by an application that does not know the option ("settings cannot be used"), never silently reinterpreted.
 2. `deflate-raw` (level 9) with a fixed preset dictionary (`SEED_DICTIONARY`, part of the format; it only makes codes short).
 3. Bytes = `[0x01 format][deflated envelope][first 4 bytes of SHA-256 of the preceding bytes]`.
 4. Crockford base32 (`0123456789ABCDEFGHJKMNPQRSTVWXYZ`) in groups of 8, prefix `DS1TR1-`.
