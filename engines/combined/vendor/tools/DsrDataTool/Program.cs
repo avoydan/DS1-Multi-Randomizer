@@ -4350,8 +4350,10 @@ static void AddScaledNpcRows(PARAM npcParam, List<PatchPlacement> placements)
         // Roaming boss (Part E1): the reward and the respawn bit are decisions of the placement, not of the boss row.
         if (placement.RoamingBossSouls.HasValue)
             SetCell(scaled, "getSoul", placement.RoamingBossSouls.Value);
-        if (placement.DisableRespawn)
-            SetCell(scaled, "disableRespawn", 1);
+        // A boss row carries disableRespawn = 1 (bosses do not come back); a roaming boss row is a copy of it, so the bit is written for
+        // BOTH values of the option and never left to what the copy inherited. Rows of ordinary replacements are not touched.
+        if (placement.RoamingBossSouls.HasValue)
+            SetCell(scaled, "disableRespawn", placement.DisableRespawn ? 1 : 0);
         // A replacement may use a neutral/friendly PARAM team in its vanilla
         // arena (Gwyndolin is the important example). Preserve the destination
         // encounter's allegiance unless a passive slot explicitly overrides it.
@@ -4366,13 +4368,13 @@ static void AddScaledNpcRows(PARAM npcParam, List<PatchPlacement> placements)
                 !combatFields.Contains(name) &&
                 name != "teamType" &&
                 !IsNpcItemLotField(name) &&
-                !(placement.DisableRespawn && name == "disableRespawn") &&
+                !(placement.RoamingBossSouls.HasValue && name == "disableRespawn") &&
                 !(placement.MakeTangible &&
                   name is "isGhost" or "isChangeWanderGhost" or "ghostModelId"));
         if (placement.RoamingBossSouls.HasValue)
             AssertCell(scaled, "getSoul", placement.RoamingBossSouls.Value);
-        if (placement.DisableRespawn)
-            AssertCell(scaled, "disableRespawn", 1);
+        if (placement.RoamingBossSouls.HasValue)
+            AssertCell(scaled, "disableRespawn", placement.DisableRespawn ? 1 : 0);
         AssertCell(
             scaled,
             "teamType",
@@ -5430,7 +5432,7 @@ record PatchPlacement(
     bool PortableHydraGroup,
     int? AwardItemLotId,
     // Part E1 (patches/0014): a boss in a regular enemy slot. RoamingBossSouls is the soul reward of its scaled row (the boss kill
-    // souls come from an event in the arena, which a regular slot does not have); DisableRespawn sets the row's own "do not respawn".
+    // souls come from an event in the arena, which a regular slot does not have); DisableRespawn is the value of the row's own "do not respawn" bit (written to 1 or 0 for every roaming row; patches/0015).
     int? RoamingBossSouls = null,
     bool DisableRespawn = false)
 {

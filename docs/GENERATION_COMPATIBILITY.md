@@ -56,6 +56,29 @@ Making a new profile (`ds1tr-gen-v2`):
 4. Record `fixtures/golden/ds1tr-gen-v2.json` with the new tooling; **never touch** `ds1tr-gen-v1.json`.
 5. Keep verifying v1 in the golden test; both profiles must pass in the same build.
 
+## Recorded exception: the roaming boss respawn bit (backend 0.35.1, 2026-10-06)
+
+**What changed.** A roaming boss (Part E1) is a copy of a boss NpcParam row, and boss rows carry `disableRespawn = 1`. DsrDataTool only ever *set* the bit (stay dead on), so with
+"Roaming bosses stay dead" **off** the rows kept the inherited 1: the option did nothing in the data. The tool now writes the bit for every roaming row from the option
+(on = 1, off = 0) and asserts it (`patches/0015-roaming-respawn-bit.patch`).
+
+**What changes, proven.** The same worlds generated with the tool before and after the fix (`ds1tr-gen-v1`, same Seed Codes):
+
+| World | Package |
+|---|---|
+| roaming bosses, stay dead **off** (`quick-roaming-basic`, `quick-roaming-repeated`, golden `roaming-both-combined`, `roaming-both-boss-sampling-fog`, Part E extended worlds) | **different**: `GameParam.parambnd.dcx` only; inside it only the `disableRespawn` cell of the roaming rows, 1 -> 0 (53 rows in `quick-roaming-basic`, 96 in `quick-roaming-repeated`); every other file and cell is identical |
+| roaming bosses, stay dead **on** (`quick-roaming-souls`, golden `roaming-bosses-souls-stay-dead`) | identical |
+| no roaming bosses: classic, sampling, boss sampling (Part D), `quick-sampling-asylum`, `quick-boss-asylum-demon`, all 15 earlier golden fixtures | identical |
+
+So **a Seed Code of a roaming world with stay dead off keeps its text and its settings and gets a package that differs in that one cell**; nothing else a Seed Code can express is affected.
+
+**Decision: no new generation profile; a narrow, recorded exception to the rule above.** The rule exists so that a shared Seed Code keeps its world. Here the option never worked as
+documented (the world a person got did not match the setting they chose), Part E1 and every roaming world are younger than the day of this fix and have never been public (the
+only worlds played are the test worlds), and the bit is the only difference. Because the world before the fix was wrong against its own setting, keeping it byte-stable under a new
+profile would preserve a defect. Consequences: the two affected golden cases were re-recorded (the file `ds1tr-gen-v1.roaming-bosses.json` is the only fixture changed; its stay-dead case is
+byte-identical to the old record, the 15 older fixtures and the Part D fixtures were not touched), and the played test records say which packages changed after they were played.
+**This is not a precedent**: it applies to options introduced after the last public release only; once the app is released, any such change needs a new profile.
+
 ## Golden fixtures
 
 `apps/backend/fixtures/golden/<profile>.json` holds, per scenario: the Seed Code, the decoded canonical settings, the profile, the

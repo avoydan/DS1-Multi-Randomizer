@@ -993,6 +993,12 @@ Date: 2026-10-06.
 8. **Launch game** is a desktop (Electron) concern: Steam `steam://rungameid/570940` first, the game executable as a fallback,
    and the method used is reported. The renderer never starts processes.
 
+## Roaming boss respawn bit written for both values (backend 0.35.1)
+
+Date: 2026-10-06. The roaming-boss row inherits `disableRespawn = 1` from the boss row, so only writing the bit when stay dead is on left "stay dead off" without effect. DsrDataTool now writes
+the bit for every roaming row (1 for stay dead, 0 otherwise) and asserts it. Only roaming worlds with stay dead off change, in one cell of `GameParam`; no new generation profile (pre-release,
+narrow, proven; `docs/GENERATION_COMPATIBILITY.md`, "Recorded exception"). A sixth quick test (`quick-roaming-respawn`) exercises the respawning variant; the stay-dead variant was played and passed.
+
 ## Smoke tests: quick worlds by seed search, no forced placements (backend 0.35.0, desktop 0.22.0, contracts 0.20.0)
 
 Date: 2026-10-06.

@@ -88,7 +88,7 @@ const defaults: GenerationDependencies = {
   getFogPrerequisites: (language, context) => resolveFogPrerequisites(language, process.env, context),
   combined: executeCombinedGeneration,
   fog: new FogHostProcess(),
-  appVersion: '0.35.0',
+  appVersion: '0.35.1',
 };
 
 async function fingerprint(file: string): Promise<{ size: number; sha256: string }> {

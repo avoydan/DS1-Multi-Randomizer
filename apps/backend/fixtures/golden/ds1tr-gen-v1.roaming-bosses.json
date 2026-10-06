@@ -1,6 +1,6 @@
 {
   "profile": "ds1tr-gen-v1",
-  "recordedAt": "2026-10-06T14:33:54.252Z",
+  "recordedAt": "2026-10-06T19:22:29.463Z",
   "cases": [
     {
       "name": "roaming-both-combined",
@@ -71,7 +71,7 @@
       },
       "expected": {
         "fileCount": 55,
-        "digest": "3b643e2e8f51a17db292ffa183dadb11038119ce73864da7daa2e64096b590b2",
+        "digest": "76ad63b575c04924f88e15366c08def32d6de4f521485c1cbbcf469e973694fb",
         "files": {
           "README.txt": "b240aafb06a818df97625bbb8703058b5f2d281056a760479329b2ebbbb5440f",
           "mod/event/m10_00_00_00.emevd.dcx": "0bdce020482601d261054b76b0650395f5adf865579ce5b7bc96cf4ef58fe398",
@@ -108,7 +108,7 @@
           "mod/map/MapStudio/m17_00_00_00.msb": "0827ec93b01c3f54b71d1e07992e03965cf400a4bda77eb4172b32ec5c4717b8",
           "mod/map/MapStudio/m18_00_00_00.msb": "b5b948fa7a62583cd7fe34e52e40b6a27017903c36bccd83b440bfb57cf63bfe",
           "mod/map/MapStudio/m18_01_00_00.msb": "66cc9c0c7666b78ea91d1a2c2c63aee8bb226a5dd193c24fb6fd21dc3a8401bb",
-          "mod/param/GameParam/GameParam.parambnd.dcx": "1627a998b9ddd5c7a3224348a699f49f50c9082cd4f51eeda1822283062c60f0",
+          "mod/param/GameParam/GameParam.parambnd.dcx": "a02279524157e42eb1af4c02898327d5143b5fdb6c12977978c5299ffd7f5902",
           "mod/script/m10_00_00_00.luabnd.dcx": "5f623feafe18cf8cb2ca39b6451c50c216e15c2f52434595d6e519d5611c20e6",
           "mod/script/m10_01_00_00.luabnd.dcx": "49e093b572119600885e5f4872cfbda613d74fa46c5245c8a0722dfbeea2028c",
           "mod/script/m10_02_00_00.luabnd.dcx": "fbb3afaffc491d04d90613c31a35007d532fb60d705e0f35993b476df2a2cc02",
@@ -340,7 +340,7 @@
       },
       "expected": {
         "fileCount": 73,
-        "digest": "495cc51a2fcafeefe4ea30f99ff961e3dc76672758a79f65146eabe3cef54b65",
+        "digest": "2526ad1e2d87ec51682064c18a3ae3f1c1e72fffe90d0ae32fde1426aaf21301",
         "files": {
           "event/common.emevd.dcx": "5d80fdab0a539ebd659884d66e19193b798487be8484ffda0303ecba1ac2361b",
           "event/m10_00_00_00.emevd.dcx": "716b7180cfa1c8f5491f8029e1f2b0d02e5376c52a91d00b2e76729ed55659f4",
@@ -379,7 +379,7 @@
           "map/MapStudio/m18_00_00_00.msb": "cd604f520427a714952778878c1bde2235c3256cce3ed4c9c79ce5bd1e0cfe32",
           "map/MapStudio/m18_01_00_00.msb": "23552e0f14a8d8c921d069a1d2fcdf1feddfd9e7fd6a37ec80d05fec867a257a",
           "msg/ENGLISH/menu.msgbnd.dcx": "864227749930912f55d0495e1a5c485de1181e0866160434d996b5bb67b58e7d",
-          "param/GameParam/GameParam.parambnd.dcx": "8fcf5c55c5a95c5ef846183bb02f3cfe7cc1f4f439e296a6f4bbab6b9c9450cf",
+          "param/GameParam/GameParam.parambnd.dcx": "478dfc0f136b7ba7efc940ef0dd09845d35811782dea7809aeec5b3d7cdc4260",
           "script/m10_00_00_00.luabnd.dcx": "58c71f3f11fab34fef11375cd6b85fab56b55743f89bd68431647d3f25783d1a",
           "script/m10_01_00_00.luabnd.dcx": "3a8f496ac06f9331522df9b4851c55947780abd3353724442ef9286e96a8e75c",
           "script/m10_02_00_00.luabnd.dcx": "c938a1fbdf63f9d3ce0ec6f349e5c19bab451371218cad8e8d4f346a71db8678",

@@ -38,6 +38,23 @@ to 80 events, and every other map, are unchanged: the audit shows `IDs used == I
   no reseeding), so no package or Seed Code of such a world ever existed; no profile change is needed.
 - **Tooling:** `apps/backend/scripts/placementMatrix.mjs` (configuration x seed matrix with window audit, retries, deterministic reruns).
 
+**Roaming boss respawn fix and the first real gameplay results (2026-10-06; backend 0.35.1, contracts 0.21.0, desktop 0.23.0; patch 0015; generation profile `ds1tr-gen-v1` unchanged).**
+- **Gameplay milestone.** The five quick smoke tests (roaming boss - basic, roaming boss - souls and respawn, three roaming bosses at once, regular enemies - first three change, boss
+  sampling - the first boss) were **played by hand in the real game and passed**: the replacements appeared and rendered, woke up, fought and could be killed, boss and non-boss health bars
+  behaved as expected, the souls were as expected, the stay-dead boss stayed dead after the reset, the Asylum Demon encounter completed with the replacement boss, no crash or T-pose.
+  This is real gameplay validation of Part D boss sampling on the Asylum Demon, of sampling-v1 regular enemies, and of roaming bosses with stay dead **on**. The extended worlds (Fog,
+  Second Bell Gargoyle, Undead Parish, Type + roaming in the Burg, ...) were **not** played and are not marked as verified. Two of the five worlds (`quick-roaming-basic`,
+  `quick-roaming-repeated`) were played with the package from before the respawn fix and have not been played again; their record says so.
+- **Respawn bug fixed.** Root cause: a roaming boss row is a copy of a boss row (`disableRespawn = 1`) and DsrDataTool only set the bit when stay dead was on, so "stay dead off" never
+  cleared it. The tool now writes the bit for every roaming row from the option (1 or 0) and asserts it. Compatibility: only roaming worlds with stay dead off change, and only in that
+  cell of `GameParam`; the stay-dead-on fixture, the 15 earlier fixtures and Part D are byte-identical; recorded as a narrow exception without a new profile
+  (`docs/GENERATION_COMPATIBILITY.md`). The UI hint "Off: it respawns like a normal enemy" is now true in the data.
+- **New quick test `quick-roaming-respawn`** (Capra Demon in place of the Hollow c2500_0007, 11.4 m from the start, stay dead off): kill it, reset the area by dying once, return; the boss must
+  be alive again. Statically verified (`disableRespawn = 0`); **not played yet**.
+- **Regression (real catalog, real data tool):** golden 18 fixtures: 16 identical, the 2 stay-dead-off roaming cases changed exactly as predicted (`GameParam` only) and were re-recorded, then 18/18; quick static verification 6/6 (packages identical on a second run);
+  Part E representative matrix 125/125 (5 cases x 25 seeds), Part D baseline 200/200 (boss sampling and curve, 100 seeds each, same figures as before), Fog 30/30 with `verify-skips` clean (15 boss-overlay events, 12 merges, 0 conflicts);
+  0 event-window overruns, 0 non-deterministic reruns, no map above its own model baseline (Undead Parish 33 as before). Backend 397 tests, desktop 6/6.
+
 **Smoke tests redesigned: quick vs extended (2026-10-06; backend 0.35.0, desktop 0.22.0, contracts 0.20.0; engine, data tool and generation profile `ds1tr-gen-v1` unchanged).**
 The test worlds under Advanced are split into five **quick smoke tests** and twelve **extended gameplay tests**. A quick test puts the feature next to where the player wakes up
 in the Undead Asylum (first visit): a Capra Demon where the first Hollow stood (8.7 m), a Taurus Demon with 100% souls that stays dead, the same Smough in three neighbouring slots,
@@ -47,11 +64,7 @@ replacement, an estimated time (20-90 s) and specific checks. **No override or f
 `smokeTestCatalog.mjs verify` generates each quick world twice through the normal pipeline (identical package) and `tools/smoke-verify` reads the package: the MSB part has the promised
 model, the model is loaded by the map, the NpcParam and NpcThinkParam rows exist, souls and the respawn bit are as promised, a wake-up event was added for the entity, event ids are
 unique and the model count is within the limit. That proves the files contain the target; nothing was played. Details: `docs/SMOKE_TESTS.md`.
-- **Found by the static check, not fixed here:** a roaming boss row is a copy of the boss row, and boss rows carry `disableRespawn = 1`. Part E1 only ever *sets* the bit (stay dead on), so
-  with "Roaming bosses stay dead" **off** the row still has the bit set and the setting has no effect in the data (the UI hint "Off: it respawns like a normal enemy" does not hold).
-  The legacy tool writes the bit explicitly for its roaming copies. The fix is one line in `AddScaledNpcRows` (set the bit to the option's value), but it changes the files of every
-  Part E world with stay-dead off, including two of the three `ds1tr-gen-v1.roaming-bosses.json` fixtures, so it needs a decision (re-record the unreleased fixtures or a new generation
-  profile). The quick worlds do not depend on it (`quick-roaming-basic` does not assert the bit).
+- **Found by the static check and fixed in backend 0.35.1 (see the entry above this one):** a roaming boss row is a copy of the boss row, and boss rows carry `disableRespawn = 1`; Part E1 only ever *set* the bit, so with "Roaming bosses stay dead" **off** it stayed 1.
 - **Also seen, not changed:** the roaming pass treats dummy slots (`c2500_0004`, `c2500_0008` in the Asylum) as ordinary slots, so a boss can be placed on a part that is never spawned.
 
 **Enemy placement Part E1: bosses in regular enemy slots (2026-10-06; backend 0.34.0, desktop 0.21.0, contracts 0.19.0, patch 0014; RANDOMIZER_VERSION 0.5.66 and FogHost 0.5.0 unchanged; generation profile `ds1tr-gen-v1` unchanged).**
