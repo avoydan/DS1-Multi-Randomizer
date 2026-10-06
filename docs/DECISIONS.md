@@ -1000,7 +1000,7 @@ Date: 2026-10-06.
 1. **Scope.** `sampling-v1` gains `enemies.placement.bossReplacement` (`classic` = the existing archetype shuffle, the neutral value; `bosses`
    = every single-body boss slot draws its own replacement from the portable boss pool, with repeats) and `uniqueBosses` (the pool is
    used up before a boss repeats). The replacement chance applies to every boss slot; Gwyn follows the Gwyn spawn nerf per candidate.
-   **Linked units (dragons, Gargoyles, Four Kings, Bed of Chaos, Mass of Souls) stay with their own planners in both modes**: unit
+   **Linked units (Priscilla, Kalameet, Gaping Dragon, Seath, the Sanctuary Guardian, the Bell Gargoyles and the Centipede Demon) stay with their own planners in both modes** (Four Kings and Bed of Chaos are members of the sampled pool): unit
    participation by chance and unit sampling are not part of this step. `bossChanceInBossSlots` and the cross-class modes belong to
    Part E and are not exposed (a control without an effect is a bug).
 2. **No new generation profile.** The new options default to a neutral value that reproduces the earlier behavior exactly, and the

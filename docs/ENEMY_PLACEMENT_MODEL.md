@@ -1243,9 +1243,11 @@ worsened.
 **Scope.** `sampling-v1` with `enemies.placement.bossReplacement: "bosses"` draws a replacement for every *single-body* boss slot
 (24 on the real catalog) from the portable boss pool: the boss archetypes the classic planner already shuffles (the same `sources`
 list, `nonPortableBossReplacementModels` empty). A boss may appear any number of times. `"classic"` (the neutral value and the default)
-runs the existing archetype permutation byte for byte. **Linked units stay classic in both modes** (dragons, Bell Gargoyles, Four
-Kings, Centipede Demon, Bed of Chaos units, Mass of Souls, Anor Londo Gargoyles): chance-based unit participation and unit sampling
-are not built; the "unit participation" item of the plan is deferred. The cross-class modes, `bossChanceInBossSlots`, roaming-boss souls and
+runs the existing archetype permutation byte for byte. **Linked units stay classic in both modes**: Crossbreed Priscilla, the two Black
+Dragon Kalameet bodies, Gaping Dragon, Seath, the Sanctuary Guardian, the Bell Gargoyles and the Centipede Demon (the bosses of the
+dragon / linked-boss planners; they swap with each other as whole units). **Correction (2026-10-06):** an earlier version of this text
+also listed Four Kings and Bed of Chaos; both are ordinary members of the 24-slot boss pool (the same as in the permutation) and take
+part in boss sampling like the other 21 archetypes. Chance-based unit participation and unit sampling are not built; the "unit participation" item of the plan is deferred. The cross-class modes, `bossChanceInBossSlots`, roaming-boss souls and
 respawn belong to Part E and are not exposed.
 
 | Option | Contract | Neutral | Rule |

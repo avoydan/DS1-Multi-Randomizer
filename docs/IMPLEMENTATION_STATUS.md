@@ -3,7 +3,7 @@
 **Enemy placement Part D: boss sampling (2026-10-06; backend 0.32.0, desktop 0.19.0, contracts 0.16.0, patch 0012; RANDOMIZER_VERSION 0.5.66 and FogHost 0.5.0 unchanged; generation profile `ds1tr-gen-v1` unchanged).**
 `sampling-v1` can draw a replacement for every single-body boss slot from the boss pool (`Boss replacement: Random bosses`), with the
 replacement chance per boss slot, the Gwyn nerf per candidate and an optional `Unique bosses` cycle; the controls replace two PLANNED
-placeholders. Linked units (dragons, Gargoyles, Four Kings, ...) stay with their classic planners (unit participation is not built). Details,
+placeholders. Linked units (Priscilla, Kalameet, Gaping Dragon, Seath, Sanctuary Guardian, Bell Gargoyles, Centipede Demon) stay with their classic planners (unit participation is not built). Details,
 evidence and open points: `docs/ENEMY_PLACEMENT_MODEL.md` 10.6. The two new options are **extension keys** of the Seed Code (stored only when
 non-neutral), so no existing code changed and none can decode to another world (`docs/SEED_FORMAT.md`, `docs/DECISIONS.md`); presets are version 10.
 

@@ -73,7 +73,7 @@ export const TYPE_REPLACEMENT_MODES = Object.freeze(["disabled", "enabled", "ena
 
 /**
  * Boss replacement (Part D): "classic" keeps the archetype permutation of the existing boss planner; "bosses" samples every
- * single-body boss slot from the portable boss pool with replacement. Linked units (dragons, Gargoyles, Four Kings, ...)
+ * single-body boss slot from the portable boss pool with replacement. Linked units (Priscilla, Kalameet, Gaping Dragon, Seath, the Sanctuary Guardian, the Bell Gargoyles, the Centipede Demon)
  * stay classic in both modes.
  */
 export const BOSS_REPLACEMENT_MODES = Object.freeze(["classic", "bosses"]);
