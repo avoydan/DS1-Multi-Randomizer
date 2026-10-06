@@ -1030,3 +1030,14 @@ Date: 2026-10-06.
 3. **Rule for new events:** an event with a fixed ID must be added to the reserved set before the window is chosen; a feature that can add
    many events must be measured with the audit (`DS1TR_AUDIT_EVENTS=1`).
 
+## A chosen game folder wins over detection (desktop 0.19.1)
+
+Date: 2026-10-06.
+
+1. A folder the person chose by hand and that passed the installation check is saved as machine-local state and used at the next start,
+   even when Steam detection finds another copy. Detection is only the fallback (nothing saved, saved folder gone or no longer valid).
+   An automatically detected copy is never saved, so a later Steam change is followed.
+2. "Change game folder" updates the saved choice once the new folder passed the check. An invalid or vanished saved folder is kept (a
+   disk that is temporarily offline wins again when it returns) but not used.
+3. The choice is not part of any Seed Code, preset or configuration.
+

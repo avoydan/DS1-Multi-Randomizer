@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { readFile, writeFile, mkdir, access } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { migrateSettings, type StoredSettings } from './settings.js';
+import { migrateSettings, normalizeGamePath, type StoredSettings } from './settings.js';
 import { launchGame } from './launchGame.js';
 
 const currentDirectory = path.dirname(fileURLToPath(import.meta.url));
@@ -132,9 +132,15 @@ async function createWindow(): Promise<void> {
 ipcMain.handle('dialog:select-game-directory', async () => {
   const result = await dialog.showOpenDialog({ title: 'Select the Dark Souls Remastered folder', properties: ['openDirectory'] });
   if (result.canceled) return null;
-  settings = { ...settings, gamePath: result.filePaths[0] };
-  await saveSettings();
+  // Only the choice is returned: the folder is remembered once the installation check accepted it (game:remember-path).
   return result.filePaths[0];
+});
+ipcMain.handle('game:remember-path', async (_event, gamePath: unknown) => {
+  const normalized = normalizeGamePath(gamePath);
+  if (!normalized) return false;
+  settings = { ...settings, gamePath: normalized };
+  await saveSettings();
+  return true;
 });
 ipcMain.handle('runtime:connection', () => ({
   apiBase: app.isPackaged ? backendUrl : 'http://127.0.0.1:43177/api',

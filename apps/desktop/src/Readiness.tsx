@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { decideStartupInstallation } from '@ds1tr/contracts';
 import type { GameStateReport } from '@ds1tr/contracts';
 import { api, type DetectedInstallation } from './api';
 
@@ -45,12 +46,16 @@ export function Readiness({ gamePath, backendReady, worldNeeded, onPath, onState
   const [draft, setDraft] = useState('');
   const started = useRef(false);
   const checked = useRef('');
+  /** The folder the person picked by hand (Browse, Use this folder, one of several copies); remembered once it passed the check. */
+  const manual = useRef('');
+  const pick = (path: string) => { manual.current = path; checked.current = ''; onPath(path); };
 
   const checkGame = useCallback(async (path: string) => {
     setGame({ kind: 'checking' });
     setWorld({ kind: 'idle' });
     try {
       const validation = await api.validateInstallation(path);
+      if (validation.valid && manual.current === path) void window.desktop?.rememberGamePath(path);
       if (!validation.valid) {
         setGame({ kind: 'problem', message: 'This folder does not look like a complete Dark Souls Remastered installation. Verify the game files in Steam, or choose another folder.' });
         onState(null);
@@ -81,12 +86,15 @@ export function Readiness({ gamePath, backendReady, worldNeeded, onPath, onState
       const saved = (await window.desktop?.connection())?.gamePath ?? '';
       if (gamePath) return;
       try {
-        const { installations } = await api.detectGame();
-        const usable = installations.filter((item) => item.valid);
-        if (saved && (usable.some((item) => item.gamePath.toLowerCase() === saved.toLowerCase()) || usable.length === 0)) onPath(saved);
-        else if (usable.length === 1) onPath(usable[0].gamePath);
-        else if (usable.length > 1) setGame({ kind: 'choose', options: usable });
-        else if (saved) onPath(saved);
+        // A copy the person chose by hand wins while it still passes the check; Steam detection is only the fallback.
+        let savedValid = false;
+        if (saved) {
+          try { savedValid = (await api.validateInstallation(saved)).valid; } catch { savedValid = false; }
+        }
+        const detected = savedValid ? [] : (await api.detectGame()).installations.filter((item) => item.valid);
+        const decision = decideStartupInstallation({ saved, savedValid, detected: detected.map((item) => item.gamePath) });
+        if (decision.kind === 'saved' || decision.kind === 'detected') onPath(decision.path);
+        else if (decision.kind === 'choose') setGame({ kind: 'choose', options: detected });
         else setGame({ kind: 'missing' });
       } catch {
         setGame({ kind: 'missing' });
@@ -118,7 +126,7 @@ export function Readiness({ gamePath, backendReady, worldNeeded, onPath, onState
 
   const choose = async () => {
     const selected = await window.desktop?.selectGameDirectory();
-    if (selected) { checked.current = ''; onPath(selected); setShowFolder(false); }
+    if (selected) { pick(selected); setShowFolder(false); }
   };
 
   return (
@@ -137,7 +145,7 @@ export function Readiness({ gamePath, backendReady, worldNeeded, onPath, onState
           {game.kind === 'problem' && <p>{game.message}</p>}
           {game.kind === 'choose' && (
             <div className="readiness-choices">
-              {game.options.map((item) => <button key={item.gamePath} className="secondary" onClick={() => { checked.current = ''; onPath(item.gamePath); }}>Use the copy in {item.gamePath}</button>)}
+              {game.options.map((item) => <button key={item.gamePath} className="secondary" onClick={() => pick(item.gamePath)}>Use the copy in {item.gamePath}</button>)}
             </div>
           )}
           {gamePath && game.kind === 'ready' && <small className="field-note">{gamePath}</small>}
@@ -150,7 +158,7 @@ export function Readiness({ gamePath, backendReady, worldNeeded, onPath, onState
         <div className="path-row">
           <input value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Type the Dark Souls Remastered folder, or use Browse" aria-label="Dark Souls Remastered folder" />
           <button className="secondary" onClick={() => void choose()}>Browse</button>
-          <button className="secondary" disabled={!draft.trim()} onClick={() => { checked.current = ''; onPath(draft.trim()); setShowFolder(false); }}>Use this folder</button>
+          <button className="secondary" disabled={!draft.trim()} onClick={() => { pick(draft.trim()); setShowFolder(false); }}>Use this folder</button>
         </div>
       )}
       {worldNeeded && game.kind === 'ready' && (

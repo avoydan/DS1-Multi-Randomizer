@@ -1,5 +1,14 @@
 # Implementation status
 
+**The game folder you chose is remembered (2026-10-06; desktop 0.19.1, contracts 0.17.0).**
+After a restart the app used the Steam copy whenever Steam detection found one, even if the person had chosen another folder, because
+the saved choice was honoured only when it was among the detected installations (and a typed folder was never saved at all). Now a folder
+chosen by hand (Browse, "Use this folder", or one of several detected copies) is saved after the installation check accepted it and wins at
+the next start; Steam detection is only the fallback when nothing is saved, the saved folder is gone, or it no longer passes the check.
+The saved choice is machine-local (`userData/settings.json`), never part of a Seed Code, a preset or a generation configuration, and the
+per-installation state is keyed by the installation path (`state/installs/<id>`), so state of one copy is never applied to another.
+The decision is a pure function (`decideStartupInstallation`, contracts) with tests; a packaged-app proof drove the cases through the UI.
+
 **Fix: custom event window vs the Bed of Chaos floor event (2026-10-06; backend 0.32.1, data tool only; `ds1tr-gen-v1` unchanged).**
 `sampling-v1` with Type replacement `enabled`, Placement `anywhere` and bosses on sometimes failed in `patch-enemies` with
 `Randomizer event ID is already used: 11419980`. Root cause (reproduced deterministically, details in `docs/EVENT_ALLOCATION.md`): the

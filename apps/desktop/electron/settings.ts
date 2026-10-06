@@ -1,7 +1,19 @@
 /** Application settings kept in userData/settings.json. */
 export interface StoredSettings {
-  /** The Dark Souls Remastered folder the person last chose (only when automatic detection did not apply). */
+  /** The Dark Souls Remastered folder the person chose by hand and that passed the installation check; it wins over detection. */
   gamePath?: string;
+}
+
+/**
+ * The canonical form of a folder the person chose: absolute, normalized separators, no trailing separator. Anything else is not a
+ * usable installation folder and is not remembered.
+ */
+export function normalizeGamePath(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!/^[A-Za-z]:[\\/]/u.test(trimmed) && !trimmed.startsWith('\\\\')) return null;
+  const normalized = trimmed.replace(/\//gu, '\\').replace(/\\+$/u, '');
+  return normalized.length > 3 ? normalized : null;
 }
 
 /**

@@ -316,3 +316,4 @@ export type PresetImportResult =
   | { ok: false; problems: string[] };
 
 export * from './generation.js';
+export * from './installation.js';
