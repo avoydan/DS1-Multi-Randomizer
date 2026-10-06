@@ -82,10 +82,18 @@ export const TYPE_REPLACEMENT_MODES = Object.freeze(["disabled", "enabled", "ena
  * single-body boss slot from the portable boss pool with replacement. Linked units (Priscilla, Kalameet, Gaping Dragon, Seath, the Sanctuary Guardian, the Bell Gargoyles, the Centipede Demon)
  * stay classic in both modes.
  */
-export const BOSS_REPLACEMENT_MODES = Object.freeze(["classic", "bosses"]);
+export const BOSS_REPLACEMENT_MODES = Object.freeze(["classic", "bosses", "normals", "both"]);
+
+/**
+ * Part E2 (regular enemy in a boss slot). "normals": a participating boss slot of the supported set gets a normal enemy, every other
+ * slot keeps its boss; "both": each participating slot gets a boss with `bossChanceInBossSlots`, otherwise (supported slots only) a
+ * normal enemy. Together with "bosses" these are the modes of the boss sampler; "classic" is the permutation.
+ */
+export const BOSS_SAMPLING_MODES = Object.freeze(["bosses", "normals", "both"]);
 
 /** Values under which permutation-v1 behaves exactly as it always did; anything else is refused there. */
 export const SAMPLING_NEUTRAL_OPTIONS = Object.freeze({
+  enemyBossChanceBossSlots: 90,
   enemyBossChanceNormalSlots: 10,
   enemyRoamingBossSouls: 50,
   enemyRoamingBossesStayDead: false,
@@ -181,8 +189,13 @@ export function resolveEnemyPlacementOptions(config, algorithm = config.enemyPla
   }
   if (typeof config.enemyUniqueBosses !== "boolean") {
     problems.push(`enemyUniqueBosses must be true or false (got ${String(config.enemyUniqueBosses)}).`);
-  } else if (config.enemyUniqueBosses && config.enemyBossReplacement !== "bosses") {
-    problems.push("enemyUniqueBosses needs enemyBossReplacement \"bosses\" (it only changes how bosses are drawn).");
+  } else if (config.enemyUniqueBosses && !["bosses", "both"].includes(config.enemyBossReplacement)) {
+    problems.push("enemyUniqueBosses needs enemyBossReplacement \"bosses\" or \"both\" (it only changes how bosses are drawn).");
+  }
+  if (!Number.isInteger(config.enemyBossChanceBossSlots) || config.enemyBossChanceBossSlots < 0 || config.enemyBossChanceBossSlots > 100) {
+    problems.push(`enemyBossChanceBossSlots must be an integer from 0 to 100 (got ${String(config.enemyBossChanceBossSlots)}).`);
+  } else if (config.enemyBossChanceBossSlots !== SAMPLING_NEUTRAL_OPTIONS.enemyBossChanceBossSlots && config.enemyBossReplacement !== "both") {
+    problems.push("enemyBossChanceBossSlots only applies with enemyBossReplacement \"both\" (a boss or a normal enemy per boss slot).");
   }
   const roamingMode = ROAMING_BOSS_MODES.includes(config.enemyNormalReplacement);
   if (!Number.isInteger(config.enemyBossChanceNormalSlots) || config.enemyBossChanceNormalSlots < 0 || config.enemyBossChanceNormalSlots > 100) {
@@ -221,6 +234,7 @@ export function resolveEnemyPlacementOptions(config, algorithm = config.enemyPla
     customPool: customPoolOf(config),
     bossReplacement: config.enemyBossReplacement,
     uniqueBosses: config.enemyUniqueBosses,
+    bossChanceInBossSlots: config.enemyBossChanceBossSlots,
     bossChanceInNormalSlots: config.enemyBossChanceNormalSlots,
     roamingBossSouls: config.enemyRoamingBossSouls,
     roamingBossesStayDead: config.enemyRoamingBossesStayDead,

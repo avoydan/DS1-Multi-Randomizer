@@ -25,7 +25,7 @@ export const DEFAULT_GENERATION_SETTINGS: GenerationSettings = {
     placement: {
       algorithm: 'permutation-v1', replacementChance: 100, normalReplacement: 'normals', fit: 'anywhere', difficultyMode: 'random',
       difficultyStrictness: 'loose', typeReplacement: 'disabled', customPool: null, bossReplacement: 'classic', uniqueBosses: false,
-      bossChanceInNormalSlots: 10, roamingBossSouls: 50, roamingBossesStayDead: false,
+      bossChanceInBossSlots: 90, bossChanceInNormalSlots: 10, roamingBossSouls: 50, roamingBossesStayDead: false,
     },
   },
   fog: {
@@ -49,7 +49,7 @@ export const SMOKE_START = { map: 'm18_01_00_00', mapName: 'Undead Asylum', x: -
 
 /** One thing a quick world promises, in the words the tester reads and in the terms a static check of the generated files uses. */
 export interface SmokeExpectation {
-  kind: 'roaming-boss' | 'regular-enemy' | 'boss';
+  kind: 'roaming-boss' | 'regular-enemy' | 'boss' | 'encounter-body';
   map: string;
   mapName: string;
   /** The part name in the map's MSB (`c2500_0006`), the same as the slot id after the colon. */
@@ -107,6 +107,7 @@ export function describeSmokeTarget(expectation: SmokeExpectation): string {
 
 /** "Capra Demon (c2240) replaces the Hollow at slot c2500_0006". */
 export function describeSmokeExpected(expectation: SmokeExpectation): string {
+  if (expectation.kind === 'encounter-body') return `${expectation.name} (${expectation.model}) takes the place of ${expectation.replacedName} as the body of the boss encounter; the health bar and the name on it stay ${expectation.replacedName}'s, and the fight completes when ${expectation.name} dies`;
   if (expectation.kind === 'boss') return `${expectation.name} (${expectation.model}) takes the place of ${expectation.replacedName}, the first boss`;
   const extra = expectation.souls === undefined ? '' : `; it carries ${expectation.souls} souls${expectation.disableRespawn ? ' and stays dead' : ''}`;
   return `${expectation.name} (${expectation.model}) replaces the ${expectation.replacedName} at slot ${expectation.slot}${extra}`;
@@ -154,6 +155,13 @@ export const QUICK_SMOKE_RECIPES: Readonly<Record<string, { seedPrefix: string; 
         randomizeBosses: false,
         placement: { algorithm: 'sampling-v1', fit: 'anywhere', difficultyMode: 'random', replacementChance: 8, normalReplacement: 'bosses', roamingBossSouls: 100, roamingBossesStayDead: true },
       },
+    },
+  },
+  'quick-encounter-body': {
+    seedPrefix: 'smoke-q7-body',
+    settings: {
+      items: { enabled: false }, fog: { enabled: false },
+      enemies: { randomizeRegularEnemies: false, gwynNerf: 'none', secondGargoyle: 'keep', placement: { algorithm: 'sampling-v1', fit: 'anywhere', difficultyMode: 'random', replacementChance: 100, bossReplacement: 'normals' } },
     },
   },
   'quick-roaming-respawn': {
@@ -224,6 +232,24 @@ export const SMOKE_SCENARIOS: readonly SmokeScenario[] = [
     afterwards: [
       'Reset the area: the Asylum has no bonfire (none in its map data), so die once (any way). Everything that respawns comes back when you wake up again.',
       'Return to the same place: the Hollows are back, the Taurus Demon is NOT (the stay-dead setting; not yet confirmed in the game).',
+    ],
+  },
+  {
+    id: 'quick-encounter-body', category: 'quick', title: 'First boss fight - a normal enemy', masterSeed: 'smoke-q7-body-43',
+    purpose: 'A normal enemy takes the place of the first boss: the fight must still start, show its health bar, end when it dies and open the way on.',
+    settings: QUICK_SMOKE_RECIPES['quick-encounter-body'].settings,
+    expectations: [{ kind: 'encounter-body', map: 'm18_01_00_00', mapName: 'Undead Asylum', slot: 'c2232_0000', replacedModel: 'c2232', replacedName: 'Asylum Demon', model: 'c2560', name: 'Balder Knight', meters: 22.5, up: 13.3 }],
+    estimateSeconds: 90,
+    observe: [
+      'A Balder Knight stands in the arena where the Asylum Demon normally appears; the Asylum Demon is not there.',
+      'The fight starts as the Asylum Demon fight does: the Balder Knight wakes up, moves and attacks (no T-pose, no frozen idle).',
+      'The boss health bar appears and it says "Asylum Demon" (the fight keeps the boss name on purpose). The knight has the health of the Asylum Demon (area scaling), so it should take noticeably more hits than a Balder Knight normally does.',
+      'Kill it: the bar disappears, the fight is over and the way on opens as after the Asylum Demon (you can leave the Asylum). The rewards of the fight are those of the boss (the drops of the knight itself do not appear).',
+      'Nothing freezes or crashes when the fight starts, runs or ends.',
+    ],
+    afterwards: [
+      'Quit to the main menu and continue: the arena stays clear and the fight does not start again.',
+      'The time above is for reaching the arena and seeing the replacement; the fight itself is not estimated.',
     ],
   },
   {
@@ -392,6 +418,54 @@ export const SMOKE_SCENARIOS: readonly SmokeScenario[] = [
       enemies: { randomizeBosses: false, placement: { algorithm: 'sampling-v1', fit: 'anywhere', difficultyMode: 'random', normalReplacement: 'bosses' } },
     },
     observe: ['Walk the whole Undead Parish, including the church and the Sunlight Altar side.', ...roamingObserve],
+  },
+  {
+    id: 'body-burg-fights', category: 'extended', title: 'A normal enemy in the Taurus Demon and Capra Demon fights', masterSeed: 'smoke-o-body-burg-1',
+    purpose: 'The second and third early boss fights with a normal enemy as the body: the Taurus Demon bridge and the Capra Demon room in the Undead Burg.',
+    settings: {
+      items: { enabled: false }, fog: { enabled: false },
+      enemies: { randomizeRegularEnemies: false, gwynNerf: 'none', secondGargoyle: 'keep', placement: { algorithm: 'sampling-v1', fit: 'anywhere', difficultyMode: 'random', replacementChance: 100, bossReplacement: 'normals' } },
+    },
+    observe: ['Fight the Taurus Demon on the bridge of the Undead Burg and the Capra Demon below: the bodies of this world are listed in docs/SMOKE_TESTS.md, the health bars keep the boss names, each fight ends when its body dies and its fog gate opens.', 'Both fights must not start again after a reload.'],
+  },
+  {
+    id: 'body-fog', category: 'extended', title: 'A normal enemy as a boss body with the fog randomizer', masterSeed: 'smoke-o-body-fog-1',
+    purpose: 'Boss bodies together with the fog randomizer: the boss fog gates, the warps and the boss events are rearranged by the fog randomizer and must still complete.',
+    settings: {
+      items: { enabled: false },
+      enemies: { randomizeRegularEnemies: false, gwynNerf: 'none', secondGargoyle: 'keep', placement: { algorithm: 'sampling-v1', fit: 'anywhere', difficultyMode: 'random', replacementChance: 100, bossReplacement: 'normals' } },
+    },
+    observe: ['Find the Asylum Demon, Taurus Demon and Capra Demon fights wherever the fog randomizer put them: each must start, show its health bar, end when the body dies and open its fog gate.'],
+  },
+  {
+    id: 'body-roaming', category: 'extended', title: 'Boss bodies and roaming bosses together', masterSeed: 'smoke-o-body-roaming-1',
+    purpose: 'Normal enemies in the early boss fights and bosses in regular enemy slots in the same world (the two directions of replacement).',
+    settings: {
+      items: { enabled: false }, fog: { enabled: false },
+      enemies: {
+        randomizeRegularEnemies: true, gwynNerf: 'none', secondGargoyle: 'keep',
+        placement: { algorithm: 'sampling-v1', fit: 'anywhere', difficultyMode: 'random', replacementChance: 100, normalReplacement: 'both', bossChanceInNormalSlots: 5, bossReplacement: 'normals' },
+      },
+    },
+    observe: ['The first boss fight has a normal enemy as its body, and some regular enemies of the world are bosses.', 'Neither kind interferes with the other: each boss fight completes, each roaming boss fights on its own.'],
+  },
+  {
+    id: 'body-both', category: 'extended', title: 'Bosses or normal enemies in the boss fights', masterSeed: 'smoke-o-body-both-1',
+    purpose: 'Boss sampling together with normal-enemy bodies: some fights get a boss, the three early ones may get a normal enemy (Boss replacement: Bosses or normal enemies).',
+    settings: {
+      items: { enabled: false }, fog: { enabled: false },
+      enemies: { randomizeRegularEnemies: false, gwynNerf: 'strong', secondGargoyle: 'keep', placement: { algorithm: 'sampling-v1', fit: 'anywhere', difficultyMode: 'random', replacementChance: 100, bossReplacement: 'both', bossChanceInBossSlots: 40 } },
+    },
+    observe: ['Visit the boss fights: the three early ones may have a normal enemy as the body (listed in docs/SMOKE_TESTS.md), every other fight has a boss.'],
+  },
+  {
+    id: 'body-gargoyle', category: 'extended', title: 'Boss bodies with the second Bell Gargoyle', masterSeed: 'smoke-o-body-gargoyle-1',
+    purpose: 'Normal enemies in the early boss fights together with the second Bell Gargoyle replaced by a boss (the Gargoyles are never given a normal enemy).',
+    settings: {
+      items: { enabled: false }, fog: { enabled: false },
+      enemies: { randomizeRegularEnemies: false, gwynNerf: 'none', secondGargoyle: 'replace', placement: { algorithm: 'sampling-v1', fit: 'anywhere', difficultyMode: 'random', replacementChance: 100, bossReplacement: 'normals' } },
+    },
+    observe: ['Go up to the rooftop of the Undead Parish church: the Bell Gargoyles fight is the one listed in docs/SMOKE_TESTS.md (the classic shuffle still moves the multi-body bosses around), with its second body replaced by a boss as in the Second Bell Gargoyle test. The Gargoyles never get a normal enemy.', 'The Asylum Demon, Taurus Demon and Capra Demon fights have normal enemies as bodies (listed in docs/SMOKE_TESTS.md).'],
   },
 ];
 

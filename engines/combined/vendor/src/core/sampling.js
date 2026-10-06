@@ -675,7 +675,7 @@ export function planSampledRegularEnemies({
   // The roaming-boss options (Part E1) belong to planRoamingBosses in the same way.
   const {
     bossReplacement: _bossReplacement, uniqueBosses: _uniqueBosses, bossChanceInNormalSlots: _bossChance, roamingBossSouls: _roamingSouls,
-    roamingBossesStayDead: _roamingStayDead, ...regularOptions
+    roamingBossesStayDead: _roamingStayDead, bossChanceInBossSlots: _bossChanceBossSlots, ...regularOptions
   } = options;
   const settings = {
     ...regularOptions,
@@ -775,9 +775,17 @@ export function planSampledRegularEnemies({
  * A boss may otherwise repeat any number of times. There is no model budget here: the fixed models of the boss
  * placements are what the regular-enemy planner then respects.
  *
+ * Part E2 (a regular enemy in a boss slot) extends the same loop. With `options.bossReplacement` "normals" or "both" and a `bodies`
+ * description, a participating slot of the supported set may take a normal enemy as the BODY of its encounter: the slot, its entity
+ * and its events stay the boss's, only the body in the arena changes. "normals" always does, "both" draws once from its own stream
+ * (`category:slot:<id>`) against `bossChanceInBossSlots`; a slot that is not supported keeps its boss in "normals" and can only
+ * get a boss in "both". The body is drawn from its own stream (`body:slot:<id>`), so the boss draws of every other mode and slot are
+ * untouched (with the share at 100 "both" is exactly boss sampling); it never takes part in the Unique bosses cycle; it must keep the map within `max(30, the map's vanilla model count)`.
+ * Neither mode changes anything for "bosses" (no extra draw, no extra stream).
+ *
  * @param {object} input
  * @param {string} input.seed
- * @param {{replacementChance:number, uniqueBosses:boolean}} input.options
+ * @param {{replacementChance:number, uniqueBosses:boolean, bossReplacement?:string, bossChanceInBossSlots?:number, fit?:string, difficultyMode?:string, difficultyStrictness?:string}} input.options
  * @param {Array<object>} input.slots                 single-body boss slots (catalog slots)
  * @param {Array<object>} input.pool                  portable boss archetypes (catalog slots, one per archetype)
  * @param {(slot: object) => string} input.keyOf      archetype key of a slot or archetype
@@ -785,15 +793,29 @@ export function planSampledRegularEnemies({
  * @param {string} input.gwynModel
  * @param {(slot: object, candidate: object) => boolean} input.isUnsafePair
  * @param {object} input.diagnostics
- * @returns {{assignment: Map<string, object>}}
+ * @param {null | {supported: Set<string>, types: Array<object>, destination: (slot: object) => {size: number, difficulty: number}, modelCounts: Map<string, Map<string, number>>, vanillaSizes: Map<string, number>}} [input.bodies]
+ * @returns {{assignment: Map<string, object>, bodySlots: Set<string>}}
  */
-export function planSampledBosses({ seed, options, slots, pool, keyOf, gwynRejection, gwynModel, isUnsafePair, diagnostics }) {
+export function planSampledBosses({ seed, options, slots, pool, keyOf, gwynRejection, gwynModel, isUnsafePair, diagnostics, bodies = null }) {
   const byKey = new Map();
   for (const archetype of pool) if (!byKey.has(keyOf(archetype))) byKey.set(keyOf(archetype), archetype);
   const archetypes = [...byKey.entries()].sort(([a], [b]) => compare(a, b)).map(([, archetype]) => archetype);
   const assignment = new Map();
+  const bodySlots = new Set();
   const used = new Set();
   const ordered = [...slots].sort((left, right) => compare(left.id, right.id));
+  const mode = options.bossReplacement ?? "bosses";
+  const bodyMode = bodies !== null && (mode === "normals" || mode === "both");
+  // Running model counts of each map (a copy: the planner changes them as it decides), so a body is admitted against what the
+  // earlier decisions of this same pass already did to the map.
+  const counts = bodyMode ? new Map([...bodies.modelCounts].map(([mapId, models]) => [mapId, new Map(models)])) : null;
+  const swap = (mapId, leaving, arriving) => {
+    const models = counts.get(mapId) ?? new Map();
+    counts.set(mapId, models);
+    const left = (models.get(leaving) ?? 0) - 1;
+    if (left <= 0) models.delete(leaving); else models.set(leaving, left);
+    models.set(arriving, (models.get(arriving) ?? 0) + 1);
+  };
   diagnostics.count("bossSlots", ordered.length);
 
   for (const slot of ordered) {
@@ -802,6 +824,28 @@ export function planSampledBosses({ seed, options, slots, pool, keyOf, gwynRejec
     if (!participates) {
       diagnostics.count("bossSlotsNotParticipating");
       continue;
+    }
+    const supported = bodyMode && bodies.supported.has(slot.id);
+    let wantsBody = false;
+    if (mode === "normals") {
+      if (!supported) { diagnostics.count("bossSlotsKeptUnsupported"); continue; }
+      wantsBody = true;
+    } else if (mode === "both" && supported) {
+      // Its own stream: with the share at 100 every slot draws its boss from the slot stream exactly as boss sampling does.
+      const category = new DeterministicRng(deriveSeed(seed, `category:slot:${slot.id}`, SAMPLING_RNG_VERSION));
+      wantsBody = category.int(100) + 1 > (options.bossChanceInBossSlots ?? 90);
+    }
+    if (wantsBody) {
+      const chosen = chooseBody({ seed, slot, options, bodies, counts, diagnostics });
+      if (chosen) {
+        swap(slot.mapId, slot.modelName, chosen.model);
+        assignment.set(slot.id, chosen.source);
+        bodySlots.add(slot.id);
+        diagnostics.count("bodiesPlaced");
+        continue;
+      }
+      diagnostics.count("bodiesNoCandidate");
+      if (mode === "normals") continue; // nothing safe to put there: the boss stays
     }
     const slotKey = keyOf(slot);
     const rejected = [];
@@ -826,6 +870,7 @@ export function planSampledBosses({ seed, options, slots, pool, keyOf, gwynRejec
     }
     if (chosen) {
       assignment.set(slot.id, chosen);
+      if (bodyMode) swap(slot.mapId, slot.modelName, chosen.modelName);
       if (options.uniqueBosses) {
         used.add(keyOf(chosen));
         if (used.size >= archetypes.length) used.clear();
@@ -837,7 +882,63 @@ export function planSampledBosses({ seed, options, slots, pool, keyOf, gwynRejec
     // Boss counters stay apart from the regular-slot summary (slots, stages, rejections describe regular enemies only).
     for (const entry of rejected) diagnostics.count(`bossRejections:${entry.reason}`);
   }
-  return { assignment };
+  return { assignment, bodySlots };
+}
+
+/**
+ * The body for one boss slot (Part E2): the candidates are the allowed normal enemies that fit the slot (Placement fit), are of a
+ * difficulty the mode allows (the curve modes look for the nearest class the pool has) and keep the map inside its model limit.
+ * Uniform draw with list shrink from the slot's own `body:slot:<id>` stream.
+ */
+function chooseBody({ seed, slot, options, bodies, counts, diagnostics }) {
+  const rng = new DeterministicRng(deriveSeed(seed, `body:slot:${slot.id}`, SAMPLING_RNG_VERSION));
+  const destination = bodies.destination(slot);
+  const fitPool = bodies.types.filter((type) => options.fit !== "fits" || type.size <= destination.size);
+  let candidates = fitPool;
+  if (CURVE_MODES.has(options.difficultyMode ?? "random") && fitPool.length > 0) {
+    const target = difficultyTargetClass(destination.difficulty, options.difficultyStrictness ?? "loose", rng.int(100));
+    const classes = [...new Set(fitPool.map((type) => type.difficulty))].sort((a, b) => Math.abs(a - target) - Math.abs(b - target) || a - b);
+    candidates = fitPool.filter((type) => type.difficulty === classes[0]);
+  }
+  const limit = Math.max(MODEL_BUDGET_CAP, bodies.vanillaSizes.get(slot.mapId) ?? 0);
+  const list = [...candidates];
+  let budgetBlocked = false;
+  while (list.length > 0) {
+    const index = rng.int(list.length);
+    const candidate = list[index];
+    const models = new Map(counts.get(slot.mapId) ?? []);
+    const left = (models.get(slot.modelName) ?? 0) - 1;
+    if (left <= 0) models.delete(slot.modelName); else models.set(slot.modelName, left);
+    models.set(candidate.model, (models.get(candidate.model) ?? 0) + 1);
+    if (models.size <= limit) return candidate;
+    budgetBlocked = true;
+    list.splice(index, 1);
+  }
+  if (budgetBlocked) diagnostics.count("bodiesBudgetRejected");
+  return null;
+}
+
+/**
+ * The normal enemies that may be the body of a boss encounter, typed like the regular models (size and difficulty class of the
+ * class table). `sources` maps an allowed model to the catalog slot that stands for its body (its base combat variant).
+ */
+export function deriveBodyTypes(sources, table) {
+  const types = [];
+  for (const [model, source] of sources) {
+    const type = table.byModel.get(model);
+    if (!type) continue;
+    types.push({ key: `${model}:${source.npcParamId}`, model, size: type.size, difficulty: type.difficulty, source });
+  }
+  return types.sort((left, right) => compare(left.key, right.key));
+}
+
+/** Size and difficulty class of a boss slot as a destination: its capsule, and its map tier and HP with the formula of the regular classes. */
+export function bossDestinationClass(table, slot) {
+  const footprint = slotFootprint(slot);
+  return {
+    size: footprint === null ? UNKNOWN_SLOT_SIZE : sizeClassOfFootprint(footprint),
+    difficulty: Number.isFinite(slot.baseHp) && slot.baseHp > 0 ? difficultyOfScore(tierOfMap(slot.mapId, slot.id), hpRank(table.sortedLogHp, Math.log(slot.baseHp))) : MAX_DIFFICULTY_CLASS,
+  };
 }
 
 // ---- roaming bosses (Part E1) ---------------------------------------------------------------------------------------------

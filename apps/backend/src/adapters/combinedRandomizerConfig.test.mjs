@@ -118,6 +118,7 @@ test('maps both enabled capabilities deterministically', () => {
       enemyCustomPool: null,
       enemyBossReplacement: 'classic',
       enemyUniqueBosses: false,
+      enemyBossChanceBossSlots: 90,
       enemyBossChanceNormalSlots: 10,
       enemyRoamingBossSouls: 50,
       enemyRoamingBossesStayDead: false,

@@ -104,9 +104,12 @@ export const TYPE_REPLACEMENT_MODES: readonly TypeReplacementMode[] = ['disabled
  * for every single-body boss slot from the portable boss pool, with repeats. Linked units (dragons, Gargoyles, Four Kings, ...)
  * stay classic in both modes. Sampling only: neutral under permutation-v1.
  */
-export type BossReplacementMode = 'classic' | 'bosses';
+export type BossReplacementMode = 'classic' | 'bosses' | 'normals' | 'both';
 
-export const BOSS_REPLACEMENT_MODES: readonly BossReplacementMode[] = ['classic', 'bosses'];
+export const BOSS_REPLACEMENT_MODES: readonly BossReplacementMode[] = ['classic', 'bosses', 'normals', 'both'];
+
+/** The values in which a normal enemy can be the body of a boss encounter (Part E2). */
+export const ENCOUNTER_BODY_REPLACEMENT_MODES: readonly BossReplacementMode[] = ['normals', 'both'];
 
 /**
  * Placement settings. Everything except `algorithm` applies to `sampling-v1` only; under `permutation-v1` the
@@ -131,6 +134,8 @@ export interface EnemyPlacementOptions {
   bossReplacement: BossReplacementMode;
   /** Part D. Draws every boss of the pool once before any boss repeats. Needs `bossReplacement: 'bosses'`. */
   uniqueBosses: boolean;
+  /** Part E2. Chance (percent, 0-100) that a boss slot that takes part gets a boss rather than a normal enemy. Needs `bossReplacement: 'both'`. */
+  bossChanceInBossSlots: number;
   /** Part E1. Chance (percent, 0-100) that a regular enemy slot that takes part gets a boss rather than a normal enemy. Needs `normalReplacement: 'both'`. */
   bossChanceInNormalSlots: number;
   /** Part E1. Share (percent, 0-100) of a boss's fight souls that the boss drops when it stands in a regular slot. Needs roaming bosses. */
@@ -170,6 +175,7 @@ export const NEUTRAL_ENEMY_PLACEMENT_OPTIONS: Omit<EnemyPlacementOptions, 'algor
   customPool: null,
   bossReplacement: 'classic',
   uniqueBosses: false,
+  bossChanceInBossSlots: 90,
   bossChanceInNormalSlots: 10,
   roamingBossSouls: 50,
   roamingBossesStayDead: false,
@@ -186,6 +192,7 @@ export const LEGACY_ENEMY_PLACEMENT_OPTIONS: Omit<EnemyPlacementOptions, 'algori
   customPool: null,
   bossReplacement: 'classic',
   uniqueBosses: false,
+  bossChanceInBossSlots: 90,
   bossChanceInNormalSlots: 10,
   roamingBossSouls: 50,
   roamingBossesStayDead: false,
@@ -313,7 +320,7 @@ export type GenerationResult =
   | { ok: false; code: string; message: string; stage: string };
 
 export const PRESET_FORMAT = 'ds1tr-preset';
-export const PRESET_VERSION = 11;
+export const PRESET_VERSION = 12;
 
 /** Shareable settings: everything in RandomizerConfig except the machine-specific game path. */
 export interface PresetDocument {

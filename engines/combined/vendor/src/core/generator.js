@@ -11,6 +11,7 @@ import { createStream } from "./rng.js";
 import { normalizeConfig, validateConfig } from "./config.js";
 import {
   EnemyPlacementUnavailableError,
+  BOSS_SAMPLING_MODES,
   ROAMING_BOSS_MODES,
   assertSlotOwnedDrops,
   createPlacementDiagnostics,
@@ -18,7 +19,7 @@ import {
   resolveEnemyPlacementAlgorithm,
   resolveEnemyPlacementOptions,
 } from "./placement.js";
-import { deriveRegularClassTable, deriveRoamingBossTypes, planRoamingBosses, planSampledBosses, planSampledRegularEnemies } from "./sampling.js";
+import { bossDestinationClass, deriveBodyTypes, deriveRegularClassTable, deriveRoamingBossTypes, planRoamingBosses, planSampledBosses, planSampledRegularEnemies } from "./sampling.js";
 import {
   enemies,
   enemySlots,
@@ -299,6 +300,85 @@ const roamingExcludedModels = new Set([
  * the Moonlight Butterfly is a flier with a 0.4 x 0.2 capsule and a body about three meters wide.
  */
 const roamingSizeClassOverrides = new Map([["c3230", 3]]);
+
+// ---- a regular enemy as the body of a boss encounter (Part E2, patches/0016) ------------------------------------------------
+// The encounter stays the boss's: the slot keeps its entity id, so every vanilla event that waits for that entity (the health bar, the
+// death, the boss-defeated flag, the fog, the exit) keeps working, and only the body that stands in the arena changes. DsrDataTool
+// adds nothing to the events (the same portable-boss edits as boss sampling); it writes the body's NpcParam row so that the
+// encounter owns what a boss row owns: item lots, drop type, souls, "do not initialize as dead" and "do not respawn".
+
+/**
+ * The boss slots whose encounter was audited as safe for a normal enemy as the body (docs/ENEMY_PLACEMENT_MODEL.md, 10.8): one
+ * entity, completion that depends only on that entity's death, no dependent entities of its own, in a map that the legacy tool
+ * needed no event surgery for. Every other boss slot keeps its boss in "normals" and can only be given a boss in "both".
+ */
+const encounterBodySupportedSlots = new Set([
+  "m18_01_00_00:c2232_0000", // Asylum Demon
+  "m10_01_00_00:c2250_0000", // Taurus Demon
+  "m10_01_00_00:c2240_0000", // Capra Demon
+]);
+
+/**
+ * The normal enemies that may be the body: ordinary awake ground melee enemies with a plain combat brain. Everything that is
+ * passive, an ambush, tangible-ghost, a mimic, stationary, a flier, a statue, a plant, an NPC or tied to a scripted map event is left
+ * out, and so is every boss-family model. Names are for the spoiler only.
+ */
+const encounterBodyModels = new Map([
+  ["c2500", "Hollow"], ["c2540", "Armored Hollow"], ["c2550", "Undead Soldier"], ["c2560", "Balder Knight"], ["c2520", "Undead Assassin"],
+  ["c2790", "Black Knight"], ["c2410", "Silver Knight"], ["c2390", "Darkwraith"], ["c2810", "Infested Barbarian"],
+  ["c2690", "Serpent Soldier"], ["c2800", "Undead Crystal Soldier"],
+]);
+
+/**
+ * model -> the catalog slot that stands for the model's body: among the regular slots of the model that are not protected, the variant
+ * with the model's base brain (think row model*100), otherwise the most common one; ties by the lowest key, then the lowest slot id.
+ */
+function encounterBodySources(catalog) {
+  const protectedIds = roamingProtectedSlotIds(catalog.enemySlots);
+  const sources = new Map();
+  for (const model of encounterBodyModels.keys()) {
+    const base = Number(model.slice(1)) * 100;
+    const slots = catalog.enemySlots.filter((slot) =>
+      slot.modelName === model && !slot.dummy && slot.teamType === 0 && slot.npcParamId > 0 && slot.thinkParamId > 0 && slot.baseHp > 0 &&
+      !protectedIds.has(slot.id));
+    const groups = new Map();
+    for (const slot of slots) {
+      const key = `${slot.npcParamId}:${slot.thinkParamId}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(slot);
+    }
+    const ranked = [...groups].sort(([a, left], [b, right]) => {
+      const baseLeft = left[0].thinkParamId === base ? 0 : 1;
+      const baseRight = right[0].thinkParamId === base ? 0 : 1;
+      return baseLeft - baseRight || right.length - left.length || (a < b ? -1 : a > b ? 1 : 0);
+    });
+    if (ranked.length > 0) sources.set(model, ranked[0][1].sort((a, b) => (a.id < b.id ? -1 : 1))[0]);
+  }
+  return sources;
+}
+
+/** What the boss planner needs to give a boss slot a normal enemy as its body, or null when the mode does not allow it. */
+function encounterBodySetup(config, catalog, dragonPlan, bossOptions) {
+  if (!["normals", "both"].includes(bossOptions.bossReplacement)) return null;
+  const { slots } = regularEnemyContext(config, catalog, dragonPlan, []);
+  const table = deriveRegularClassTable(slots);
+  const customPool = bossOptions.customPool === null || bossOptions.customPool === undefined ? null : new Set(bossOptions.customPool);
+  const sources = new Map([...encounterBodySources(catalog)].filter(([model]) => customPool === null || customPool.has(model)));
+  const modelCounts = new Map();
+  for (const slot of catalog.enemySlots) {
+    if (slot.dummy || !/^m1[0-8]_/u.test(slot.mapId) || !slot.modelName.startsWith("c")) continue;
+    if (!modelCounts.has(slot.mapId)) modelCounts.set(slot.mapId, new Map());
+    const models = modelCounts.get(slot.mapId);
+    models.set(slot.modelName, (models.get(slot.modelName) ?? 0) + 1);
+  }
+  return {
+    supported: encounterBodySupportedSlots,
+    types: deriveBodyTypes(sources, table),
+    destination: (slot) => bossDestinationClass(table, slot),
+    modelCounts,
+    vanillaSizes: new Map([...modelCounts].map(([mapId, models]) => [mapId, models.size])),
+  };
+}
 
 /** Regular slots that keep their own enemy even when bosses may roam (they have special handling that a boss would break). */
 function roamingProtectedSlotIds(slots) {
@@ -1581,7 +1661,7 @@ function randomizeExtractedBosses(config, catalog, dragonPlan, placementDiagnost
   const bossOptions = config.enemyPlacementAlgorithm === "sampling-v1"
     ? resolveEnemyPlacementOptions(config, "sampling-v1")
     : null;
-  const sampledBosses = bossOptions?.bossReplacement === "bosses" && placementDiagnostics !== null;
+  const sampledBosses = BOSS_SAMPLING_MODES.includes(bossOptions?.bossReplacement) && placementDiagnostics !== null;
   const shuffled = sampledBosses
     ? []
     : shuffledPortableBosses(
@@ -1688,9 +1768,10 @@ function randomizeExtractedBosses(config, catalog, dragonPlan, placementDiagnost
   };
   let placements;
   if (sampledBosses) {
-    const { assignment } = planSampledBosses({
+    const { assignment, bodySlots } = planSampledBosses({
       seed: config.seed,
       options: bossOptions,
+      bodies: encounterBodySetup(config, catalog, dragonPlan, bossOptions),
       slots: sources,
       pool: archetypes.filter((archetype) => !nonPortableBossReplacementModels.has(archetype.modelName)),
       keyOf: bossArchetypeKey,
@@ -1702,13 +1783,24 @@ function randomizeExtractedBosses(config, catalog, dragonPlan, placementDiagnost
         (canonicalBossModel.get(candidate.modelName) || candidate.modelName) === "c5250",
       diagnostics: placementDiagnostics,
     });
-    placements = sources.flatMap((slot, index) => assignment.has(slot.id)
-      ? [buildBossPlacement(slot, index, assignment.get(slot.id), {
-          // Drops and team follow the slot (model document 6.9); the compatibility tag names the planner.
+    placements = sources.flatMap((slot, index) => {
+      if (!assignment.has(slot.id)) return [];
+      if (bodySlots.has(slot.id)) {
+        // A normal enemy as the body of the encounter (Part E2): the plain combat brain of its model, the encounter's own rewards.
+        const body = assignment.get(slot.id);
+        return [buildBossPlacement(slot, index, { ...body, thinkParamId: activeReplacementThinkParams.get(body.modelName) ?? body.thinkParamId }, {
           forceScaledNpcParam: true,
-          compatibility: "sampled-boss-replacement",
-        })]
-      : []);
+          encounterBody: true,
+          randomizedBossName: encounterBodyModels.get(body.modelName) ?? body.modelName,
+          compatibility: "sampled-encounter-body",
+        })];
+      }
+      return [buildBossPlacement(slot, index, assignment.get(slot.id), {
+        // Drops and team follow the slot (model document 6.9); the compatibility tag names the planner.
+        forceScaledNpcParam: true,
+        compatibility: "sampled-boss-replacement",
+      })];
+    });
   } else {
     placements = sources.map((slot, index) =>
       buildBossPlacement(

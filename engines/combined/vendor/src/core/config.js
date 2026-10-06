@@ -59,6 +59,9 @@ export const defaultConfig = Object.freeze({
   // single-body boss slot draws its own replacement from the portable boss pool. Unique bosses cycles through that pool.
   enemyBossReplacement: "classic",
   enemyUniqueBosses: false,
+  // Part E2 (patches/0016): a regular enemy in a boss encounter slot. enemyBossReplacement may then also be "normals" or "both"; the
+  // chance only applies with "both" (legacy "Boss chance: boss slots", default 90) and is refused otherwise (never ignored).
+  enemyBossChanceBossSlots: 90,
   // Part E1 (patches/0014): bosses in regular enemy slots ("roaming bosses"). enemyNormalReplacement may then be "bosses" or "both";
   // the three options below only apply with those values and are refused otherwise (never ignored). 10 / 50 / false are the legacy
   // defaults ("Boss chance: normal slots", "Roaming boss souls", "Respawning roaming bosses": respawn).

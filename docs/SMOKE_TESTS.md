@@ -18,6 +18,7 @@ There are two kinds of world.
 |---|---|---|---|
 | `quick-roaming-basic` | Roaming boss - basic | c2500_0006 (8.7 m) | ~25 s |
 | `quick-roaming-souls` | Roaming boss - souls and respawn | c2500_0006 (8.7 m) | ~25 s |
+| `quick-encounter-body` | First boss fight - a normal enemy | c2232_0000 (22.5 m) | ~90 s |
 | `quick-roaming-respawn` | Roaming boss - respawns | c2500_0007 (11.4 m) | ~30 s |
 | `quick-roaming-repeated` | Roaming boss - three at once | c2500_0006 (8.7 m), c2500_0007 (11.4 m), c2500_0005 (33.2 m) | ~35 s |
 | `quick-sampling-asylum` | Regular enemies - first three change | c2500_0006 (8.7 m), c2500_0007 (11.4 m), c2500_0005 (33.2 m) | ~35 s |
@@ -97,6 +98,43 @@ A roaming boss with 100% souls that stays dead: the reward and the "does not com
 
 ```
 DS1TR1-06NJDCP6-577CVKTE-TMPK9MHD-94P2TAHD-TRTK9D1M-4SCFF80Q-P6HSBKTG-NNYD0JW9-45DFP84Q-0DCAP7GB-XGAGYD6K-1SCBV8X3-0GPKWG7H-056HDR2T-294KHD9R-Q0JB3MH5-6MRGANMY-CBB5BM70-3JPTSA2G-B40G0NME-YJ3G
+```
+
+### First boss fight - a normal enemy
+
+**Quick smoke test** - ID `quick-encounter-body`
+
+A normal enemy takes the place of the first boss: the fight must still start, show its health bar, end when it dies and open the way on.
+
+**Target**
+
+- Undead Asylum: the Asylum Demon at slot c2232_0000, 22.5 m from where you wake up, 13 m higher than the start
+
+**Expected**
+
+- Balder Knight (c2560) takes the place of Asylum Demon as the body of the boss encounter; the health bar and the name on it stay Asylum Demon's, and the fight completes when Balder Knight dies
+
+**Estimated time to the target:** ~90 seconds after you gain control.
+
+**Needs a reset or reload:** no
+
+**Gameplay result:** not played in the real game yet; only the static check exists.
+
+**Check**
+
+- [ ] A Balder Knight stands in the arena where the Asylum Demon normally appears; the Asylum Demon is not there.
+- [ ] The fight starts as the Asylum Demon fight does: the Balder Knight wakes up, moves and attacks (no T-pose, no frozen idle).
+- [ ] The boss health bar appears and it says "Asylum Demon" (the fight keeps the boss name on purpose). The knight has the health of the Asylum Demon (area scaling), so it should take noticeably more hits than a Balder Knight normally does.
+- [ ] Kill it: the bar disappears, the fight is over and the way on opens as after the Asylum Demon (you can leave the Asylum). The rewards of the fight are those of the boss (the drops of the knight itself do not appear).
+- [ ] Nothing freezes or crashes when the fight starts, runs or ends.
+
+**Afterwards**
+
+- [ ] Quit to the main menu and continue: the arena stays clear and the fight does not start again.
+- [ ] The time above is for reaching the arena and seeing the replacement; the fight itself is not estimated.
+
+```
+DS1TR1-06NJDCP6-577CVKTE-TMPK9NTD-S97TKN1N-64K5HVX0-2YQT65EF-M2QQHM0X-6VM6M7KG-060ABQG1-2W4QGAGX-WKP3ZH3A-3H41B0PX-A7C6M8V8-M26NCHTM-N27005EJ-1450
 ```
 
 ### Roaming boss - respawns
@@ -682,4 +720,108 @@ Bosses in regular enemy slots in this world: 180 (Iron Golem x11, Gravelord Nito
 - Undead Burg / Parish: a boss replaces enemy c2370 (slot c2370_0001): Super Ornstein, souls 12500
 
 Different enemy models in the Undead Parish: 30 (the limit is 30; a map that bosses and dragons already push above it never gets more).
+
+### A normal enemy in the Taurus Demon and Capra Demon fights
+
+**Extended gameplay test** - ID `body-burg-fights`
+
+The second and third early boss fights with a normal enemy as the body: the Taurus Demon bridge and the Capra Demon room in the Undead Burg.
+
+**Gameplay result:** not played in the real game yet; only the static check exists.
+
+```
+DS1TR1-06NJDCP6-577CVKTE-TQ6XEKEA-9YMX8K9A-5N5DED94-B3TT15XG-MDTWZ85F-FF81TDQ8-58FQ06C0-MQN035RA-F3N1VS0J-C245AEMG-B82BQ8XG-AN4D0G0V-NP8TGM13-0401ABBP-KM
+```
+
+**In this world**
+
+- Fight the Taurus Demon on the bridge of the Undead Burg and the Capra Demon below: the bodies of this world are listed in docs/SMOKE_TESTS.md, the health bars keep the boss names, each fight ends when its body dies and its fog gate opens.
+- Both fights must not start again after a reload.
+
+### A normal enemy as a boss body with the fog randomizer
+
+**Extended gameplay test** - ID `body-fog`
+
+Boss bodies together with the fog randomizer: the boss fog gates, the warps and the boss events are rearranged by the fog randomizer and must still complete.
+
+**Gameplay result:** not played in the real game yet; only the static check exists.
+
+```
+DS1TR1-06NJDCP6-577CVKTE-TQ6XEKEA-9YMX8KEB-9ZBKA92R-YEG1FC53-AQ7T1BVT-T0EKDT7A-3SR13055-WR0HE2KR-N8EY80K0-H3AKK42A-0JXT6HQB-4EDDCHR0-E9VDC30
+```
+
+**In this world**
+
+- Find the Asylum Demon, Taurus Demon and Capra Demon fights wherever the fog randomizer put them: each must start, show its health bar, end when the body dies and open its fog gate.
+
+### Boss bodies and roaming bosses together
+
+**Extended gameplay test** - ID `body-roaming`
+
+Normal enemies in the early boss fights and bosses in regular enemy slots in the same world (the two directions of replacement).
+
+**Gameplay result:** not played in the real game yet; only the static check exists.
+
+```
+DS1TR1-06NJDCP6-577CVKTE-TQ6XEKEA-9YMR9YY5-J1GEV0TY-S275CFX3-TM7RBN8F-Q0AC0MQS-G35GAF1N-1XS1JG2T-PP9S8QWJ-65R7A3N4-2B0NA4C2-WGG1XW6C-YC1RP1Q7-WJ1H59H9-PTX0M6MT-MEAHA59A-5C029936-B0
+```
+
+**In this world**
+
+- The first boss fight has a normal enemy as its body, and some regular enemies of the world are bosses.
+- Neither kind interferes with the other: each boss fight completes, each roaming boss fights on its own.
+
+Bosses in regular enemy slots in this world: 69 (Moonlight Butterfly x17, Demon Firesage x6, Sif x3, Manus x6, Artorias x2, Pinwheel x8, Gravelord Nito x1, Quelaag x10, Taurus Demon x3, Capra Demon x3, Iron Golem x2, Smough x6, Ornstein x2). The first 14 by map order:
+
+- The Depths: a boss replaces enemy c2370 (slot c2370_0000): Moonlight Butterfly, souls 5000
+- The Depths: a boss replaces enemy c2500 (slot c2500_0015): Moonlight Butterfly, souls 5000
+- Painted World: a boss replaces enemy c1203 (slot c1203_0001): Demon Firesage, souls 10000
+- Painted World: a boss replaces enemy c2930 (slot c2930_0008): Demon Firesage, souls 10000
+- Darkroot Garden: a boss replaces enemy c2280 (slot c2280_0008): Sif, souls 20000
+- Darkroot Garden: a boss replaces enemy c2380 (slot c2380_0007): Sif, souls 20000
+- Darkroot Garden: a boss replaces enemy c3350 (slot c3350_0000): Moonlight Butterfly, souls 5000
+- Darkroot Basin: a boss replaces enemy c2280 (slot c2280_0000): Sif, souls 20000
+- Darkroot Basin: a boss replaces enemy c5360 (slot c5360_0002): Manus, souls 30000
+- Oolacile: a boss replaces enemy c4090 (slot c4090_0001): Moonlight Butterfly, souls 5000
+- Oolacile: a boss replaces enemy c4120 (slot c4120_0013): Artorias, souls 25000
+- Oolacile: a boss replaces enemy c4130 (slot c4130_0018): Manus, souls 30000
+- Oolacile: a boss replaces enemy c4130 (slot c4130_0049): Manus, souls 30000
+- Oolacile: a boss replaces enemy c4150 (slot c4150_0010): Moonlight Butterfly, souls 5000
+
+Different enemy models in the Undead Parish: 30 (the limit is 30; a map that bosses and dragons already push above it never gets more).
+
+### Bosses or normal enemies in the boss fights
+
+**Extended gameplay test** - ID `body-both`
+
+Boss sampling together with normal-enemy bodies: some fights get a boss, the three early ones may get a normal enemy (Boss replacement: Bosses or normal enemies).
+
+**Gameplay result:** not played in the real game yet; only the static check exists.
+
+```
+DS1TR1-06NJDCP6-577CVKTE-TQ6XEKEA-9YMX8KEA-5Z4X0D94-B3TT15XG-MDTWZ85F-FF81TDQ8-58FPGPC0-MQS035RB-F1N1XS1J-C245AEWG-F825AE98-1WN42910-3VRCR0T5-ASR4WFH8-CPD1GR5B-NAGC2EAT-AX8T3BG2-02W1EDGC
+```
+
+**In this world**
+
+- Visit the boss fights: the three early ones may have a normal enemy as the body (listed in docs/SMOKE_TESTS.md), every other fight has a boss.
+
+### Boss bodies with the second Bell Gargoyle
+
+**Extended gameplay test** - ID `body-gargoyle`
+
+Normal enemies in the early boss fights together with the second Bell Gargoyle replaced by a boss (the Gargoyles are never given a normal enemy).
+
+**Gameplay result:** not played in the real game yet; only the static check exists.
+
+```
+DS1TR1-06NJDCP6-577CVKTE-TQ6XEKEA-9YMX8KC7-CSWNTGW2-TM7QMA9V-BBZGSYQT-0ZEP30XE-0819E0Z4-AMZWG1E1-22NQP84N-15V4ERDB-JYGE2DJT-658T2RG2-00C1XV77
+```
+
+**In this world**
+
+- Go up to the rooftop of the Undead Parish church: the Bell Gargoyles fight is the one listed in docs/SMOKE_TESTS.md (the classic shuffle still moves the multi-body bosses around), with its second body replaced by a boss as in the Second Bell Gargoyle test. The Gargoyles never get a normal enemy.
+- The Asylum Demon, Taurus Demon and Capra Demon fights have normal enemies as bodies (listed in docs/SMOKE_TESTS.md).
+
+Expected: the second Bell Gargoyle of the Undead Parish fight becomes **c5271 (c5271)**; the first Gargoyle body becomes Centipede Demon. It is released when the first body drops to about 60% health, on the rooftop.
 

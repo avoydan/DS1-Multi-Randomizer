@@ -12,20 +12,21 @@ import { canonicalizeSettings } from '../../dist/core/canonicalSettings.js';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.join(here, '..', '..', '..', '..');
 
-test('the smoke-test worlds are six quick smoke tests and twelve extended gameplay tests with unique ids and seeds', () => {
+test('the smoke-test worlds are seven quick smoke tests and seventeen extended gameplay tests with unique ids and seeds', () => {
   const quick = SMOKE_SCENARIOS.filter((scenario) => scenario.category === 'quick').map((scenario) => scenario.id);
   const extended = SMOKE_SCENARIOS.filter((scenario) => scenario.category === 'extended').map((scenario) => scenario.id);
-  assert.deepEqual(quick, ['quick-roaming-basic', 'quick-roaming-souls', 'quick-roaming-respawn', 'quick-roaming-repeated', 'quick-sampling-asylum', 'quick-boss-asylum-demon']);
+  assert.deepEqual(quick, ['quick-roaming-basic', 'quick-roaming-souls', 'quick-encounter-body', 'quick-roaming-respawn', 'quick-roaming-repeated', 'quick-sampling-asylum', 'quick-boss-asylum-demon']);
   assert.deepEqual(extended, [
     'classic-triple', 'sampling-regular', 'second-gargoyle', 'parish-models', 'boss-sampling', 'boss-repeat', 'boss-unique', 'boss-partial',
     'roaming-repeat', 'roaming-gargoyle', 'roaming-fog', 'roaming-parish',
+    'body-burg-fights', 'body-fog', 'body-roaming', 'body-both', 'body-gargoyle',
   ]);
   assert.deepEqual(SMOKE_SCENARIOS.map((scenario) => scenario.category), [...quick.map(() => 'quick'), ...extended.map(() => 'extended')], 'quick tests come first');
   assert.equal(new Set(SMOKE_SCENARIOS.map((scenario) => scenario.masterSeed)).size, SMOKE_SCENARIOS.length);
   assert.equal(new Set(SMOKE_SCENARIOS.map((scenario) => scenario.id)).size, SMOKE_SCENARIOS.length);
   for (const scenario of SMOKE_SCENARIOS) {
     assert.ok(scenario.observe.length > 0, `${scenario.id} says what to look at`);
-    assert.match(scenario.masterSeed, /^smoke-(q[1-9]|[a-n])-[a-z-]+(-\d+)?$/u);
+    assert.match(scenario.masterSeed, /^smoke-(q[1-9]|[a-o])-[a-z-]+(-\d+)?$/u);
   }
   assert.ok(SMOKE_TEST_CHECKLIST.length >= 10);
 });
@@ -140,6 +141,17 @@ test('the scenarios exercise what they claim: boss sampling options, chance, uni
   assert.equal(by('roaming-gargoyle').enemies.secondGargoyle, 'replace');
   assert.equal(by('roaming-fog').fog.enabled, true);
   assert.equal(by('roaming-parish').enemies.placement.normalReplacement, 'bosses');
+  // Part E2: a normal enemy as the body of a boss encounter.
+  for (const id of ['quick-encounter-body', 'body-burg-fights', 'body-fog', 'body-roaming', 'body-gargoyle']) assert.equal(by(id).enemies.placement.bossReplacement, 'normals', id);
+  assert.equal(by('body-both').enemies.placement.bossReplacement, 'both');
+  assert.equal(by('body-both').enemies.placement.bossChanceInBossSlots, 40);
+  assert.equal(by('body-fog').fog.enabled, true);
+  assert.equal(by('body-gargoyle').enemies.secondGargoyle, 'replace');
+  assert.equal(by('body-roaming').enemies.placement.normalReplacement, 'both');
+  const encounter = SMOKE_SCENARIOS.find((scenario) => scenario.id === 'quick-encounter-body');
+  assert.equal(encounter.expectations[0].kind, 'encounter-body');
+  assert.equal(encounter.gameplay, undefined, 'nobody has played the encounter-body world yet');
+  assert.match(describeSmokeExpected(encounter.expectations[0]), /the health bar and the name on it stay Asylum Demon's/u);
 });
 
 test('the documented Seed Codes in docs/SMOKE_TESTS.md are the codes the app creates (the document is generated, never hand-edited)', async () => {

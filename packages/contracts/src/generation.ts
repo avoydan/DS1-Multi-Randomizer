@@ -84,6 +84,9 @@ export const CANONICAL_PLACEMENT_EXTENSION_KEYS = [
   { key: 'bossChanceInNormalSlots', neutral: 10 },
   { key: 'roamingBossSouls', neutral: 50 },
   { key: 'roamingBossesStayDead', neutral: false },
+  // Part E2: a normal enemy in a boss slot. The neutral value is the legacy default; it matters only with Boss replacement "normals" /
+  // "both", which an earlier code cannot contain, so no existing code changes.
+  { key: 'bossChanceInBossSlots', neutral: 90 },
 ] as const;
 export const CANONICAL_FOG_KEYS = [
   'enabled', 'traversableFogs', 'bossFogs', 'areaWarps', 'majorPvpFogs', 'minorPvpFogs', 'lordvesselGates', 'randomStart',

@@ -53,7 +53,7 @@ async function findSpoiler(workspacePath: string, packagePath: string): Promise<
   return null;
 }
 
-const APP_VERSION = '0.35.1';
+const APP_VERSION = '0.36.0';
 const runDependencies = { ...generationDependencies, appVersion: APP_VERSION };
 
 function send(res: http.ServerResponse, status: number, body: unknown): void {

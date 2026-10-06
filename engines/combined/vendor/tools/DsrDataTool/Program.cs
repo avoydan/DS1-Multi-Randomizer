@@ -1103,7 +1103,9 @@ static PatchReport PatchEnemies(
                         ? roamingSouls.GetInt32()
                         : null,
                 element.TryGetProperty("disableRespawn", out var noRespawn) &&
-                    noRespawn.ValueKind == JsonValueKind.True))
+                    noRespawn.ValueKind == JsonValueKind.True,
+                element.TryGetProperty("encounterBody", out var encounterBody) &&
+                    encounterBody.ValueKind == JsonValueKind.True))
             .Where(placement =>
                 placement.TargetNpcParamId >= 0 && placement.TargetThinkParamId >= 0);
     }
@@ -4284,6 +4286,10 @@ static PatchedFile? PatchGameParam(
         HashFile(outputPath));
 }
 
+// The NpcParam cells that make a row's death a boss death: what it drops, the souls of the row, and that its dead state is not
+// initialized by the engine (the boss events own it). They come from the boss row of the encounter, never from the body.
+static string[] EncounterOwnedCells() => new[] { "dropType", "getSoul", "disableInitializeDead" };
+
 static void AddScaledNpcRows(PARAM npcParam, List<PatchPlacement> placements)
 {
     if (placements.Count == 0)
@@ -4347,6 +4353,15 @@ static void AddScaledNpcRows(PARAM npcParam, List<PatchPlacement> placements)
             SetCell(scaled, "isChangeWanderGhost", 0);
             SetCell(scaled, "ghostModelId", -1);
         }
+        // Encounter body (Part E2): a normal enemy stands in a boss encounter. The encounter, not the body, owns the reward and the
+        // lifecycle, so every cell a boss row uses for that is taken from the boss row of the slot (the source row) in every scaling mode
+        // (item lots were copied above), and the body never respawns: the row of a regular enemy has these cells at their regular defaults.
+        if (placement.EncounterBody)
+        {
+            foreach (var cellName in EncounterOwnedCells())
+                SetCell(scaled, cellName, GetCellInt(source, cellName));
+            SetCell(scaled, "disableRespawn", 1);
+        }
         // Roaming boss (Part E1): the reward and the respawn bit are decisions of the placement, not of the boss row.
         if (placement.RoamingBossSouls.HasValue)
             SetCell(scaled, "getSoul", placement.RoamingBossSouls.Value);
@@ -4369,12 +4384,19 @@ static void AddScaledNpcRows(PARAM npcParam, List<PatchPlacement> placements)
                 name != "teamType" &&
                 !IsNpcItemLotField(name) &&
                 !(placement.RoamingBossSouls.HasValue && name == "disableRespawn") &&
+                !(placement.EncounterBody && (name == "disableRespawn" || EncounterOwnedCells().Contains(name))) &&
                 !(placement.MakeTangible &&
                   name is "isGhost" or "isChangeWanderGhost" or "ghostModelId"));
         if (placement.RoamingBossSouls.HasValue)
             AssertCell(scaled, "getSoul", placement.RoamingBossSouls.Value);
         if (placement.RoamingBossSouls.HasValue)
             AssertCell(scaled, "disableRespawn", placement.DisableRespawn ? 1 : 0);
+        if (placement.EncounterBody)
+        {
+            foreach (var cellName in EncounterOwnedCells())
+                AssertCell(scaled, cellName, GetCellInt(source, cellName));
+            AssertCell(scaled, "disableRespawn", 1);
+        }
         AssertCell(
             scaled,
             "teamType",
@@ -5434,7 +5456,9 @@ record PatchPlacement(
     // Part E1 (patches/0014): a boss in a regular enemy slot. RoamingBossSouls is the soul reward of its scaled row (the boss kill
     // souls come from an event in the arena, which a regular slot does not have); DisableRespawn is the value of the row's own "do not respawn" bit (written to 1 or 0 for every roaming row; patches/0015).
     int? RoamingBossSouls = null,
-    bool DisableRespawn = false)
+    bool DisableRespawn = false,
+    // Part E2 (patches/0016): the body of a boss encounter is a normal enemy; its row is owned by the encounter (see AddScaledNpcRows).
+    bool EncounterBody = false)
 {
     public int EffectiveNpcParamId => ScaledNpcParamId ?? TargetNpcParamId;
 }

@@ -267,3 +267,31 @@ test('Part E1 options (bosses in regular slots) extend the format without changi
     assert.equal(invalid.code, 'INVALID_SETTINGS');
   }
 });
+
+test('Part E2 (a normal enemy in a boss slot) extends the format without changing any earlier code', () => {
+  const part = { algorithm: 'sampling-v1', fit: 'fits', bossReplacement: 'bosses', uniqueBosses: true };
+  const before = fullSettings({ enemies: { placement: part } });
+  // A Part D world and a Part E1 world are stored exactly as before: the new key is neutral and therefore absent.
+  assert.doesNotMatch(canonicalSettingsJson(before), /bossChanceInBossSlots/u);
+  const e1 = fullSettings({ enemies: { placement: { ...part, normalReplacement: 'both', bossChanceInNormalSlots: 25, roamingBossSouls: 80, roamingBossesStayDead: true } } });
+  assert.match(canonicalSettingsJson(e1), /"roamingBossesStayDead":true\}/u, 'the E1 text is unchanged: it still ends with its last key');
+  const both = fullSettings({ enemies: { placement: { algorithm: 'sampling-v1', bossReplacement: 'both', bossChanceInBossSlots: 60, uniqueBosses: true } } });
+  assert.match(canonicalSettingsJson(both), /"bossReplacement":"both","uniqueBosses":true,"bossChanceInBossSlots":60\}/u);
+  const decoded = decodeSeedCode(encodeSeedCode(envelopeOf(both)));
+  assert.equal(decoded.ok, true);
+  assert.equal(decoded.envelope.settings.enemies.placement.bossChanceInBossSlots, 60);
+  assert.equal(decoded.seedCode, encodeSeedCode(envelopeOf(both)));
+  const normals = decodeSeedCode(encodeSeedCode(envelopeOf(fullSettings({ enemies: { placement: { algorithm: 'sampling-v1', bossReplacement: 'normals' } } }))));
+  assert.equal(normals.ok, true);
+  assert.equal(normals.envelope.settings.enemies.placement.bossChanceInBossSlots, 90, 'the neutral value is filled in');
+  for (const placement of [
+    { bossReplacement: 'normals', bossChanceInBossSlots: 60 },
+    { bossReplacement: 'bosses', bossChanceInBossSlots: 60 },
+    { bossReplacement: 'normals', uniqueBosses: true },
+    { bossReplacement: 'both', bossChanceInBossSlots: 101 },
+  ]) {
+    const invalid = decodeSeedCode(encodeSeedCode(envelopeOf(fullSettings({ enemies: { placement: { algorithm: 'sampling-v1', ...placement } } }))));
+    assert.equal(invalid.ok, false, JSON.stringify(placement));
+    assert.equal(invalid.code, 'INVALID_SETTINGS');
+  }
+});

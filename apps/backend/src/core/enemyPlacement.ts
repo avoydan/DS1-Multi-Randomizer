@@ -69,7 +69,12 @@ function validateSamplingOnlyValues(value: Record<string, unknown>, path: string
   }
   if (Object.hasOwn(value, 'uniqueBosses')) {
     if (typeof value.uniqueBosses !== 'boolean') problems.push(`${path}.uniqueBosses must be true or false.`);
-    else if (value.uniqueBosses && (value.bossReplacement ?? 'classic') !== 'bosses') problems.push(`${path}.uniqueBosses needs ${path}.bossReplacement "bosses".`);
+    else if (value.uniqueBosses && !['bosses', 'both'].includes(String(value.bossReplacement ?? 'classic'))) problems.push(`${path}.uniqueBosses needs ${path}.bossReplacement "bosses" or "both".`);
+  }
+  if (Object.hasOwn(value, 'bossChanceInBossSlots')) {
+    const chance = value.bossChanceInBossSlots;
+    if (typeof chance !== 'number' || !Number.isInteger(chance) || chance < 0 || chance > 100) problems.push(`${path}.bossChanceInBossSlots must be an integer from 0 to 100.`);
+    else if (chance !== NEUTRAL_ENEMY_PLACEMENT_OPTIONS.bossChanceInBossSlots && value.bossReplacement !== 'both') problems.push(`${path}.bossChanceInBossSlots needs ${path}.bossReplacement "both".`);
   }
   const roaming = (ROAMING_BOSS_REPLACEMENT_MODES as readonly unknown[]).includes(value.normalReplacement);
   if (Object.hasOwn(value, 'bossChanceInNormalSlots')) {
