@@ -34,8 +34,8 @@ a scratch directory for this audit only. The commit ids above are the revisions 
 | | Count |
 |---|---|
 | Original options audited (Item 11 + Enemy 27 + FogMod 16) | **54** |
-| FULL | 34 (21 + 4 in Batch 1 + 3 in Batch 2 + 1 Second Gargoyle + 2 in Part A: Placement fit, Replacement chance + 2 in Part B: Difficulty mode, Difficulty strictness + 1 in Part C1: Type replacement) |
-| UI_ONLY (engine gap) | 14 |
+| FULL | 37 (3 in Part E1: Boss chance for normal-enemy slots, Roaming boss souls, Roaming boss respawn; 34 = 21 + 4 in Batch 1 + 3 in Batch 2 + 1 Second Gargoyle + 2 in Part A: Placement fit, Replacement chance + 2 in Part B: Difficulty mode, Difficulty strictness + 1 in Part C1: Type replacement) |
+| UI_ONLY (engine gap) | 11 (14 before Part E1) |
 | PARTIAL | 4 (I11 hintsheet; I5 Soul items, where Transposed is unavailable; E2 Normal enemy replacement, added in Part A; E22 Custom enemy pool, added in Part C2: regular enemies only) |
 | INTENTIONALLY_UNSUPPORTED | 1 |
 | DUPLICATE | 1 |
@@ -75,25 +75,25 @@ All 21 configuration fields map to one position in the original config string. T
 
 | # | Original option | Original values | Proposed DS1TR control / default | UI | Contract | Backend | Engine | Status |
 |---|---|---|---|---|---|---|---|---|
-| E1 | Replace bosses | 0 don't, 1 only with bosses, 2 only with normal enemies, 3 either | select: Classic shuffle / Random bosses | yes (`enemies.placement.bossReplacement`, `sampling-v1`) | yes | yes | yes for "only with bosses" on single-body bosses (Part D); linked units stay classic; the cross-class values need Part E | PARTIAL |
-| E2 | Replace normal enemies | same four values | select, `2` | yes (`enemies.placement.normalReplacement`, `sampling-v1`) | yes | yes | yes (Part A: `none`, `normals`; `bosses` and `both` need boss sources) | PARTIAL |
+| E1 | Replace bosses | 0 don't, 1 only with bosses, 2 only with normal enemies, 3 either | select: Classic shuffle / Random bosses | yes (`enemies.placement.bossReplacement`, `sampling-v1`) | yes | yes | yes for "only with bosses" on single-body bosses (Part D); linked units stay classic; the "with normal enemies" and "either" values for boss slots (Part E2) are not built (`ENEMY_PLACEMENT_MODEL.md` 10.7) | PARTIAL |
+| E2 | Replace normal enemies | same four values | select, `2` | yes (`enemies.placement.normalReplacement`, `sampling-v1`) | yes | yes | yes (`none`, `normals`; Part E1: `bosses` and `both` with the roaming-boss safety list, `ENEMY_PLACEMENT_MODEL.md` 10.7) | PARTIAL (a boss that needs its own arena or has several bodies never roams) |
 | E3 | Replace NPCs | same four values | select, `0` | placeholder | no | no | no | UI_ONLY |
 | E4 | Replace mimics | 0 no, 1 yes | toggle, on | yes (`enemies.replaceMimics`) | yes | yes | yes (Batch 1) | FULL |
 | E5 | Placement fit | 0 only where they fit, 1 anywhere, 2 anywhere except when replacing NPCs | select, `0` | yes (`enemies.placement.fit`, `sampling-v1`) | yes | yes | yes (Part A, regular slots; value 2 equals 1 until NPCs are replaced) | FULL |
 | E6 | Difficulty mode | 4 curve + easy Asylum, 1 random with curve, 3 random + easy Asylum, 2 fully random | select, `3` | yes (`enemies.placement.difficultyMode`, `sampling-v1`) | yes | yes | yes (Part B, regular enemies; project-derived classes) | FULL |
 | E7 | Replacement chance | 0-100 % | slider, 100 | yes (`enemies.placement.replacementChance`, `sampling-v1`) | yes | yes | yes (Part A, whole range, non-worsening budget) | FULL |
-| E8 | Boss chance for normal-enemy slots | 0-100 % | slider, 10 | placeholder | no | no | no | UI_ONLY |
+| E8 | Boss chance for normal-enemy slots | 0-100 % | slider, 10; shown only with "Bosses or normal enemies" | yes (`enemies.placement.bossChanceInNormalSlots`, `sampling-v1`) | yes | yes | yes (Part E1; the roaming pass, `ENEMY_PLACEMENT_MODEL.md` 10.7) | FULL |
 | E9 | Boss chance for boss slots | 0-100 % | slider, 90 | placeholder | no | no | no | UI_ONLY |
 | E10 | Replace second Gargoyle | 0 no, 1 yes | select, Replace (legacy default); also Do not replace and Single boss (earlier DS1TR behavior) | yes (`enemies.secondGargoyle`) | yes | yes | yes | FULL |
 | E11 | Difficulty strictness | 0 strict, 1 a bit loose, 2 very loose | select, `1` | yes (`enemies.placement.difficultyStrictness`, `sampling-v1`) | yes | yes | yes (Part B, regular enemies; project-derived classes) | FULL |
 | E12 | T-pose behavior | 0 enabled, 1 disabled | toggle, enabled | placeholder | no | no | no | UI_ONLY |
-| E13 | Roaming boss soul percentage | 0-100 % | slider, 50 | placeholder | no | no | no | UI_ONLY |
+| E13 | Roaming boss soul percentage | 0-100 % | slider, 50; shown only with a boss mode | yes (`enemies.placement.roamingBossSouls`) | yes | yes | yes (Part E1; percent of the authored souls of the boss fight, written to the scaled NpcParam row's `getSoul`) | FULL |
 | E14 | Pinwheel Chaos | 0 enabled, 1 disabled | toggle, disabled (default off) | yes (`enemies.pinwheelChaos`) | yes | yes | yes (Batch 2) | FULL |
 | E15 | Type replacement | 0 enabled, 2 enabled except roaming bosses, 1 disabled | select, disabled | yes (`enemies.placement.typeReplacement`, `sampling-v1`) | yes | yes | yes (Part C1, regular enemies; map-level groups, see `ENEMY_PLACEMENT_MODEL.md` 10.4) | FULL |
 | E16 | Gwyn spawn nerf | 0 strong, 1 medium, 2 none | select, medium (legacy default) | yes (`enemies.gwynNerf`) | yes | yes | yes (Batch 2) | FULL |
 | E17 | Prevent replacement by the same enemy | 0 enabled, 1 disabled | toggle, disabled (default off) | yes (`enemies.preventSameEnemy`) | yes | yes | yes (Batch 1) | FULL |
 | E18 | Unique bosses | 1 enabled, 0 disabled | toggle, off | yes (`enemies.placement.uniqueBosses`, needs Random bosses) | yes | yes | yes (cycle over the single-body boss pool) | FULL for single-body bosses |
-| E19 | Roaming boss respawn | 0 enabled, 1 disabled | toggle, enabled | placeholder | no | no | no | UI_ONLY |
+| E19 | Roaming boss respawn | 0 enabled, 1 disabled | toggle "Roaming bosses stay dead", off; shown only with a boss mode | yes (`enemies.placement.roamingBossesStayDead`) | yes | yes | yes (Part E1, deliberate deviation: the game's own `NpcParam.disableRespawn` bit on the scaled row instead of the legacy per-entity event; not yet seen in the game) | FULL (unverified in game) |
 | E20 | Hostile NPCs | 1 enabled, 0 disabled | toggle, off | placeholder | no | no | no | UI_ONLY |
 | E21 | Replace respawning mosquitoes | 1 enabled, 0 disabled | toggle, on | yes (`enemies.replaceRespawningMosquitoes`) | yes | yes | yes (Batch 1) | FULL |
 | E22 | Custom enemy pool (config editor) | Per-enemy enable/disable lists with named, saved configs | filterable list of the regular enemies of the clean game data, All / None / Reset, counts | yes (`enemies.placement.customPool`, `sampling-v1`; presets v9) | yes (`POST /api/enemy-pool`, typed `ENEMY_PLACEMENT_CUSTOM_POOL_INVALID`) | yes | yes (Part C2, regular enemies only; the pool restricts replacements, unselected enemies stay; proven-impossible pools are refused, a one-model grace to 31 models only when proven necessary, see `ENEMY_PLACEMENT_MODEL.md` 10.5) | PARTIAL |
@@ -222,12 +222,12 @@ mapped one-to-one.
 |---|---|---|---|
 | G8 | Replacement chance (E7) | done (Part A) | Per-slot keep/replace decision before the permutation. A count-preserving permutation must be rebuilt over only the replaced subset. |
 | G9 | Boss replace/normal replace/NPC replace modes (E1, E2, E3) | B-C | Source/target class partitions. NPC replacement is the hardest: friendly NPCs are deliberately kept vanilla by the engine today. |
-| G10 | Boss chance for normal / boss slots (E8, E9) | B | Cross-class sampling probabilities. Depends on G9. |
+| G10 | Boss chance for normal / boss slots (E8, E9) | E8 done (Part E1); E9 not built | The normal-slot side is the roaming pass. The boss-slot side (a regular enemy in a boss arena) is not built: see `ENEMY_PLACEMENT_MODEL.md` 10.7, "Part E2: not built". |
 | G11 | Placement fit (E5) | done for regular slots (Part A) | The engine already checks compatibility via `pickCompatibleEnemy` and `bossGrounding`; "anywhere" requires relaxing these and accepting the crash and softlock risk, which the 40/40 sweeps do not cover. |
 | G12 | Difficulty mode and strictness (E6, E11) | done for regular enemies (Part B) | Needs a per-enemy tier table and area tiers. The prototype data shows tiers, but the real catalog needs them for all enemies. |
 | G13 | Mimics, second Gargoyle, mosquitoes (E4, E10, E21) | done | See 6a. |
 | G14 | T-pose behavior (E12) | B | Relates to Anor Londo / New Londo event scripts. It needs an event-level change and interacts with the Fog EMEVD merge. |
-| G15 | Roaming boss souls % (E13) and roaming boss respawn (E19) | B | Edit NpcParam/ItemLot soul values and event flags. NpcParam is preserved across Fog, so the merge must be checked. |
+| G15 | Roaming boss souls % (E13) and roaming boss respawn (E19) | done (Part E1) | Scaled NpcParam row: `getSoul` and `disableRespawn`. NpcParam is preserved across Fog; the Fog sweeps with `verify-skips` cover it. |
 | G16 | Pinwheel Chaos, Gwyn nerf (E14, E16) | done | See 6b. |
 | G17 | Type replacement (E15) | done for regular enemies (Part C1) | Sub-mode of G9. |
 | G18 | Prevent same enemy (E17) | done | See 6a. |

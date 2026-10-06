@@ -53,6 +53,25 @@ export const sets = {
     { name: 'type-enabled-pool-fog', patch: merge2(noItems, sampling({ fit: 'anywhere', typeReplacement: 'enabled', customPool: ['c1200', 'c1201', 'c1202', 'c2260', 'c2270', 'c2280', 'c2500', 'c2711', 'c2860', 'c2940', 'c3490', 'c4171'] })) },
     { name: 'scaling-vanilla-type', patch: merge2(noItems, noFog, sampling({ fit: 'anywhere', typeReplacement: 'enabled' }, { scaling: 'vanilla' })) },
   ],
+  /** Part E1: bosses in regular enemy slots (roaming bosses) through the real data tool; the "-fog" cases also run the world randomizer. */
+  'roaming-e1': [
+    { name: 'roaming-bosses-fits', patch: merge2(noItems, noFog, sampling({ normalReplacement: 'bosses', fit: 'fits' })) },
+    { name: 'roaming-both-legacy-default', patch: merge2(noItems, noFog, sampling({ normalReplacement: 'both', fit: 'fits', difficultyMode: 'random-easy-asylum' })) },
+    { name: 'roaming-both-25-anywhere', patch: merge2(noItems, noFog, sampling({ normalReplacement: 'both', bossChanceInNormalSlots: 25, fit: 'anywhere' })) },
+    { name: 'roaming-bosses-c60-curve', patch: merge2(noItems, noFog, sampling({ normalReplacement: 'bosses', replacementChance: 60, fit: 'fits', difficultyMode: 'curve', difficultyStrictness: 'loose' })) },
+    { name: 'roaming-bosses-c25', patch: merge2(noItems, noFog, sampling({ normalReplacement: 'bosses', replacementChance: 25, fit: 'anywhere' })) },
+    { name: 'roaming-type-enabled', patch: merge2(noItems, noFog, sampling({ normalReplacement: 'both', bossChanceInNormalSlots: 30, typeReplacement: 'enabled', fit: 'anywhere' })) },
+    { name: 'roaming-type-except-roaming', patch: merge2(noItems, noFog, sampling({ normalReplacement: 'both', bossChanceInNormalSlots: 30, typeReplacement: 'enabled-except-roaming-bosses', fit: 'anywhere' })) },
+    { name: 'roaming-prevent-same', patch: merge2(noItems, noFog, sampling({ normalReplacement: 'bosses', fit: 'fits' }, { preventSameEnemy: true })) },
+    { name: 'roaming-custom-pool', patch: merge2(noItems, noFog, sampling({ normalReplacement: 'both', bossChanceInNormalSlots: 50, fit: 'anywhere', customPool: ['c1200', 'c1201', 'c1202', 'c2260', 'c2270', 'c2280', 'c2500', 'c2711', 'c2860', 'c2940', 'c3490', 'c4171'] })) },
+    { name: 'roaming-boss-sampling', patch: merge2(noItems, noFog, sampling({ normalReplacement: 'both', bossChanceInNormalSlots: 25, fit: 'anywhere', bossReplacement: 'bosses' })) },
+    { name: 'roaming-unique-bosses', patch: merge2(noItems, noFog, sampling({ normalReplacement: 'bosses', replacementChance: 50, fit: 'anywhere', bossReplacement: 'bosses', uniqueBosses: true })) },
+    { name: 'roaming-stay-dead-souls0', patch: merge2(noItems, noFog, sampling({ normalReplacement: 'bosses', replacementChance: 40, fit: 'fits', roamingBossSouls: 0, roamingBossesStayDead: true })) },
+    { name: 'roaming-second-gargoyle', patch: merge2(noItems, noFog, sampling({ normalReplacement: 'both', bossChanceInNormalSlots: 25, fit: 'anywhere' }, { secondGargoyle: 'replace' })) },
+    { name: 'roaming-vanilla-scaling', patch: merge2(noItems, noFog, sampling({ normalReplacement: 'bosses', replacementChance: 50, fit: 'anywhere' }, { scaling: 'vanilla' })) },
+    { name: 'roaming-both-fog', patch: merge2(noItems, sampling({ normalReplacement: 'both', bossChanceInNormalSlots: 25, fit: 'fits' })), seeds: 20 },
+    { name: 'roaming-bosses-fog', patch: merge2(noItems, sampling({ normalReplacement: 'bosses', replacementChance: 40, fit: 'anywhere', typeReplacement: 'enabled-except-roaming-bosses' })), seeds: 20 },
+  ],
 };
 
 const deterministicSeed = (set, name, index) => `matrix-${set}-${name}-${index}`;

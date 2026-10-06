@@ -993,6 +993,29 @@ Date: 2026-10-06.
 8. **Launch game** is a desktop (Electron) concern: Steam `steam://rungameid/570940` first, the game executable as a fallback,
    and the method used is reported. The renderer never starts processes.
 
+## Roaming bosses: bosses in regular enemy slots, Part E1 (backend 0.34.0, desktop 0.21.0, contracts 0.19.0)
+
+Date: 2026-10-06.
+
+1. **Scope.** Part E = cross-class replacement. E1 (a boss in a regular enemy slot, "roaming boss") is built; **E2 (a regular enemy in a boss slot) is deliberately not
+   built**: a boss arena's completion depends on the boss entity (boss-bar name, health, fog gate and kill-flag events, the Fog boss overlay), and a safe version needs a
+   wrapper that cannot be proven without playing. No control is shown for it (a control without an effect is a bug).
+2. **A second pass, not a rewrite.** The regular sampler is unchanged and runs with `normals` / `none`; `planRoamingBosses` overrides slots afterwards from named streams
+   that did not exist before. A slot that gets no boss keeps exactly what it had (proved byte for byte in the sweeps), so enabling the option never reshuffles the normal
+   enemies that stay.
+3. **Safety boundary (DS1TR, not legacy).** Bosses with an authored souls entry may roam, except those that need scripted terrain, cannot move or are neutral (Bed of Chaos,
+   Ceaseless Discharge, Dark Sun Gwyndolin, Lord Gwyn) and every multi-body boss. Slots with special handling never take a boss. At most 10 per map.
+4. **Souls and respawn are properties of the placement's scaled NpcParam row** (decision D-7 of the model document, now built): `getSoul` = percent of an authored table of the
+   fight's souls (the real boss rows have almost no `getSoul`); "stay dead" sets the row's own `disableRespawn` bit instead of the legacy per-entity event (no vanilla event is
+   touched). The bit is unverified in the game and the UI says so.
+5. **Model budget:** the non-worsening rule of Part B (`max(30, size before the pass)`), exact admission per boss, **no Custom Pool grace**; a boss that would raise a map above the
+   limit is not placed.
+6. **Seed Codes and profile:** extension keys again (`bossChanceInNormalSlots` 10, `roamingBossSouls` 50, `roamingBossesStayDead` false); `normalReplacement` gains `bosses` and
+   `both`. No new generation profile: the change is additive and gated behind options no earlier code can contain, proven by the 15 earlier golden fixtures, the 24 lock hashes
+   and the sampling pins. Worlds that use the new values are pinned by `ds1tr-gen-v1.roaming-bosses.json`.
+7. **Unique bosses** does not apply to roaming bosses (legacy: it only concerns a boss replacing a boss). **Type replacement:** `enabled` gives a whole kind one boss;
+   `enabled-except-roaming-bosses` lets every slot of the kind decide on its own - the legacy distinction.
+
 ## Boss sampling (Part D) and extension keys (backend 0.32.0, desktop 0.19.0, contracts 0.16.0)
 
 Date: 2026-10-06.

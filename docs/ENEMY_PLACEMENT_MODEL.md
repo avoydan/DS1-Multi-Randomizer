@@ -592,7 +592,7 @@ risk: data first, selection-only options next, event-touching options last.
 | **B** (built, see 10.3) | Difficulty curve | class draw, strictness tables, D-1 refinement, Easy Asylum rule, curated overrides | `difficultyMode` curve values, `strictness`, `easyAsylum` | select + slider activation | offset distributions, same-class share, empty-class fallback | 20 seeds | none |
 | **C** (C1 Type replacement built, see 10.4; C2 custom pool built, see 10.5) | Type replacement and custom pool | type map with type-level participation and injectivity; pool filter | `typeReplacement`, `customPool` (named list of enabled types) | select, pool editor (largest UI piece) | injectivity, sentinel cases, pool filter | 10 seeds | none |
 | **D** (built, see 10.6) | Boss class (bosses only) | boss sampler over the portable single-body pool, per-candidate Gwyn nerf, Unique bosses, unit participation | `bossReplacement` {none, bosses}, `uniqueBosses`, `bossChanceInBossSlots` | activation | boss repetition, unit swaps, hash lock | **40 seeds** Bosses + Fog (overlay set must remain the 15 events), `verify-skips` | medium |
-| **E** | Cross-class and roaming boss options | boss to normal slot, normal to boss slot, "both" modes, `getSoul` on the scaled row, respawn handling | modes `normals`/`both`, `bossChanceInNormalSlots`, `roamingBossSouls`, `respawningRoamingBosses` | activation | reward ownership, scaled row always present, boss bar rules | **40 seeds**, measure edited events against the overlay and FogMod; stop on any new overlap | **high** |
+| **E** (E1 built 2026-10-06, section 10.7; E2 not built) | Cross-class and roaming boss options | boss to normal slot, normal to boss slot, "both" modes, `getSoul` on the scaled row, respawn handling | modes `normals`/`both`, `bossChanceInNormalSlots`, `roamingBossSouls`, `respawningRoamingBosses` | activation | reward ownership, scaled row always present, boss bar rules | **40 seeds**, measure edited events against the overlay and FogMod; stop on any new overlap | **high** |
 | **F** | NPC class and hostile NPCs | NPC allowlist, talk preservation, hostile sources, allegiance events | `npcReplacement`, `hostileNpcs` | activation | NPC fit rules, talk preservation fixtures | event-set diff vs FogMod first, then 40 seeds | **high** |
 | **G** | Default flip (product decision) | none | default `sampling`, docs, migration notes | default values | n/a | full 40-seed default sweep | low once A-F passed |
 
@@ -1247,8 +1247,8 @@ runs the existing archetype permutation byte for byte. **Linked units stay class
 Dragon Kalameet bodies, Gaping Dragon, Seath, the Sanctuary Guardian, the Bell Gargoyles and the Centipede Demon (the bosses of the
 dragon / linked-boss planners; they swap with each other as whole units). **Correction (2026-10-06):** an earlier version of this text
 also listed Four Kings and Bed of Chaos; both are ordinary members of the 24-slot boss pool (the same as in the permutation) and take
-part in boss sampling like the other 21 archetypes. Chance-based unit participation and unit sampling are not built; the "unit participation" item of the plan is deferred. The cross-class modes, `bossChanceInBossSlots`, roaming-boss souls and
-respawn belong to Part E and are not exposed.
+part in boss sampling like the other 21 archetypes. Chance-based unit participation and unit sampling are not built; the "unit participation" item of the plan is deferred. The cross-class modes, roaming-boss souls and respawn are Part E1 (10.7);
+`bossChanceInBossSlots` (regular enemies in boss slots) is not built (10.7, "Part E2: not built").
 
 | Option | Contract | Neutral | Rule |
 |---|---|---|---|
@@ -1293,6 +1293,104 @@ cases) reproduce from their Seed Codes, also under a different application versi
 **Open.** (a) Unit participation by chance and unit sampling (Part D2). (b) Whether a map can reach more than 30 models through repeated
 bosses was not observed (maximum 30 in 100 seeds). (c) In-game behaviour of repeated bosses (two copies of one boss in different maps, a
 boss in an arena built for another) is covered by the same compatibility rules as the permutation but has not been played.
+
+### 10.7 Part E1 as built (2026-10-06): bosses in regular enemy slots ("roaming bosses")
+
+**Scope.** `sampling-v1` with `enemies.placement.normalReplacement` `bosses` or `both` lets bosses stand in regular enemy slots. This is Part E1.
+**Part E2 (regular enemies in boss slots, legacy "Boss chance, boss slots") is not built; see "Part E2: not built" below.** NPC and hostile-NPC
+replacement (Part F) is untouched.
+
+#### Legacy semantics (pinned Enemy Randomizer `83f008d`; reconstructed, not copied)
+
+| Legacy element (source) | Behavior |
+|---|---|
+| "Normal enemy replacement" (`randomizer.py`, config position 1) | 0 none, 1 only bosses, 2 only normal enemies, 3 either. With 1 every participating normal slot receives a boss; with 3 the slot receives a boss with the chance of "Boss chance, normal slots" (position 7, default 10), otherwise a normal enemy. |
+| Participation | The replacement chance is the first draw of a slot (or of a Type replacement entry); a slot that fails it keeps its enemy in every mode. |
+| Souls (`NpcParam.applyBossSouls`, `BossSouls`) | A boss in a normal slot uses a copy of its NpcParam row (id + 50, "<boss> with souls") whose `getSoul` is `int(authored souls of the boss fight * percent / 100)`. The table is authored per NpcParam row (Asylum Demon 2000, Taurus 3000, Capra 6000, Gaping 25000, Gwyn 70000, ...). Almost every vanilla boss row has `getSoul` 0 in the real catalog (the arena awards the reward; only Kalameet and the Anor Londo Gargoyles carry a value), which is why the copy exists. Percent default 50. |
+| Respawn (`AddRespawnEventInit`, template event 0 of `eventTemplates.dkscript`) | "Respawning roaming bosses: stay dead" initializes one event per entity (a normal slot receives an entity id if it has none) that makes the boss stay dead. The NpcParam copies themselves are written with `disableRespawn` = false at both call sites. |
+| Type replacement "except roaming bosses" | A replacement whose new type is a boss is not stored for the other slots of the original type; normal replacements are. |
+| Difficulty, Placement fit, Prevent same | Apply to the boss draw like to any draw (size class of the boss against the slot, curve class, own model). |
+| Unique bosses | Only the boss-replaces-boss draw (step 7); not the boss-in-normal-slot draw. |
+| Boss-in-normal-slot restrictions | None beyond the generic ones; the hard-coded pair rejections concern boss *destinations* (Gwyndolin, Capra, Iron Golem, Stray Demon, Pinwheel, Ceaseless Discharge slots). |
+
+#### What DS1TR builds
+
+| Option | Contract | Neutral | Rule |
+|---|---|---|---|
+| Normal enemy replacement | `normalReplacement`: `none` / `normals` / `bosses` / `both` | `normals` | `bosses` and `both` need `sampling-v1`; refused under `permutation-v1` |
+| Boss chance in normal slots | `bossChanceInNormalSlots` 0-100 | 10 | needs `both`; refused otherwise |
+| Roaming boss souls | `roamingBossSouls` 0-100 (percent) | 50 | needs `bosses` / `both` |
+| Roaming bosses stay dead | `roamingBossesStayDead` | `false` | needs `bosses` / `both` |
+| Type replacement | `typeReplacement` (existing) | `disabled` | `enabled`: a whole kind in a map gets one boss; `enabled-except-roaming-bosses`: each slot of the kind decides on its own (the legacy distinction; the exception is now real) |
+
+**Planner** (`planRoamingBosses`, `sampling.js`). A *second pass* after the unchanged regular sampler. The sampler runs with `normalReplacement` `none`
+(`bosses`) or `normals` (`both`); the pass only *overrides* slots, so a slot that gets no boss keeps exactly the placement it had without the pass
+(proved by the sweeps: every slot outside the pass is byte-identical to the same world with `normals`/`none`). Per map, in stable slot order (a Type
+replacement group in `enabled`): (1) participation = the first draw of the slot's / group's existing stream (replacement chance); (2) category: `bosses`
+always, `both` a draw from the named stream `roaming:slot:<id>` / `roaming:type:<map>:<model>` against the boss chance; (3) per-map limit of 10 roaming
+bosses (a group counts all its slots); (4) candidates: fit, Prevent same, the difficulty class(es) of the curve, the Easy Asylum rule, uniform draw with list
+shrink from the same stream; (5) **model budget** admission: the boss is accepted only if the final model set of the map (fixed models and the final model
+of every slot) stays within `max(30, its size before the pass)` - the non-worsening rule, **no** Custom Pool grace. A group with a member that cannot take
+a boss (protected slot) stays whole. New streams are derived under `enemy-placement-v1` with names that did not exist before, so no earlier draw moves.
+
+**Roaming candidates.** One archetype per boss with an authored souls entry (`bossKillSouls`, generator.js) that is not on the safety exclusion list:
+Stray Demon, Demon Firesage, Asylum Demon, Capra Demon, Taurus Demon, Iron Golem, Smough, Super Smough, Moonlight Butterfly, Pinwheel, Knight Artorias,
+Manus, Sif, Gravelord Nito, Dragon Slayer Ornstein, Super Ornstein, Chaos Witch Quelaag. **Never roaming (DS1TR safety boundary, a conscious restriction, not a legacy rule):**
+Bed of Chaos (immobile, floor script), Ceaseless Discharge (immobile, 10 m body), Dark Sun Gwyndolin (neutral team, stationary, scripted), Lord Gwyn (scripted
+entrance), and every multi-body boss (Priscilla, Hellkite, Sanctuary Guardian, Kalameet, Centipede Demon, Gaping Dragon, Seath, Bell and Anor Londo Gargoyles,
+Four Kings). The exclusion holds with or without boss randomization (the dragon plan only reserves those bosses when bosses are randomized).
+**Protected slots** never take a boss: the passive slots (Asylum, New Londo, the Kiln knight, the Parish bonfire Titanite Demon), tangible-ghost slots,
+the Darkroot butterfly path, slots whose events lock their model (`eventModelLocked`) and Pinwheel Chaos clones.
+
+**A roaming boss placement** (`decorateEnemyPlacements`): compatibility `sampled-roaming-boss`; `scaling: "vanilla"` (the boss keeps its own combat
+stats; drops and team still follow the slot through the scaled NpcParam row, the model document 6.9 rule); `roamingBossSouls = trunc(souls * percent / 100)`
+written to the scaled row's `getSoul`; `disableRespawn: true` (when "stay dead") written to the scaled row's own `disableRespawn` bit; the standard
+wake-up event (`forceCombatActivation`, an entity id is assigned if the slot has none) that every portable boss gets; no boss bar, no fog gate, no
+boss-death event (a regular slot has none).
+
+**Deliberate deviations.** (1) *Respawn is a field, not an event.* The game's `NpcParam.disableRespawn` bit exists in the paramdef; setting it on the
+scaled row needs no custom event (legacy writes an event per entity). It has not been seen working in the game - treat "stay dead" as unverified.
+(2) The per-map limit of 10 is DS1TR's (legacy has none; `bosses` at 100% would otherwise place a boss in every slot). (3) The exclusion list above.
+(4) Difficulty class of a boss uses the regular formula (map tier and HP rank); a boss's HP is above every regular enemy, so bosses are class 3-7 and the
+curve modes keep them out of the earliest maps and the Easy Asylum rule keeps them out of the Asylum. (5) The budget is the non-worsening rule of 10.3.
+(6) Unique bosses does not apply to roaming bosses (as in the legacy). (7) Placement fit uses an authored size class for the Moonlight Butterfly (class 3, `roamingSizeClassOverrides`) instead of the class of its 0.4 x 0.2 hit capsule: the capsule of a flier does not describe its body, and without the override "only where they fit" would put the Butterfly into almost every slot (27 of 31 roaming bosses in the first smoke world).
+
+**Seed Codes.** The three options are *extension keys* (stored in a code only when different from the neutral values 10 / 50 / false); `normalReplacement`
+gains the values `bosses` and `both`. A code made before Part E contains none of them, decodes to the neutral values and re-encodes to the same text; its
+world is the same world (all 15 golden fixtures of `ds1tr-gen-v1` verify byte for byte with the Part E engine and data tool). The profile stays `ds1tr-gen-v1`: the
+change is additive and gated behind options an old code cannot have. New worlds are pinned by `ds1tr-gen-v1.roaming-bosses.json`. Presets: version 11.
+
+**Data tool** (patch 0014). `PatchPlacement` gains `roamingBossSouls` and `disableRespawn`; the scaled NpcParam row sets `getSoul` / `disableRespawn` and
+asserts them (the other cells stay asserted equal to the boss row). Events: one wake-up event per roaming boss inside the map's custom event window
+(`docs/EVENT_ALLOCATION.md`); nothing is added to the vanilla events and nothing to the Fog whitelist.
+
+#### Part E2: not built (regular enemy in a boss slot)
+
+Legacy "Boss chance, boss slots" (default 90, i.e. 10% normal enemies in boss arenas) is **not implemented** and no control is shown. The reasons are
+about completion safety, not effort: a boss arena's encounter is driven by the boss entity (boss bar name from the model, health bar, music/fog events
+that wait for that entity's death, the 15-event Fog boss overlay, the `portableBossSanitization` and activation rules per boss). A regular model has no boss
+name, a different HP/stat scale, a body that the fog-gate and kill-flag events of the arena were not written for, and the boss-defeated flags, rewards and bonfire/
+gate logic depend on that death. A safe version needs a deliberate wrapper (a named boss-bar substitute, boss-scale stats, per-arena activation and a decision about the Fog overlay);
+that is an architecture-level piece of work that must be validated in the game and is deferred. Nothing in the roaming planner prevents it later.
+
+#### Measurements and proofs
+
+All on the real extracted catalog of a clean Dark Souls Remastered copy; zero unexplained failures; nothing was retried and no limit was relaxed.
+
+| What | Result |
+|---|---|
+| Engine, 18 configurations x 100 seeds (`roamingSweep.mjs`: normal baseline, boss-sampling baseline, bosses and "either" at several chances / fit / difficulty / Prevent same / Type replacement enabled and except-roaming / souls 0 and 100 + stay dead / Unique bosses / Gwyn nerf / Second Gargoyle / Pinwheel Chaos) | 1800/1800 worlds: deterministic; every roaming boss is an allowed archetype with the right souls, respawn bit, vanilla scaling, scaled row and wake-up; at most 10 per map; no roaming boss on a protected or passive slot; the final model count of a map is never above `max(30, count without the pass)`; every slot the pass did not take is byte-identical to the same world without the pass |
+| Real data tool, `placementMatrix.mjs roaming-e1` (before the Butterfly size override): 6 cases x 100 seeds and 8 cases x 60 seeds | 1080/1080 generated, 0 retries, 0 event-window overruns, 0 non-deterministic reruns |
+| Same matrix after the override: 10 cases x 40 seeds | 400/400, same invariants |
+| Baselines through the real tool (`type-event-former` 100: Type replacement enabled, Placement anywhere, bosses on = the case of the event-ID fix; `type-event-matrix`: curve at 60% and boss sampling, 100 each) | 300/300 |
+| Fog (real format): 6 configurations x 10 seeds, run twice (before and after the override), `verify-skips` on every package | 120/120 generated, 0 retries, 0 conflicts, the same 15 boss-overlay events and 12 instruction merges as without roaming bosses, 120 skip checks, 0 failed |
+| Model limit | 30 in every map except the Undead Parish, which reaches 33 (30 + dragon/boss models) in the same worlds without roaming bosses; never above its own baseline (`mapsAboveCap` never counts a map worse than before) |
+| Custom event window | at most 122 events in one map (Demon Ruins, Type replacement except roaming) against a 100-ID window; in 16 of the Type-replacement seeds the window moved off the Bed of Chaos floor event, which is exactly what `docs/EVENT_ALLOCATION.md` provides; 0 overruns |
+| Read back from the generated `GameParam` of real packages (`roamingProbe.mjs` + an NpcParam reader) | every roaming row has the planned `getSoul` and `disableRespawn` (71/71 and 109/109) |
+| Compatibility | all 15 earlier golden fixtures of `ds1tr-gen-v1` verify byte for byte with the Part E engine and data tool; 3 new fixtures pin roaming worlds |
+| Tests | backend 393 tests (391 pass, 2 skipped by design), desktop 6/6 |
+
+**Not verified by playing:** wake-up, navigation, killability, souls, "stay dead", textures and crashes with up to ten bosses per map. The six Part E worlds under Advanced, Test worlds for playtesting (`docs/SMOKE_TESTS.md`) are made for that.
 
 ---
 

@@ -38,6 +38,23 @@ to 80 events, and every other map, are unchanged: the audit shows `IDs used == I
   no reseeding), so no package or Seed Code of such a world ever existed; no profile change is needed.
 - **Tooling:** `apps/backend/scripts/placementMatrix.mjs` (configuration x seed matrix with window audit, retries, deterministic reruns).
 
+**Enemy placement Part E1: bosses in regular enemy slots (2026-10-06; backend 0.34.0, desktop 0.21.0, contracts 0.19.0, patch 0014; RANDOMIZER_VERSION 0.5.66 and FogHost 0.5.0 unchanged; generation profile `ds1tr-gen-v1` unchanged).**
+`sampling-v1` with Normal enemy replacement "Only bosses" or "Bosses or normal enemies" places bosses in regular enemy slots ("roaming bosses"), with a
+"Boss chance in normal slots" (only with "either"), "Roaming boss souls" (percent of the authored fight souls, written to the scaled NpcParam row's `getSoul`) and
+"Roaming bosses stay dead" (the row's own `disableRespawn` bit; **not yet confirmed in the game**). Type replacement "except roaming bosses" is now real. The
+controls appear only when they apply and are put back to their defaults when they stop applying. 17 boss archetypes can roam; Bed of Chaos, Ceaseless Discharge,
+Dark Sun Gwyndolin, Lord Gwyn and every multi-body boss never do; at most 10 roam in a map; the model limit never gets worse (no Custom Pool grace). **Part E2 (a
+regular enemy in a boss slot) is not built** and shows no control; the reasons and what a safe version needs are in `docs/ENEMY_PLACEMENT_MODEL.md` 10.7. Part F (NPC /
+hostile NPC replacement) is untouched. Details, legacy semantics, deviations and measurements: `docs/ENEMY_PLACEMENT_MODEL.md` 10.7.
+
+- **Seed Codes:** the three options are extension keys (stored only when non-neutral); `normalReplacement` gained two values an older code cannot contain. All 15 earlier golden
+  fixtures verify byte for byte with the Part E engine and data tool; three new fixtures pin roaming worlds (`ds1tr-gen-v1.roaming-bosses.json`). Presets are version 11.
+- **Tooling:** `apps/backend/scripts/roamingSweep.mjs` (engine on a real catalog, invariants), `roamingProbe.mjs` (keeps one package), `placementMatrix.mjs roaming-e1`
+  (real data tool), six Part E smoke worlds in Advanced (`docs/SMOKE_TESTS.md`).
+- **Measurements:** engine 1800/1800 worlds (18 configurations x 100 seeds); real data tool 1780/1780 runs (including 300 baseline runs); Fog 120/120 with `verify-skips` clean, boss overlay unchanged (15 events), 0 conflicts; no map above its own model baseline (Undead Parish 33 as before); 15/15 earlier golden fixtures byte-identical; full table in `docs/ENEMY_PLACEMENT_MODEL.md` 10.7.
+- **Not verified in the game (needs playtesting):** that a roaming boss wakes up, navigates, can be killed and drops the intended souls; that "stay dead" holds after resting at a bonfire;
+  that no map shows missing textures or crashes with up to ten bosses and 30+ models; the Fog interplay at runtime. Use the Part E worlds under Advanced, Test worlds for playtesting.
+
 **Enemy placement Part D: boss sampling (2026-10-06; backend 0.32.0, desktop 0.19.0, contracts 0.16.0, patch 0012; RANDOMIZER_VERSION 0.5.66 and FogHost 0.5.0 unchanged; generation profile `ds1tr-gen-v1` unchanged).**
 `sampling-v1` can draw a replacement for every single-body boss slot from the boss pool (`Boss replacement: Random bosses`), with the
 replacement chance per boss slot, the Gwyn nerf per candidate and an optional `Unique bosses` cycle; the controls replace two PLANNED

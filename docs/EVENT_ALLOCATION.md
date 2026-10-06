@@ -61,3 +61,11 @@ one: every other event creation in the tool takes its ID from the window (`nextC
   Part E sweeps record it (`maxEvents`, `maxEventsMap`).
 * The window may grow past 100 IDs. It is protected against existing events and the reserved IDs, not against events added by another
   tool later; a Fog merge that finds an overlap fails with `FOG_MERGE_CONFLICT`, it never overwrites.
+
+## Roaming bosses (Part E1)
+
+A boss in a regular enemy slot adds exactly one custom event (the same wake-up event every portable boss gets, `forceCombatActivation`) inside the
+map's custom event window. It edits no vanilla event and adds nothing to the Fog boss overlay (15 events, unchanged). The planner limits a map to
+10 roaming bosses, which bounds the growth of the window; `DS1TR_AUDIT_EVENTS=1` reports reserved against consumed IDs and the matrix
+(`placementMatrix.mjs roaming-e1`) records the highest count per map. A slot without an entity id gets one from `16099000 + index` (the range every
+combat event uses).
