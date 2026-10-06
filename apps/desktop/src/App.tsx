@@ -179,8 +179,8 @@ export function App() {
       enemies: {
         ...current.enemies,
         placement: algorithm === 'sampling-v1'
-          ? { algorithm, replacementChance: 100, normalReplacement: 'normals', fit: 'fits', difficultyMode: 'random-easy-asylum', difficultyStrictness: 'loose', typeReplacement: 'disabled', customPool: null, bossReplacement: 'classic', uniqueBosses: false, bossChanceInNormalSlots: 10, roamingBossSouls: 50, roamingBossesStayDead: false }
-          : { algorithm, replacementChance: 100, normalReplacement: 'normals', fit: 'anywhere', difficultyMode: 'random', difficultyStrictness: 'loose', typeReplacement: 'disabled', customPool: null, bossReplacement: 'classic', uniqueBosses: false, bossChanceInNormalSlots: 10, roamingBossSouls: 50, roamingBossesStayDead: false },
+          ? { algorithm, replacementChance: 100, normalReplacement: 'normals', fit: 'fits', difficultyMode: 'random-easy-asylum', difficultyStrictness: 'loose', typeReplacement: 'disabled', customPool: null, bossReplacement: 'classic', uniqueBosses: false, bossChanceInBossSlots: 90, bossChanceInNormalSlots: 10, roamingBossSouls: 50, roamingBossesStayDead: false }
+          : { algorithm, replacementChance: 100, normalReplacement: 'normals', fit: 'anywhere', difficultyMode: 'random', difficultyStrictness: 'loose', typeReplacement: 'disabled', customPool: null, bossReplacement: 'classic', uniqueBosses: false, bossChanceInBossSlots: 90, bossChanceInNormalSlots: 10, roamingBossSouls: 50, roamingBossesStayDead: false },
       },
     }));
   const setPlacement = <K extends keyof RandomizerConfig['enemies']['placement']>(key: K, value: RandomizerConfig['enemies']['placement'][K]) =>
@@ -192,6 +192,14 @@ export function App() {
       const placement = { ...current.enemies.placement, normalReplacement: mode };
       if (mode !== 'both') placement.bossChanceInNormalSlots = 10;
       if (!roaming) { placement.roamingBossSouls = 50; placement.roamingBossesStayDead = false; }
+      return { ...current, enemies: { ...current.enemies, placement } };
+    });
+  /** Leaving "Bosses or normal enemies" puts its chance back to the default, and Unique bosses is off wherever no boss is drawn. */
+  const setBossReplacement = (mode: RandomizerConfig['enemies']['placement']['bossReplacement']) =>
+    setConfig((current) => {
+      const placement = { ...current.enemies.placement, bossReplacement: mode };
+      if (mode !== 'both') placement.bossChanceInBossSlots = 90;
+      if (mode !== 'bosses' && mode !== 'both') placement.uniqueBosses = false;
       return { ...current, enemies: { ...current.enemies, placement } };
     });
   const setFog = <K extends keyof RandomizerConfig['fog']>(key: K, value: RandomizerConfig['fog'][K]) =>
@@ -505,8 +513,11 @@ export function App() {
               <label className="field-label">Type replacement</label>
               <select value={config.enemies.placement.typeReplacement} disabled={!config.enemies.randomizeRegularEnemies || config.enemies.placement.algorithm !== 'sampling-v1'} title="Legacy-style sampling only. Enabled: all enemies of one kind in a map (every Hollow in the Parish) are replaced by the same new kind, and two kinds in one map never get the same replacement. The replacement chance then applies to the kind, not to each enemy. With bosses in regular slots, Enabled gives every enemy of one kind the same boss; the exception lets each slot draw its own boss instead." onChange={(event) => setPlacement('typeReplacement', event.target.value as RandomizerConfig['enemies']['placement']['typeReplacement'])}><option value="enabled">Enabled</option><option value="enabled-except-roaming-bosses">Enabled, except roaming bosses</option><option value="disabled">Disabled</option></select>
               <label className="field-label">Boss replacement</label>
-              <select value={config.enemies.placement.bossReplacement} disabled={!config.enemies.randomizeBosses || config.enemies.placement.algorithm !== 'sampling-v1'} title="Legacy-style sampling only. Classic shuffle: the bosses are shuffled among the boss slots as before. Random bosses: every single-body boss slot draws its own replacement from the boss pool, so a boss can appear more than once; the replacement chance applies to each boss slot. The dragons, Seath, Priscilla, the Sanctuary Guardian, the Bell Gargoyles and the Centipede Demon keep the classic shuffle. Lord Gwyn follows the Gwyn spawn nerf." onChange={(event) => setPlacement('bossReplacement', event.target.value as RandomizerConfig['enemies']['placement']['bossReplacement'])}><option value="classic">Classic shuffle</option><option value="bosses">Random bosses (legacy-style)</option></select>
-              <Toggle inactive={!config.enemies.randomizeBosses || config.enemies.placement.algorithm !== 'sampling-v1' || config.enemies.placement.bossReplacement !== 'bosses'} label="Unique bosses" hint="Needs Random bosses. Every boss of the pool is used once before any boss appears a second time." checked={config.enemies.placement.uniqueBosses} onChange={(value) => setPlacement('uniqueBosses', value)} />
+              <select value={config.enemies.placement.bossReplacement} disabled={!config.enemies.randomizeBosses || config.enemies.placement.algorithm !== 'sampling-v1'} title="Legacy-style sampling only. Classic shuffle: the bosses are shuffled among the boss slots as before. Random bosses: every single-body boss slot draws its own replacement from the boss pool, so a boss can appear more than once. Only normal enemies / Bosses or normal enemies: a normal enemy takes the place of the boss in three early fights (Asylum Demon, Taurus Demon, Capra Demon); the fight stays the boss's (its health bar and its name, its fog gate, what it unlocks and its rewards) and the normal enemy never comes back. With Area or Progressive scaling it takes the boss's health and strength, with Vanilla scaling its own. Every other boss keeps its own boss in Only normal enemies and gets a random boss in Bosses or normal enemies. The dragons, Seath, Priscilla, the Sanctuary Guardian, the Bell Gargoyles and the Centipede Demon keep the classic shuffle. Lord Gwyn follows the Gwyn spawn nerf." onChange={(event) => setBossReplacement(event.target.value as RandomizerConfig['enemies']['placement']['bossReplacement'])}><option value="classic">Classic shuffle</option><option value="bosses">Random bosses (legacy-style)</option><option value="normals">Only normal enemies (early fights)</option><option value="both">Bosses or normal enemies</option></select>
+              {config.enemies.placement.algorithm === 'sampling-v1' && config.enemies.placement.bossReplacement === 'both' && (
+                <RangeOption label="Boss chance in boss slots" hint="Of the boss slots that take part and can take a normal enemy, the share that get a boss; the rest get a normal enemy." value={config.enemies.placement.bossChanceInBossSlots} inactive={!config.enemies.randomizeBosses} onChange={(value) => setPlacement('bossChanceInBossSlots', value)} />
+              )}
+              <Toggle inactive={!config.enemies.randomizeBosses || config.enemies.placement.algorithm !== 'sampling-v1' || (config.enemies.placement.bossReplacement !== 'bosses' && config.enemies.placement.bossReplacement !== 'both')} label="Unique bosses" hint="Needs Random bosses or Bosses or normal enemies. Every boss of the pool is used once before any boss appears a second time." checked={config.enemies.placement.uniqueBosses} onChange={(value) => setPlacement('uniqueBosses', value)} />
               <EnemyPoolEditor gamePath={config.gamePath} active={config.enemies.randomizeRegularEnemies && config.enemies.placement.algorithm === 'sampling-v1'} fit={config.enemies.placement.fit} customPool={config.enemies.placement.customPool} onChange={(pool) => setPlacement('customPool', pool)} />
             </div>
             <div className="option-group"><h3>Legacy options</h3>
