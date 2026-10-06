@@ -5,6 +5,7 @@ export interface SmokeTestList {
   worlds: Array<{
     id: string; title: string; category: 'quick' | 'extended'; purpose: string; seedCode: string; settings: unknown; observe: string[];
     targets: string[]; expected: string[]; estimateSeconds: number | null; afterwards: string[];
+    gameplay: { result: 'passed'; date: string; note: string } | null;
   }>;
   checklist: string[];
   start: string;

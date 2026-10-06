@@ -142,6 +142,7 @@ try {
       '## Quick smoke tests', '',
       '| Test | What it shows | Where | Time to the target |', '|---|---|---|---|',
     ];
+    const gameplayLine = (scenario) => (scenario.gameplay ? `**Gameplay result:** passed in the real game on ${scenario.gameplay.date} (played by hand). ${scenario.gameplay.note}` : '**Gameplay result:** not played in the real game yet; only the static check exists.');
     const quick = SMOKE_SCENARIOS.filter((entry) => entry.category === 'quick');
     const extended = SMOKE_SCENARIOS.filter((entry) => entry.category === 'extended');
     for (const scenario of quick) lines.push(`| \`${scenario.id}\` | ${scenario.title} | ${scenario.expectations.map((e) => `${e.slot} (${e.meters} m)`).join(', ')} | ~${scenario.estimateSeconds} s |`);
@@ -160,6 +161,7 @@ try {
         '**Expected**', '', ...scenario.expectations.map((entry) => `- ${describeSmokeExpected(entry)}`), '',
         `**Estimated time to the target:** ~${scenario.estimateSeconds} seconds after you gain control.`, '',
         `**Needs a reset or reload:** ${scenario.afterwards?.some((line) => /die once/u.test(line)) ? 'yes - die once' : 'no'}`, '',
+        gameplayLine(scenario), '',
         '**Check**', '', ...scenario.observe.map((line) => `- [ ] ${line}`), '');
       if (scenario.afterwards?.length) lines.push('**Afterwards**', '', ...scenario.afterwards.map((line) => `- [ ] ${line}`), '');
       lines.push('```', result.seedCode, '```', '');
@@ -169,7 +171,7 @@ try {
     for (const scenario of extended) {
       const result = await measure(scenario, scenario.masterSeed);
       if (!result.ok) throw new Error(`${scenario.id}: ${result.error}`);
-      lines.push(`### ${scenario.title}`, '', `**Extended gameplay test** - ID \`${scenario.id}\``, '', scenario.purpose, '', '```', result.seedCode, '```', '', '**In this world**', '', ...scenario.observe.map((line) => `- ${line}`));
+      lines.push(`### ${scenario.title}`, '', `**Extended gameplay test** - ID \`${scenario.id}\``, '', scenario.purpose, '', gameplayLine(scenario), '', '```', result.seedCode, '```', '', '**In this world**', '', ...scenario.observe.map((line) => `- ${line}`));
       if (result.bossSlotsChanged > 0 && scenario.settings.enemies?.placement?.bossReplacement === 'bosses') {
         const sampled = result.bossTable.slice(0, 24);
         lines.push('', `Boss replacements of this world (${sampled.length} boss slots; the first ${sampled.length} lines are the sampled ones):`, '', ...sampled.map((line) => `- ${line}`));

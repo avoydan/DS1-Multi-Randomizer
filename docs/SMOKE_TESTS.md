@@ -18,6 +18,7 @@ There are two kinds of world.
 |---|---|---|---|
 | `quick-roaming-basic` | Roaming boss - basic | c2500_0006 (8.7 m) | ~25 s |
 | `quick-roaming-souls` | Roaming boss - souls and respawn | c2500_0006 (8.7 m) | ~25 s |
+| `quick-roaming-respawn` | Roaming boss - respawns | c2500_0007 (11.4 m) | ~30 s |
 | `quick-roaming-repeated` | Roaming boss - three at once | c2500_0006 (8.7 m), c2500_0007 (11.4 m), c2500_0005 (33.2 m) | ~35 s |
 | `quick-sampling-asylum` | Regular enemies - first three change | c2500_0006 (8.7 m), c2500_0007 (11.4 m), c2500_0005 (33.2 m) | ~35 s |
 | `quick-boss-asylum-demon` | Boss sampling - the first boss | c2232_0000 (22.5 m) | ~90 s |
@@ -49,6 +50,8 @@ A boss stands where a regular enemy stood: the smallest check that a boss works 
 
 **Needs a reset or reload:** no
 
+**Gameplay result:** passed in the real game on 2026-10-06 (played by hand). The replacement appeared, rendered, woke up, fought and died, it had no boss bar and the souls were as expected. Played before the respawn fix (backend 0.35.1). That fix changed this world's package in one cell only: the roaming rows now carry disableRespawn = 0 where they carried an inherited 1. The world has not been played again.
+
 **Check**
 
 - [ ] The Capra Demon is there, fully textured (no T-pose, no invisible body) - not a Hollow.
@@ -79,6 +82,8 @@ A roaming boss with 100% souls that stays dead: the reward and the "does not com
 
 **Needs a reset or reload:** yes - die once
 
+**Gameplay result:** passed in the real game on 2026-10-06 (played by hand). The souls were as expected and the boss stayed dead after the reset. The respawn fix leaves this world's package byte-identical.
+
 **Check**
 
 - [ ] A Taurus Demon stands where the first Hollow would be; it wakes up, moves and attacks (no boss health bar, no fog gate).
@@ -92,6 +97,41 @@ A roaming boss with 100% souls that stays dead: the reward and the "does not com
 
 ```
 DS1TR1-06NJDCP6-577CVKTE-TMPK9MHD-94P2TAHD-TRTK9D1M-4SCFF80Q-P6HSBKTG-NNYD0JW9-45DFP84Q-0DCAP7GB-XGAGYD6K-1SCBV8X3-0GPKWG7H-056HDR2T-294KHD9R-Q0JB3MH5-6MRGANMY-CBB5BM70-3JPTSA2G-B40G0NME-YJ3G
+```
+
+### Roaming boss - respawns
+
+**Quick smoke test** - ID `quick-roaming-respawn`
+
+A roaming boss with stay dead switched OFF: after the area is reset it must be back. The counterpart of the souls test, where it must stay dead.
+
+**Target**
+
+- Undead Asylum: the Hollow at slot c2500_0007, 11.4 m from where you wake up, on the same floor as the start
+
+**Expected**
+
+- Capra Demon (c2240) replaces the Hollow at slot c2500_0007; it carries 3000 souls
+
+**Estimated time to the target:** ~30 seconds after you gain control.
+
+**Needs a reset or reload:** yes - die once
+
+**Gameplay result:** not played in the real game yet; only the static check exists.
+
+**Check**
+
+- [ ] A Capra Demon stands where a Hollow would be; it wakes up, moves and attacks (no boss health bar, no fog gate).
+- [ ] Kill it: you gain 3000 souls (50% of the 6000 that DS1TR lists for that fight).
+- [ ] Control: the other Hollows of the cell block (slots c2500_0006, 8.7 m, and c2500_0005, 33.2 m from the start) are normal Hollows.
+
+**Afterwards**
+
+- [ ] Reset the area: the Asylum has no bonfire (none in its map data), so die once (any way). Everything that respawns comes back when you wake up again.
+- [ ] Return to the same place. After resetting the area, this boss should respawn: the Capra Demon MUST be alive again, together with the Hollows.
+
+```
+DS1TR1-06NJDCP6-577CVKTE-TMPK9MSD-GAA2KEP6-RT309TRY-YGH7DD7J-36N9A3VT-54RM8TRZ-WHS00TYN-CE0VVRM1-CVD42NFF-821PDD72-M51CA0R0-6WSEH50
 ```
 
 ### Roaming boss - three at once
@@ -115,6 +155,8 @@ The same boss in three neighbouring slots: separate bodies, separate fights, not
 **Estimated time to the target:** ~35 seconds after you gain control.
 
 **Needs a reset or reload:** no
+
+**Gameplay result:** passed in the real game on 2026-10-06 (played by hand). Three independent bosses. Played before the respawn fix (backend 0.35.1). That fix changed this world's package in one cell only: the roaming rows now carry disableRespawn = 0 where they carried an inherited 1. The world has not been played again.
 
 **Check**
 
@@ -149,6 +191,8 @@ Legacy-style sampling at runtime: the first Hollows are different enemies and be
 
 **Needs a reset or reload:** no
 
+**Gameplay result:** passed in the real game on 2026-10-06 (played by hand). The three replacements appeared, rendered, woke up and fought. The respawn fix leaves this world's package byte-identical.
+
 **Check**
 
 - [ ] Where the first three Hollows stood there are a Balder Knight, an Undead Soldier and an Undead Assassin.
@@ -176,6 +220,8 @@ The first boss of the game is replaced by another boss: model, health bar, AI, d
 **Estimated time to the target:** ~90 seconds after you gain control.
 
 **Needs a reset or reload:** no
+
+**Gameplay result:** passed in the real game on 2026-10-06 (played by hand). The Asylum Demon encounter completed with the replacement boss. The respawn fix leaves this world's package byte-identical.
 
 **Check**
 
@@ -215,6 +261,8 @@ These need travel or progression, or exercise a whole system. They are not smoke
 
 Everything on with the default classic placement: items, enemies, bosses and the fog randomizer together.
 
+**Gameplay result:** not played in the real game yet; only the static check exists.
+
 ```
 DS1TR1-06NJDCP6-577CVKTE-TN6X8K86-JQBSKJD3-TQ76HD9K-BBPRRNHV-REHDM080-JEZCRRR
 ```
@@ -232,6 +280,8 @@ Expected: the second Bell Gargoyle of the Undead Parish fight becomes **Gravelor
 
 Regular enemies drawn per slot (legacy-style sampling), no bosses, no items, no fog randomizer.
 
+**Gameplay result:** not played in the real game yet; only the static check exists.
+
 ```
 DS1TR1-06NJDCP6-577CVKTE-TN6X51C5-4K0QM1XX-F0ETTY46-DB2R6QJ2-1K8SM1XS-1JGASPG1-2WG3HARW-JGH85XPN-1WT98HQB-3WND8FR0-4PEP5VG
 ```
@@ -246,6 +296,8 @@ DS1TR1-06NJDCP6-577CVKTE-TN6X51C5-4K0QM1XX-F0ETTY46-DB2R6QJ2-1K8SM1XS-1JGASPG1-2
 **Extended gameplay test** - ID `second-gargoyle`
 
 The second Bell Gargoyle is replaced by another boss (the first one also changes).
+
+**Gameplay result:** not played in the real game yet; only the static check exists.
 
 ```
 DS1TR1-06NJDCP6-577CVKTE-TN6XCKC7-WSV5TWW2-6M7QM09V-BBTGSYNA-0ZEP30XE-XR0HE0D3-6M7MM1GV-NNXAGM7N-000FN97V-1C
@@ -264,6 +316,8 @@ Expected: the second Bell Gargoyle of the Undead Parish fight becomes **Knight A
 
 The Undead Parish map holding one of the highest numbers of different enemy models the sampler produces.
 
+**Gameplay result:** not played in the real game yet; only the static check exists.
+
 ```
 DS1TR1-06NJDCP6-577CVKTE-TN6X2BA8-5K52SKPG-6MJ5HVX0-2YQT65EF-A2PQHM2B-H0GNNWS0-JW0W786T-G63CWT5X-8E2QM1R0-05AF6MR
 ```
@@ -280,6 +334,8 @@ Undead Parish holds 30 different enemy models in this world (the limit is 30). N
 **Extended gameplay test** - ID `boss-sampling`
 
 Every single-body boss slot draws its own replacement (bosses can repeat).
+
+**Gameplay result:** not played in the real game yet; only the static check exists.
 
 ```
 DS1TR1-06NJDCP6-577CVKTE-TN6RAEJZ-TY861FC3-BTY8WNHW-GEZE4GBQ-V2GAPYD0-0M0QJD8F-E8CK1H5A-3N43V0NA-3HD8WR5B-J6G02DTT-4N8T2JG2-02XK9458
@@ -328,6 +384,8 @@ Expected: the second Bell Gargoyle of the Undead Parish fight becomes **Moonligh
 
 A boss that appears in more than one arena in the same world (boss sampling draws with repeats).
 
+**Gameplay result:** not played in the real game yet; only the static check exists.
+
 ```
 DS1TR1-06NJDCP6-577CVKTE-TN6X6BAA-5N44TB6H-6MS2AP7H-M2BTZ8SN-SYGAYYEG-3MVEHAGY-D14M0QPN-GDE0G35H-F83N54D0-5A3HC96R-N8J6HG4D-TS4N9A4K-03HJQ0S4
 ```
@@ -374,6 +432,8 @@ Expected: the second Bell Gargoyle of the Undead Parish fight becomes **Ceaseles
 **Extended gameplay test** - ID `boss-unique`
 
 Boss sampling where a boss is not used a second time before every boss was used once.
+
+**Gameplay result:** not played in the real game yet; only the static check exists.
 
 ```
 DS1TR1-06NJDCP6-577CVKTE-TN6XEBED-SCP2RKEN-6MGNHVX0-2YQT65EF-M2QQHM0X-6VM6M7K8-8505XKC3-BG30SCBA-0X98Z81A-GYB26EJA-J0E8J72Q-V1N2JT30-HSB56N58-MR06HET4-5R
@@ -422,6 +482,8 @@ Expected: the second Bell Gargoyle of the Undead Parish fight becomes **Asylum D
 
 Boss sampling with a 50% replacement chance: about half of the boss slots keep their own boss.
 
+**Gameplay result:** not played in the real game yet; only the static check exists.
+
 ```
 DS1TR1-06NJDCP6-577CVKTE-TQ6X0B80-JNTRJEDT-GR22P7QM-Y9TV9SGS-YGTGZEP3-0SEXA0SD-174APYMG-1C0TSXCE-X5GATXH0-YM4AMWK8-761ATHM2-GVDPH5A4-GMN0J05C-JR6Q8
 ```
@@ -466,6 +528,8 @@ Expected: the second Bell Gargoyle of the Undead Parish fight becomes **Pinwheel
 
 With Type replacement, every enemy of one kind in a map is replaced by the same boss, so one boss stands in several places of an area.
 
+**Gameplay result:** not played in the real game yet; only the static check exists.
+
 ```
 DS1TR1-06NJDCP6-577CVKTE-TQ6R4YX3-52TJ0DDH-8KBS0R7X-GDFCS3JP-811VA0J2-5WMRCT0D-GHE1CR5D-FT671N1Y-T2E0QAVW-R32GGN9B-3SCFR42Q-XX086SDM-WAGM5H83-010JGA7B
 ```
@@ -499,6 +563,8 @@ Different enemy models in the Undead Parish: 28 (the limit is 30; a map that bos
 **Extended gameplay test** - ID `roaming-gargoyle`
 
 Bosses in regular slots together with a replaced second Bell Gargoyle and boss sampling in the boss arenas.
+
+**Gameplay result:** not played in the real game yet; only the static check exists.
 
 ```
 DS1TR1-06NJDCP6-577CVKTE-TQ6R2YS3-3PDEPX8D-17B41T05-XNM1AD2T-0N8NG1A1-9C2F5AH0-WK100TZX-CE6A7YJ9-S8QWK06Q-7QG5512Y-YM7A88J1-EW6KGMNG-AN4X000V-NP9TGM17-0406HW3K-FC
@@ -551,6 +617,8 @@ Different enemy models in the Undead Parish: 31 (the limit is 30; a map that bos
 
 Bosses in regular slots with the fog randomizer on (fog gates, warps and boss fogs are moved too).
 
+**Gameplay result:** not played in the real game yet; only the static check exists.
+
 ```
 DS1TR1-06NJDCP6-577CVKTE-TQ6RAYS3-5MZNVNWG-C3JR6QP6-HVB3WGXN-YS0JY9M6-D3TR6Q0G-C2PQQ33H-AGYMKY95-37R7M1TW-GA6DCEE3-MB70207M-YH6G4
 ```
@@ -583,6 +651,8 @@ Different enemy models in the Undead Parish: 30 (the limit is 30; a map that bos
 **Extended gameplay test** - ID `roaming-parish`
 
 Every regular slot that can take a boss gets one (at most ten per map): the highest load of different models a roaming world can put on one map.
+
+**Gameplay result:** not played in the real game yet; only the static check exists.
 
 ```
 DS1TR1-06NJDCP6-577CVKTE-TQ6R6YX3-42RJHCSR-8FBS0R7X-GDFCS3JP-811VA0J2-5WMRCT0D-GHE1D42P-ZN0B7VN0-N9YT109K-BBYN18FT-040CFP4M-VC

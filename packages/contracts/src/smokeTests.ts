@@ -69,6 +69,13 @@ export interface SmokeExpectation {
   wakeUpEvent?: boolean;
 }
 
+/** What a person who played a world in the real game reported. Only a manual result belongs here; static checks never set it. */
+export interface SmokeGameplayResult {
+  result: 'passed';
+  date: string;
+  note: string;
+}
+
 export interface SmokeScenario {
   id: string;
   title: string;
@@ -85,6 +92,8 @@ export interface SmokeScenario {
   expectations?: SmokeExpectation[];
   /** Quick worlds only: seconds from gaining control to seeing the target, estimated from the distance (about 4 m/s, a detour factor and the cell door), not timed in the game. */
   estimateSeconds?: number;
+  /** Present only when a person has played this world in the real game and reported the result. */
+  gameplay?: SmokeGameplayResult;
   /** Quick worlds only: further steps after the first check (for example dying once to reset the area). */
   afterwards?: string[];
 }
@@ -147,6 +156,16 @@ export const QUICK_SMOKE_RECIPES: Readonly<Record<string, { seedPrefix: string; 
       },
     },
   },
+  'quick-roaming-respawn': {
+    seedPrefix: 'smoke-q6-respawn',
+    settings: {
+      items: { enabled: false }, fog: { enabled: false },
+      enemies: {
+        randomizeBosses: false,
+        placement: { algorithm: 'sampling-v1', fit: 'anywhere', difficultyMode: 'random', replacementChance: 8, normalReplacement: 'bosses', roamingBossesStayDead: false },
+      },
+    },
+  },
   'quick-roaming-repeated': {
     seedPrefix: 'smoke-q3-repeat',
     settings: {
@@ -179,7 +198,8 @@ export const SMOKE_SCENARIOS: readonly SmokeScenario[] = [
     id: 'quick-roaming-basic', category: 'quick', title: 'Roaming boss - basic', masterSeed: 'smoke-q1-capra-476',
     purpose: 'A boss stands where a regular enemy stood: the smallest check that a boss works outside its arena.',
     settings: QUICK_SMOKE_RECIPES['quick-roaming-basic'].settings,
-    expectations: [{ kind: 'roaming-boss', map: 'm18_01_00_00', mapName: 'Undead Asylum', slot: 'c2500_0006', replacedModel: 'c2500', replacedName: 'Hollow', model: 'c2240', name: 'Capra Demon', meters: 8.7, up: 0, souls: 3000, wakeUpEvent: true }],
+    expectations: [{ kind: 'roaming-boss', map: 'm18_01_00_00', mapName: 'Undead Asylum', slot: 'c2500_0006', replacedModel: 'c2500', replacedName: 'Hollow', model: 'c2240', name: 'Capra Demon', meters: 8.7, up: 0, souls: 3000, disableRespawn: false, wakeUpEvent: true }],
+    gameplay: { result: 'passed', date: '2026-10-06', note: "The replacement appeared, rendered, woke up, fought and died, it had no boss bar and the souls were as expected. Played before the respawn fix (backend 0.35.1). That fix changed this world's package in one cell only: the roaming rows now carry disableRespawn = 0 where they carried an inherited 1. The world has not been played again." },
     estimateSeconds: 25,
     observe: [
       'The Capra Demon is there, fully textured (no T-pose, no invisible body) - not a Hollow.',
@@ -194,6 +214,7 @@ export const SMOKE_SCENARIOS: readonly SmokeScenario[] = [
     purpose: 'A roaming boss with 100% souls that stays dead: the reward and the "does not come back" setting in one short loop.',
     settings: QUICK_SMOKE_RECIPES['quick-roaming-souls'].settings,
     expectations: [{ kind: 'roaming-boss', map: 'm18_01_00_00', mapName: 'Undead Asylum', slot: 'c2500_0006', replacedModel: 'c2500', replacedName: 'Hollow', model: 'c2250', name: 'Taurus Demon', meters: 8.7, up: 0, souls: 3000, disableRespawn: true, wakeUpEvent: true }],
+    gameplay: { result: 'passed', date: '2026-10-06', note: "The souls were as expected and the boss stayed dead after the reset. The respawn fix leaves this world's package byte-identical." },
     estimateSeconds: 25,
     observe: [
       'A Taurus Demon stands where the first Hollow would be; it wakes up, moves and attacks (no boss health bar, no fog gate).',
@@ -206,14 +227,31 @@ export const SMOKE_SCENARIOS: readonly SmokeScenario[] = [
     ],
   },
   {
+    id: 'quick-roaming-respawn', category: 'quick', title: 'Roaming boss - respawns', masterSeed: 'smoke-q6-respawn-331',
+    purpose: 'A roaming boss with stay dead switched OFF: after the area is reset it must be back. The counterpart of the souls test, where it must stay dead.',
+    settings: QUICK_SMOKE_RECIPES['quick-roaming-respawn'].settings,
+    expectations: [{ kind: 'roaming-boss', map: 'm18_01_00_00', mapName: 'Undead Asylum', slot: 'c2500_0007', replacedModel: 'c2500', replacedName: 'Hollow', model: 'c2240', name: 'Capra Demon', meters: 11.4, up: 0, souls: 3000, disableRespawn: false, wakeUpEvent: true }],
+    estimateSeconds: 30,
+    observe: [
+      'A Capra Demon stands where a Hollow would be; it wakes up, moves and attacks (no boss health bar, no fog gate).',
+      'Kill it: you gain 3000 souls (50% of the 6000 that DS1TR lists for that fight).',
+      'Control: the other Hollows of the cell block (slots c2500_0006, 8.7 m, and c2500_0005, 33.2 m from the start) are normal Hollows.',
+    ],
+    afterwards: [
+      'Reset the area: the Asylum has no bonfire (none in its map data), so die once (any way). Everything that respawns comes back when you wake up again.',
+      'Return to the same place. After resetting the area, this boss should respawn: the Capra Demon MUST be alive again, together with the Hollows.',
+    ],
+  },
+  {
     id: 'quick-roaming-repeated', category: 'quick', title: 'Roaming boss - three at once', masterSeed: 'smoke-q3-repeat-243588',
     purpose: 'The same boss in three neighbouring slots: separate bodies, separate fights, nothing shared between them.',
     settings: QUICK_SMOKE_RECIPES['quick-roaming-repeated'].settings,
     expectations: [
-      { kind: 'roaming-boss', map: 'm18_01_00_00', mapName: 'Undead Asylum', slot: 'c2500_0006', replacedModel: 'c2500', replacedName: 'Hollow', model: 'c2360', name: 'Executioner Smough', meters: 8.7, up: 0, souls: 5000, wakeUpEvent: true },
-      { kind: 'roaming-boss', map: 'm18_01_00_00', mapName: 'Undead Asylum', slot: 'c2500_0007', replacedModel: 'c2500', replacedName: 'Hollow', model: 'c2360', name: 'Executioner Smough', meters: 11.4, up: 0, souls: 5000, wakeUpEvent: true },
-      { kind: 'roaming-boss', map: 'm18_01_00_00', mapName: 'Undead Asylum', slot: 'c2500_0005', replacedModel: 'c2500', replacedName: 'Hollow', model: 'c2360', name: 'Executioner Smough', meters: 33.2, up: 0.9, souls: 5000, wakeUpEvent: true },
+      { kind: 'roaming-boss', map: 'm18_01_00_00', mapName: 'Undead Asylum', slot: 'c2500_0006', replacedModel: 'c2500', replacedName: 'Hollow', model: 'c2360', name: 'Executioner Smough', meters: 8.7, up: 0, souls: 5000, disableRespawn: false, wakeUpEvent: true },
+      { kind: 'roaming-boss', map: 'm18_01_00_00', mapName: 'Undead Asylum', slot: 'c2500_0007', replacedModel: 'c2500', replacedName: 'Hollow', model: 'c2360', name: 'Executioner Smough', meters: 11.4, up: 0, souls: 5000, disableRespawn: false, wakeUpEvent: true },
+      { kind: 'roaming-boss', map: 'm18_01_00_00', mapName: 'Undead Asylum', slot: 'c2500_0005', replacedModel: 'c2500', replacedName: 'Hollow', model: 'c2360', name: 'Executioner Smough', meters: 33.2, up: 0.9, souls: 5000, disableRespawn: false, wakeUpEvent: true },
     ],
+    gameplay: { result: 'passed', date: '2026-10-06', note: "Three independent bosses. Played before the respawn fix (backend 0.35.1). That fix changed this world's package in one cell only: the roaming rows now carry disableRespawn = 0 where they carried an inherited 1. The world has not been played again." },
     estimateSeconds: 35,
     observe: [
       'Three Executioner Smoughs stand in the cell block, 8.7, 11.4 and 33.2 m from the start.',
@@ -231,6 +269,7 @@ export const SMOKE_SCENARIOS: readonly SmokeScenario[] = [
       { kind: 'regular-enemy', map: 'm18_01_00_00', mapName: 'Undead Asylum', slot: 'c2500_0007', replacedModel: 'c2500', replacedName: 'Hollow', model: 'c2550', name: 'Undead Soldier', meters: 11.4, up: 0 },
       { kind: 'regular-enemy', map: 'm18_01_00_00', mapName: 'Undead Asylum', slot: 'c2500_0005', replacedModel: 'c2500', replacedName: 'Hollow', model: 'c2520', name: 'Undead Assassin', meters: 33.2, up: 0.9 },
     ],
+    gameplay: { result: 'passed', date: '2026-10-06', note: "The three replacements appeared, rendered, woke up and fought. The respawn fix leaves this world's package byte-identical." },
     estimateSeconds: 35,
     observe: [
       'Where the first three Hollows stood there are a Balder Knight, an Undead Soldier and an Undead Assassin.',
@@ -243,6 +282,7 @@ export const SMOKE_SCENARIOS: readonly SmokeScenario[] = [
     purpose: 'The first boss of the game is replaced by another boss: model, health bar, AI, death and the way on.',
     settings: QUICK_SMOKE_RECIPES['quick-boss-asylum-demon'].settings,
     expectations: [{ kind: 'boss', map: 'm18_01_00_00', mapName: 'Undead Asylum', slot: 'c2232_0000', replacedModel: 'c2232', replacedName: 'Asylum Demon', model: 'c2250', name: 'Taurus Demon', meters: 22.5, up: 13.3 }],
+    gameplay: { result: 'passed', date: '2026-10-06', note: "The Asylum Demon encounter completed with the replacement boss. The respawn fix leaves this world's package byte-identical." },
     estimateSeconds: 90,
     observe: [
       'Go to the arena where the Asylum Demon normally appears: a Taurus Demon appears instead, and the boss health bar names it.',

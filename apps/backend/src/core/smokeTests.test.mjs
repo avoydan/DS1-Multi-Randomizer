@@ -12,10 +12,10 @@ import { canonicalizeSettings } from '../../dist/core/canonicalSettings.js';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.join(here, '..', '..', '..', '..');
 
-test('the smoke-test worlds are five quick smoke tests and twelve extended gameplay tests with unique ids and seeds', () => {
+test('the smoke-test worlds are six quick smoke tests and twelve extended gameplay tests with unique ids and seeds', () => {
   const quick = SMOKE_SCENARIOS.filter((scenario) => scenario.category === 'quick').map((scenario) => scenario.id);
   const extended = SMOKE_SCENARIOS.filter((scenario) => scenario.category === 'extended').map((scenario) => scenario.id);
-  assert.deepEqual(quick, ['quick-roaming-basic', 'quick-roaming-souls', 'quick-roaming-repeated', 'quick-sampling-asylum', 'quick-boss-asylum-demon']);
+  assert.deepEqual(quick, ['quick-roaming-basic', 'quick-roaming-souls', 'quick-roaming-respawn', 'quick-roaming-repeated', 'quick-sampling-asylum', 'quick-boss-asylum-demon']);
   assert.deepEqual(extended, [
     'classic-triple', 'sampling-regular', 'second-gargoyle', 'parish-models', 'boss-sampling', 'boss-repeat', 'boss-unique', 'boss-partial',
     'roaming-repeat', 'roaming-gargoyle', 'roaming-fog', 'roaming-parish',
@@ -54,14 +54,36 @@ test('every quick smoke test states an exact target, an expected replacement and
       assert.equal(entry.wakeUpEvent, true, `${id}: a roaming boss is checked for its wake-up event`);
     }
   }
-  // The five quick tests cover the five features: basic roaming, souls + stay dead, a repeated boss, regular sampling and boss sampling.
+  // The quick tests cover: basic roaming, souls + stay dead, respawn, a repeated boss, regular sampling and boss sampling.
   const by = (id) => resolveScenarioSettings(SMOKE_SCENARIOS.find((scenario) => scenario.id === id));
   assert.equal(by('quick-roaming-souls').enemies.placement.roamingBossSouls, 100);
   assert.equal(by('quick-roaming-souls').enemies.placement.roamingBossesStayDead, true);
   assert.equal(by('quick-roaming-repeated').enemies.placement.typeReplacement, 'enabled-except-roaming-bosses');
   assert.equal(new Set(SMOKE_SCENARIOS.find((scenario) => scenario.id === 'quick-roaming-repeated').expectations.map((entry) => entry.model)).size, 1, 'the same boss three times');
+  assert.equal(by('quick-roaming-respawn').enemies.placement.roamingBossesStayDead, false);
+  assert.equal(by('quick-roaming-respawn').enemies.placement.roamingBossSouls, 50);
+  const respawn = SMOKE_SCENARIOS.find((scenario) => scenario.id === 'quick-roaming-respawn');
+  assert.equal(respawn.expectations[0].disableRespawn, false, 'the static check asserts the respawn bit is 0');
+  assert.ok([...respawn.observe, ...respawn.afterwards].some((line) => /should respawn/u.test(line)), 'the expected result is stated explicitly');
+  assert.ok(respawn.estimateSeconds <= 60);
   assert.equal(by('quick-sampling-asylum').enemies.placement.normalReplacement, 'normals');
   assert.equal(by('quick-boss-asylum-demon').enemies.placement.bossReplacement, 'bosses');
+});
+
+test('only worlds that a person played in the real game carry a gameplay result; static checks never set one', () => {
+  const played = SMOKE_SCENARIOS.filter((scenario) => scenario.gameplay).map((scenario) => scenario.id);
+  assert.deepEqual(played, ['quick-roaming-basic', 'quick-roaming-souls', 'quick-roaming-repeated', 'quick-sampling-asylum', 'quick-boss-asylum-demon']);
+  for (const scenario of SMOKE_SCENARIOS.filter((entry) => entry.gameplay)) {
+    assert.equal(scenario.gameplay.result, 'passed');
+    assert.match(scenario.gameplay.date, /^\d{4}-\d{2}-\d{2}$/u);
+  }
+  // The respawn test, every extended world (Fog, Gargoyle, Parish ...) and anything new have not been played.
+  assert.equal(SMOKE_SCENARIOS.find((scenario) => scenario.id === 'quick-roaming-respawn').gameplay, undefined);
+  for (const scenario of SMOKE_SCENARIOS.filter((entry) => entry.category === 'extended')) assert.equal(scenario.gameplay, undefined, scenario.id);
+  // Two played worlds changed one cell after they were played (the respawn bit); the record says so.
+  for (const id of ['quick-roaming-basic', 'quick-roaming-repeated']) assert.match(SMOKE_SCENARIOS.find((scenario) => scenario.id === id).gameplay.note, /disableRespawn = 0/u, id);
+  const { worlds } = smokeTestWorlds();
+  assert.deepEqual(worlds.filter((world) => world.gameplay).map((world) => world.id), played);
 });
 
 test('quick worlds are ordinary worlds: no override, no forced placement, nothing a Seed Code does not already say', () => {
@@ -73,7 +95,7 @@ test('quick worlds are ordinary worlds: no override, no forced placement, nothin
     assert.equal(decoded.envelope.masterSeed, scenario.masterSeed);
   }
   // Part E1 settings of quick worlds sit inside what presets and Seed Codes already express.
-  for (const id of ['quick-roaming-basic', 'quick-roaming-souls', 'quick-roaming-repeated']) {
+  for (const id of ['quick-roaming-basic', 'quick-roaming-souls', 'quick-roaming-respawn', 'quick-roaming-repeated']) {
     const placement = resolveScenarioSettings(SMOKE_SCENARIOS.find((scenario) => scenario.id === id)).enemies.placement;
     assert.equal(placement.algorithm, 'sampling-v1');
     assert.equal(placement.fit, 'anywhere');

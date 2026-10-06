@@ -493,7 +493,7 @@ export function App() {
               {config.enemies.placement.algorithm === 'sampling-v1' && (config.enemies.placement.normalReplacement === 'bosses' || config.enemies.placement.normalReplacement === 'both') && (
                 <>
                   <RangeOption label="Roaming boss souls" hint="How many of its fight souls a boss drops when it stands in a regular enemy slot (percent of the souls the boss gives in its own arena)." value={config.enemies.placement.roamingBossSouls} inactive={!config.enemies.randomizeRegularEnemies} onChange={(value) => setPlacement('roamingBossSouls', value)} />
-                  <Toggle inactive={!config.enemies.randomizeRegularEnemies} label="Roaming bosses stay dead" hint="On: a boss in a regular slot does not come back when you rest at a bonfire. Off: it respawns like a normal enemy. This is set in the game's own data and has not been confirmed in a playthrough yet." checked={config.enemies.placement.roamingBossesStayDead} onChange={(value) => setPlacement('roamingBossesStayDead', value)} />
+                  <Toggle inactive={!config.enemies.randomizeRegularEnemies} label="Roaming bosses stay dead" hint="On: a boss in a regular slot does not come back once the area is reset (played in the game: it stayed dead). Off: it respawns like a normal enemy (written to the game's data; not yet confirmed in a playthrough)." checked={config.enemies.placement.roamingBossesStayDead} onChange={(value) => setPlacement('roamingBossesStayDead', value)} />
                 </>
               )}
               <label className="field-label">Placement</label>

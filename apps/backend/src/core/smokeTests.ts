@@ -1,5 +1,5 @@
 import { SMOKE_SCENARIOS, SMOKE_START, SMOKE_TEST_CHECKLIST, SMOKE_TEST_PROFILE, describeSmokeExpected, describeSmokeTarget, resolveScenarioSettings } from '@ds1tr/contracts';
-import type { GenerationSettings, SmokeCategory } from '@ds1tr/contracts';
+import type { GenerationSettings, SmokeCategory, SmokeGameplayResult } from '@ds1tr/contracts';
 import { canonicalizeSettings } from './canonicalSettings.js';
 import { encodeSeedCode } from './seedCode.js';
 
@@ -17,6 +17,8 @@ export interface SmokeTestWorld {
   expected: readonly string[];
   estimateSeconds: number | null;
   afterwards: readonly string[];
+  /** Set only when a person played this world in the real game and reported the result; null otherwise (static checks never set it). */
+  gameplay: SmokeGameplayResult | null;
 }
 
 export function smokeTestWorlds(): { worlds: SmokeTestWorld[]; checklist: readonly string[]; start: string } {
@@ -29,6 +31,7 @@ export function smokeTestWorlds(): { worlds: SmokeTestWorld[]; checklist: readon
       expected: (scenario.expectations ?? []).map(describeSmokeExpected),
       estimateSeconds: scenario.estimateSeconds ?? null,
       afterwards: scenario.afterwards ?? [],
+      gameplay: scenario.gameplay ?? null,
     };
   });
   return {

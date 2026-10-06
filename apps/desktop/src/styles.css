@@ -152,3 +152,5 @@ input:focus, select:focus { border-color: #8e7043; box-shadow: 0 0 0 3px #8e7043
 .smoke-category { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; letter-spacing: 0.04em; text-transform: uppercase; }
 .smoke-category.quick { background: rgba(80, 160, 90, 0.2); }
 .smoke-category.extended { background: rgba(190, 150, 60, 0.2); }
+.smoke-result { font-size: 0.85rem; opacity: 0.9; }
+.smoke-result.passed { border-left: 3px solid rgba(80, 160, 90, 0.8); padding-left: 8px; }
