@@ -50,8 +50,14 @@ export function resolveEnemyPlacementAlgorithm(config) {
 
 // ---- sampling-only options (Part A: regular enemy slots) -----------------------------------------------------------
 
-/** Legacy "Normal enemy replacement" values the regular-slot sampler can honor (the others need boss slots). */
-export const NORMAL_REPLACEMENT_MODES = Object.freeze(["none", "normals"]);
+/**
+ * Legacy "Normal enemy replacement": none, only normal enemies, only bosses ("roaming bosses": a boss in a regular enemy slot) or
+ * either (a boss with the chance of "Boss chance: normal slots", otherwise a normal enemy). Bosses need Part E1 (roaming planner).
+ */
+export const NORMAL_REPLACEMENT_MODES = Object.freeze(["none", "normals", "bosses", "both"]);
+
+/** The modes in which bosses can land in regular enemy slots. */
+export const ROAMING_BOSS_MODES = Object.freeze(["bosses", "both"]);
 
 /** Legacy "Placement" values: 0 only where they fit, 1 anywhere, 2 anywhere except when replacing NPCs. */
 export const PLACEMENT_FIT_MODES = Object.freeze(["fits", "anywhere", "anywhere-except-npcs"]);
@@ -80,6 +86,9 @@ export const BOSS_REPLACEMENT_MODES = Object.freeze(["classic", "bosses"]);
 
 /** Values under which permutation-v1 behaves exactly as it always did; anything else is refused there. */
 export const SAMPLING_NEUTRAL_OPTIONS = Object.freeze({
+  enemyBossChanceNormalSlots: 10,
+  enemyRoamingBossSouls: 50,
+  enemyRoamingBossesStayDead: false,
   enemyBossReplacement: "classic",
   enemyUniqueBosses: false,
   enemyReplacementChance: 100,
@@ -175,6 +184,22 @@ export function resolveEnemyPlacementOptions(config, algorithm = config.enemyPla
   } else if (config.enemyUniqueBosses && config.enemyBossReplacement !== "bosses") {
     problems.push("enemyUniqueBosses needs enemyBossReplacement \"bosses\" (it only changes how bosses are drawn).");
   }
+  const roamingMode = ROAMING_BOSS_MODES.includes(config.enemyNormalReplacement);
+  if (!Number.isInteger(config.enemyBossChanceNormalSlots) || config.enemyBossChanceNormalSlots < 0 || config.enemyBossChanceNormalSlots > 100) {
+    problems.push(`enemyBossChanceNormalSlots must be an integer from 0 to 100 (got ${String(config.enemyBossChanceNormalSlots)}).`);
+  } else if (config.enemyBossChanceNormalSlots !== SAMPLING_NEUTRAL_OPTIONS.enemyBossChanceNormalSlots && config.enemyNormalReplacement !== "both") {
+    problems.push("enemyBossChanceNormalSlots only applies with enemyNormalReplacement \"both\" (a boss or a normal enemy per slot).");
+  }
+  if (!Number.isInteger(config.enemyRoamingBossSouls) || config.enemyRoamingBossSouls < 0 || config.enemyRoamingBossSouls > 100) {
+    problems.push(`enemyRoamingBossSouls must be an integer from 0 to 100 (got ${String(config.enemyRoamingBossSouls)}).`);
+  } else if (config.enemyRoamingBossSouls !== SAMPLING_NEUTRAL_OPTIONS.enemyRoamingBossSouls && !roamingMode) {
+    problems.push("enemyRoamingBossSouls only applies when bosses can appear in regular enemy slots (enemyNormalReplacement \"bosses\" or \"both\").");
+  }
+  if (typeof config.enemyRoamingBossesStayDead !== "boolean") {
+    problems.push(`enemyRoamingBossesStayDead must be true or false (got ${String(config.enemyRoamingBossesStayDead)}).`);
+  } else if (config.enemyRoamingBossesStayDead && !roamingMode) {
+    problems.push("enemyRoamingBossesStayDead only applies when bosses can appear in regular enemy slots (enemyNormalReplacement \"bosses\" or \"both\").");
+  }
   if (config.enemyCustomPool !== null && config.enemyCustomPool !== undefined && algorithm === "permutation-v1") {
     problems.push("enemyCustomPool only applies to sampling-v1; it must be null with permutation-v1.");
   } else if (algorithm === "sampling-v1") {
@@ -196,6 +221,9 @@ export function resolveEnemyPlacementOptions(config, algorithm = config.enemyPla
     customPool: customPoolOf(config),
     bossReplacement: config.enemyBossReplacement,
     uniqueBosses: config.enemyUniqueBosses,
+    bossChanceInNormalSlots: config.enemyBossChanceNormalSlots,
+    roamingBossSouls: config.enemyRoamingBossSouls,
+    roamingBossesStayDead: config.enemyRoamingBossesStayDead,
   };
 }
 

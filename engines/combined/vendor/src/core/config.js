@@ -59,6 +59,12 @@ export const defaultConfig = Object.freeze({
   // single-body boss slot draws its own replacement from the portable boss pool. Unique bosses cycles through that pool.
   enemyBossReplacement: "classic",
   enemyUniqueBosses: false,
+  // Part E1 (patches/0014): bosses in regular enemy slots ("roaming bosses"). enemyNormalReplacement may then be "bosses" or "both";
+  // the three options below only apply with those values and are refused otherwise (never ignored). 10 / 50 / false are the legacy
+  // defaults ("Boss chance: normal slots", "Roaming boss souls", "Respawning roaming bosses": respawn).
+  enemyBossChanceNormalSlots: 10,
+  enemyRoamingBossSouls: 50,
+  enemyRoamingBossesStayDead: false,
   // Items that the world randomizer (FogMod) follows by lot: null (no world randomizer) or
   // { items: [{ equipType, itemId, required }], lotStarts: [itemLotRowId] }. FogMod needs exactly one copy of each required
   // item in the lots it annotates (a start row or the rows that follow it without a gap) and at most one of any other;

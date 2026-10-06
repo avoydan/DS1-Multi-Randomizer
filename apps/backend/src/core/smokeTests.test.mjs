@@ -12,14 +12,15 @@ import { canonicalizeSettings } from '../../dist/core/canonicalSettings.js';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.join(here, '..', '..', '..', '..');
 
-test('the smoke-test worlds are the eight documented scenarios with unique ids and seeds', () => {
+test('the smoke-test worlds are the fourteen documented scenarios with unique ids and seeds', () => {
   assert.deepEqual(SMOKE_SCENARIOS.map((scenario) => scenario.id), [
     'classic-triple', 'sampling-regular', 'second-gargoyle', 'parish-models', 'boss-sampling', 'boss-repeat', 'boss-unique', 'boss-partial',
+    'roaming-single', 'roaming-repeat', 'roaming-souls', 'roaming-gargoyle', 'roaming-fog', 'roaming-parish',
   ]);
   assert.equal(new Set(SMOKE_SCENARIOS.map((scenario) => scenario.masterSeed)).size, SMOKE_SCENARIOS.length);
   for (const scenario of SMOKE_SCENARIOS) {
     assert.ok(scenario.observe.length > 0, `${scenario.id} says what to look at`);
-    assert.match(scenario.masterSeed, /^smoke-[a-h]-[a-z]+(-\d+)?$/u);
+    assert.match(scenario.masterSeed, /^smoke-[a-n]-[a-z-]+(-\d+)?$/u);
   }
   assert.ok(SMOKE_TEST_CHECKLIST.length >= 10);
 });
@@ -53,6 +54,17 @@ test('the scenarios exercise what they claim: boss sampling options, chance, uni
   assert.equal(by('boss-unique').enemies.placement.uniqueBosses, true);
   assert.equal(by('boss-partial').enemies.placement.replacementChance, 50);
   assert.equal(by('parish-models').enemies.placement.fit, 'anywhere');
+  for (const id of ['roaming-single', 'roaming-repeat', 'roaming-souls', 'roaming-gargoyle', 'roaming-fog', 'roaming-parish']) {
+    assert.equal(by(id).enemies.placement.algorithm, 'sampling-v1', id);
+    assert.ok(['bosses', 'both'].includes(by(id).enemies.placement.normalReplacement), `${id} lets bosses stand in regular slots`);
+  }
+  assert.equal(by('roaming-repeat').enemies.placement.typeReplacement, 'enabled');
+  assert.equal(by('roaming-souls').enemies.placement.roamingBossSouls, 100);
+  assert.equal(by('roaming-souls').enemies.placement.roamingBossesStayDead, true);
+  assert.equal(by('roaming-gargoyle').enemies.secondGargoyle, 'replace');
+  assert.equal(by('roaming-fog').fog.enabled, true);
+  assert.equal(by('roaming-parish').enemies.placement.normalReplacement, 'bosses');
+  assert.equal(by('roaming-single').enemies.placement.bossChanceInNormalSlots, 20);
 });
 
 test('the documented Seed Codes in docs/SMOKE_TESTS.md are the codes the app creates (the document is generated, never hand-edited)', async () => {

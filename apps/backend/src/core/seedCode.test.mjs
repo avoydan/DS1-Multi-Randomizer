@@ -217,12 +217,13 @@ test('placement options added after format 1 are stored only when they differ fr
   const withoutExtensions = structuredClone(complete);
   delete withoutExtensions.enemies.placement.bossReplacement;
   delete withoutExtensions.enemies.placement.uniqueBosses;
+  for (const key of ['bossChanceInNormalSlots', 'roamingBossSouls', 'roamingBossesStayDead']) delete withoutExtensions.enemies.placement[key];
   // A settings object that predates the options is completed with their neutral value ...
   assert.equal(canonicalizeSettings(withoutExtensions).enemies.placement.bossReplacement, 'classic');
   assert.equal(canonicalizeSettings(withoutExtensions).enemies.placement.uniqueBosses, false);
   // ... and has exactly the same Seed Code as one that states the neutral values.
   assert.equal(encodeSeedCode(envelopeOf(withoutExtensions)), encodeSeedCode(envelopeOf(complete)));
-  assert.doesNotMatch(canonicalSettingsJson(complete), /bossReplacement|uniqueBosses/u, 'the stored form omits neutral extension keys');
+  assert.doesNotMatch(canonicalSettingsJson(complete), /bossReplacement|uniqueBosses|bossChanceInNormalSlots|roamingBossSouls|roamingBossesStayDead/u, 'the stored form omits neutral extension keys');
   // A non-neutral value is stored, changes the code and round-trips; the order of the keys is fixed (after customPool).
   const sampled = fullSettings({ enemies: { placement: { algorithm: 'sampling-v1', fit: 'fits', bossReplacement: 'bosses', uniqueBosses: true } } });
   assert.match(canonicalSettingsJson(sampled), /"customPool":null,"bossReplacement":"bosses","uniqueBosses":true\}/u);
@@ -240,4 +241,29 @@ test('placement options added after format 1 are stored only when they differ fr
   const invalid = decodeSeedCode(encodeSeedCode(envelopeOf(fullSettings({ enemies: { placement: { uniqueBosses: true } } }))));
   assert.equal(invalid.ok, false);
   assert.equal(invalid.code, 'INVALID_SETTINGS');
+});
+
+test('Part E1 options (bosses in regular slots) extend the format without changing any earlier code', () => {
+  const part = { algorithm: 'sampling-v1', fit: 'fits', bossReplacement: 'bosses', uniqueBosses: true };
+  const before = fullSettings({ enemies: { placement: part } });
+  // The Part D world is stored exactly as before: the three new keys are neutral and therefore absent.
+  assert.match(canonicalSettingsJson(before), /"customPool":null,"bossReplacement":"bosses","uniqueBosses":true\}/u);
+  const roaming = fullSettings({ enemies: { placement: { ...part, normalReplacement: 'both', bossChanceInNormalSlots: 25, roamingBossSouls: 80, roamingBossesStayDead: true } } });
+  assert.match(canonicalSettingsJson(roaming), /"bossReplacement":"bosses","uniqueBosses":true,"bossChanceInNormalSlots":25,"roamingBossSouls":80,"roamingBossesStayDead":true\}/u);
+  assert.notEqual(encodeSeedCode(envelopeOf(roaming)), encodeSeedCode(envelopeOf(before)));
+  const decoded = decodeSeedCode(encodeSeedCode(envelopeOf(roaming)));
+  assert.equal(decoded.ok, true);
+  assert.deepEqual(decoded.envelope.settings.enemies.placement, canonicalizeSettings(roaming).enemies.placement);
+  assert.equal(decoded.seedCode, encodeSeedCode(envelopeOf(roaming)));
+  // Only the options that apply are accepted: a setting of a mode that is not selected is refused, never ignored.
+  for (const placement of [
+    { normalReplacement: 'normals', bossChanceInNormalSlots: 30 },
+    { normalReplacement: 'bosses', bossChanceInNormalSlots: 30 },
+    { normalReplacement: 'normals', roamingBossSouls: 10 },
+    { normalReplacement: 'none', roamingBossesStayDead: true },
+  ]) {
+    const invalid = decodeSeedCode(encodeSeedCode(envelopeOf(fullSettings({ enemies: { placement: { algorithm: 'sampling-v1', ...placement } } }))));
+    assert.equal(invalid.ok, false, JSON.stringify(placement));
+    assert.equal(invalid.code, 'INVALID_SETTINGS');
+  }
 });

@@ -61,12 +61,15 @@ export const IMPLEMENTED_ENEMY_PLACEMENT_ALGORITHMS: readonly EnemyPlacementAlgo
 export const DEFAULT_ENEMY_PLACEMENT_ALGORITHM: EnemyPlacementAlgorithm = 'permutation-v1';
 
 /**
- * Legacy "Normal enemy replacement" (0 none, 1 only with bosses, 2 only with normal enemies, 3 either). Part A
- * supports the two values that involve no boss slot or boss source; the other two need cross-class replacement.
+ * Legacy "Normal enemy replacement" (0 none, 1 only with bosses, 2 only with normal enemies, 3 either). `bosses` and `both` (Part E1)
+ * let bosses stand in regular enemy slots ("roaming bosses"); they need `sampling-v1`.
  */
-export type NormalEnemyReplacementMode = 'none' | 'normals';
+export type NormalEnemyReplacementMode = 'none' | 'normals' | 'bosses' | 'both';
 
-export const NORMAL_ENEMY_REPLACEMENT_MODES: readonly NormalEnemyReplacementMode[] = ['none', 'normals'];
+export const NORMAL_ENEMY_REPLACEMENT_MODES: readonly NormalEnemyReplacementMode[] = ['none', 'normals', 'bosses', 'both'];
+
+/** The Normal enemy replacement values in which a boss can stand in a regular enemy slot. */
+export const ROAMING_BOSS_REPLACEMENT_MODES: readonly NormalEnemyReplacementMode[] = ['bosses', 'both'];
 
 /** Legacy "Placement" (0 only where they fit, 1 anywhere, 2 anywhere except when replacing NPCs). */
 export type PlacementFitMode = 'fits' | 'anywhere' | 'anywhere-except-npcs';
@@ -128,6 +131,12 @@ export interface EnemyPlacementOptions {
   bossReplacement: BossReplacementMode;
   /** Part D. Draws every boss of the pool once before any boss repeats. Needs `bossReplacement: 'bosses'`. */
   uniqueBosses: boolean;
+  /** Part E1. Chance (percent, 0-100) that a regular enemy slot that takes part gets a boss rather than a normal enemy. Needs `normalReplacement: 'both'`. */
+  bossChanceInNormalSlots: number;
+  /** Part E1. Share (percent, 0-100) of a boss's fight souls that the boss drops when it stands in a regular slot. Needs roaming bosses. */
+  roamingBossSouls: number;
+  /** Part E1. A roaming boss stays dead once killed instead of coming back when the player rests. Needs roaming bosses. */
+  roamingBossesStayDead: boolean;
 }
 
 /** One enemy a custom pool can contain, described from the game data of the installation. */
@@ -161,6 +170,9 @@ export const NEUTRAL_ENEMY_PLACEMENT_OPTIONS: Omit<EnemyPlacementOptions, 'algor
   customPool: null,
   bossReplacement: 'classic',
   uniqueBosses: false,
+  bossChanceInNormalSlots: 10,
+  roamingBossSouls: 50,
+  roamingBossesStayDead: false,
 };
 
 /** The legacy defaults offered when `sampling-v1` is chosen: replace always, only normal enemies, only where they fit. */
@@ -174,6 +186,9 @@ export const LEGACY_ENEMY_PLACEMENT_OPTIONS: Omit<EnemyPlacementOptions, 'algori
   customPool: null,
   bossReplacement: 'classic',
   uniqueBosses: false,
+  bossChanceInNormalSlots: 10,
+  roamingBossSouls: 50,
+  roamingBossesStayDead: false,
 };
 
 export interface EnemyOptions {
@@ -298,7 +313,7 @@ export type GenerationResult =
   | { ok: false; code: string; message: string; stage: string };
 
 export const PRESET_FORMAT = 'ds1tr-preset';
-export const PRESET_VERSION = 10;
+export const PRESET_VERSION = 11;
 
 /** Shareable settings: everything in RandomizerConfig except the machine-specific game path. */
 export interface PresetDocument {

@@ -9,6 +9,7 @@ import {
   NEUTRAL_ENEMY_PLACEMENT_OPTIONS,
   NORMAL_ENEMY_REPLACEMENT_MODES,
   PLACEMENT_FIT_MODES,
+  ROAMING_BOSS_REPLACEMENT_MODES,
   TYPE_REPLACEMENT_MODES,
 } from '@ds1tr/contracts';
 import type { EnemyPlacementAlgorithm } from '@ds1tr/contracts';
@@ -69,6 +70,21 @@ function validateSamplingOnlyValues(value: Record<string, unknown>, path: string
   if (Object.hasOwn(value, 'uniqueBosses')) {
     if (typeof value.uniqueBosses !== 'boolean') problems.push(`${path}.uniqueBosses must be true or false.`);
     else if (value.uniqueBosses && (value.bossReplacement ?? 'classic') !== 'bosses') problems.push(`${path}.uniqueBosses needs ${path}.bossReplacement "bosses".`);
+  }
+  const roaming = (ROAMING_BOSS_REPLACEMENT_MODES as readonly unknown[]).includes(value.normalReplacement);
+  if (Object.hasOwn(value, 'bossChanceInNormalSlots')) {
+    const chance = value.bossChanceInNormalSlots;
+    if (typeof chance !== 'number' || !Number.isInteger(chance) || chance < 0 || chance > 100) problems.push(`${path}.bossChanceInNormalSlots must be an integer from 0 to 100.`);
+    else if (chance !== NEUTRAL_ENEMY_PLACEMENT_OPTIONS.bossChanceInNormalSlots && value.normalReplacement !== 'both') problems.push(`${path}.bossChanceInNormalSlots needs ${path}.normalReplacement "both".`);
+  }
+  if (Object.hasOwn(value, 'roamingBossSouls')) {
+    const souls = value.roamingBossSouls;
+    if (typeof souls !== 'number' || !Number.isInteger(souls) || souls < 0 || souls > 100) problems.push(`${path}.roamingBossSouls must be an integer from 0 to 100.`);
+    else if (souls !== NEUTRAL_ENEMY_PLACEMENT_OPTIONS.roamingBossSouls && !roaming) problems.push(`${path}.roamingBossSouls needs ${path}.normalReplacement "bosses" or "both".`);
+  }
+  if (Object.hasOwn(value, 'roamingBossesStayDead')) {
+    if (typeof value.roamingBossesStayDead !== 'boolean') problems.push(`${path}.roamingBossesStayDead must be true or false.`);
+    else if (value.roamingBossesStayDead && !roaming) problems.push(`${path}.roamingBossesStayDead needs ${path}.normalReplacement "bosses" or "both".`);
   }
   if (Object.hasOwn(value, 'customPool')) {
     const pool = value.customPool;

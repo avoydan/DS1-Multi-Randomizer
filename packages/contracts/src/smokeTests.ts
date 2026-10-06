@@ -25,6 +25,7 @@ export const DEFAULT_GENERATION_SETTINGS: GenerationSettings = {
     placement: {
       algorithm: 'permutation-v1', replacementChance: 100, normalReplacement: 'normals', fit: 'anywhere', difficultyMode: 'random',
       difficultyStrictness: 'loose', typeReplacement: 'disabled', customPool: null, bossReplacement: 'classic', uniqueBosses: false,
+      bossChanceInNormalSlots: 10, roamingBossSouls: 50, roamingBossesStayDead: false,
     },
   },
   fog: {
@@ -66,6 +67,10 @@ export const SMOKE_TEST_CHECKLIST: readonly string[] = [
 ];
 
 const bossRoom = ['Enter the boss arena.', 'Defeat the boss and take the fog exit.'];
+const roamingObserve = [
+  'Find a boss among the regular enemies: the list below names the area and the enemy it replaced.',
+  'It should wake up when you come close, fight like the boss it is (no boss health bar, no fog gate) and be killable; the souls and drops should look sane.',
+];
 
 export const SMOKE_SCENARIOS: readonly SmokeScenario[] = [
   {
@@ -133,6 +138,60 @@ export const SMOKE_SCENARIOS: readonly SmokeScenario[] = [
       enemies: { randomizeRegularEnemies: false, gwynNerf: 'strong', placement: { algorithm: 'sampling-v1', replacementChance: 50, bossReplacement: 'bosses' } },
     },
     observe: [...bossRoom, 'Also visit a boss that stayed vanilla: its fog gate and fight must still be normal.'],
+  },
+  {
+    id: 'roaming-single', title: 'A boss among regular enemies', masterSeed: 'smoke-i-roaming-1',
+    purpose: 'Bosses stand in some regular enemy slots (Normal enemy replacement: Bosses or normal enemies); the rest of the enemies are normal.',
+    settings: {
+      items: { enabled: false }, fog: { enabled: false },
+      enemies: { randomizeBosses: false, placement: { algorithm: 'sampling-v1', fit: 'anywhere', replacementChance: 25, normalReplacement: 'both', bossChanceInNormalSlots: 20 } },
+    },
+    observe: roamingObserve,
+  },
+  {
+    id: 'roaming-repeat', title: 'The same boss in several regular slots', masterSeed: 'smoke-j-roaming-repeat-1',
+    purpose: 'With Type replacement, every enemy of one kind in a map is replaced by the same boss, so one boss stands in several places of an area.',
+    settings: {
+      items: { enabled: false }, fog: { enabled: false },
+      enemies: { randomizeBosses: false, placement: { algorithm: 'sampling-v1', fit: 'fits', replacementChance: 20, normalReplacement: 'bosses', typeReplacement: 'enabled' } },
+    },
+    observe: roamingObserve,
+  },
+  {
+    id: 'roaming-souls', title: 'Roaming boss souls and respawn', masterSeed: 'smoke-k-roaming-souls-1',
+    purpose: 'Bosses in regular slots drop 100% of their fight souls and stay dead once killed.',
+    settings: {
+      items: { enabled: false }, fog: { enabled: false },
+      enemies: { randomizeBosses: false, placement: { algorithm: 'sampling-v1', fit: 'fits', replacementChance: 30, normalReplacement: 'both', bossChanceInNormalSlots: 30, roamingBossSouls: 100, roamingBossesStayDead: true } },
+    },
+    observe: [...roamingObserve, 'Kill a roaming boss and note the souls; rest at a bonfire and check that it does not come back (the "stay dead" setting is untested in the game).'],
+  },
+  {
+    id: 'roaming-gargoyle', title: 'Roaming bosses with the second Bell Gargoyle', masterSeed: 'smoke-l-roaming-gargoyle-1',
+    purpose: 'Bosses in regular slots together with a replaced second Bell Gargoyle and boss sampling in the boss arenas.',
+    settings: {
+      items: { enabled: false }, fog: { enabled: false },
+      enemies: { secondGargoyle: 'replace', gwynNerf: 'strong', placement: { algorithm: 'sampling-v1', fit: 'fits', replacementChance: 30, normalReplacement: 'both', bossReplacement: 'bosses' } },
+    },
+    observe: ['Go up to the rooftop of the Undead Parish church: the Bell Gargoyles boss fight and the roaming bosses around it.', ...roamingObserve],
+  },
+  {
+    id: 'roaming-fog', title: 'Roaming bosses with the fog randomizer', masterSeed: 'smoke-m-roaming-fog-1',
+    purpose: 'Bosses in regular slots with the fog randomizer on (fog gates, warps and boss fogs are moved too).',
+    settings: {
+      items: { enabled: false },
+      enemies: { randomizeBosses: false, placement: { algorithm: 'sampling-v1', fit: 'fits', replacementChance: 30, normalReplacement: 'both' } },
+    },
+    observe: [...roamingObserve, 'Check that fog gates and warps still lead where the fog randomizer says, and that no roaming boss blocks a gate.'],
+  },
+  {
+    id: 'roaming-parish', title: 'Undead Parish full of bosses', masterSeed: 'smoke-n-roaming-parish-1',
+    purpose: 'Every regular slot that can take a boss gets one (at most ten per map): the highest load of different models a roaming world can put on one map.',
+    settings: {
+      items: { enabled: false }, fog: { enabled: false },
+      enemies: { randomizeBosses: false, placement: { algorithm: 'sampling-v1', fit: 'anywhere', difficultyMode: 'random', normalReplacement: 'bosses' } },
+    },
+    observe: ['Walk the whole Undead Parish, including the church and the Sunlight Altar side.', ...roamingObserve],
   },
 ];
 

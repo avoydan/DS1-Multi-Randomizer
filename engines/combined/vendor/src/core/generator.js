@@ -11,13 +11,14 @@ import { createStream } from "./rng.js";
 import { normalizeConfig, validateConfig } from "./config.js";
 import {
   EnemyPlacementUnavailableError,
+  ROAMING_BOSS_MODES,
   assertSlotOwnedDrops,
   createPlacementDiagnostics,
   permutationDiagnostics,
   resolveEnemyPlacementAlgorithm,
   resolveEnemyPlacementOptions,
 } from "./placement.js";
-import { deriveRegularClassTable, planSampledBosses, planSampledRegularEnemies } from "./sampling.js";
+import { deriveRegularClassTable, deriveRoamingBossTypes, planRoamingBosses, planSampledBosses, planSampledRegularEnemies } from "./sampling.js";
 import {
   enemies,
   enemySlots,
@@ -254,6 +255,62 @@ const bossArchetypeKey = (slot) => {
   if (slot.id === "m14_01_00_00:c5401_0000") return "c5230:523000";
   return `${slot.modelName}:${slot.npcParamId}`;
 };
+
+// ---- roaming bosses (Part E1, patches/0014) -------------------------------------------------------------------------------
+// A boss in a regular enemy slot. Legacy: Normal enemy replacement "bosses"/"both"; the boss then drops a share of its souls
+// (legacy `BossSouls`, authored per NpcParam row) because the boss-kill reward of an arena is an event a regular slot does not have.
+
+/**
+ * Souls of the vanilla boss fight by NpcParam row (the game's own values; the table is DS1TR's, keyed like the boss archetypes).
+ * Only a boss with an entry can roam: without a known reward there is no souls figure to scale.
+ */
+const bossKillSouls = new Map([
+  [223000, 20000], [223100, 20000], [223200, 2000], [224000, 6000], [225000, 3000], [232000, 40000], [236000, 10000], [236001, 25000],
+  [273000, 30000], [323000, 10000], [332000, 15000], [410000, 50000], [450000, 60000], [451000, 60000], [521000, 40000], [522000, 60000],
+  [525000, 20000], [526000, 25000], [527000, 10000], [527100, 25000], [528000, 20000], [532000, 40000], [537000, 70000],
+]);
+
+/**
+ * DS1TR safety boundary: bosses that never roam, because the fight needs scripted terrain, the body cannot move, or it is not hostile
+ * on its own. Everything else with a souls entry is a roaming candidate (single-body, mobile ground or air fighters).
+ */
+const roamingExcludedModels = new Set([
+  "c5230", // Bed of Chaos: immobile, floor script
+  "c5401", // Bed of Chaos core
+  "c5250", // Ceaseless Discharge: immobile, 10 m tall lava body
+  "c5320", // Dark Sun Gwyndolin: neutral team, stationary, scripted
+  "c5370", // Lord Gwyn: scripted entrance, arena-bound
+  // Multi-body bosses stay with their own planners (tails, linked parts, scripted release): they never stand in a regular slot,
+  // with or without boss randomization (the dragon plan only reserves them when bosses are randomized).
+  "c2730", // Crossbreed Priscilla (tail)
+  "c3430", // Hellkite Drake (bridge dragon bodies)
+  "c3471", // Sanctuary Guardian (tail)
+  "c4510", // Black Dragon Kalameet (tail, two bodies)
+  "c5200", // Centipede Demon (linked)
+  "c5260", // Gaping Dragon (tail)
+  "c5290", // Seath the Scaleless (tail, arena script)
+  "c5350", // Bell Gargoyles
+  "c5351", // Anor Londo Gargoyles
+  "c5390", // Four Kings (linked bodies)
+]);
+
+/**
+ * Bosses whose hit capsule does not describe their body, with the size class (0-5, `SIZE_EDGES` in sampling.js) Placement fit uses instead:
+ * the Moonlight Butterfly is a flier with a 0.4 x 0.2 capsule and a body about three meters wide.
+ */
+const roamingSizeClassOverrides = new Map([["c3230", 3]]);
+
+/** Regular slots that keep their own enemy even when bosses may roam (they have special handling that a boss would break). */
+function roamingProtectedSlotIds(slots) {
+  return new Set(slots.filter((slot) =>
+    asylumPassiveSlots.has(slot.id) ||
+    newLondoPassiveSlots.has(slot.id) ||
+    additionalPassiveSlots.has(slot.id) ||
+    parishBonfirePassiveSlots.has(slot.id) ||
+    slot.eventModelLocked === true ||
+    tangibleGhostModels.has(slot.modelName) ||
+    ((slot.mapId === "m12_00_00_00" || slot.mapId === "m12_00_00_01") && slot.modelName === "c2330")).map((slot) => slot.id));
+}
 
 function effectiveBossSlots(catalog) {
   const result = new Map(
@@ -1177,7 +1234,7 @@ function regularEnemyContext(config, catalog, dragonPlan, bossPlan) {
 // activation), think-param clones and the placement record itself. Behavior for permutation-v1 is unchanged;
 // sampling-v1 only differs in the compatibility label and in always forcing a scaled NpcParam row, so the
 // destination slot's drops and team follow the slot (model document 6.9).
-function decorateEnemyPlacements(config, catalog, allSlots, assignment, pinwheelCloneIds, algorithm) {
+function decorateEnemyPlacements(config, catalog, allSlots, assignment, pinwheelCloneIds, algorithm, roamingSlotIds = new Set(), roamingOptions = null) {
   const sampling = algorithm === "sampling-v1";
   const newLondoGroundAnchors = catalog.enemySlots
     .filter((slot) =>
@@ -1245,9 +1302,12 @@ function decorateEnemyPlacements(config, catalog, allSlots, assignment, pinwheel
     const darkrootButterflyPath =
       (slot.mapId === "m12_00_00_00" || slot.mapId === "m12_00_00_01") &&
       slot.modelName === "c2330";
+    const isRoamingBoss = roamingSlotIds.has(slot.id);
+    // A boss brain moved into a regular slot may wait for its arena event: the same wake-up as every portable boss gets.
     const requiresCombatEvent =
       forceCombatActivationModels.has(replacement.modelName) ||
-      darkrootButterflyPath;
+      darkrootButterflyPath ||
+      isRoamingBoss;
     const assignedEntityId =
       (passiveUntilAttacked || requiresCombatEvent) && slot.entityId < 0
         ? 16_099_000 + index
@@ -1268,6 +1328,14 @@ function decorateEnemyPlacements(config, catalog, allSlots, assignment, pinwheel
       // Replaced clones keep their own combat stats (normal HP) instead of
       // inheriting the clone's 1 HP; drops and team still follow the slot.
       ...(isChaosPinwheelClone ? { scaling: "vanilla" } : {}),
+      // A roaming boss keeps the boss's own combat stats and the reward is set explicitly (legacy: the "with souls" row).
+      ...(isRoamingBoss
+        ? {
+            scaling: "vanilla",
+            roamingBossSouls: Math.trunc(bossKillSouls.get(replacement.npcParamId) * roamingOptions.roamingBossSouls / 100),
+            ...(roamingOptions.roamingBossesStayDead ? { disableRespawn: true } : {}),
+          }
+        : {}),
       ...(sampling ? { forceScaledNpcParam: true } : {}),
       ...(groundedGhostSpawn
         ? {
@@ -1291,7 +1359,9 @@ function decorateEnemyPlacements(config, catalog, allSlots, assignment, pinwheel
           }
         : {}),
       compatibility: sampling
-        ? isChaosPinwheelClone
+        ? isRoamingBoss
+          ? "sampled-roaming-boss"
+          : isChaosPinwheelClone
           ? "pinwheel-chaos-clone"
           : passiveUntilAttacked
             ? "passive-until-attacked-sampled"
@@ -1374,9 +1444,12 @@ function sampleExtractedEnemies(config, catalog, dragonPlan, bossPlan, diagnosti
   const options = resolveEnemyPlacementOptions(config, "sampling-v1");
   const { massOfSoulsPlan, slots, pinwheelClones, pinwheelCloneIds, fixedModelsByMap } =
     regularEnemyContext(config, catalog, dragonPlan, bossPlan);
-  const { assignment } = planSampledRegularEnemies({
+  // Part E1: with bosses allowed in regular slots the regular sampler plans the normal enemies only ("bosses" leaves every
+  // slot to the boss pass, "both" keeps the normal draw for the slots that do not get a boss) and the roaming pass overrides slots.
+  const roamingMode = ROAMING_BOSS_MODES.includes(options.normalReplacement);
+  const { assignment: regularAssignment, table } = planSampledRegularEnemies({
     seed: config.seed,
-    options,
+    options: roamingMode ? { ...options, normalReplacement: options.normalReplacement === "both" ? "normals" : "none" } : options,
     preventSame: config.preventSameEnemy,
     slots,
     extraSlots: pinwheelClones,
@@ -1384,9 +1457,34 @@ function sampleExtractedEnemies(config, catalog, dragonPlan, bossPlan, diagnosti
     diagnostics,
   });
   const allSlots = [...slots, ...pinwheelClones];
+  let assignment = regularAssignment;
+  let roaming = new Map();
+  if (roamingMode) {
+    // The regular sampler saw "normals"/"none"; the diagnostics state what was asked for.
+    diagnostics.options = {
+      ...diagnostics.options, normalReplacement: options.normalReplacement, bossChanceInNormalSlots: options.bossChanceInNormalSlots,
+      roamingBossSouls: options.roamingBossSouls, roamingBossesStayDead: options.roamingBossesStayDead,
+    };
+    const candidates = roamingBossCandidates(config, catalog, dragonPlan);
+    roaming = planRoamingBosses({
+      seed: config.seed,
+      options,
+      slots,
+      allSlots,
+      assignment: regularAssignment,
+      fixedModelsByMap,
+      table,
+      bossTypes: deriveRoamingBossTypes(candidates, table, roamingSizeClassOverrides),
+      preventSame: config.preventSameEnemy,
+      excludedSlotIds: roamingProtectedSlotIds(slots),
+      diagnostics,
+    });
+    diagnostics.count("roamingCandidates", candidates.length);
+    assignment = new Map([...regularAssignment, ...roaming]);
+  }
   // Decoration (and its index-based ids) is computed over every slot so ids stay stable, but only slots the
   // sampler assigned get a placement: the others stay exactly vanilla (model document 5, decision 2).
-  const randomized = decorateEnemyPlacements(config, catalog, allSlots, assignment, pinwheelCloneIds, "sampling-v1")
+  const randomized = decorateEnemyPlacements(config, catalog, allSlots, assignment, pinwheelCloneIds, "sampling-v1", new Set(roaming.keys()), options)
     .filter((placement) => assignment.has(placement.slot));
   assertSlotOwnedDrops(randomized);
   return randomized
@@ -1431,15 +1529,9 @@ function shuffledPortableBosses(rng, archetypeKeys, archetypes, excludedModels =
   throw new Error("Could not create a safe boss permutation.");
 }
 
-function randomizeExtractedBosses(config, catalog, dragonPlan, placementDiagnostics = null) {
-  if (!config.randomizeBosses || !catalog?.bossSlots?.length) return [];
-  const rng = createStream(config.seed, "bosses", config.version);
-  const areaNames = new Map(
-    (catalog.maps || []).map((map) => [map.id, map.name]),
-  );
-  const bossNames = catalog.bossNames || {};
-  const effectiveSlots = effectiveBossSlots(catalog);
-  const sources = effectiveSlots.filter(
+// The single-body boss slots that are both the destinations and the archetype sources of the boss planners.
+function bossSourceSlots(config, catalog, dragonPlan) {
+  return effectiveBossSlots(catalog).filter(
     (slot) =>
       !dragonPlan.reservedSlotIds.has(slot.id) &&
       !(config.pinwheelChaos && config.randomizeEnemies && slot.id === pinwheelMainSlot) &&
@@ -1447,6 +1539,29 @@ function randomizeExtractedBosses(config, catalog, dragonPlan, placementDiagnost
       slot.npcParamId >= 0 &&
       slot.thinkParamId >= 0,
   );
+}
+
+// One boss slot per archetype that may stand in a regular slot (a souls entry, not on the exclusion list, not Gwyn-nerf-rejected by a
+// "none" setting: the nerf applies to Lord Gwyn, who never roams).
+function roamingBossCandidates(config, catalog, dragonPlan) {
+  const byKey = new Map();
+  for (const slot of bossSourceSlots(config, catalog, dragonPlan)) {
+    const key = bossArchetypeKey(slot);
+    if (byKey.has(key) || nonPortableBossReplacementModels.has(slot.modelName) || roamingExcludedModels.has(slot.modelName)) continue;
+    if (!bossKillSouls.has(slot.npcParamId)) continue;
+    byKey.set(key, slot);
+  }
+  return [...byKey.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([, slot]) => slot);
+}
+
+function randomizeExtractedBosses(config, catalog, dragonPlan, placementDiagnostics = null) {
+  if (!config.randomizeBosses || !catalog?.bossSlots?.length) return [];
+  const rng = createStream(config.seed, "bosses", config.version);
+  const areaNames = new Map(
+    (catalog.maps || []).map((map) => [map.id, map.name]),
+  );
+  const bossNames = catalog.bossNames || {};
+  const sources = bossSourceSlots(config, catalog, dragonPlan);
   const archetypeKeys = [
     ...new Set(sources.map((slot) => bossArchetypeKey(slot))),
   ];

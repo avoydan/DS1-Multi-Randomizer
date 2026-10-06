@@ -121,6 +121,15 @@ export const v1ExtraCaseSets = {
     { name: 'boss-sampling-unique-combined', masterSeed: 'golden-v1-bosssample-unique', patch: { items: { enabled: false }, fog: { enabled: false },
       enemies: { gwynNerf: 'medium', secondGargoyle: 'keep', placement: { algorithm: 'sampling-v1', replacementChance: 70, fit: 'anywhere', bossReplacement: 'bosses', uniqueBosses: true } } } },
   ],
+  /** Bosses in regular enemy slots (Part E1): worlds that use the non-neutral extension keys, frozen from the day they exist. */
+  'roaming-bosses': [
+    { name: 'roaming-both-combined', masterSeed: 'golden-v1-roaming-both', patch: { items: { enabled: false }, fog: { enabled: false },
+      enemies: { randomizeBosses: false, placement: { algorithm: 'sampling-v1', replacementChance: 60, fit: 'fits', normalReplacement: 'both', bossChanceInNormalSlots: 25 } } } },
+    { name: 'roaming-bosses-souls-stay-dead', masterSeed: 'golden-v1-roaming-souls', patch: { items: { enabled: false }, fog: { enabled: false },
+      enemies: { randomizeBosses: false, placement: { algorithm: 'sampling-v1', replacementChance: 40, fit: 'anywhere', normalReplacement: 'bosses', typeReplacement: 'enabled-except-roaming-bosses', roamingBossSouls: 80, roamingBossesStayDead: true } } } },
+    { name: 'roaming-both-boss-sampling-fog', masterSeed: 'golden-v1-roaming-fog', patch: { items: { enabled: false },
+      enemies: { gwynNerf: 'strong', secondGargoyle: 'replace', placement: { algorithm: 'sampling-v1', replacementChance: 50, fit: 'fits', normalReplacement: 'both', bossChanceInNormalSlots: 20, bossReplacement: 'bosses' } } } },
+  ],
   'boss-baseline': [
     { name: 'sampling-bosses-fog', masterSeed: 'golden-v1-boss-fog', patch: { enemies: { gwynNerf: 'strong', secondGargoyle: 'replace',
       placement: { algorithm: 'sampling-v1', replacementChance: 70, fit: 'fits', difficultyMode: 'curve', difficultyStrictness: 'strict' } } } },

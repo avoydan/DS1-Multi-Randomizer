@@ -48,6 +48,12 @@ const placementBatch9Defaults: Record<string, unknown> = {
   bossReplacement: NEUTRAL_ENEMY_PLACEMENT_OPTIONS.bossReplacement,
   uniqueBosses: NEUTRAL_ENEMY_PLACEMENT_OPTIONS.uniqueBosses,
 };
+/** Version 11: bosses in regular enemy slots (Part E1); older presets migrate to the legacy defaults, which do nothing without roaming bosses. */
+const placementBatch10Defaults: Record<string, unknown> = {
+  bossChanceInNormalSlots: NEUTRAL_ENEMY_PLACEMENT_OPTIONS.bossChanceInNormalSlots,
+  roamingBossSouls: NEUTRAL_ENEMY_PLACEMENT_OPTIONS.roamingBossSouls,
+  roamingBossesStayDead: NEUTRAL_ENEMY_PLACEMENT_OPTIONS.roamingBossesStayDead,
+};
 /** Nested `enemies.placement` keys added by each preset version, applied to every older preset. */
 const placementKeysAddedIn: Array<{ version: number; defaults: Record<string, unknown> }> = [
   { version: 6, defaults: placementBatch5Defaults },
@@ -55,6 +61,7 @@ const placementKeysAddedIn: Array<{ version: number; defaults: Record<string, un
   { version: 8, defaults: placementBatch7Defaults },
   { version: 9, defaults: placementBatch8Defaults },
   { version: 10, defaults: placementBatch9Defaults },
+  { version: 11, defaults: placementBatch10Defaults },
 ];
 /** What each older preset version lacks, newest additions last (the nested v6 placement keys are handled apart). */
 const missingByVersion: Record<number, SectionDefaults[]> = {
@@ -67,6 +74,7 @@ const missingByVersion: Record<number, SectionDefaults[]> = {
   7: [],
   8: [],
   9: [],
+  10: [],
 };
 
 const presetKeys = ['format', 'presetVersion', 'masterSeed', 'items', 'enemies', 'fog', 'output'];
@@ -80,6 +88,9 @@ function canonicalEnemies(enemies: RandomizerConfig['enemies']): RandomizerConfi
     ...enemies.placement,
     bossReplacement: enemies.placement.bossReplacement ?? NEUTRAL_ENEMY_PLACEMENT_OPTIONS.bossReplacement,
     uniqueBosses: enemies.placement.uniqueBosses ?? NEUTRAL_ENEMY_PLACEMENT_OPTIONS.uniqueBosses,
+    bossChanceInNormalSlots: enemies.placement.bossChanceInNormalSlots ?? NEUTRAL_ENEMY_PLACEMENT_OPTIONS.bossChanceInNormalSlots,
+    roamingBossSouls: enemies.placement.roamingBossSouls ?? NEUTRAL_ENEMY_PLACEMENT_OPTIONS.roamingBossSouls,
+    roamingBossesStayDead: enemies.placement.roamingBossesStayDead ?? NEUTRAL_ENEMY_PLACEMENT_OPTIONS.roamingBossesStayDead,
   };
   return { ...enemies, placement: pool === null ? placement : { ...placement, customPool: [...pool].sort() } };
 }
@@ -106,7 +117,7 @@ export function importPreset(text: string): PresetImportResult {
   const problems: string[] = [];
   if (record.format !== PRESET_FORMAT) problems.push(`Preset format must be "${PRESET_FORMAT}".`);
   if (record.presetVersion !== PRESET_VERSION && !(typeof record.presetVersion === 'number' && missingByVersion[record.presetVersion])) {
-    problems.push(`Preset version must be ${PRESET_VERSION} (versions 1 to 9 are migrated).`);
+    problems.push(`Preset version must be ${PRESET_VERSION} (versions 1 to 10 are migrated).`);
   }
   for (const key of Object.keys(record)) {
     if (!presetKeys.includes(key)) problems.push(`preset.${key} is not supported.`);

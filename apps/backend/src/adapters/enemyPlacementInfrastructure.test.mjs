@@ -94,7 +94,7 @@ test('sampling-only options are validated in the engine and refused under permut
   }
   for (const overrides of [
     { enemyReplacementChance: 101 }, { enemyReplacementChance: -1 }, { enemyReplacementChance: 1.5 }, { enemyReplacementChance: '50' },
-    { enemyNormalReplacement: 'bosses' }, { enemyNormalReplacement: 'both' }, { enemyPlacementFit: 'everywhere' },
+    { enemyNormalReplacement: 'bosses-and-more' }, { enemyBossChanceNormalSlots: 50 }, { enemyRoamingBossSouls: 20 }, { enemyRoamingBossesStayDead: true }, { enemyNormalReplacement: 'normals', enemyBossChanceNormalSlots: 101 }, { enemyPlacementFit: 'everywhere' },
   ]) {
     assert.throws(
       () => generate(config({ enemyPlacementAlgorithm: 'sampling-v1', ...overrides }), { gameCatalog: catalog() }),

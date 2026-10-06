@@ -64,7 +64,11 @@ export function formatPlacementDiagnostics(diagnostics: PlacementDiagnosticsSumm
   const groups = typeMode === 'disabled' ? '' : `type replacement ${typeMode} (${summary.counters.typeGroupsReplaced ?? 0}/${summary.counters.typeGroups ?? 0} groups replaced), `;
   const bossSlots = summary.counters.bossSlots ?? 0;
   const bossText = bossSlots > 0 ? `bosses sampled ${summary.counters.bossesReplaced ?? 0}/${bossSlots} (${summary.counters.bossesKeptVanilla ?? 0} kept, ${summary.counters.bossSlotsNotParticipating ?? 0} left by chance), ` : '';
-  return `Enemy placement sampling-v1 (difficulty ${String(options.difficultyMode ?? 'random')}/${String(options.difficultyStrictness ?? 'loose')}): ${poolText}${groups}${bossText}${summary.slots} regular slots, ${replaced} sampled, `
+  const roamingBosses = summary.counters.roamingBosses ?? 0;
+  const roamingText = ['bosses', 'both'].includes(String(options.normalReplacement))
+    ? `roaming bosses ${roamingBosses} in ${summary.counters.roamingMaps ?? 0} map(s) (${summary.counters.roamingMapLimitReached ?? 0} left by the map limit, ${summary.counters.roamingBudgetRejected ?? 0} by the model limit), `
+    : '';
+  return `Enemy placement sampling-v1 (difficulty ${String(options.difficultyMode ?? 'random')}/${String(options.difficultyStrictness ?? 'loose')}): ${poolText}${groups}${bossText}${roamingText}${summary.slots} regular slots, ${replaced} sampled, `
     + `${retried} map(s) retried, ${summary.counters.difficultyLapses ?? 0} difficulty lapses, `
     + `${summary.counters.keptByChance ?? 0} left by replacement chance, ${summary.rejections['model-budget'] ?? 0} model-budget rejections, `
     + `at most ${maxModels} models in a map, stages ${stages || 'none'}, class table ${diagnostics.classTableHash?.slice(0, 12) ?? 'n/a'}.`;

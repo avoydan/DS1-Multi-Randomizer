@@ -41,6 +41,9 @@ export interface UpstreamCombinedRandomizerConfig {
   enemyCustomPool: string[] | null;
   enemyBossReplacement: BossReplacementMode;
   enemyUniqueBosses: boolean;
+  enemyBossChanceNormalSlots: number;
+  enemyRoamingBossSouls: number;
+  enemyRoamingBossesStayDead: boolean;
   placementDiagnosticsLevel: 'summary' | 'detail';
   /** Items the world randomizer follows and the lots it can follow them in; null when it does not run. */
   fogTrackedItems: FogTrackedItems | null;
@@ -110,6 +113,10 @@ export function mapCombinedRandomizerConfig(
     // Part D options are optional on input (a configuration that predates them means the classic boss planner).
     enemyBossReplacement: request.enemies.placement.bossReplacement ?? 'classic',
     enemyUniqueBosses: request.enemies.placement.uniqueBosses ?? false,
+    // Part E1 options are optional on input too (the legacy defaults, which do nothing without roaming bosses).
+    enemyBossChanceNormalSlots: request.enemies.placement.bossChanceInNormalSlots ?? 10,
+    enemyRoamingBossSouls: request.enemies.placement.roamingBossSouls ?? 50,
+    enemyRoamingBossesStayDead: request.enemies.placement.roamingBossesStayDead ?? false,
     placementDiagnosticsLevel: request.placementDiagnosticsLevel ?? 'summary',
     fogTrackedItems: request.fogTrackedItems ?? null,
     generateSpoilerLog: request.generateSpoilerLog,

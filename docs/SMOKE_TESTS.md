@@ -254,3 +254,213 @@ Boss slots that keep their own boss: about half (see the list: a slot is missing
 
 Expected: the second Bell Gargoyle of the Undead Parish fight becomes **Pinwheel (c3320)**; the first Gargoyle body becomes Sanctuary Guardian. It is released when the first body drops to about 60% health, on the rooftop.
 
+## A boss among regular enemies
+
+Bosses stand in some regular enemy slots (Normal enemy replacement: Bosses or normal enemies); the rest of the enemies are normal.
+
+```
+DS1TR1-06NJDCP6-577CVKTE-TQ6R8YY3-J1GCB0TY-QT7DCF23-PQK42BS2-GSMDB0TW-11GATXWC-9JRNEET9-Z4JHJ0TQ-WX02M4C8-3CYZ7Z60-XR5WXJ87-MN0260VC-2M939P26-DCJ2NN28-02HT08KW
+```
+
+**In this world**
+
+- Find a boss among the regular enemies: the list below names the area and the enemy it replaced.
+- It should wake up when you come close, fight like the boss it is (no boss health bar, no fog gate) and be killable; the souls and drops should look sane.
+
+Bosses in regular enemy slots in this world: 65 (Capra Demon x14, Taurus Demon x6, Demon Firesage x7, Artorias x7, Moonlight Butterfly x4, Sif x1, Manus x6, Asylum Demon x9, Smough x3, Pinwheel x1, Stray Demon x1, Quelaag x3, Ornstein x2, Super Ornstein x1). The first 14 by map order:
+
+- Undead Burg / Parish: a boss replaces enemy c2500 (slot c2500_0026): Capra Demon, souls 3000
+- Undead Burg / Parish: a boss replaces enemy c2500 (slot c2500_0035): Capra Demon, souls 3000
+- Undead Burg / Parish: a boss replaces enemy c2500 (slot c2500_0040): Capra Demon, souls 3000
+- Undead Burg / Parish: a boss replaces enemy c2500 (slot c2500_0045): Taurus Demon, souls 1500
+- Undead Burg / Parish: a boss replaces enemy c2520 (slot c2520_0005): Capra Demon, souls 3000
+- Undead Burg / Parish: a boss replaces enemy c2550 (slot c2550_0003): Taurus Demon, souls 1500
+- Undead Burg / Parish: a boss replaces enemy c2550 (slot c2550_0037): Taurus Demon, souls 1500
+- Undead Burg / Parish: a boss replaces enemy c2560 (slot c2560_0008): Taurus Demon, souls 1500
+- Undead Burg / Parish: a boss replaces enemy c3340 (slot c3340_0003): Capra Demon, souls 3000
+- Undead Burg / Parish: a boss replaces enemy c3491 (slot c3491_0001): Capra Demon, souls 3000
+- Painted World: a boss replaces enemy c2500 (slot c2500_0006): Demon Firesage, souls 10000
+- Painted World: a boss replaces enemy c2500 (slot c2500_0018): Artorias, souls 25000
+- Painted World: a boss replaces enemy c2500 (slot c2500_0030): Artorias, souls 25000
+- Darkroot Garden: a boss replaces enemy c2260 (slot c2260_0003): Moonlight Butterfly, souls 5000
+
+Different enemy models in the Undead Parish: 30 (the limit is 30; a map that bosses and dragons already push above it never gets more).
+
+## The same boss in several regular slots
+
+With Type replacement, every enemy of one kind in a map is replaced by the same boss, so one boss stands in several places of an area.
+
+```
+DS1TR1-06NJDCP6-577CVKTE-TQ6R4YX3-52TJ0DDH-8KBS0R7X-GDFCS3JP-811VA0J2-5WMRCT0D-GHE1CR5D-FT671N1Y-T2E0QAVW-R32GGN9B-3SCFR42Q-XX086SDM-WAGM5H83-010JGA7B
+```
+
+**In this world**
+
+- Find a boss among the regular enemies: the list below names the area and the enemy it replaced.
+- It should wake up when you come close, fight like the boss it is (no boss health bar, no fog gate) and be killable; the souls and drops should look sane.
+
+Bosses in regular enemy slots in this world: 22 (Stray Demon x1, Smough x9, Pinwheel x12). The first 14 by map order:
+
+- Undead Burg / Parish: a boss replaces enemy c2860 (slot c2860_0000): Stray Demon, souls 10000
+- Darkroot Garden: a boss replaces enemy c2710 (slot c2710_0000): Smough, souls 12500
+- Darkroot Garden: a boss replaces enemy c2710 (slot c2710_0001): Smough, souls 12500
+- Darkroot Garden: a boss replaces enemy c2710 (slot c2710_0002): Smough, souls 12500
+- Darkroot Garden: a boss replaces enemy c2710 (slot c2710_0003): Smough, souls 12500
+- Darkroot Basin: a boss replaces enemy c2795 (slot c2795_0000): Pinwheel, souls 7500
+- Tomb of the Giants: a boss replaces enemy c2795 (slot c2795_0000): Pinwheel, souls 7500
+- Ash Lake: a boss replaces enemy c3250 (slot c3250_0000): Pinwheel, souls 7500
+- Ash Lake: a boss replaces enemy c3250 (slot c3250_0001): Pinwheel, souls 7500
+- Ash Lake: a boss replaces enemy c3250 (slot c3250_0002): Pinwheel, souls 7500
+- Blighttown: a boss replaces enemy c2811 (slot c2811_0000): Smough, souls 12500
+- Blighttown: a boss replaces enemy c2811 (slot c2811_0001): Smough, souls 12500
+- Blighttown: a boss replaces enemy c2811 (slot c2811_0002): Smough, souls 12500
+- Blighttown: a boss replaces enemy c2811 (slot c2811_0003): Smough, souls 12500
+
+Different enemy models in the Undead Parish: 28 (the limit is 30; a map that bosses and dragons already push above it never gets more).
+
+## Roaming boss souls and respawn
+
+Bosses in regular slots drop 100% of their fight souls and stay dead once killed.
+
+```
+DS1TR1-06NJDCP6-577CVKTE-TQ6RCYR3-AGB1DTRT-2AP7XM2B-V78ZMSX8-TRZYG1E5-22PR144B-0APBB3SH-HV52EADZ-4G1NXWW0-SC87NN9T-J1N09RHY-SWY3ZC6V-G9SZ4GD9-1ZJ5GT4P-0K2H6D5S-G0NN0971-TKHE14P4-9ABX9H0M-B18RPPCD-861QKD0Y-MD13T1G0-3P5JDYG
+```
+
+**In this world**
+
+- Find a boss among the regular enemies: the list below names the area and the enemy it replaced.
+- It should wake up when you come close, fight like the boss it is (no boss health bar, no fog gate) and be killable; the souls and drops should look sane.
+- Kill a roaming boss and note the souls; rest at a bonfire and check that it does not come back (the "stay dead" setting is untested in the game).
+
+Bosses in regular enemy slots in this world: 20 (Moonlight Butterfly x5, Pinwheel x7, Capra Demon x2, Taurus Demon x3, Ornstein x2, Quelaag x1). The first 14 by map order:
+
+- Darkroot Basin: a boss replaces enemy c2710 (slot c2710_0003): Moonlight Butterfly, souls 10000, stays dead
+- Darkroot Basin: a boss replaces enemy c3350 (slot c3350_0000): Moonlight Butterfly, souls 10000, stays dead
+- Darkroot Basin: a boss replaces enemy c5360 (slot c5360_0001): Moonlight Butterfly, souls 10000, stays dead
+- Tomb of the Giants: a boss replaces enemy c2910 (slot c2910_0008): Pinwheel, souls 15000, stays dead
+- Tomb of the Giants: a boss replaces enemy c2910 (slot c2910_0010): Pinwheel, souls 15000, stays dead
+- Tomb of the Giants: a boss replaces enemy c2950 (slot c2950_0001): Pinwheel, souls 15000, stays dead
+- Tomb of the Giants: a boss replaces enemy c2960 (slot c2960_0013): Capra Demon, souls 6000, stays dead
+- Blighttown: a boss replaces enemy c2811 (slot c2811_0004): Taurus Demon, souls 3000, stays dead
+- Demon Ruins: a boss replaces enemy c3390 (slot c3390_0006): Capra Demon, souls 6000, stays dead
+- Anor Londo: a boss replaces enemy c2260 (slot c2260_0003): Moonlight Butterfly, souls 10000, stays dead
+- Anor Londo: a boss replaces enemy c2260 (slot c2260_0004): Ornstein, souls 10000, stays dead
+- Anor Londo: a boss replaces enemy c2260 (slot c2260_0008): Ornstein, souls 10000, stays dead
+- Anor Londo: a boss replaces enemy c2870 (slot c2870_0001): Moonlight Butterfly, souls 10000, stays dead
+- Duke's Archives: a boss replaces enemy c2710 (slot c2710_0000): Quelaag, souls 20000, stays dead
+
+Different enemy models in the Undead Parish: 30 (the limit is 30; a map that bosses and dragons already push above it never gets more).
+
+## Roaming bosses with the second Bell Gargoyle
+
+Bosses in regular slots together with a replaced second Bell Gargoyle and boss sampling in the boss arenas.
+
+```
+DS1TR1-06NJDCP6-577CVKTE-TQ6R2YS3-3PDEPX8D-17B41T05-XNM1AD2T-0N8NG1A1-9C2F5AH0-WK100TZX-CE6A7YJ9-S8QWK06Q-7QG5512Y-YM7A88J1-EW6KGMNG-AN4X000V-NP9TGM17-0406HW3K-FC
+```
+
+**In this world**
+
+- Go up to the rooftop of the Undead Parish church: the Bell Gargoyles boss fight and the roaming bosses around it.
+- Find a boss among the regular enemies: the list below names the area and the enemy it replaced.
+- It should wake up when you come close, fight like the boss it is (no boss health bar, no fog gate) and be killable; the souls and drops should look sane.
+
+Boss replacements of this world (15 boss slots; the first 15 lines are the sampled ones):
+
+- Darkroot Garden / Darkroot Basin: Moonlight Butterfly -> Stray Demon
+- Blighttown / Quelaag's Domain: Chaos Witch Quelaag -> Taurus Demon
+- Demon Ruins / Lost Izalith: Demon Firesage -> Capra Demon
+- Anor Londo: Executioner Smough -> Chaos Witch Quelaag
+- Anor Londo: Dragon Slayer Ornstein -> Gravelord Nito
+- New Londo Ruins / Valley of Drakes: Four Kings -> Pinwheel
+- Undead Asylum: Stray Demon -> Pinwheel
+- Painted World of Ariamis: Crossbreed Priscilla -> Black Dragon Kalameet
+- Oolacile / Royal Wood: Black Dragon Kalameet -> Gaping Dragon
+- Oolacile / Royal Wood: Black Dragon Kalameet -> Gaping Dragon
+- Depths: Gaping Dragon -> Seath the Scaleless
+- The Duke's Archives / Crystal Cave: Seath the Scaleless -> Crossbreed Priscilla
+- Oolacile / Royal Wood: Sanctuary Guardian -> Centipede Demon
+- Undead Burg / Undead Parish: Bell Gargoyle -> Sanctuary Guardian
+- Demon Ruins / Lost Izalith: Centipede Demon -> Bell Gargoyle
+
+Bosses that appear more than once: Pinwheel x2, Gaping Dragon x2.
+Boss slots that keep their own boss: none.
+
+Expected: the second Bell Gargoyle of the Undead Parish fight becomes **Gravelord Nito (c5220)**; the first Gargoyle body becomes Sanctuary Guardian. It is released when the first body drops to about 60% health, on the rooftop.
+
+Bosses in regular enemy slots in this world: 7 (Moonlight Butterfly x1, Manus x1, Pinwheel x2, Artorias x1, Quelaag x1, Smough x1). The first 7 by map order:
+
+- Darkroot Garden: a boss replaces enemy c2380 (slot c2380_0009): Moonlight Butterfly, souls 5000
+- Darkroot Basin: a boss replaces enemy c2711 (slot c2711_0000): Manus, souls 30000
+- Tomb of the Giants: a boss replaces enemy c2910 (slot c2910_0017): Pinwheel, souls 7500
+- Tomb of the Giants: a boss replaces enemy c2960 (slot c2960_0000): Artorias, souls 25000
+- Tomb of the Giants: a boss replaces enemy c2960 (slot c2960_0012): Quelaag, souls 10000
+- Sen's Fortress: a boss replaces enemy c2700 (slot c2700_0011): Pinwheel, souls 7500
+- Anor Londo: a boss replaces enemy c2260 (slot c2260_0007): Smough, souls 5000
+
+Different enemy models in the Undead Parish: 31 (the limit is 30; a map that bosses and dragons already push above it never gets more).
+
+## Roaming bosses with the fog randomizer
+
+Bosses in regular slots with the fog randomizer on (fog gates, warps and boss fogs are moved too).
+
+```
+DS1TR1-06NJDCP6-577CVKTE-TQ6RAYS3-5MZNVNWG-C3JR6QP6-HVB3WGXN-YS0JY9M6-D3TR6Q0G-C2PQQ33H-AGYMKY95-37R7M1TW-GA6DCEE3-MB70207M-YH6G4
+```
+
+**In this world**
+
+- Find a boss among the regular enemies: the list below names the area and the enemy it replaced.
+- It should wake up when you come close, fight like the boss it is (no boss health bar, no fog gate) and be killable; the souls and drops should look sane.
+- Check that fog gates and warps still lead where the fog randomizer says, and that no roaming boss blocks a gate.
+
+Bosses in regular enemy slots in this world: 12 (Pinwheel x7, Moonlight Butterfly x1, Quelaag x2, Taurus Demon x1, Capra Demon x1). The first 12 by map order:
+
+- Lower Undead Burg: a boss replaces enemy c2910 (slot c2910_0001): Pinwheel, souls 7500
+- Darkroot Garden: a boss replaces enemy c2260 (slot c2260_0001): Moonlight Butterfly, souls 5000
+- Darkroot Basin: a boss replaces enemy c2260 (slot c2260_0004): Quelaag, souls 10000
+- Catacombs: a boss replaces enemy c2650 (slot c2650_0001): Pinwheel, souls 7500
+- Tomb of the Giants: a boss replaces enemy c2910 (slot c2910_0025): Pinwheel, souls 7500
+- Tomb of the Giants: a boss replaces enemy c2960 (slot c2960_0014): Taurus Demon, souls 1500
+- Blighttown: a boss replaces enemy c2810 (slot c2810_0006): Pinwheel, souls 7500
+- Blighttown: a boss replaces enemy c2810 (slot c2810_0010): Pinwheel, souls 7500
+- Blighttown: a boss replaces enemy c2811 (slot c2811_0002): Quelaag, souls 10000
+- Demon Ruins: a boss replaces enemy c3390 (slot c3390_0001): Capra Demon, souls 3000
+- Sen's Fortress: a boss replaces enemy c2690 (slot c2690_0000): Pinwheel, souls 7500
+- The Kiln: a boss replaces enemy c2790 (slot c2790_0010): Pinwheel, souls 7500
+
+Different enemy models in the Undead Parish: 30 (the limit is 30; a map that bosses and dragons already push above it never gets more).
+
+## Undead Parish full of bosses
+
+Every regular slot that can take a boss gets one (at most ten per map): the highest load of different models a roaming world can put on one map.
+
+```
+DS1TR1-06NJDCP6-577CVKTE-TQ6R6YX3-42RJHCSR-8FBS0R7X-GDFCS3JP-811VA0J2-5WMRCT0D-GHE1D42P-ZN0B7VN0-N9YT109K-BBYN18FT-040CFP4M-VC
+```
+
+**In this world**
+
+- Walk the whole Undead Parish, including the church and the Sunlight Altar side.
+- Find a boss among the regular enemies: the list below names the area and the enemy it replaced.
+- It should wake up when you come close, fight like the boss it is (no boss health bar, no fog gate) and be killable; the souls and drops should look sane.
+
+Bosses in regular enemy slots in this world: 180 (Iron Golem x11, Gravelord Nito x14, Smough x18, Capra Demon x9, Artorias x8, Super Ornstein x16, Moonlight Butterfly x11, Stray Demon x10, Quelaag x7, Sif x9, Ornstein x16, Asylum Demon x12, Demon Firesage x13, Taurus Demon x14, Manus x6, Pinwheel x6). The first 14 by map order:
+
+- The Depths: a boss replaces enemy c1200 (slot c1200_0000): Iron Golem, souls 20000
+- The Depths: a boss replaces enemy c1200 (slot c1200_0001): Gravelord Nito, souls 30000
+- The Depths: a boss replaces enemy c1200 (slot c1200_0002): Smough, souls 12500
+- The Depths: a boss replaces enemy c1200 (slot c1200_0003): Capra Demon, souls 3000
+- The Depths: a boss replaces enemy c1200 (slot c1200_0004): Artorias, souls 25000
+- The Depths: a boss replaces enemy c1200 (slot c1200_0005): Super Ornstein, souls 12500
+- The Depths: a boss replaces enemy c1201 (slot c1201_0000): Moonlight Butterfly, souls 5000
+- The Depths: a boss replaces enemy c1201 (slot c1201_0001): Stray Demon, souls 10000
+- The Depths: a boss replaces enemy c1201 (slot c1201_0002): Quelaag, souls 10000
+- The Depths: a boss replaces enemy c1201 (slot c1201_0003): Stray Demon, souls 10000
+- Undead Burg / Parish: a boss replaces enemy c1201 (slot c1201_0000): Capra Demon, souls 3000
+- Undead Burg / Parish: a boss replaces enemy c1201 (slot c1201_0001): Capra Demon, souls 3000
+- Undead Burg / Parish: a boss replaces enemy c1201 (slot c1201_0002): Capra Demon, souls 3000
+- Undead Burg / Parish: a boss replaces enemy c2370 (slot c2370_0001): Super Ornstein, souls 12500
+
+Different enemy models in the Undead Parish: 30 (the limit is 30; a map that bosses and dragons already push above it never gets more).
+

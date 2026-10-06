@@ -59,8 +59,18 @@ try {
     const models = bosses.map((p) => p.randomizedBossName ?? p.targetModelName);
     const counts = new Map();
     for (const name of models) counts.set(name, (counts.get(name) ?? 0) + 1);
+    // Bosses standing in regular enemy slots (Part E1): where, which boss, what it replaced.
+    const BOSS_NAME = { c2230: 'Stray Demon', c2231: 'Demon Firesage', c2232: 'Asylum Demon', c2240: 'Capra Demon', c2250: 'Taurus Demon', c2320: 'Iron Golem', c2360: 'Smough', c3230: 'Moonlight Butterfly', c3320: 'Pinwheel', c4100: 'Artorias', c4500: 'Manus', c5210: 'Sif', c5220: 'Gravelord Nito', c5270: 'Ornstein', c5271: 'Super Ornstein', c5280: 'Quelaag' };
+    const AREA = { m10_00_00_00: 'The Depths', m10_01_00_00: 'Undead Burg / Parish', m10_02_00_00: 'Lower Undead Burg', m11_00_00_00: 'Painted World', m12_00_00_00: 'Darkroot Garden', m12_00_00_01: 'Darkroot Basin', m12_01_00_00: 'Oolacile', m13_00_00_00: 'Catacombs', m13_01_00_00: 'Tomb of the Giants', m13_02_00_00: 'Ash Lake', m14_00_00_00: 'Blighttown', m14_01_00_00: 'Demon Ruins', m15_00_00_00: "Sen's Fortress", m15_01_00_00: 'Anor Londo', m16_00_00_00: 'New Londo Ruins', m17_00_00_00: "Duke's Archives", m18_00_00_00: 'The Kiln', m18_01_00_00: 'Undead Asylum' };
+    const roamingRows = plan.placements.enemies.filter((p) => p.compatibility === 'sampled-roaming-boss');
+    const roamingNames = roamingRows.map((p) => BOSS_NAME[p.targetModelName] ?? p.targetModelName);
+    const roamingCounts = new Map();
+    for (const name of roamingNames) roamingCounts.set(name, (roamingCounts.get(name) ?? 0) + 1);
     const out = {
       masterSeed, seedCode, ok: true,
+      roamingCount: roamingRows.length,
+      roamingTable: roamingRows.map((p) => `${AREA[p.map] ?? p.map}: a boss replaces enemy ${p.from.split(' [')[0]} (slot ${p.slot.split(':')[1]}): ${BOSS_NAME[p.targetModelName] ?? p.targetModelName}, souls ${p.roamingBossSouls}${p.disableRespawn ? ', stays dead' : ''}`),
+      roamingKinds: [...roamingCounts].map(([name, n]) => `${name} x${n}`),
       bossTable: bosses.map((p) => `${p.encounterLocation?.area ?? p.map}: ${p.originalBossName} -> ${p.randomizedBossName}`),
       bossSlotsChanged: bosses.length,
       repeated: [...counts].filter(([, n]) => n > 1).map(([name, n]) => `${name} x${n}`),
@@ -105,6 +115,11 @@ try {
         const first = result.bossTable.find((line) => line.includes(': Bell Gargoyle -> '));
         lines.push('', `Expected: the second Bell Gargoyle of the Undead Parish fight becomes **${result.secondGargoyle}**${first ? `; the first Gargoyle body becomes ${first.split(' -> ')[1]}` : ''}. It is released when the first body drops to about 60% health, on the rooftop.`);
       }
+      if (result.roamingCount > 0) {
+        const first = result.roamingTable.slice(0, 14);
+        lines.push('', `Bosses in regular enemy slots in this world: ${result.roamingCount} (${result.roamingKinds.join(', ')}). The first ${first.length} by map order:`, '', ...first.map((line) => `- ${line}`));
+        lines.push('', `Different enemy models in the Undead Parish: ${result.parishModels} (the limit is 30; a map that bosses and dragons already push above it never gets more).`);
+      }
       if (scenario.id === 'parish-models') lines.push('', `Undead Parish holds ${result.parishModels} different enemy models in this world (the limit is 30). Note: the Parish reaches this count in essentially every sampled seed; it is the map with the most enemy types, so this is the normal worst case, not a rare one.`);
       lines.push('');
     }
@@ -116,7 +131,7 @@ try {
     const prefix = scenario.masterSeed.replace(/-\d+$/u, '');
     for (let n = option('--from', 1); n <= option('--to', 20); n += 1) {
       const result = await measure(scenario, `${prefix}-${n}`);
-      console.log(JSON.stringify({ seed: result.masterSeed, ok: result.ok, bossSlotsChanged: result.bossSlotsChanged, repeated: result.repeated, secondGargoyle: result.secondGargoyle, parishModels: result.parishModels, maxModels: result.maxModels, error: result.error }));
+      console.log(JSON.stringify({ seed: result.masterSeed, ok: result.ok, roamingCount: result.roamingCount, roamingKinds: result.roamingKinds, bossSlotsChanged: result.bossSlotsChanged, repeated: result.repeated, secondGargoyle: result.secondGargoyle, parishModels: result.parishModels, maxModels: result.maxModels, error: result.error }));
     }
   }
 } finally {
