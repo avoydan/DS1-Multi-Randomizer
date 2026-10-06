@@ -96,6 +96,10 @@ test('bosses in regular slots (Part E1): the options are real, appear only when 
   // Leaving a mode puts the settings that only it needed back to their defaults (a hidden setting never stays in the world).
   assert.match(app, /if \(mode !== 'both'\) placement\.bossChanceInNormalSlots = 10;/u);
   assert.match(app, /if \(!roaming\) \{ placement\.roamingBossSouls = 50; placement\.roamingBossesStayDead = false; \}/u);
+  // No dead twin of a real control is left behind in the planned group (a disabled "Roaming boss souls", "Boss chance: ..." or "Respawning roaming bosses").
+  assert.doesNotMatch(app, /<RangeOption disabled label="(Boss chance: normal slots|Boss chance: boss slots|Roaming boss souls)"/u);
+  assert.doesNotMatch(app, /'Respawning roaming bosses'/u);
+  assert.equal((app.match(/label="Roaming boss souls"/gu) ?? []).length, 1, 'one Roaming boss souls control');
   // Plain language: no engine vocabulary in the visible labels.
   for (const label of ['Boss chance in normal slots', 'Roaming boss souls', 'Roaming bosses stay dead']) assert.doesNotMatch(label, /NpcParam|getSoul|entity|EMEVD/u);
 });

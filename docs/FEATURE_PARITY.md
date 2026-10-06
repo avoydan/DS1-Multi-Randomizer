@@ -83,7 +83,7 @@ All 21 configuration fields map to one position in the original config string. T
 | E6 | Difficulty mode | 4 curve + easy Asylum, 1 random with curve, 3 random + easy Asylum, 2 fully random | select, `3` | yes (`enemies.placement.difficultyMode`, `sampling-v1`) | yes | yes | yes (Part B, regular enemies; project-derived classes) | FULL |
 | E7 | Replacement chance | 0-100 % | slider, 100 | yes (`enemies.placement.replacementChance`, `sampling-v1`) | yes | yes | yes (Part A, whole range, non-worsening budget) | FULL |
 | E8 | Boss chance for normal-enemy slots | 0-100 % | slider, 10; shown only with "Bosses or normal enemies" | yes (`enemies.placement.bossChanceInNormalSlots`, `sampling-v1`) | yes | yes | yes (Part E1; the roaming pass, `ENEMY_PLACEMENT_MODEL.md` 10.7) | FULL |
-| E9 | Boss chance for boss slots | 0-100 % | slider, 90 | placeholder | no | no | no | UI_ONLY |
+| E9 | Boss chance for boss slots | 0-100 % | slider, 90 | none: no control is shown (Part E2 is not built, `ENEMY_PLACEMENT_MODEL.md` 10.7) | no | no | no | UI_ONLY |
 | E10 | Replace second Gargoyle | 0 no, 1 yes | select, Replace (legacy default); also Do not replace and Single boss (earlier DS1TR behavior) | yes (`enemies.secondGargoyle`) | yes | yes | yes | FULL |
 | E11 | Difficulty strictness | 0 strict, 1 a bit loose, 2 very loose | select, `1` | yes (`enemies.placement.difficultyStrictness`, `sampling-v1`) | yes | yes | yes (Part B, regular enemies; project-derived classes) | FULL |
 | E12 | T-pose behavior | 0 enabled, 1 disabled | toggle, enabled | placeholder | no | no | no | UI_ONLY |

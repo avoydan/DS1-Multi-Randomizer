@@ -521,10 +521,7 @@ export function App() {
             </div>
             <div className="option-group planned-group"><h3>Legacy parity <span>planned</span></h3>
               {['NPC replacement'].map((label) => <div key={label}><label className="field-label">{label}</label><select defaultValue="disabled" disabled><option value="disabled">Disabled</option><option value="bosses">Only bosses</option><option value="enemies">Only normal enemies</option><option value="all">Bosses or normal enemies</option></select></div>)}
-              <RangeOption disabled label="Boss chance: normal slots" value={10} onChange={() => undefined} />
-              <RangeOption disabled label="Boss chance: boss slots" value={90} onChange={() => undefined} />
-              <RangeOption disabled label="Roaming boss souls" value={100} onChange={() => undefined} />
-              {['Allow T-pose behavior', 'Respawning roaming bosses', 'Hostile NPCs'].map((label) => <Toggle key={label} disabled label={label} checked={false} onChange={() => undefined} />)}
+              {['Allow T-pose behavior', 'Hostile NPCs'].map((label) => <Toggle key={label} disabled label={label} checked={false} onChange={() => undefined} />)}
             </div>
           </section>
 
