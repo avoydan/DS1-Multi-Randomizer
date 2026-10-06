@@ -179,13 +179,13 @@ The first boss of the game is replaced by another boss: model, health bar, AI, d
 
 **Check**
 
-- [ ] Climb to the balcony where the Asylum Demon normally drops in: a Taurus Demon arrives instead, with its own name on the boss health bar.
+- [ ] Go to the arena where the Asylum Demon normally appears: a Taurus Demon appears instead, and the boss health bar names it.
 - [ ] It fights (moves, attacks, no T-pose), can be killed and its death ends the encounter.
 - [ ] The way on opens as it does after the Asylum Demon (progression: you can leave the Asylum).
 
 **Afterwards**
 
-- [ ] Two moments matter: the replacement becomes visible when the encounter starts (about a minute), and the fight can be completed only once you have taken the upper route (about three more).
+- [ ] The time above is for seeing the replacement when the encounter starts. The engine holds this boss back while the side gate is closed and wakes it after the upper boss fog; the whole fight therefore takes longer, and that part is not estimated.
 
 ```
 DS1TR1-06NJDCP6-577CVKTE-TMPK9NAD-976WVKYK-PMJ5HVX0-2YQT65EF-M2QQHM0X-6VM6M7K8-860ABSG1-2W57HAGX-WG16126N-7684M12N-76T11GAP-3N0M6VDM-7TH44Z84-029JY1N2

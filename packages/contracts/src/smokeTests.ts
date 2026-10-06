@@ -245,11 +245,11 @@ export const SMOKE_SCENARIOS: readonly SmokeScenario[] = [
     expectations: [{ kind: 'boss', map: 'm18_01_00_00', mapName: 'Undead Asylum', slot: 'c2232_0000', replacedModel: 'c2232', replacedName: 'Asylum Demon', model: 'c2250', name: 'Taurus Demon', meters: 22.5, up: 13.3 }],
     estimateSeconds: 90,
     observe: [
-      'Climb to the balcony where the Asylum Demon normally drops in: a Taurus Demon arrives instead, with its own name on the boss health bar.',
+      'Go to the arena where the Asylum Demon normally appears: a Taurus Demon appears instead, and the boss health bar names it.',
       'It fights (moves, attacks, no T-pose), can be killed and its death ends the encounter.',
       'The way on opens as it does after the Asylum Demon (progression: you can leave the Asylum).',
     ],
-    afterwards: ['Two moments matter: the replacement becomes visible when the encounter starts (about a minute), and the fight can be completed only once you have taken the upper route (about three more).'],
+    afterwards: ['The time above is for seeing the replacement when the encounter starts. The engine holds this boss back while the side gate is closed and wakes it after the upper boss fog; the whole fight therefore takes longer, and that part is not estimated.'],
   },
   {
     id: 'classic-triple', category: 'extended', title: 'Classic full Triple', masterSeed: 'smoke-a-classic',
