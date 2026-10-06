@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { EnemyPoolEditor } from './EnemyPoolEditor';
 import { Readiness } from './Readiness';
-import { LoadedSeedSummary, SeedPanel, type LoadedSeed } from './SeedPanel';
+import { SeedPanel, SummaryChips, shortSeedCode, type LoadedSeed } from './SeedPanel';
 import { RunHistoryPanel } from './RunHistoryPanel';
-import { OUTCOME_MESSAGES, isLoadedSeedModified, joinConfig, splitConfig } from '@ds1tr/contracts';
-import type { RunHistoryEntry, EnemyPlacementAlgorithm, FogLanguage, GameStateReport, GwynNerfMode, SecondGargoyleMode, SoulItemsMode, StartingItemsMode, GenerationResult, PipelinePlan, RandomizerConfig } from '@ds1tr/contracts';
+import { OUTCOME_MESSAGES, deriveRunPhase, isLoadedSeedModified, joinConfig, splitConfig } from '@ds1tr/contracts';
+import type { RunPhase, RunHistoryEntry, EnemyPlacementAlgorithm, FogLanguage, GameStateReport, GwynNerfMode, SecondGargoyleMode, SoulItemsMode, StartingItemsMode, GenerationResult, PipelinePlan, RandomizerConfig } from '@ds1tr/contracts';
 import { api } from './api';
+import ludos from './assets/branding/ludos.png';
 
 const initialConfig: RandomizerConfig = {
   gamePath: '',
@@ -119,11 +120,22 @@ function stateText(state: GameStateReport | null): string {
   }
 }
 
+function phaseTitle(phase: RunPhase): string {
+  switch (phase) {
+    case 'generated': return 'Ready to apply';
+    case 'applied': return 'Randomized game';
+    case 'repair': return 'Repair needed';
+    case 'blocked': return 'Your game';
+    case 'working': return 'Working';
+    default: return 'Randomize';
+  }
+}
+
 function progressLabel(stage: string): string {
   switch (stage) {
     case 'verify': case 'import': return 'Checking your game';
     case 'combined': return 'Randomizing items and enemies';
-    case 'fog': return 'Randomizing the world';
+    case 'fog': return 'Randomizing fog gates and warps';
     default: return 'Working';
   }
 }
@@ -153,6 +165,10 @@ export function App() {
   const [settingsWarning, setSettingsWarning] = useState<string | null>(null);
   const [launchMessage, setLaunchMessage] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  /** A shared world waiting for the game to be original again (restoring is the one thing the person has to do). */
+  const [pendingSeed, setPendingSeed] = useState<LoadedSeed | null>(null);
+  const [workLabel, setWorkLabel] = useState('Working');
+  const [runMenuOpen, setRunMenuOpen] = useState(false);
 
   useEffect(() => {
     api.health().then(setBackendOnline);
@@ -194,6 +210,8 @@ export function App() {
   }, [settingsReady, settingsKey, config.output.generateSpoilerLog]);
 
   const seedModified = loadedSeed !== null && isLoadedSeedModified(loadedSeed.settings, currentSettings);
+  const appliedEntry = history.find((entry) => entry.status === 'applied') ?? null;
+  const phase = deriveRunPhase({ busy, gameState: gameState?.state ?? null, hasGeneratedWorld: generation?.ok === true });
 
   const enabledCount = useMemo(
     () => Number(config.items.enabled || config.enemies.enabled) + Number(config.fog.enabled),
@@ -246,6 +264,8 @@ export function App() {
     setBusy(true);
     setProgress(0);
     setProgressStage('Preparing generation');
+    setRunMenuOpen(false);
+    setPendingSeed(null);
     setLogs([]);
     setGeneration(null);
     setErrorMessage(null);
@@ -267,13 +287,14 @@ export function App() {
         setErrorMessage(result.message);
         setLogs((current) => [...current, `[${result.stage}] failed: ${result.code}`]);
       }
-      setMessage(result.ok ? 'Your randomized game is ready. Click "Apply to game".' : result.message);
+      setMessage(result.ok ? 'Your randomized game is ready.' : result.message);
     } catch (error) { reportError(error); }
     finally { setBusy(false); }
   };
 
   const applyPackage = async (packagePath: string) => {
     setBusy(true);
+    setWorkLabel('Applying the randomized game');
     setProgressStage('');
     setErrorMessage(null);
     setNotice(null);
@@ -300,6 +321,7 @@ export function App() {
 
   const restore = async () => {
     setBusy(true);
+    setWorkLabel('Restoring the original game');
     setProgressStage('');
     setErrorMessage(null);
     setNotice(null);
@@ -307,6 +329,7 @@ export function App() {
     try {
       const result = await api.restore(config.gamePath);
       if (result.ok) {
+        setGeneration(null);
         setNotice({ ...OUTCOME_MESSAGES.restored });
         setMessage(OUTCOME_MESSAGES.restored.text);
       } else {
@@ -342,12 +365,56 @@ export function App() {
     setConfig((current) => joinConfig(seed.settings, current.gamePath, '', current.output.generateSpoilerLog));
     setLoadedSeed(seed);
     setSeedPanelOpen(false);
-    setMessage('Shared world loaded. Click "Generate this world" to create it.');
   };
 
-  const recreate = async (entry: RunHistoryEntry) => {
-    adoptSeed({ code: entry.seedCode, settings: entry.settings });
+  /** Load seed: take over the settings of the code and create that exact world. If the game is not original, restoring comes first. */
+  const loadSeed = async (seed: LoadedSeed) => {
+    adoptSeed(seed);
+    setNotice(null);
+    setErrorMessage(null);
+    if (gameState?.state === 'vanilla') await generateShared(seed);
+    else setPendingSeed(seed);
+  };
+
+  /** The Fog data has to be ready before a world that uses it is created; the check is quick when it already is. */
+  const generateShared = async (seed: LoadedSeed) => {
+    if (seed.settings.fog.enabled) {
+      setBusy(true);
+      setWorkLabel('Preparing the fog randomizer');
+      try {
+        const prepared = await api.prepareWorldData(config.gamePath);
+        if (!prepared.ok) { setErrorMessage(prepared.userMessage); setBusy(false); return; }
+      } catch (error) { setBusy(false); reportError(error); return; }
+      setBusy(false);
+    }
+    await generateRun(seed.code);
+  };
+
+  /** Regenerate files: the same world again from its Seed Code. It refreshes the history entry; it is not a new run. */
+  const regenerate = async (entry: RunHistoryEntry) => {
     await generateRun(entry.seedCode);
+  };
+
+  // A shared world that was waiting for an original game is created as soon as the game is original again.
+  useEffect(() => {
+    if (pendingSeed && phase === 'ready') {
+      const seed = pendingSeed;
+      setPendingSeed(null);
+      void generateShared(seed);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingSeed, phase]);
+
+  const deleteEntry = async (entry: RunHistoryEntry) => {
+    try { await api.deleteHistoryEntry(entry.id); } catch { /* the entry stays */ }
+    await refreshHistory();
+  };
+
+  const spoilerOf = async (entry: RunHistoryEntry): Promise<string> => {
+    try {
+      const result = await api.spoiler(entry.id);
+      return result.ok ? result.text : result.message;
+    } catch { return 'The spoiler log could not be read.'; }
   };
 
   const exportPreset = async () => {
@@ -391,16 +458,19 @@ export function App() {
 
   return (
     <div className="app-shell">
-      <header>
-        <div><div className="eyebrow">DARK SOULS REMASTERED</div><h1>Triple Randomizer</h1><p>Randomize items, enemies and the world of Dark Souls Remastered.</p></div>
-        <div className={`status ${backendOnline ? 'online' : 'offline'}`}><span /> {backendOnline === null ? 'Starting...' : backendOnline ? 'Ready' : 'Not running'}</div>
+      <header className="hero">
+        <div className="hero-brand"><div className="eyebrow">DARK SOULS REMASTERED</div><h1>Triple Randomizer</h1><p>Randomize items, enemies and fog gates of Dark Souls Remastered.</p></div>
+        <div className="hero-side">
+          <div className={`status ${backendOnline ? 'online' : 'offline'}`}><span /> {backendOnline === null ? 'Starting...' : backendOnline ? 'Ready' : 'Not running'}</div>
+          <img className="hero-ludos" src={ludos} alt="" aria-hidden="true" draggable={false} />
+        </div>
       </header>
 
       <main>
         {settingsWarning && <div className="notice">{settingsWarning}</div>}
         {startupError && <div className="notice error">DS1 Triple Randomizer could not start its engine. Close and reopen the app; if it keeps happening, download the app again.<details><summary>Details</summary>{startupError}</details></div>}
         <section className="card setup-card">
-          <div className="section-title"><span>01</span><h2>Your game and seed</h2></div>
+          <div className="section-title"><span>01</span><h2>Your game</h2></div>
           <Readiness
             gamePath={config.gamePath}
             backendReady={backendOnline === true}
@@ -497,7 +567,7 @@ export function App() {
           </section>
 
           <section className={`card engine-card ${config.fog.enabled ? '' : 'disabled-card'}`}>
-            <div className="engine-heading"><div><span className="engine-index">WORLD</span><h2>World settings</h2></div><input type="checkbox" checked={config.fog.enabled} onChange={(event) => setFog('enabled', event.target.checked)} /></div>
+            <div className="engine-heading"><div><span className="engine-index">FOG</span><h2>Fog randomizer settings</h2><p className="engine-note">Randomizes fog gates, warps and world progression.</p></div><input type="checkbox" checked={config.fog.enabled} onChange={(event) => setFog('enabled', event.target.checked)} /></div>
             <div className="option-group"><h3>Entrances</h3>
               <Toggle label="Traversable non-boss fogs" checked={config.fog.traversableFogs} onChange={(value) => setFog('traversableFogs', value)} />
               <Toggle label="Boss fog gates" checked={config.fog.bossFogs} onChange={(value) => setFog('bossFogs', value)} />
@@ -519,34 +589,91 @@ export function App() {
           </section>
         </div>
 
-        <section className="card action-card"><div><div className="eyebrow">YOUR SELECTION</div><h2>{enabledCount} of 3 parts switched on</h2><p role="status">{message}</p>{errorMessage && <div className="notice error" role="alert">{errorMessage}</div>}</div></section>
+        <section className={`card run-card phase-${phase}`}>
+          <div className="section-title"><span>02</span><h2>{phaseTitle(phase)}</h2></div>
+          <p className="sr-only" role="status">{message}</p>
+          {phase === 'working' && (
+            <div className="progress-status">
+              <span>{progressStage ? `${progressLabel(progressStage)}: ${Math.round(progress * 100)}%` : `${workLabel}...`}</span>
+              {progressStage ? <progress value={progress} max={1} aria-label="Progress" /> : <progress aria-label="Progress" />}
+            </div>
+          )}
+          {phase !== 'working' && <p className="run-state">{stateText(gameState)}</p>}
+          {errorMessage && <div className="notice error" role="alert">{errorMessage}</div>}
 
-        <section className="card run-card">
-          <div className="section-title"><span>02</span><h2>Randomize</h2></div>
-          <p>{stateText(gameState)}</p>
-          <div className="run-actions">
-            <button className="primary" onClick={() => void generateRun()} disabled={busy || !config.gamePath || gameState?.state !== 'vanilla' || enabledCount === 0}>Randomize</button>
-            <button className="secondary" onClick={() => setSeedPanelOpen((open) => !open)} disabled={busy}>Load seed</button>
-            <button className="secondary" onClick={() => void activate()} disabled={busy || !generation?.ok || gameState?.state !== 'vanilla'}>Apply to game</button>
-            <button className="secondary" onClick={restore} disabled={busy || !gameState || !['active', 'interrupted'].includes(gameState.state)}>Restore original game</button>
-            {(gameState?.state === 'active' || notice !== null) && <button className="primary" onClick={() => void launch()} disabled={busy || !config.gamePath}>Launch game</button>}
-          </div>
-          {seedPanelOpen && <SeedPanel busy={busy} onLoaded={adoptSeed} onClose={() => setSeedPanelOpen(false)} />}
-          {loadedSeed && <LoadedSeedSummary settings={loadedSeed.settings} modified={seedModified} busy={busy || gameState?.state !== 'vanilla'} onGenerate={() => void generateRun(loadedSeed.code)} />}
-          {notice && <div className="notice success apply-notice" role="status"><strong>{notice.text}</strong><span>{notice.sub}</span></div>}
-          {launchMessage && <div className="notice" role="status">{launchMessage}</div>}
-          {busy && progressStage && <div className="progress-status"><span>{progressLabel(progressStage)}: {Math.round(progress * 100)}%</span><progress value={progress} max={1} aria-label="Progress" /></div>}
-          {generation?.ok && <div className="generated-status" role="status">
-            <strong>Your randomized game is ready</strong>
-            <span>Seed code - share it to give someone the same world:</span>
-            <textarea className="run-logs seed-output" readOnly rows={3} aria-label="Seed code" value={generation.seedCode} onFocus={(event) => event.currentTarget.select()} />
-            <div className="run-actions"><button className="secondary" onClick={() => void copySeed(generation.seedCode)}>{copied ? 'Copied' : 'Copy seed'}</button></div>
-          </div>}
-          <h3 className="history-title">History</h3>
+          {phase === 'ready' && (
+            <>
+              {notice && <div className="notice success apply-notice" role="status"><strong>{notice.text}</strong><span>{notice.sub}</span></div>}
+              <SummaryChips settings={currentSettings} />
+              <div className="run-actions">
+                <button className="primary" onClick={() => void generateRun()} disabled={!config.gamePath || enabledCount === 0}>Randomize</button>
+                <button className="secondary" onClick={() => setSeedPanelOpen((open) => !open)}>Load seed</button>
+              </div>
+            </>
+          )}
+
+          {phase === 'generated' && generation?.ok && (
+            <>
+              <div className="generated-status" role="status">
+                <strong>Your randomized game is ready</strong>
+                <textarea className="run-logs seed-output" readOnly rows={2} aria-label="Seed code" value={generation.seedCode} onFocus={(event) => event.currentTarget.select()} />
+                <SummaryChips settings={currentSettings} />
+                {seedModified && <span className="stale-warning">You changed the settings, so Randomize will create a new world with a new seed code.</span>}
+              </div>
+              <div className="run-actions">
+                <button className="primary" onClick={() => void activate()}>Apply to game</button>
+                <button className="secondary" onClick={() => void copySeed(generation.seedCode)}>{copied ? 'Copied' : 'Copy seed'}</button>
+                <div className="menu-anchor">
+                  <button className="secondary" aria-label="More actions" aria-haspopup="menu" aria-expanded={runMenuOpen} onClick={() => setRunMenuOpen((open) => !open)}>…</button>
+                  {runMenuOpen && (
+                    <div className="menu" role="menu">
+                      <button role="menuitem" onClick={() => void generateRun()} disabled={!config.gamePath || enabledCount === 0}>Randomize again</button>
+                      <button role="menuitem" onClick={() => { setRunMenuOpen(false); setSeedPanelOpen(true); }}>Load seed</button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+
+          {phase === 'applied' && (
+            <>
+              {notice && <div className="notice success apply-notice" role="status"><strong>{notice.text}</strong><span>{notice.sub}</span></div>}
+              {launchMessage && <div className="notice" role="status">{launchMessage}</div>}
+              {pendingSeed && <div className="notice" role="status">To create the shared world, restore the original game first. It is created automatically afterwards.</div>}
+              <div className="run-actions">
+                <button className="primary" onClick={() => void launch()} disabled={!config.gamePath}>Launch game</button>
+                <button className="secondary" onClick={restore}>{pendingSeed ? 'Restore and create shared world' : 'Restore original game'}</button>
+                {appliedEntry && <button className="secondary" onClick={() => void copySeed(appliedEntry.seedCode)} title={appliedEntry.seedCode}>{copied ? 'Copied' : `Copy seed ${shortSeedCode(appliedEntry.seedCode)}`}</button>}
+                <div className="menu-anchor">
+                  <button className="secondary" aria-label="More actions" aria-haspopup="menu" aria-expanded={runMenuOpen} onClick={() => setRunMenuOpen((open) => !open)}>…</button>
+                  {runMenuOpen && (
+                    <div className="menu" role="menu">
+                      <button role="menuitem" onClick={() => { setRunMenuOpen(false); setSeedPanelOpen(true); }}>Load seed</button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+
+          {phase === 'repair' && (
+            <>
+              {pendingSeed && <div className="notice" role="status">To create the shared world, repair the game first. It is created automatically afterwards.</div>}
+              <div className="run-actions"><button className="primary" onClick={restore}>Restore original game</button></div>
+            </>
+          )}
+
+          {phase === 'blocked' && pendingSeed && <div className="notice" role="status">The shared world is created as soon as your game is ready.</div>}
+          {phase === 'blocked' && gameState?.state === 'version-changed' && <div className="run-actions"><button className="primary" onClick={restore}>Restore original game</button></div>}
+
+          {seedPanelOpen && phase !== 'working' && <SeedPanel busy={busy} onLoaded={(seed) => void loadSeed(seed)} onClose={() => setSeedPanelOpen(false)} />}
+
           <RunHistoryPanel
             entries={history} gameState={gameState} busy={busy}
-            onApply={(entry) => void applyPackage(entry.packagePath)} onRecreate={(entry) => void recreate(entry)}
+            onApply={(entry) => void applyPackage(entry.packagePath)} onRegenerate={(entry) => void regenerate(entry)}
             onCopy={(entry) => void copySeed(entry.seedCode)} onLaunch={() => void launch()}
+            onDelete={(entry) => void deleteEntry(entry)} onSpoiler={spoilerOf}
           />
           <details className="log-panel" open={logs.length > 0}><summary>Advanced</summary>
             <div className="run-actions">

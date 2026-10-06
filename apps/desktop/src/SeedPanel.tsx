@@ -7,17 +7,24 @@ export interface LoadedSeed { code: string; settings: GenerationSettings }
 
 export const SummaryChips = ({ settings }: { settings: GenerationSettings }) => {
   const summary = summarize(settings);
-  const chip = (label: string, on: boolean) => <span key={label} className={`summary-chip ${on ? 'on' : 'off'}`}>{label} {on ? '✓' : '–'}</span>;
-  return <div className="summary-row">{chip('Items', summary.items)}{chip('Enemies', summary.enemies)}{chip('Bosses', summary.bosses)}{chip('World', summary.world)}</div>;
+  const chip = (label: string, on: boolean) => <span key={label} className={`summary-chip ${on ? 'on' : 'off'}`}>{label}</span>;
+  return <div className="summary-row">{chip('Items', summary.items)}{chip('Enemies', summary.enemies)}{chip('Bosses', summary.bosses)}{chip('Fog', summary.fog)}</div>;
+};
+
+/** `DS1TR1-06NJDCP6-...-2G`: the start and the end are enough to recognize a code in a list. */
+export const shortSeedCode = (code: string): string => {
+  const groups = code.split('-');
+  return groups.length <= 3 ? code : `${groups[0]}-${groups[1]}…${groups[groups.length - 1]}`;
 };
 
 interface Props {
   busy: boolean;
+  /** Called with a valid, decoded code: the app takes over its settings and generates that exact world. */
   onLoaded: (seed: LoadedSeed) => void;
   onClose: () => void;
 }
 
-/** "Load seed": paste a Seed Code; the app checks it and takes over the settings stored inside. */
+/** "Load seed": paste a Seed Code. A valid code is loaded and its world is created right away; there is no second step. */
 export function SeedPanel({ busy, onLoaded, onClose }: Props) {
   const [text, setText] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -29,8 +36,8 @@ export function SeedPanel({ busy, onLoaded, onClose }: Props) {
     try {
       const result = await api.decodeSeed(text);
       if (!result.ok) { setError(result.message); return; }
-      onLoaded({ code: result.seedCode, settings: result.settings });
       setText('');
+      onLoaded({ code: result.seedCode, settings: result.settings });
     } catch {
       setError('The seed code could not be checked. Restart the app and try again.');
     } finally {
@@ -47,18 +54,6 @@ export function SeedPanel({ busy, onLoaded, onClose }: Props) {
         <button className="primary" disabled={busy || checking || !text.trim()} onClick={() => void load()}>Load</button>
         <button className="secondary" onClick={onClose}>Cancel</button>
       </div>
-    </div>
-  );
-}
-
-export function LoadedSeedSummary({ settings, modified, busy, onGenerate }: { settings: GenerationSettings; modified: boolean; busy: boolean; onGenerate: () => void }) {
-  return (
-    <div className={`loaded-seed ${modified ? 'modified' : ''}`}>
-      <strong>{modified ? 'Settings changed' : 'Shared world loaded'}</strong>
-      <SummaryChips settings={settings} />
-      {modified
-        ? <p>You changed the settings, so this is no longer the shared world. Randomize will create a new world with a new seed code.</p>
-        : <><p>The settings below are the ones stored in the seed code.</p><button className="primary" disabled={busy} onClick={onGenerate}>Generate this world</button></>}
     </div>
   );
 }

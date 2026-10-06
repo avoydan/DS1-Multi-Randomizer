@@ -88,7 +88,7 @@ const defaults: GenerationDependencies = {
   getFogPrerequisites: (language, context) => resolveFogPrerequisites(language, process.env, context),
   combined: executeCombinedGeneration,
   fog: new FogHostProcess(),
-  appVersion: '0.30.0',
+  appVersion: '0.31.0',
 };
 
 async function fingerprint(file: string): Promise<{ size: number; sha256: string }> {
@@ -176,16 +176,16 @@ export async function generateRun(
 
   let fogReady: FogPrerequisites | null = null;
   if (config.fog.enabled) {
-    progress('fog', 0.12, 'Preparing world randomizer...');
+    progress('fog', 0.12, 'Preparing fog randomizer...');
     const prerequisites = await services.getFogPrerequisites(config.fog.language, {
       pristineDirectory: pristine.directory,
       onProgress: (event) => progress('fog', 0.12 + 0.03 * event.fraction, event.message),
     });
     if (!prerequisites) return fail('fog', 'FOG_PREREQUISITES_MISSING',
-      'The world randomizer is not available in this installation. Turn it off, or download DS1 Triple Randomizer again.');
+      'The fog randomizer is not available in this installation. Turn it off, or download DS1 Triple Randomizer again.');
     if ('failure' in prerequisites) {
       const { code, userMessage, technical } = prerequisites.failure;
-      manifest.validation.push(`world randomizer: ${code}: ${technical}`);
+      manifest.validation.push(`fog randomizer: ${code}: ${technical}`);
       onEvent({ type: 'log', stage: 'fog', level: 'info', message: `Details: ${code}: ${technical}` });
       return fail('fog', code === 'FOG_HOST_MISSING' ? 'FOG_PREREQUISITES_MISSING' : code, userMessage);
     }
@@ -193,10 +193,10 @@ export async function generateRun(
     const dataDrift = drift({ worldDataId: prerequisites.worldDataId });
     if (dataDrift) return fail('fog', 'GENERATION_PROFILE_MISMATCH', dataDrift);
     try { await requireFile(fogReady.executablePath); await access(fogReady.dataRoot); }
-    catch { return fail('fog', 'FOG_PREREQUISITES_MISSING', 'The world randomizer files could not be found. Click Retry; if it keeps failing, download DS1 Triple Randomizer again.'); }
+    catch { return fail('fog', 'FOG_PREREQUISITES_MISSING', 'The fog randomizer files could not be found. Click Retry; if it keeps failing, download DS1 Triple Randomizer again.'); }
   }
 
-  // The world randomizer follows some items by lot; the item shuffle must keep them where it can (fogItemRules.ts).
+  // The fog randomizer follows some items by lot; the item shuffle must keep them where it can (fogItemRules.ts).
   let fogTrackedItems: FogTrackedItems | null = null;
   if (fogReady) {
     try { fogTrackedItems = await readFogItemRules(fogReady.dataRoot); } catch (error) {

@@ -9,7 +9,7 @@ FogMod settings.
 1. Download **DS1 Triple Randomizer** and run it.
 2. Choose your settings.
 3. Click **Randomize**, then **Apply to game**.
-4. Start Dark Souls Remastered from Steam and play offline.
+4. Click **Launch game** (or start Dark Souls Remastered from Steam) and play offline.
 
 Every run gets a **Seed Code** (it starts with `DS1TR`). Share it with a friend: they click **Load seed**, paste it, and get
 exactly the same world. Seed Codes include the randomizer settings needed to reproduce the same world, and they keep working in

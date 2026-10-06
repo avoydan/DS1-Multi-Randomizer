@@ -114,3 +114,34 @@ input:focus, select:focus { border-color: #8e7043; box-shadow: 0 0 0 3px #8e7043
 .history-status { font-size: 11px; padding: 2px 8px; border-radius: 100px; background: #272e39; color: #b4bcc9; }
 .history-status.applied { background: #173322; color: #8ed0a5; }
 
+.hero { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 18px 28px; }
+.hero-side { display: flex; flex-direction: column; align-items: flex-end; gap: 12px; }
+/* A small deliberate signature, never the primary brand: fixed modest width, muted, no frame. */
+.hero-ludos { display: block; width: clamp(110px, 11vw, 150px); height: auto; opacity: .82; user-select: none; pointer-events: none; }
+@media (max-width: 760px) {
+  .app-shell { padding: 22px 18px 40px; }
+  .hero { grid-template-columns: 1fr; }
+  .hero-side { flex-direction: row-reverse; align-items: center; justify-content: space-between; }
+  .hero-ludos { width: 110px; }
+}
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.engine-note { margin: 4px 0 0; font-size: 11px; }
+.run-state { margin: 0 0 4px; }
+.summary-chip.off { opacity: .45; text-decoration: line-through; }
+.run-card .summary-row { margin-top: 10px; }
+.history { margin-top: 22px; }
+.history-toggle { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 14px; border: 1px solid #29303b; border-radius: 10px; background: #131821; color: #e5e9ef; font-size: 13px; font-weight: 650; text-align: left; }
+.history-toggle:hover { background: #181e29; }
+.history-count { padding: 1px 8px; border-radius: 100px; background: #272e39; color: #b4bcc9; font-size: 11px; font-weight: 700; }
+.history-caret { margin-left: auto; color: #8791a0; font-size: 11px; }
+.history .history-list { margin-top: 8px; }
+.history-seed { color: #b4bcc9; font-size: 11px; }
+.history-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.history-actions .primary { padding: 8px 15px; font-size: 13px; box-shadow: none; }
+.history-actions .secondary { padding: 8px 12px; font-size: 13px; }
+.history-details-title { display: flex; justify-content: space-between; align-items: center; margin: 8px 0 4px; font-size: 12px; }
+.menu-anchor { position: relative; }
+.menu { position: absolute; z-index: 5; top: calc(100% + 4px); left: 0; min-width: 190px; display: grid; padding: 5px; border: 1px solid #353d49; border-radius: 10px; background: #181e29; box-shadow: 0 14px 34px rgba(0, 0, 0, .45); }
+.menu button { padding: 8px 10px; border: 0; border-radius: 7px; background: none; color: #e5e9ef; font-size: 13px; text-align: left; }
+.menu button:hover:not(:disabled) { background: #272e39; }
+.menu button.danger { color: #dd9999; }

@@ -5,7 +5,7 @@ import { api, type DetectedInstallation } from './api';
 interface Props {
   gamePath: string;
   backendReady: boolean;
-  /** The world randomizer (fog gates) is switched on, so its data has to be ready. */
+  /** The fog randomizer (fog gates) is switched on, so its data has to be ready. */
   worldNeeded: boolean;
   onPath: (path: string) => void;
   onState: (state: GameStateReport | null) => void;
@@ -35,7 +35,7 @@ const plainState: Record<GameStateReport['state'], string> = {
 };
 
 /**
- * First-run readiness: finds Dark Souls Remastered, checks it and prepares the world randomizer, all without asking the
+ * First-run readiness: finds Dark Souls Remastered, checks it and prepares the fog randomizer, all without asking the
  * person for anything but, at most, which installation to use. Technical details stay in the backend log.
  */
 export function Readiness({ gamePath, backendReady, worldNeeded, onPath, onState, refreshKey, busy }: Props) {
@@ -103,12 +103,12 @@ export function Readiness({ gamePath, backendReady, worldNeeded, onPath, onState
   }, [backendReady, gamePath, refreshKey, checkGame]);
 
   const prepareWorld = useCallback(async () => {
-    setWorld({ kind: 'preparing', message: 'Preparing world randomizer...' });
+    setWorld({ kind: 'preparing', message: 'Preparing fog randomizer...' });
     try {
       const result = await api.prepareWorldData(gamePath);
       setWorld(result.ok ? { kind: 'ready' } : { kind: 'failed', message: result.userMessage });
     } catch {
-      setWorld({ kind: 'failed', message: 'The world randomizer could not be prepared. Click Retry.' });
+      setWorld({ kind: 'failed', message: 'The fog randomizer could not be prepared. Click Retry.' });
     }
   }, [gamePath]);
 
@@ -157,7 +157,7 @@ export function Readiness({ gamePath, backendReady, worldNeeded, onPath, onState
         <div className={`readiness-row ${world.kind}`}>
           <span className="readiness-mark">{world.kind === 'ready' ? '✓' : world.kind === 'failed' ? '!' : '…'}</span>
           <div>
-            <strong>{world.kind === 'ready' ? 'World randomizer ready' : world.kind === 'failed' ? 'World randomizer needs attention' : world.kind === 'preparing' ? world.message : 'World randomizer'}</strong>
+            <strong>{world.kind === 'ready' ? 'Fog randomizer ready' : world.kind === 'failed' ? 'Fog randomizer needs attention' : world.kind === 'preparing' ? world.message : 'Fog randomizer'}</strong>
             {world.kind === 'failed' && <p>{world.message}</p>}
           </div>
           {world.kind === 'failed' && <button className="secondary" onClick={() => void prepareWorld()}>Retry</button>}

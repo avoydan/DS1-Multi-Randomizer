@@ -164,3 +164,24 @@ export const OUTCOME_MESSAGES = {
   applied: { text: 'Randomized game applied successfully.', sub: 'You can now launch Dark Souls Remastered.' },
   restored: { text: 'Original game restored successfully.', sub: 'Dark Souls Remastered is back to its original files.' },
 } as const;
+
+/**
+ * What the run area of the app shows. The action buttons follow this state, so only what applies right now is offered:
+ *   ready      original game: Randomize, Load seed
+ *   generated  a world is ready: Apply to game (Copy seed secondary)
+ *   applied    a randomized game is in place: Launch game, Restore original game
+ *   repair     an interrupted change: Restore original game
+ *   blocked    the game cannot be used yet (not found, modified, updated): a message and nothing to click
+ *   working    a long operation is running: progress only
+ */
+export type RunPhase = 'ready' | 'generated' | 'applied' | 'repair' | 'blocked' | 'working';
+
+export function deriveRunPhase(input: { busy: boolean; gameState: string | null; hasGeneratedWorld: boolean }): RunPhase {
+  if (input.busy) return 'working';
+  switch (input.gameState) {
+    case 'active': return 'applied';
+    case 'interrupted': return 'repair';
+    case 'vanilla': return input.hasGeneratedWorld ? 'generated' : 'ready';
+    default: return 'blocked';
+  }
+}

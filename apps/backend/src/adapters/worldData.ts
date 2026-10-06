@@ -209,10 +209,10 @@ async function assemble(options: WorldDataOptions): Promise<WorldDataResult> {
   const report = (fraction: number, message: string): void => options.onProgress?.({ fraction, message });
   const root = path.join(options.cacheRoot, id);
 
-  report(0, 'Checking world randomizer data...');
+  report(0, 'Checking fog randomizer data...');
   const current = await verifyWorldDataRoot(root, manifest);
   if (current.ok) {
-    report(1, 'World randomizer data is ready.');
+    report(1, 'Fog randomizer data is ready.');
     return { ok: true, root, reused: true, downloaded: 0, derived: 0 };
   }
 
@@ -241,7 +241,7 @@ async function assemble(options: WorldDataOptions): Promise<WorldDataResult> {
     }
 
     for (const entry of manifest.filter((candidate) => candidate.origin === 'game' && !reusable.has(candidate.path))) {
-      report(0.05 + 0.15 * (done / needed), 'Preparing world randomizer data...');
+      report(0.05 + 0.15 * (done / needed), 'Preparing fog randomizer data...');
       let content: Buffer;
       try { content = await readFile(path.join(options.pristineDirectory, ...(entry.gamePath ?? '').split('/'))); } catch (error) {
         return failure('WORLD_DATA_GAME_FILES', 'Your Dark Souls Remastered files could not be read. Verify the game files in Steam and try again.',
@@ -250,7 +250,7 @@ async function assemble(options: WorldDataOptions): Promise<WorldDataResult> {
       const actual = hashWorldDataContent(content, entry.text);
       if (actual !== entry.sha256) {
         return failure('WORLD_DATA_GAME_VERSION',
-          'This version of Dark Souls Remastered is not supported by the world randomizer yet. Verify the game files in Steam, or turn the world randomizer off.',
+          'This version of Dark Souls Remastered is not supported by the fog randomizer yet. Verify the game files in Steam, or turn the fog randomizer off.',
           `${entry.gamePath} does not match the expected content (sha256 ${actual}, expected ${entry.sha256}).`);
       }
       await place(entry, content);
@@ -274,16 +274,16 @@ async function assemble(options: WorldDataOptions): Promise<WorldDataResult> {
         await place(entry, result.bytes);
         downloaded += 1;
         done += 1;
-        report(0.2 + 0.7 * (done / needed), 'Downloading required world randomizer data...');
+        report(0.2 + 0.7 * (done / needed), 'Downloading required fog randomizer data...');
       }
     };
     await Promise.all([worker(), worker(), worker(), worker()]);
     if (firstFailure) return firstFailure;
 
-    report(0.92, 'Verifying world randomizer data...');
+    report(0.92, 'Verifying fog randomizer data...');
     const verification = await verifyWorldDataRoot(staging, manifest);
     if (!verification.ok) {
-      return failure('WORLD_DATA_DOWNLOAD_CORRUPT', 'The world randomizer data could not be verified. Click Retry; if it keeps failing, check your internet connection.',
+      return failure('WORLD_DATA_DOWNLOAD_CORRUPT', 'The fog randomizer data could not be verified. Click Retry; if it keeps failing, check your internet connection.',
         `Prepared set failed verification: missing ${verification.missing.join(', ') || 'none'}; altered ${verification.altered.join(', ') || 'none'}; unexpected ${verification.unexpected.join(', ') || 'none'}.`);
     }
 
@@ -295,14 +295,14 @@ async function assemble(options: WorldDataOptions): Promise<WorldDataResult> {
       await rename(staging, root);
     } catch (error) {
       if (movedAside) await rename(aside, root).catch(() => undefined);
-      return failure('WORLD_DATA_WRITE_FAILED', 'The world randomizer data could not be saved. Check that the disk has free space and try again.',
+      return failure('WORLD_DATA_WRITE_FAILED', 'The fog randomizer data could not be saved. Check that the disk has free space and try again.',
         `Cannot install ${root}: ${error instanceof Error ? error.message : String(error)}`);
     }
     if (movedAside) await rm(aside, { recursive: true, force: true }).catch(() => undefined);
-    report(1, 'World randomizer data is ready.');
+    report(1, 'Fog randomizer data is ready.');
     return { ok: true, root, reused: false, downloaded, derived };
   } catch (error) {
-    return failure('WORLD_DATA_WRITE_FAILED', 'The world randomizer data could not be prepared. Check that the disk has free space and try again.',
+    return failure('WORLD_DATA_WRITE_FAILED', 'The fog randomizer data could not be prepared. Check that the disk has free space and try again.',
       error instanceof Error ? error.message : String(error));
   } finally {
     await rm(staging, { recursive: true, force: true }).catch(() => undefined);
@@ -330,6 +330,6 @@ async function download(
     if (attempt < attempts) await new Promise((resolve) => setTimeout(resolve, 250 * attempt));
   }
   return corrupt
-    ? { failure: failure('WORLD_DATA_DOWNLOAD_CORRUPT', 'The world randomizer data arrived damaged. Click Retry.', `${url}: ${lastError}`) }
-    : { failure: failure('WORLD_DATA_OFFLINE', 'The world randomizer files could not be prepared. Check your internet connection and click Retry.', `${url}: ${lastError}`) };
+    ? { failure: failure('WORLD_DATA_DOWNLOAD_CORRUPT', 'The fog randomizer data arrived damaged. Click Retry.', `${url}: ${lastError}`) }
+    : { failure: failure('WORLD_DATA_OFFLINE', 'The fog randomizer files could not be prepared. Check your internet connection and click Retry.', `${url}: ${lastError}`) };
 }

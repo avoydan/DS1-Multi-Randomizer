@@ -195,11 +195,11 @@ test('passes the Fog message language to the prerequisite provider', async () =>
   assert.equal(requested, 'POLISH');
 }));
 
-test('a world randomizer preparation failure is shown in plain language; the exact reason goes to the log and the manifest', async () => fixture(async ({ game, pristine, workspace }) => {
+test('a fog randomizer preparation failure is shown in plain language; the exact reason goes to the log and the manifest', async () => fixture(async ({ game, pristine, workspace }) => {
   const events = [];
   const result = await generateRun({ config: config(game, true), workspacePath: workspace }, (event) => events.push(event), {
     getPristineSource: async () => ({ directory: pristine }),
-    getFogPrerequisites: async () => ({ failure: { code: 'WORLD_DATA_OFFLINE', userMessage: 'The world randomizer files could not be prepared. Check your internet connection and click Retry.', technical: 'https://raw.githubusercontent.com/x: ENOTFOUND' } }),
+    getFogPrerequisites: async () => ({ failure: { code: 'WORLD_DATA_OFFLINE', userMessage: 'The fog randomizer files could not be prepared. Check your internet connection and click Retry.', technical: 'https://raw.githubusercontent.com/x: ENOTFOUND' } }),
     combined: async () => { throw new Error('unexpected'); },
   });
   assert.equal(result.ok, false);
@@ -215,11 +215,11 @@ test('the preparation step receives the verified pristine snapshot and reports p
   let context = null;
   await generateRun({ config: config(game, true), workspacePath: workspace }, (event) => events.push(event), {
     getPristineSource: async () => ({ directory: pristine }),
-    getFogPrerequisites: async (_language, received) => { context = received; received.onProgress({ fraction: 0.5, message: 'Downloading required world randomizer data...' }); return null; },
+    getFogPrerequisites: async (_language, received) => { context = received; received.onProgress({ fraction: 0.5, message: 'Downloading required fog randomizer data...' }); return null; },
     combined: async () => { throw new Error('unexpected'); },
   });
   assert.equal(context.pristineDirectory, pristine);
-  assert.ok(events.some((event) => event.type === 'progress' && event.stage === 'fog' && /Downloading required world randomizer data/u.test(event.message)));
+  assert.ok(events.some((event) => event.type === 'progress' && event.stage === 'fog' && /Downloading required fog randomizer data/u.test(event.message)));
 }));
 
 test('technical failures are turned into plain messages while the code and detail stay available', async () => fixture(async ({ game, pristine, workspace }) => {
@@ -235,7 +235,7 @@ test('technical failures are turned into plain messages while the code and detai
   assert.ok(events.some((event) => /0xC0000005/u.test(event.message)));
 }));
 
-test('Fog runs hand the combined engine the items the world randomizer follows and the lots it can follow them in', async () => fixture(async ({ root, game, pristine, workspace }) => {
+test('Fog runs hand the combined engine the items the fog randomizer follows and the lots it can follow them in', async () => fixture(async ({ root, game, pristine, workspace }) => {
   const executablePath = path.join(root, 'FogHost.exe');
   await writeFile(executablePath, 'host');
   const dataRoot = await fogData(root);
@@ -248,7 +248,7 @@ test('Fog runs hand the combined engine the items the world randomizer follows a
     fog: { execute: async () => ({ schemaVersion: 2, ok: false, error: { code: 'FOG_ENGINE_FAILED', retryable: false, retryScope: 'none', message: 'stop here' } }) },
   });
   assert.deepEqual(requests[0].fogTrackedItems, { items: [{ equipType: 2, itemId: 149, required: true }], lotStarts: [1300020] });
-  // Without the world randomizer nothing is constrained.
+  // Without the fog randomizer nothing is constrained.
   const plain = [];
   await generateRun({ config: config(game, false), workspacePath: path.join(root, 'plain') }, () => {}, {
     getPristineSource: async () => ({ directory: pristine }),
@@ -257,7 +257,7 @@ test('Fog runs hand the combined engine the items the world randomizer follows a
   assert.equal(plain[0].fogTrackedItems ?? null, null);
 }));
 
-test('a key item outside the world randomizer lots is structural: one attempt, no reseeding, plain message without internals', async () => fixture(async ({ root, game, pristine, workspace }) => {
+test('a key item outside the fog randomizer lots is structural: one attempt, no reseeding, plain message without internals', async () => fixture(async ({ root, game, pristine, workspace }) => {
   const executablePath = path.join(root, 'FogHost.exe');
   await writeFile(executablePath, 'host');
   const dataRoot = await fogData(root);

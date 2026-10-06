@@ -27,7 +27,7 @@ export interface FogPrerequisites {
   worldDataId?: string;
 }
 
-/** Why the world randomizer cannot run: a plain-language message for the person and the exact reason for diagnostics. */
+/** Why the fog randomizer cannot run: a plain-language message for the person and the exact reason for diagnostics. */
 export interface FogPrerequisiteFailure {
   failure: { code: string; userMessage: string; technical: string };
 }
@@ -68,7 +68,7 @@ export async function resolveFogPrerequisites(
   try { await access(executablePath); } catch {
     return { failure: {
       code: 'FOG_HOST_MISSING',
-      userMessage: 'A part of the world randomizer is missing from this installation. Please download DS1 Triple Randomizer again.',
+      userMessage: 'A part of the fog randomizer is missing from this installation. Please download DS1 Triple Randomizer again.',
       technical: `FogHost executable not found: ${executablePath}`,
     } };
   }

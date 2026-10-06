@@ -1,6 +1,6 @@
 import http from 'node:http';
 import { randomUUID } from 'node:crypto';
-import { access, mkdir } from 'node:fs/promises';
+import { access, mkdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { URL } from 'node:url';
 import type { RandomizerConfig } from '@ds1tr/contracts';
@@ -31,7 +31,7 @@ const generationDependencies = {
 };
 const runRoot = path.join(defaultStateRoot(), 'runs');
 const history = new RunHistory(defaultStateRoot());
-const APP_VERSION = '0.30.0';
+const APP_VERSION = '0.31.0';
 const runDependencies = { ...generationDependencies, appVersion: APP_VERSION };
 
 function send(res: http.ServerResponse, status: number, body: unknown): void {
@@ -150,6 +150,22 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { entries: await history.list(), supportedProfiles: supportedGenerationProfiles() });
     }
 
+    if (req.method === 'POST' && url.pathname === '/api/history/delete') {
+      const body = await readJson<{ id?: string }>(req);
+      return send(res, 200, { ok: typeof body.id === 'string' && await history.remove(body.id) });
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/history/spoiler') {
+      const body = await readJson<{ id?: string }>(req);
+      const entry = typeof body.id === 'string' ? await history.get(body.id) : null;
+      if (!entry?.spoilerPath) return send(res, 200, { ok: false, message: 'This world has no spoiler log.' });
+      try {
+        return send(res, 200, { ok: true, text: await readFile(entry.spoilerPath, 'utf8') });
+      } catch {
+        return send(res, 200, { ok: false, message: 'The spoiler log is no longer available. Use Regenerate files to create it again.' });
+      }
+    }
+
     if (req.method === 'POST' && url.pathname === '/api/settings/load') {
       const loaded = await loadPersistedSettings(defaultStateRoot());
       return send(res, 200, loaded);
@@ -186,11 +202,12 @@ const server = http.createServer(async (req, res) => {
         if (result.ok) {
           const spoiler = path.join(result.packagePath, 'spoiler.txt');
           const spoilerPath = await access(spoiler).then(() => spoiler, () => null);
-          await history.add({
+          // The same world generated again (Load seed, Regenerate files) refreshes its entry; it is not a new run.
+          const entry = await history.addOrRefresh({
             seedCode: prepared.seedCode, profile: prepared.profile.id, masterSeed: prepared.config.masterSeed, settings: prepared.envelope.settings,
             packagePath: result.packagePath, manifestPath: result.manifestPath, spoilerPath,
-          }).catch(() => undefined);
-          res.write(`event: result\ndata: ${JSON.stringify({ ...result, seedCode: prepared.seedCode, profile: prepared.profile.id, masterSeed: prepared.config.masterSeed })}\n\n`);
+          }).catch(() => null);
+          res.write(`event: result\ndata: ${JSON.stringify({ ...result, seedCode: prepared.seedCode, profile: prepared.profile.id, masterSeed: prepared.config.masterSeed, historyId: entry?.id ?? null })}\n\n`);
         } else {
           res.write(`event: result\ndata: ${JSON.stringify(result)}\n\n`);
         }

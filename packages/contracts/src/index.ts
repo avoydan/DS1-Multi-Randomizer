@@ -272,6 +272,8 @@ export type GenerationResult =
     ok: true; packagePath: string; manifestPath: string; manifest: { masterSeed: string; files: Array<{ path: string }> };
     /** The shareable Seed Code of this world, and the generation profile it was made with. */
     seedCode: string; profile: string;
+    /** The run-history entry of this world (an existing one when the same world was generated again). */
+    historyId?: string | null;
   }
   | { ok: false; code: string; message: string; stage: string };
 

@@ -1,5 +1,25 @@
 # Implementation status
 
+**State-based run area, branding, Fog wording (2026-10-06; desktop 0.18.0, backend 0.31.0, contracts 0.13.0; generation profile ds1tr-gen-v1 unchanged).**
+The run area now follows the state of the game (`deriveRunPhase`): original game shows Randomize and Load seed; a generated world shows
+Apply to game with Copy seed secondary; an applied game shows Launch game with Restore original game secondary; an interrupted change
+shows only Restore. One current message at a time (old success banners are cleared when the next action starts). Load seed generates
+the shared world immediately (no "Generate this world" step); when the game is not original, restoring is the one thing asked, and the
+world is created automatically afterwards. Run history is collapsed by default (`Run history  N  v`); a row shows time, status, a
+shortened Seed Code and Items/Enemies/Bosses/Fog chips with Apply / Play (or Launch game), Copy seed and an overflow menu (View
+settings, View spoiler log, Regenerate files, Delete from history). **Regenerate files** (formerly Recreate) refreshes the existing
+history entry (same id, Seed Code and creation time) instead of adding one; so does loading a Seed Code that is already in the history.
+The user-facing wording is Fog again ("Fog randomizer settings"); the master seed stays under Advanced. The packaged app has no
+File/Edit/View/Window/Help menu bar. Branding: the approved icon (`apps/desktop/assets/branding/ds1tr-icon-source.png`) is converted by
+`apps/desktop/scripts/make-icon.ps1` into `apps/desktop/build/icon.ico` (16, 24, 32, 48, 64, 128, 256 px) and used by electron-builder
+and the window; the approved LUDOS artwork (`apps/desktop/src/assets/branding/ludos.png`) is a small muted accent at the right of the header.
+
+- **Packaged proof (0.18.0):** menu bar absent (window client area equals window minus frame, `GetMenu` = 0); window, taskbar and EXE
+  icons are the DS1TR icon; the whole flow Randomize, Apply, Restore, restart (settings and history persist), Load seed (auto
+  generation, same Seed Code, settings restored, history still 1 entry), Regenerate files (same entry), Load seed while applied
+  (restore-and-continue) was driven through the UI.
+- **Tests:** backend 360 (358 pass, 2 skipped), desktop 5; new tests for the phase logic, history refresh/delete and the UX contract.
+
 **Seed Codes, generation profiles, history and launch (2026-10-06; backend 0.30.0, desktop 0.17.0, contracts 0.13.0; RANDOMIZER_VERSION 0.5.66 and FogHost 0.5.0 unchanged).**
 A world is now named by a self-contained Seed Code that carries an immutable generation profile (`ds1tr-gen-v1`), the internal
 master seed and the complete canonical settings; the app version is not an input of generation. New: Randomize / Load seed (the

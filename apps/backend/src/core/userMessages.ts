@@ -1,7 +1,7 @@
 /**
  * Plain-language text for failures the person using the app can see. The exact reason (code, paths, hashes) always stays in
  * the run log and the manifest; this only decides what the primary message says. A message that is already written for
- * people (the world randomizer preparation, custom enemy pool refusals) is passed through unchanged.
+ * people (the fog randomizer preparation, custom enemy pool refusals) is passed through unchanged.
  */
 
 const exact: Record<string, string> = {
@@ -14,12 +14,12 @@ const exact: Record<string, string> = {
   COMBINED_OUTPUT_INVALID: 'The randomized files failed a safety check, so nothing was changed. Try again, or use a different seed.',
   FOG_OUTPUT_MISMATCH: 'The randomized world files failed a safety check, so nothing was changed. Try again, or use a different seed.',
   FOG_OUTPUT_INVALID: 'The randomized world files failed a safety check, so nothing was changed. Try again, or use a different seed.',
-  FOG_BRIDGE_INPUT_INVALID: 'The world randomizer could not be set up with these settings. Try again, or change the world settings.',
-  FOG_STAGING_FAILED: 'The world randomizer could not be set up. Check that the disk has free space and try again.',
-  FOG_RETRIES_EXHAUSTED: 'The world randomizer could not find a working layout for this seed and these settings. Try another seed, or switch off some world options.',
-  FOG_SEED_UNSOLVABLE: 'The world randomizer could not find a working layout for this seed and these settings. Try another seed, or switch off some world options.',
-  FOG_UPSTREAM_INCOMPATIBLE: 'These item and world settings cannot be combined yet. Your game was not changed. Switch off the world randomizer or some extra item categories (NPC gifts, enemy drops, shops) and try again.',
-  FOG_ITEM_RULES_UNREADABLE: 'The world randomizer data could not be read. Click Randomize again; if it keeps failing, restart the app.',
+  FOG_BRIDGE_INPUT_INVALID: 'The fog randomizer could not be set up with these settings. Try again, or change the fog settings.',
+  FOG_STAGING_FAILED: 'The fog randomizer could not be set up. Check that the disk has free space and try again.',
+  FOG_RETRIES_EXHAUSTED: 'The fog randomizer could not find a working layout for this seed and these settings. Try another seed, or switch off some fog options.',
+  FOG_SEED_UNSOLVABLE: 'The fog randomizer could not find a working layout for this seed and these settings. Try another seed, or switch off some fog options.',
+  FOG_UPSTREAM_INCOMPATIBLE: 'These item and fog settings cannot be combined yet. Your game was not changed. Switch off the fog randomizer or some extra item categories (NPC gifts, enemy drops, shops) and try again.',
+  FOG_ITEM_RULES_UNREADABLE: 'The fog randomizer data could not be read. Click Randomize again; if it keeps failing, restart the app.',
   COMBINED_RETRIES_EXHAUSTED: 'No working combination was found for this seed. Try another seed.',
   GENERATION_PROFILE_MISMATCH: 'This copy of the app cannot reproduce that world exactly, so nothing was generated. Update or reinstall DS1 Triple Randomizer.',
   MANIFEST_WRITE_FAILED: 'Your randomized files could not be saved. Check that the disk has free space and try again.',
@@ -30,7 +30,7 @@ const readable = /^(WORLD_DATA_|FOG_PREREQUISITES_MISSING|ENEMY_PLACEMENT_CUSTOM
 
 export const genericFailureMessage = 'Something went wrong while creating your randomized game. Try another seed; the details are under Advanced.';
 
-export const genericWorldFailureMessage = 'The world randomizer stopped with an unexpected problem. Your game was not changed. Try again; if it keeps happening, switch off the world randomizer. The details are under Advanced.';
+export const genericWorldFailureMessage = 'The fog randomizer stopped with an unexpected problem. Your game was not changed. Try again; if it keeps happening, switch off the fog randomizer. The details are under Advanced.';
 
 export function userMessageFor(code: string, technical: string): string {
   if (exact[code]) return exact[code];

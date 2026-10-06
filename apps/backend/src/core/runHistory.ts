@@ -68,6 +68,45 @@ export class RunHistory {
     });
   }
 
+  /**
+   * The same world generated again (Load seed, Regenerate files) is not a new run: the existing entry keeps its identity (id, Seed
+   * Code, first creation time) and only gets the new files. Anything else is a new entry.
+   */
+  addOrRefresh(run: NewRun): Promise<RunHistoryEntry> {
+    return this.#exclusive(async () => {
+      const entries = await this.#read();
+      const index = entries.findIndex((entry) => entry.seedCode === run.seedCode);
+      if (index < 0) {
+        const entry: RunHistoryEntry = {
+          id: randomUUID(), createdAt: (run.now ?? new Date()).toISOString(), seedCode: run.seedCode, profile: run.profile,
+          masterSeed: run.masterSeed, settings: run.settings, status: 'generated', packagePath: run.packagePath,
+          manifestPath: run.manifestPath, spoilerPath: run.spoilerPath,
+        };
+        await this.#write([entry, ...entries]);
+        return entry;
+      }
+      const refreshed: RunHistoryEntry = {
+        ...entries[index], packagePath: run.packagePath, manifestPath: run.manifestPath, spoilerPath: run.spoilerPath, status: 'generated',
+      };
+      await this.#write(entries.map((entry, position) => (position === index ? refreshed : entry)));
+      return refreshed;
+    });
+  }
+
+  remove(id: string): Promise<boolean> {
+    return this.#exclusive(async () => {
+      const entries = await this.#read();
+      const kept = entries.filter((entry) => entry.id !== id);
+      if (kept.length === entries.length) return false;
+      await this.#write(kept);
+      return true;
+    });
+  }
+
+  async get(id: string): Promise<RunHistoryEntry | null> {
+    return (await this.#exclusive(() => this.#read())).find((entry) => entry.id === id) ?? null;
+  }
+
   /** Newest first, with `packageExists` computed now. */
   async list(): Promise<RunHistoryEntry[]> {
     const entries = await this.#exclusive(() => this.#read());

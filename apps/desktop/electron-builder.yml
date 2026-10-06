@@ -1,4 +1,4 @@
-﻿appId: com.ds1tr.desktop
+appId: com.ds1tr.desktop
 productName: DS1 Triple Randomizer
 artifactName: DS1-Triple-Randomizer-${version}-${arch}.${ext}
 directories:
@@ -11,12 +11,17 @@ files:
 extraResources:
   - from: release/runtime
     to: runtime
+  - from: build/icon.ico
+    to: icon.ico
 win:
+  icon: build/icon.ico
   target:
     - target: portable
       arch:
         - x64
-  signAndEditExecutable: false
+  # Edit the executable resources (icon, version info) but do not sign it.
+  signAndEditExecutable: true
+  signExecutable: false
 beforeBuild: ./scripts/skip-node-modules.cjs
 afterPack: ./scripts/stage-runtime-modules.cjs
 asar: true

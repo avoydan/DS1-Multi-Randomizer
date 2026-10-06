@@ -116,3 +116,30 @@ test('Recreate needs only the history entry: it works without the old run folder
   assert.deepEqual(recreated.envelope.settings, entry.settings);
   assert.equal(recreated.config.gamePath, 'D:\\Games\\Mine');
 }));
+
+test('generating the same world again refreshes its entry instead of adding another one (Load seed, Regenerate files)', async () => stateRoot(async (root) => {
+  const history = new RunHistory(root);
+  const first = await history.addOrRefresh({ ...entryFor('same-world', path.join(root, 'run-1')), now: new Date('2026-10-01T10:00:00Z') });
+  const other = await history.addOrRefresh({ ...entryFor('another-world', path.join(root, 'other')), now: new Date('2026-10-02T10:00:00Z') });
+  await history.markApplied(path.join(root, 'run-1'));
+  await history.markRestored();
+  const again = await history.addOrRefresh({ ...entryFor('same-world', path.join(root, 'run-2')), now: new Date('2026-10-05T10:00:00Z') });
+  assert.equal(again.id, first.id, 'the identity of the entry is kept');
+  assert.equal(again.seedCode, first.seedCode);
+  assert.equal(again.createdAt, '2026-10-01T10:00:00.000Z', 'the original creation time is kept');
+  assert.equal(again.packagePath, path.join(root, 'run-2'), 'the files are the new ones');
+  assert.equal(again.status, 'generated');
+  const list = await history.list();
+  assert.equal(list.length, 2, 'no duplicate entry');
+  assert.deepEqual(list.map((entry) => entry.id), [other.id, first.id], 'the order of the list is not disturbed');
+}));
+
+test('an entry can be deleted from the history and is then gone for good', async () => stateRoot(async (root) => {
+  const history = new RunHistory(root);
+  const a = await history.add(entryFor('1', path.join(root, '1')));
+  await history.add(entryFor('2', path.join(root, '2')));
+  assert.equal(await history.remove(a.id), true);
+  assert.equal(await history.remove(a.id), false);
+  assert.equal(await history.get(a.id), null);
+  assert.equal((await new RunHistory(root).list()).length, 1);
+}));

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from 'electron';
 import { spawn, execFile, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { readFile, writeFile, mkdir, access } from 'node:fs/promises';
@@ -103,8 +103,15 @@ async function startBackend(): Promise<void> {
   });
 }
 
+/** The DS1TR icon: shipped next to the runtime when packaged, in build/ during development. */
+const iconPath = () => (app.isPackaged ? path.join(process.resourcesPath, 'icon.ico') : path.join(currentDirectory, '..', 'build', 'icon.ico'));
+
 async function createWindow(): Promise<void> {
+  // The packaged app has no File / Edit / View / Window / Help menu bar; development builds keep Electron's default menu.
+  if (app.isPackaged) Menu.setApplicationMenu(null);
   const win = new BrowserWindow({
+    icon: iconPath(),
+    autoHideMenuBar: true,
     width: 1280,
     height: 820,
     minWidth: 980,

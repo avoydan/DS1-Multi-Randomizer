@@ -65,7 +65,7 @@ test('preparation failures keep the plain message for the person and the exact r
   assert.deepEqual(result.failure, { code: 'WORLD_DATA_OFFLINE', userMessage: 'Check your internet connection and click Retry.', technical: 'https://raw.githubusercontent.com/...: ENOTFOUND' });
 });
 
-test('a missing packaged world randomizer component is reported without developer terms', async () => {
+test('a missing packaged fog randomizer component is reported without developer terms', async () => {
   const result = await resolveFogPrerequisites('ENGLISH', { DS1TR_FOG_HOST: path.join(os.tmpdir(), 'no-such-host', 'FogHost.exe') }, {
     pristineDirectory: 'C:\\pristine',
     prepare: async () => { throw new Error('must not prepare without the component'); },
