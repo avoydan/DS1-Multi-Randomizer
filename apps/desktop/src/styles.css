@@ -148,3 +148,7 @@ input:focus, select:focus { border-color: #8e7043; box-shadow: 0 0 0 3px #8e7043
 .smoke-details { display: grid; gap: 6px; margin-top: 8px; }
 .smoke-details ul { margin: 2px 0 8px; padding-left: 18px; color: #b4bcc9; font-size: 12px; line-height: 1.5; }
 .smoke-details p { margin: 0; }
+
+.smoke-category { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; letter-spacing: 0.04em; text-transform: uppercase; }
+.smoke-category.quick { background: rgba(80, 160, 90, 0.2); }
+.smoke-category.extended { background: rgba(190, 150, 60, 0.2); }

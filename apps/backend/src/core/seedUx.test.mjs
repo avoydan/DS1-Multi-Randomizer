@@ -103,3 +103,16 @@ test('bosses in regular slots (Part E1): the options are real, appear only when 
   // Plain language: no engine vocabulary in the visible labels.
   for (const label of ['Boss chance in normal slots', 'Roaming boss souls', 'Roaming bosses stay dead']) assert.doesNotMatch(label, /NpcParam|getSoul|entity|EMEVD/u);
 });
+
+test('the test worlds panel separates quick smoke tests from extended gameplay tests and shows the exact target, the expectation and the time', async () => {
+  const panel = await read('SmokeTestPanel.tsx');
+  assert.match(panel, /<optgroup label="Quick smoke tests/u);
+  assert.match(panel, /<optgroup label="Extended gameplay tests/u);
+  for (const label of ['Quick smoke test', 'Extended gameplay test', '<strong>Target</strong>', '<strong>Expected</strong>', 'Estimated time to the target', '<strong>Check</strong>', '<strong>Afterwards</strong>']) assert.ok(panel.includes(label), label);
+  assert.match(panel, /estimated from the distance, not timed in the game/u, 'the estimate is labelled as an estimate');
+  const app = await read('App.tsx');
+  // It stays inside Advanced: the normal screen does not mention test worlds.
+  const advanced = app.slice(app.indexOf('<summary>Advanced</summary>'));
+  assert.ok(advanced.includes('<SmokeTestPanel'), 'the panel lives in Advanced');
+  assert.equal(app.slice(0, app.indexOf('<summary>Advanced</summary>')).includes('<SmokeTestPanel'), false);
+});

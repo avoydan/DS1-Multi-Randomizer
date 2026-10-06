@@ -2,8 +2,12 @@ import type { DecodedSeedPayload, EnemyPoolDescription, GenerationSettings, Pers
 
 export interface DetectedInstallation { gamePath: string; label: string; valid: boolean; problems: string[] }
 export interface SmokeTestList {
-  worlds: Array<{ id: string; title: string; purpose: string; seedCode: string; settings: unknown; observe: string[] }>;
+  worlds: Array<{
+    id: string; title: string; category: 'quick' | 'extended'; purpose: string; seedCode: string; settings: unknown; observe: string[];
+    targets: string[]; expected: string[]; estimateSeconds: number | null; afterwards: string[];
+  }>;
   checklist: string[];
+  start: string;
 }
 
 export type WorldDataPreparation = { ok: true } | { ok: false; code: string; userMessage: string };
