@@ -965,3 +965,29 @@ Date: 2026-10-06.
    retryable with another Fog seed.
 4. **Message:** "These item and world settings cannot be combined yet ..." with no item or lot names; the exact reason stays in
    the log and the manifest. The case should no longer occur.
+
+## Seed Codes and immutable generation profiles (backend 0.30.0, desktop 0.17.0, contracts 0.13.0)
+
+Date: 2026-10-06.
+
+1. **A world is identified by a Seed Code, offline and self-contained.** `DS1TR1-` + Crockford base32 of format byte, deflated
+   canonical envelope (profile id, master seed, complete settings) and a 4-byte SHA-256 checksum. No server, no database.
+   Settings are stored in full (not as a diff from defaults) so a changed default can never change an old code.
+2. **Application version and generation behavior are separate.** `ds1tr-gen-v1` = the behavior of desktop 0.16.1 (combined
+   engine 0.5.66, seed derivation v1, retries 3/5, FogHost 0.5.0 / FogMod 6e6dc78 / world data f394fa53, item tracking v1).
+   Profile ids never contain an app version, the app version never influences output (recorded in the manifest only), and an
+   app refuses a code only if it does not know the profile.
+3. **Core rule:** any change that alters the output of an existing seed needs a new profile; published profiles and golden
+   fixtures are never edited and fixtures are never regenerated to make a test pass (`docs/GENERATION_COMPATIBILITY.md`).
+4. **Drift is loud.** The pipeline compares the engines it actually used with the profile's allow-lists and stops with
+   `GENERATION_PROFILE_MISMATCH` rather than silently generating another world.
+5. **The master seed is made at Randomize** by the backend when the run starts (never at startup or import); it is an Advanced
+   detail. Loading a Seed Code makes its settings authoritative; any later change to a generation setting ends that identity.
+   Numeric/explicit master seeds of older configurations still work. Presets keep storing settings only.
+6. **Backend owns persistence.** Settings (`settings/ui-settings.json`, schema 1, with fallback warning) and run history
+   (`history/runs.json`, schema 1, 200 entries) live in the backend state folder; the game path stays separate machine state.
+   Recreate uses only the Seed Code.
+7. **Spoiler preference and game path are excluded** from the code (documented per field in `GENERATION_FIELD_POLICY`; a test
+   fails if an option is added without a decision).
+8. **Launch game** is a desktop (Electron) concern: Steam `steam://rungameid/570940` first, the game executable as a fallback,
+   and the method used is reported. The renderer never starts processes.

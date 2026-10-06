@@ -149,6 +149,17 @@ SHA-256 namespaces. Record both derivation versions.
 > `docs/DECISIONS.md` — "The combined-engine seed is a named SHA-256
 > derivation of the master seed".
 
+## Seed Codes and generation profiles (backend 0.30.0)
+The user-visible identity of a world is a **Seed Code** (`DS1TR1-...`), not the master seed. The code carries the generation
+profile id, the internal master seed (the derivation above runs from it unchanged) and the complete canonical settings
+(`docs/SEED_FORMAT.md`). The backend owns encode/decode, settings persistence and run history; the renderer only displays
+them. A **generation profile** (`ds1tr-gen-v1`, `apps/backend/src/core/generationProfiles.ts`) is an immutable compatibility
+contract naming the exact deterministic components (seed derivation, retry bounds, combined engine version, FogHost/FogMod
+commit/world data, item tracking rules); the application version is not part of it and is only recorded in the manifest. The
+pipeline takes derivation and bounds from the profile and stops with `GENERATION_PROFILE_MISMATCH` if an engine it ran is not on
+the profile's list. Rules for when a new profile is required: `docs/GENERATION_COMPATIBILITY.md`; permanent golden fixtures:
+`apps/backend/fixtures/golden/`.
+
 ## Retry derivation
 Retries must remain reproducible.
 

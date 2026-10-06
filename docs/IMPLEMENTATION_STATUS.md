@@ -1,5 +1,20 @@
 # Implementation status
 
+**Seed Codes, generation profiles, history and launch (2026-10-06; backend 0.30.0, desktop 0.17.0, contracts 0.13.0; RANDOMIZER_VERSION 0.5.66 and FogHost 0.5.0 unchanged).**
+A world is now named by a self-contained Seed Code that carries an immutable generation profile (`ds1tr-gen-v1`), the internal
+master seed and the complete canonical settings; the app version is not an input of generation. New: Randomize / Load seed (the
+master seed moved to Advanced), persistent settings and run history (Apply, Recreate without the run folder, Copy seed, View
+settings), explicit Apply / Restore success messages and a Launch game button (Steam, executable fallback). Formats and rules:
+`docs/SEED_FORMAT.md`, `docs/GENERATION_COMPATIBILITY.md`, `docs/DECISIONS.md`.
+
+- **Golden fixtures:** `apps/backend/fixtures/golden/ds1tr-gen-v1.json`, 10 permanent cases recorded from a clean game copy (items;
+  enemies classic; sampling-v1; items+enemies+bosses; +Fog; broad items with shops; custom pool; second Gargoyle; one-model
+  grace; world options). Verified from the Seed Codes alone, also with a simulated application version (`99.1.0-future`):
+  identical profile, settings, master seed and package hashes, 10/10.
+- **Engines untouched:** no change in `engines/`, seed derivation or retry bounds; only the profile plumbing and drift guard.
+- **Tests:** backend 354 (352 pass, 2 skipped: the pre-existing one and the golden regeneration that needs a clean game copy);
+  new `seedCode`, `seedPersistence`, `generationProfiles`, `goldenCompatibility`, `seedUx`; desktop 5 (settings migration, launch game).
+
 **World randomizer item tracking (2026-10-06; backend 0.29.1, desktop 0.16.1, FogHost 0.5.0, RANDOMIZER_VERSION 0.5.66).**
 Fixed a real failure of the packaged app: with more item categories on, Fog stopped with `Couldn't find darkmoon_seance_ring in item
 lots` after three identical combined attempts and the app said "try another seed". FogMod needs exactly one copy of each
