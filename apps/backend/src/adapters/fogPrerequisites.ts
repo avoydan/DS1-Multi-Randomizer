@@ -23,6 +23,8 @@ export interface FogPrerequisites {
   executablePath: string;
   dataRoot: string;
   readSet: string[];
+  /** Id of the application-prepared world data set (its folder name); absent when a developer override supplies the data. */
+  worldDataId?: string;
 }
 
 /** Why the world randomizer cannot run: a plain-language message for the person and the exact reason for diagnostics. */
@@ -71,6 +73,7 @@ export async function resolveFogPrerequisites(
     } };
   }
   let dataRoot: string;
+  let worldDataId: string | undefined;
   if (configured) {
     dataRoot = path.resolve(configured);
   } else {
@@ -81,8 +84,9 @@ export async function resolveFogPrerequisites(
     });
     if (!prepared.ok) return { failure: { code: prepared.code, userMessage: prepared.userMessage, technical: prepared.technical } };
     dataRoot = prepared.root;
+    worldDataId = path.basename(prepared.root);
   }
   const events = await names(path.join(dataRoot, 'dist', 'DS1R', 'event'));
   const maps = await names(path.join(dataRoot, 'dist', 'DS1R', 'map', 'MapStudio'));
-  return { executablePath, dataRoot, readSet: fogReadSet(events, maps, language) };
+  return { executablePath, dataRoot, readSet: fogReadSet(events, maps, language), ...(worldDataId ? { worldDataId } : {}) };
 }

@@ -268,7 +268,11 @@ export type GenerationEvent =
   | { type: 'log'; stage: string; level: 'info' | 'warning' | 'error'; message: string };
 
 export type GenerationResult =
-  | { ok: true; packagePath: string; manifestPath: string; manifest: { masterSeed: string; files: Array<{ path: string }> } }
+  | {
+    ok: true; packagePath: string; manifestPath: string; manifest: { masterSeed: string; files: Array<{ path: string }> };
+    /** The shareable Seed Code of this world, and the generation profile it was made with. */
+    seedCode: string; profile: string;
+  }
   | { ok: false; code: string; message: string; stage: string };
 
 export const PRESET_FORMAT = 'ds1tr-preset';
@@ -288,3 +292,5 @@ export interface PresetDocument {
 export type PresetImportResult =
   | { ok: true; preset: PresetDocument }
   | { ok: false; problems: string[] };
+
+export * from './generation.js';

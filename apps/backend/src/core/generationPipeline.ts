@@ -11,6 +11,7 @@ import { resolveFogPrerequisites, type FogPreparationContext, type FogPrerequisi
 import { effectiveCombinedEnabled, validateRandomizerConfig } from './configValidation.js';
 import { validateInstallation } from './installation.js';
 import { deriveAttemptSeeds } from './seeds.js';
+import { checkProfileComponents, currentGenerationProfile, type GenerationProfile } from './generationProfiles.js';
 import type { PlacementSummary } from './placementDiagnostics.js';
 
 /** Set to `detail` to add one record per slot to the sampling-v1 diagnostics in randomizer.json (debugging only). */
@@ -19,6 +20,14 @@ const placementDiagnosticsVariable = 'DS1TR_PLACEMENT_DIAGNOSTICS';
 export interface GenerationRequest {
   config: RandomizerConfig;
   workspacePath: string;
+  /**
+   * The generation profile this run reproduces (seed derivation, retry bounds, engine versions). When given, the run also
+   * stops if an engine is not one the profile lists, so a changed component can never silently change a Seed Code's world.
+   * Without it the current profile's derivation and retries apply and the components are not checked (unit tests with stubs).
+   */
+  profile?: GenerationProfile;
+  /** The Seed Code of this run, recorded in the manifest. */
+  seedCode?: string;
 }
 
 export type GenerationEvent =
@@ -28,6 +37,9 @@ export type GenerationEvent =
 export interface GenerationManifest {
   schemaVersion: 1;
   appVersion: string;
+  /** Generation profile and Seed Code of the run (null when the caller did not use a Seed Code). */
+  generationProfile: string | null;
+  seedCode: string | null;
   game: 'DSR';
   masterSeed: string;
   /** Snapshot the package was generated from; activation refuses any other. */
@@ -64,6 +76,8 @@ export interface GenerationDependencies {
   getFogPrerequisites: (language: FogLanguage, context?: FogPreparationContext) => Promise<FogPrerequisites | FogPrerequisiteFailure | null>;
   combined: typeof executeCombinedGeneration;
   fog: FogHostProcess;
+  /** Recorded in the manifest only; it never influences the output (a Seed Code does not depend on the app version). */
+  appVersion: string;
 }
 
 const defaults: GenerationDependencies = {
@@ -74,6 +88,7 @@ const defaults: GenerationDependencies = {
   getFogPrerequisites: (language, context) => resolveFogPrerequisites(language, process.env, context),
   combined: executeCombinedGeneration,
   fog: new FogHostProcess(),
+  appVersion: '0.30.0',
 };
 
 async function fingerprint(file: string): Promise<{ size: number; sha256: string }> {
@@ -109,10 +124,15 @@ export async function generateRun(
   const services = { ...defaults, ...dependencies };
   validateRandomizerConfig(request.config);
   const config = request.config;
+  const profile = request.profile ?? currentGenerationProfile();
+  const bounds = profile.retryBounds;
+  const drift = (observed: Parameters<typeof checkProfileComponents>[1]): string | null =>
+    (request.profile ? checkProfileComponents(request.profile, observed) : null);
   const workspace = typeof request.workspacePath === 'string' && request.workspacePath
     ? path.resolve(request.workspacePath) : '';
   const manifest: GenerationManifest = {
-    schemaVersion: 1, appVersion: '0.29.1', game: 'DSR', masterSeed: config.masterSeed,
+    schemaVersion: 1, appVersion: services.appVersion, generationProfile: request.profile?.id ?? null, seedCode: request.seedCode ?? null,
+    game: 'DSR', masterSeed: config.masterSeed,
     pristineSnapshotId: null, gameTreeRoot: '',
     options: { items: config.items, enemies: config.enemies, fog: config.fog, output: config.output },
     enemyPlacement: {
@@ -170,6 +190,8 @@ export async function generateRun(
       return fail('fog', code === 'FOG_HOST_MISSING' ? 'FOG_PREREQUISITES_MISSING' : code, userMessage);
     }
     fogReady = prerequisites;
+    const dataDrift = drift({ worldDataId: prerequisites.worldDataId });
+    if (dataDrift) return fail('fog', 'GENERATION_PROFILE_MISMATCH', dataDrift);
     try { await requireFile(fogReady.executablePath); await access(fogReady.dataRoot); }
     catch { return fail('fog', 'FOG_PREREQUISITES_MISSING', 'The world randomizer files could not be found. Click Retry; if it keeps failing, download DS1 Triple Randomizer again.'); }
   }
@@ -185,8 +207,8 @@ export async function generateRun(
   const combinedEnabled = effectiveCombinedEnabled(config);
   let combinedAttempt = 0;
   let fogAttempt = 0;
-  while (combinedAttempt < defaultFogRetryBounds.maxCombinedAttempts) {
-    const seeds = deriveAttemptSeeds(config.masterSeed, combinedAttempt, 0);
+  while (combinedAttempt < bounds.maxCombinedAttempts) {
+    const seeds = deriveAttemptSeeds(config.masterSeed, combinedAttempt, 0, profile.seedDerivation);
     const attemptWorkspace = path.join(workspace, `combined-${combinedAttempt}`);
     let combined: CombinedGenerationResult | null = null;
     if (combinedEnabled) {
@@ -204,13 +226,15 @@ export async function generateRun(
       });
       if (!combined.ok) {
         manifest.attempts.push({ combinedAttempt, fogAttempt: 0, combinedSeed: seeds.combined, fogSeed: seeds.fog, result: combined.code });
-        if (combined.retryable && combinedAttempt + 1 < defaultFogRetryBounds.maxCombinedAttempts) {
+        if (combined.retryable && combinedAttempt + 1 < bounds.maxCombinedAttempts) {
           combinedAttempt++;
           continue;
         }
         return fail('combined', combined.code, combined.message);
       }
       manifest.engines.combined = combined.randomizerVersion;
+      const combinedDrift = drift({ combinedRandomizerVersion: combined.randomizerVersion });
+      if (combinedDrift) return fail('validation', 'GENERATION_PROFILE_MISMATCH', combinedDrift);
       manifest.enemyPlacement.classTableHash = combined.placementDiagnostics?.classTableHash ?? null;
       manifest.enemyPlacement.summary = combined.placementDiagnostics?.summary ?? null;
     }
@@ -243,8 +267,8 @@ export async function generateRun(
       return finish(packagePath, manifest, progress, fail);
     }
     let retryCombined = false;
-    for (fogAttempt = 0; fogAttempt < defaultFogRetryBounds.maxFogAttempts; fogAttempt++) {
-      const attemptSeeds = deriveAttemptSeeds(config.masterSeed, combinedAttempt, fogAttempt);
+    for (fogAttempt = 0; fogAttempt < bounds.maxFogAttempts; fogAttempt++) {
+      const attemptSeeds = deriveAttemptSeeds(config.masterSeed, combinedAttempt, fogAttempt, profile.seedDerivation);
       const attemptDirectory = path.join(workspace, `fog-${combinedAttempt}-${fogAttempt}`);
       let compatibility;
       try {
@@ -292,12 +316,14 @@ export async function generateRun(
       if (!response.ok) {
         manifest.attempts.push({ combinedAttempt, fogAttempt, combinedSeed: attemptSeeds.combined,
           fogSeed: attemptSeeds.fog, result: response.error.code });
-        const decision = decideFogRetry(response.error, { combinedAttempt, fogAttempt });
+        const decision = decideFogRetry(response.error, { combinedAttempt, fogAttempt }, bounds);
         if (decision.action === 'retry-fog') continue;
         if (decision.action === 'retry-combined') { retryCombined = true; break; }
         return fail('fog', response.error.code, decision.reason);
       }
       manifest.engines.fog = `${response.hostVersion} / ${response.fogModCommit}`;
+      const fogDrift = drift({ fogHostVersion: response.hostVersion, fogModCommit: response.fogModCommit });
+      if (fogDrift) return fail('validation', 'GENERATION_PROFILE_MISMATCH', fogDrift);
       try {
         for (const file of response.files) {
           const actual = await fingerprint(path.join(staging.value.stagingDirectory, file.path));

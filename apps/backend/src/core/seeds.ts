@@ -22,6 +22,10 @@ function combinedToken(masterSeed: string, stream: string): string {
   return digest(masterSeed, stream).toString('hex').slice(0, combinedSeedLength);
 }
 
+/** Name of the seed derivation that generation profile `ds1tr-gen-v1` uses. Its streams and their order never change. */
+export const SEED_DERIVATION_V1 = 'seed-derivation-v1';
+export type SeedDerivation = typeof SEED_DERIVATION_V1;
+
 export function deriveSeeds(masterSeed: string): DerivedSeeds {
   const normalized = normalize(masterSeed);
   return {
@@ -41,7 +45,10 @@ export function deriveAttemptSeeds(
   masterSeed: string,
   combinedAttempt: number,
   fogAttempt: number,
+  derivation: SeedDerivation = SEED_DERIVATION_V1,
 ): DerivedSeeds {
+  // A generation profile names its derivation; a later profile adds another entry and never edits this one.
+  if (derivation !== SEED_DERIVATION_V1) throw new RangeError(`Unknown seed derivation: ${String(derivation)}.`);
   for (const attempt of [combinedAttempt, fogAttempt]) {
     if (!Number.isSafeInteger(attempt) || attempt < 0) {
       throw new RangeError(`Retry attempt must be a non-negative integer: ${attempt}.`);

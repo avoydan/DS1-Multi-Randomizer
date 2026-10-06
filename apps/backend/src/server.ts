@@ -1,6 +1,6 @@
 import http from 'node:http';
 import { randomUUID } from 'node:crypto';
-import { mkdir } from 'node:fs/promises';
+import { access, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { URL } from 'node:url';
 import type { RandomizerConfig } from '@ds1tr/contracts';
@@ -12,7 +12,13 @@ import { exportPreset, importPreset } from './core/preset.js';
 import { GameStateAuthority, defaultStateRoot } from './core/gameState.js';
 import { describeEnemyPool } from './adapters/enemyPool.js';
 import { discoverGameInstallations } from './core/gameDiscovery.js';
+import { userMessageFor } from './core/userMessages.js';
 import { prepareWorldData } from './adapters/worldData.js';
+import { RunHistory } from './core/runHistory.js';
+import { loadPersistedSettings, savePersistedSettings } from './core/settingsStore.js';
+import { prepareRun, type RunRequestBody } from './core/seededRun.js';
+import { decodeSeedCode } from './core/seedCode.js';
+import { supportedGenerationProfiles } from './core/generationProfiles.js';
 import { defaultWorldDataCacheRoot } from './adapters/fogPrerequisites.js';
 
 const HOST = process.env.DS1TR_HOST ?? '127.0.0.1';
@@ -24,6 +30,9 @@ const generationDependencies = {
   getPristineSource: (gamePath: string) => authority.getPristineSource(gamePath),
 };
 const runRoot = path.join(defaultStateRoot(), 'runs');
+const history = new RunHistory(defaultStateRoot());
+const APP_VERSION = '0.30.0';
+const runDependencies = { ...generationDependencies, appVersion: APP_VERSION };
 
 function send(res: http.ServerResponse, status: number, body: unknown): void {
   res.writeHead(status, {
@@ -56,7 +65,7 @@ const server = http.createServer(async (req, res) => {
     const url = new URL(req.url ?? '/', `http://${HOST}:${PORT}`);
 
     if (req.method === 'GET' && url.pathname === '/api/health') {
-      return send(res, 200, { ok: true, service: 'ds1-triple-randomizer-backend', version: '0.29.1' });
+      return send(res, 200, { ok: true, service: 'ds1-triple-randomizer-backend', version: APP_VERSION });
     }
 
     if (req.method === 'POST' && url.pathname === '/api/installation/validate') {
@@ -117,6 +126,7 @@ const server = http.createServer(async (req, res) => {
       const body = await readJson<{ gamePath?: string; packagePath?: string }>(req);
       if (!body.gamePath || !body.packagePath) return send(res, 400, { error: 'Game and package paths are required.' });
       const result = await authority.activate(body.gamePath, body.packagePath);
+      if (result.ok) await history.markApplied(body.packagePath).catch(() => undefined);
       return send(res, result.ok ? 200 : 409, result);
     }
 
@@ -124,26 +134,68 @@ const server = http.createServer(async (req, res) => {
       const body = await readJson<{ gamePath?: string }>(req);
       if (!body.gamePath) return send(res, 400, { error: 'Game path is required.' });
       const result = await authority.restore(body.gamePath);
+      if (result.ok) await history.markRestored().catch(() => undefined);
       return send(res, result.ok ? 200 : 409, result);
     }
 
+    if (req.method === 'POST' && url.pathname === '/api/seed/decode') {
+      const body = await readJson<{ seedCode?: string }>(req);
+      const decoded = decodeSeedCode(typeof body.seedCode === 'string' ? body.seedCode : '');
+      return send(res, decoded.ok ? 200 : 400, decoded.ok
+        ? { ok: true, seedCode: decoded.seedCode, profile: decoded.envelope.profile, masterSeed: decoded.envelope.masterSeed, settings: decoded.envelope.settings }
+        : { ok: false, code: decoded.code, message: decoded.message, technical: decoded.technical });
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/history/list') {
+      return send(res, 200, { entries: await history.list(), supportedProfiles: supportedGenerationProfiles() });
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/settings/load') {
+      const loaded = await loadPersistedSettings(defaultStateRoot());
+      return send(res, 200, loaded);
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/settings/save') {
+      const body = await readJson<{ settings?: unknown; generateSpoilerLog?: boolean }>(req);
+      try {
+        await savePersistedSettings(defaultStateRoot(), { settings: body.settings as never, generateSpoilerLog: body.generateSpoilerLog === true });
+      } catch {
+        return send(res, 400, { ok: false });
+      }
+      return send(res, 200, { ok: true });
+    }
+
     if (req.method === 'POST' && url.pathname === '/api/runs/generate') {
-      const config = await readJson<RandomizerConfig>(req);
-      validateRandomizerConfig(config);
-      const workspacePath = path.join(runRoot, randomUUID());
-      await mkdir(workspacePath, { recursive: true });
+      const body = await readJson<RunRequestBody>(req);
+      const prepared = prepareRun(body);
       res.writeHead(200, {
         'Content-Type': 'text/event-stream; charset=utf-8',
         'Cache-Control': 'no-cache',
         'Access-Control-Allow-Origin': 'null',
       });
+      if (!prepared.ok) {
+        res.write(`event: result\ndata: ${JSON.stringify({ ok: false, code: prepared.code, message: prepared.message, stage: 'seed', technical: prepared.technical })}\n\n`);
+        return res.end();
+      }
+      const workspacePath = path.join(runRoot, randomUUID());
+      await mkdir(workspacePath, { recursive: true });
       try {
-        const result = await generateRun({ config, workspacePath }, (event) => {
+        const result = await generateRun({ config: prepared.config, workspacePath, profile: prepared.profile, seedCode: prepared.seedCode }, (event) => {
           res.write(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`);
-        }, generationDependencies);
-        res.write(`event: result\ndata: ${JSON.stringify(result)}\n\n`);
+        }, runDependencies);
+        if (result.ok) {
+          const spoiler = path.join(result.packagePath, 'spoiler.txt');
+          const spoilerPath = await access(spoiler).then(() => spoiler, () => null);
+          await history.add({
+            seedCode: prepared.seedCode, profile: prepared.profile.id, masterSeed: prepared.config.masterSeed, settings: prepared.envelope.settings,
+            packagePath: result.packagePath, manifestPath: result.manifestPath, spoilerPath,
+          }).catch(() => undefined);
+          res.write(`event: result\ndata: ${JSON.stringify({ ...result, seedCode: prepared.seedCode, profile: prepared.profile.id, masterSeed: prepared.config.masterSeed })}\n\n`);
+        } else {
+          res.write(`event: result\ndata: ${JSON.stringify(result)}\n\n`);
+        }
       } catch (error) {
-        res.write(`event: result\ndata: ${JSON.stringify({ ok: false, code: 'PIPELINE_FAILED', message: String(error), stage: 'generation' })}\n\n`);
+        res.write(`event: result\ndata: ${JSON.stringify({ ok: false, code: 'PIPELINE_FAILED', message: userMessageFor('PIPELINE_FAILED', String(error)), stage: 'generation' })}\n\n`);
       }
       return res.end();
     }

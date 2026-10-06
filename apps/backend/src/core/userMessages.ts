@@ -21,6 +21,7 @@ const exact: Record<string, string> = {
   FOG_UPSTREAM_INCOMPATIBLE: 'These item and world settings cannot be combined yet. Your game was not changed. Switch off the world randomizer or some extra item categories (NPC gifts, enemy drops, shops) and try again.',
   FOG_ITEM_RULES_UNREADABLE: 'The world randomizer data could not be read. Click Randomize again; if it keeps failing, restart the app.',
   COMBINED_RETRIES_EXHAUSTED: 'No working combination was found for this seed. Try another seed.',
+  GENERATION_PROFILE_MISMATCH: 'This copy of the app cannot reproduce that world exactly, so nothing was generated. Update or reinstall DS1 Triple Randomizer.',
   MANIFEST_WRITE_FAILED: 'Your randomized files could not be saved. Check that the disk has free space and try again.',
 };
 

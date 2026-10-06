@@ -40,9 +40,21 @@ test('desktop API exposes typed state and generation failure without touching a 
   const imported = await (await post('/game/import', { gamePath })).json();
   assert.equal(imported.ok, false);
   assert.equal(imported.code, 'GAME_INVALID');
+  // Generation is an event stream; settings that cannot be used end it with a typed result before any seed is made.
   const generation = await post('/runs/generate', { gamePath, masterSeed: '' });
-  assert.equal(generation.status, 400);
-  assert.equal((await generation.json()).error, 'Invalid configuration');
+  const streamed = await generation.text();
+  assert.match(streamed, /event: result/u);
+  assert.match(streamed, /"code":"INVALID_SETTINGS"/u);
+  assert.match(streamed, /"stage":"seed"/u);
+  const badSeed = await post('/seed/decode', { seedCode: 'DS1TR1-NOT-A-REAL-CODE' });
+  assert.equal(badSeed.status, 400);
+  assert.equal((await badSeed.json()).ok, false);
+  const noSettings = await (await post('/settings/load', {})).json();
+  assert.equal(noSettings.found, false);
+  assert.equal((await post('/settings/save', { settings: {}, generateSpoilerLog: false })).status, 400);
+  const history = await (await post('/history/list', {})).json();
+  assert.deepEqual(history.entries, []);
+  assert.deepEqual(history.supportedProfiles, ['ds1tr-gen-v1']);
   const badPreset = await post('/preset/import', { text: '{}' });
   assert.equal(badPreset.status, 400);
   assert.equal((await badPreset.json()).ok, false);
