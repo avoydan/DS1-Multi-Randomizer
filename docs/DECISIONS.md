@@ -986,7 +986,8 @@ Date: 2026-10-06.
    Numeric/explicit master seeds of older configurations still work. Presets keep storing settings only.
 6. **Backend owns persistence.** Settings (`settings/ui-settings.json`, schema 1, with fallback warning) and run history
    (`history/runs.json`, schema 1, 200 entries) live in the backend state folder; the game path stays separate machine state.
-   Recreate uses only the Seed Code.
+   Regenerate files (was Recreate) uses only the Seed Code and refreshes the existing entry; a Seed Code that is already in the
+   history never creates a second entry.
 7. **Spoiler preference and game path are excluded** from the code (documented per field in `GENERATION_FIELD_POLICY`; a test
    fails if an option is added without a decision).
 8. **Launch game** is a desktop (Electron) concern: Steam `steam://rungameid/570940` first, the game executable as a fallback,

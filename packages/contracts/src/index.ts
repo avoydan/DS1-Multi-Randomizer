@@ -1,3 +1,4 @@
+import type { GenerationSettings } from './generation.js';
 export type EngineName = 'combined' | 'fog';
 
 /** Legacy "Soul items": shuffled with the pool (default) or replaced by other consumables. "Transposed" needs boss-soul data the catalog lacks. */
@@ -274,6 +275,8 @@ export type GenerationResult =
     seedCode: string; profile: string;
     /** The run-history entry of this world (an existing one when the same world was generated again). */
     historyId?: string | null;
+    /** The settings of the generated world (the Seed Code's), which the controls may no longer show. */
+    settings?: GenerationSettings;
   }
   | { ok: false; code: string; message: string; stage: string };
 

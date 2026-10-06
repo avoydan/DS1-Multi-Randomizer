@@ -23,7 +23,7 @@ and the window; the approved LUDOS artwork (`apps/desktop/src/assets/branding/lu
 **Seed Codes, generation profiles, history and launch (2026-10-06; backend 0.30.0, desktop 0.17.0, contracts 0.13.0; RANDOMIZER_VERSION 0.5.66 and FogHost 0.5.0 unchanged).**
 A world is now named by a self-contained Seed Code that carries an immutable generation profile (`ds1tr-gen-v1`), the internal
 master seed and the complete canonical settings; the app version is not an input of generation. New: Randomize / Load seed (the
-master seed moved to Advanced), persistent settings and run history (Apply, Recreate without the run folder, Copy seed, View
+master seed moved to Advanced), persistent settings and run history (Apply, Regenerate files without the run folder, Copy seed, View
 settings), explicit Apply / Restore success messages and a Launch game button (Steam, executable fallback). Formats and rules:
 `docs/SEED_FORMAT.md`, `docs/GENERATION_COMPATIBILITY.md`, `docs/DECISIONS.md`.
 

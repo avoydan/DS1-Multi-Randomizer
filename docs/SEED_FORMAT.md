@@ -77,8 +77,12 @@ code. Such a change is a new **format** (`DS1TR2-...`), with format 1 still deco
 
 `<state>/history/runs.json` (schema 1, newest first, at most 200 entries, atomic writes, a damaged file is set aside).
 Each entry: timestamp, Seed Code, profile, master seed, settings snapshot, status `generated | applied | restored`, package /
-manifest / spoiler paths and a `packageExists` flag computed when the list is read. **Recreate** uses only the stored Seed Code,
-so it works after the run folder was cleaned up. Actions: Apply, Recreate, Copy seed, View settings.
+manifest / spoiler paths and a `packageExists` flag computed when the list is read. The list is collapsed by default. Quick actions:
+Apply / Play (Launch game for the applied world), Copy seed, and a menu (View settings, View spoiler log, Delete from history).
+**Regenerate files** uses only the stored Seed Code, so it works after the run folder was cleaned up; it is offered as the main
+action only when the files are gone. It is not a new run: **generating a Seed Code that is already in the history (Regenerate files,
+or Load seed of a known code) refreshes that entry** (same id, Seed Code and creation time; new files) instead of adding another.
+The spoiler log of a world randomizer run is the one of its item/enemy stage (recorded by path, never copied into the package).
 
 ## Saved settings
 

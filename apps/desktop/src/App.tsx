@@ -156,7 +156,6 @@ export function App() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [presetText, setPresetText] = useState('');
   const [presetProblems, setPresetProblems] = useState<string[]>([]);
-  const [loadedSeed, setLoadedSeed] = useState<LoadedSeed | null>(null);
   const [seedPanelOpen, setSeedPanelOpen] = useState(false);
   const [lastRun, setLastRun] = useState<{ seedCode: string; profile: string; masterSeed: string } | null>(null);
   const [notice, setNotice] = useState<{ text: string; sub: string } | null>(null);
@@ -209,7 +208,6 @@ export function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settingsReady, settingsKey, config.output.generateSpoilerLog]);
 
-  const seedModified = loadedSeed !== null && isLoadedSeedModified(loadedSeed.settings, currentSettings);
   const appliedEntry = history.find((entry) => entry.status === 'applied') ?? null;
   const phase = deriveRunPhase({ busy, gameState: gameState?.state ?? null, hasGeneratedWorld: generation?.ok === true });
 
@@ -281,7 +279,6 @@ export function App() {
       if (result.ok) {
         const detail = result as typeof result & { masterSeed?: string };
         setLastRun({ seedCode: result.seedCode, profile: result.profile, masterSeed: detail.masterSeed ?? result.manifest.masterSeed });
-        if (!seedCode) setLoadedSeed(null);
         void refreshHistory();
       } else {
         setErrorMessage(result.message);
@@ -363,7 +360,6 @@ export function App() {
   /** Puts the settings of a world into the controls and remembers that they came from a Seed Code. */
   const adoptSeed = (seed: LoadedSeed) => {
     setConfig((current) => joinConfig(seed.settings, current.gamePath, '', current.output.generateSpoilerLog));
-    setLoadedSeed(seed);
     setSeedPanelOpen(false);
   };
 
@@ -617,8 +613,8 @@ export function App() {
               <div className="generated-status" role="status">
                 <strong>Your randomized game is ready</strong>
                 <textarea className="run-logs seed-output" readOnly rows={2} aria-label="Seed code" value={generation.seedCode} onFocus={(event) => event.currentTarget.select()} />
-                <SummaryChips settings={currentSettings} />
-                {seedModified && <span className="stale-warning">You changed the settings, so Randomize will create a new world with a new seed code.</span>}
+                <SummaryChips settings={generation.settings ?? currentSettings} />
+                {generation.settings && isLoadedSeedModified(generation.settings, currentSettings) && <span className="stale-warning">You changed the settings after this world was created. Apply installs the world shown above; Randomize creates a new one.</span>}
               </div>
               <div className="run-actions">
                 <button className="primary" onClick={() => void activate()}>Apply to game</button>

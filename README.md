@@ -14,7 +14,7 @@ FogMod settings.
 Every run gets a **Seed Code** (it starts with `DS1TR`). Share it with a friend: they click **Load seed**, paste it, and get
 exactly the same world. Seed Codes include the randomizer settings needed to reproduce the same world, and they keep working in
 later versions of the app. The app also remembers your settings and lists your earlier runs in **History**, where you can apply,
-copy or recreate any of them. After **Apply to game** you can start Dark Souls Remastered with **Launch game**.
+copy any of them, or create their files again. After **Apply to game** you can start Dark Souls Remastered with **Launch game**.
 
 You need Windows and your own copy of Dark Souls Remastered on Steam. Nothing else has to be installed or downloaded by
 hand: the app finds the game, prepares everything it needs (the world randomizer fetches a small set of data files once

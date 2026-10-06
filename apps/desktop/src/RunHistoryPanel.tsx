@@ -66,7 +66,6 @@ export function RunHistoryPanel({ entries, gameState, busy, onApply, onRegenerat
                       <div className="menu" role="menu">
                         <button role="menuitem" onClick={() => showSettings(entry)}>View settings</button>
                         {entry.spoilerPath && <button role="menuitem" onClick={() => void showSpoiler(entry)}>View spoiler log</button>}
-                        {files && <button role="menuitem" disabled={busy || !vanilla} onClick={() => { setMenuFor(null); onRegenerate(entry); }}>Regenerate files</button>}
                         <button role="menuitem" className="danger" onClick={() => { setMenuFor(null); onDelete(entry); }}>Delete from history</button>
                       </div>
                     )}

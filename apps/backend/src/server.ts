@@ -1,6 +1,6 @@
 import http from 'node:http';
 import { randomUUID } from 'node:crypto';
-import { access, mkdir, readFile } from 'node:fs/promises';
+import { access, mkdir, readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { URL } from 'node:url';
 import type { RandomizerConfig } from '@ds1tr/contracts';
@@ -31,7 +31,28 @@ const generationDependencies = {
 };
 const runRoot = path.join(defaultStateRoot(), 'runs');
 const history = new RunHistory(defaultStateRoot());
-const APP_VERSION = '0.31.0';
+/**
+ * Where the spoiler log of a run is. A combined-only package holds it; a world randomizer package does not, so the log of the
+ * item/enemy stage (the last combined attempt of the run folder) is used. Nothing is copied into the package.
+ */
+async function findSpoiler(workspacePath: string, packagePath: string): Promise<string | null> {
+  const exists = (file: string) => access(file).then(() => true, () => false);
+  const inPackage = path.join(packagePath, 'spoiler.txt');
+  if (await exists(inPackage)) return inPackage;
+  try {
+    const attempts = (await readdir(workspacePath)).filter((name) => /^combined-\d+$/u.test(name)).sort((a, b) => Number(b.slice(9)) - Number(a.slice(9)));
+    for (const attempt of attempts) {
+      const seeds = (await readdir(path.join(workspacePath, attempt))).filter((name) => name.startsWith('seed_'));
+      for (const seed of seeds) {
+        const candidate = path.join(workspacePath, attempt, seed, 'spoiler.txt');
+        if (await exists(candidate)) return candidate;
+      }
+    }
+  } catch { /* no spoiler log */ }
+  return null;
+}
+
+const APP_VERSION = '0.31.1';
 const runDependencies = { ...generationDependencies, appVersion: APP_VERSION };
 
 function send(res: http.ServerResponse, status: number, body: unknown): void {
@@ -200,14 +221,13 @@ const server = http.createServer(async (req, res) => {
           res.write(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`);
         }, runDependencies);
         if (result.ok) {
-          const spoiler = path.join(result.packagePath, 'spoiler.txt');
-          const spoilerPath = await access(spoiler).then(() => spoiler, () => null);
+          const spoilerPath = await findSpoiler(workspacePath, result.packagePath);
           // The same world generated again (Load seed, Regenerate files) refreshes its entry; it is not a new run.
           const entry = await history.addOrRefresh({
             seedCode: prepared.seedCode, profile: prepared.profile.id, masterSeed: prepared.config.masterSeed, settings: prepared.envelope.settings,
             packagePath: result.packagePath, manifestPath: result.manifestPath, spoilerPath,
           }).catch(() => null);
-          res.write(`event: result\ndata: ${JSON.stringify({ ...result, seedCode: prepared.seedCode, profile: prepared.profile.id, masterSeed: prepared.config.masterSeed, historyId: entry?.id ?? null })}\n\n`);
+          res.write(`event: result\ndata: ${JSON.stringify({ ...result, seedCode: prepared.seedCode, profile: prepared.profile.id, masterSeed: prepared.config.masterSeed, historyId: entry?.id ?? null, settings: prepared.envelope.settings })}\n\n`);
         } else {
           res.write(`event: result\ndata: ${JSON.stringify(result)}\n\n`);
         }
