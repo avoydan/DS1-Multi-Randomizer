@@ -993,6 +993,26 @@ Date: 2026-10-06.
 8. **Launch game** is a desktop (Electron) concern: Steam `steam://rungameid/570940` first, the game executable as a fallback,
    and the method used is reported. The renderer never starts processes.
 
+## A regular enemy as the body of a boss encounter: a safe subset of three (Part E2; backend 0.36.0, desktop 0.24.0, contracts 0.22.0)
+
+Date: 2026-10-07.
+
+1. **Scope: a subset, honestly named.** Legacy "Boss replacement: only with normal enemies / either" puts a normal enemy into every boss arena. DS1TR builds it for **the Asylum Demon, Taurus Demon and Capra Demon
+   only**. The audit of every boss encounter, with a class and a reason for each exclusion, is `ENEMY_PLACEMENT_MODEL.md` 10.8. Adding an encounter needs a documented decision and a game test; "full E2" is not
+   claimed. (This supersedes decision 1 of Part E1, which deferred E2 entirely.)
+2. **Entity-preserving body, no adapter.** The slot keeps its boss entity ID and its events; only the body that stands in the arena changes, through the existing Part D boss placement path. Rejected: a new
+   wake-up/death/fog adapter per boss (new events, new Fog overlay rules, a second source of truth for the same encounter) and a model-specific event rewrite per boss (the "broad bespoke per-boss rewrite" that
+   is a hard stop). Proof: EMEVD diff against Part D packages, no new events.
+3. **The encounter owns the reward and the respawn.** The body's scaled NpcParam row takes `dropType`, `getSoul`, `disableInitializeDead` and the item-lot cells from the boss row and sets `disableRespawn` to 1
+   (`EncounterOwnedCells`). A body never respawns and never drops its own loot instead of the encounter's.
+4. **The health bar keeps the boss's name.** Functional completion beats visual parity: a body model has no boss-name id; the quick test says so explicitly.
+5. **Scaling is the existing setting.** Area and Progressive give the body the boss's HP and strength (a boss's fight length), Vanilla keeps its own stats; no slot-specific rule.
+6. **RNG.** Two new named streams under `enemy-placement-v1`: `category:slot:<id>` (the `both` draw) and `body:slot:<id>`. No stream that exists today is consumed differently: neutral worlds are identical,
+   and with the chance at 100 `both` equals Part D's boss sampling exactly.
+7. **Seed Codes.** `bossChanceInBossSlots` (neutral 90) is an extension key, `bossReplacement` gains `normals` / `both`; no existing code changes (18 earlier golden fixtures byte-identical); presets version 12.
+8. **Model budget.** `max(30, the map's vanilla model count)` against the running counts of the pass; no Custom Pool grace, no relaxing of any event collision check.
+9. **UI.** The existing Boss replacement select gains two options; "Boss chance in boss slots" appears only with `both`; the hint names the three encounters and the kept bosses. No control for a thing that does not happen.
+
 ## Roaming boss respawn bit written for both values (backend 0.35.1)
 
 Date: 2026-10-06. The roaming-boss row inherits `disableRespawn = 1` from the boss row, so only writing the bit when stay dead is on left "stay dead off" without effect. DsrDataTool now writes

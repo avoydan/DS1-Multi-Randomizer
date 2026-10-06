@@ -592,7 +592,7 @@ risk: data first, selection-only options next, event-touching options last.
 | **B** (built, see 10.3) | Difficulty curve | class draw, strictness tables, D-1 refinement, Easy Asylum rule, curated overrides | `difficultyMode` curve values, `strictness`, `easyAsylum` | select + slider activation | offset distributions, same-class share, empty-class fallback | 20 seeds | none |
 | **C** (C1 Type replacement built, see 10.4; C2 custom pool built, see 10.5) | Type replacement and custom pool | type map with type-level participation and injectivity; pool filter | `typeReplacement`, `customPool` (named list of enabled types) | select, pool editor (largest UI piece) | injectivity, sentinel cases, pool filter | 10 seeds | none |
 | **D** (built, see 10.6) | Boss class (bosses only) | boss sampler over the portable single-body pool, per-candidate Gwyn nerf, Unique bosses, unit participation | `bossReplacement` {none, bosses}, `uniqueBosses`, `bossChanceInBossSlots` | activation | boss repetition, unit swaps, hash lock | **40 seeds** Bosses + Fog (overlay set must remain the 15 events), `verify-skips` | medium |
-| **E** (E1 built 2026-10-06, section 10.7; E2 not built) | Cross-class and roaming boss options | boss to normal slot, normal to boss slot, "both" modes, `getSoul` on the scaled row, respawn handling | modes `normals`/`both`, `bossChanceInNormalSlots`, `roamingBossSouls`, `respawningRoamingBosses` | activation | reward ownership, scaled row always present, boss bar rules | **40 seeds**, measure edited events against the overlay and FogMod; stop on any new overlap | **high** |
+| **E** (E1 built 2026-10-06, section 10.7; E2 built as a three-encounter subset 2026-10-07, section 10.8) | Cross-class and roaming boss options | boss to normal slot, normal to boss slot, "both" modes, `getSoul` on the scaled row, respawn handling | modes `normals`/`both`, `bossChanceInNormalSlots`, `roamingBossSouls`, `respawningRoamingBosses` | activation | reward ownership, scaled row always present, boss bar rules | **40 seeds**, measure edited events against the overlay and FogMod; stop on any new overlap | **high** |
 | **F** | NPC class and hostile NPCs | NPC allowlist, talk preservation, hostile sources, allegiance events | `npcReplacement`, `hostileNpcs` | activation | NPC fit rules, talk preservation fixtures | event-set diff vs FogMod first, then 40 seeds | **high** |
 | **G** | Default flip (product decision) | none | default `sampling`, docs, migration notes | default values | n/a | full 40-seed default sweep | low once A-F passed |
 
@@ -1248,7 +1248,7 @@ Dragon Kalameet bodies, Gaping Dragon, Seath, the Sanctuary Guardian, the Bell G
 dragon / linked-boss planners; they swap with each other as whole units). **Correction (2026-10-06):** an earlier version of this text
 also listed Four Kings and Bed of Chaos; both are ordinary members of the 24-slot boss pool (the same as in the permutation) and take
 part in boss sampling like the other 21 archetypes. Chance-based unit participation and unit sampling are not built; the "unit participation" item of the plan is deferred. The cross-class modes, roaming-boss souls and respawn are Part E1 (10.7);
-`bossChanceInBossSlots` (regular enemies in boss slots) is not built (10.7, "Part E2: not built").
+`bossChanceInBossSlots` (a regular enemy as the body of a boss encounter) is Part E2, a safe subset of three encounters (10.8).
 
 | Option | Contract | Neutral | Rule |
 |---|---|---|---|
@@ -1297,7 +1297,7 @@ boss in an arena built for another) is covered by the same compatibility rules a
 ### 10.7 Part E1 as built (2026-10-06): bosses in regular enemy slots ("roaming bosses")
 
 **Scope.** `sampling-v1` with `enemies.placement.normalReplacement` `bosses` or `both` lets bosses stand in regular enemy slots. This is Part E1.
-**Part E2 (regular enemies in boss slots, legacy "Boss chance, boss slots") is not built; see "Part E2: not built" below.** NPC and hostile-NPC
+**Part E2 (a regular enemy as the body of a boss encounter, legacy "Boss chance, boss slots") is built as a safe subset; see 10.8.** NPC and hostile-NPC
 replacement (Part F) is untouched.
 
 #### Legacy semantics (pinned Enemy Randomizer `83f008d`; reconstructed, not copied)
@@ -1364,15 +1364,6 @@ change is additive and gated behind options an old code cannot have. New worlds 
 asserts them (the other cells stay asserted equal to the boss row). Events: one wake-up event per roaming boss inside the map's custom event window
 (`docs/EVENT_ALLOCATION.md`); nothing is added to the vanilla events and nothing to the Fog whitelist.
 
-#### Part E2: not built (regular enemy in a boss slot)
-
-Legacy "Boss chance, boss slots" (default 90, i.e. 10% normal enemies in boss arenas) is **not implemented** and no control is shown. The reasons are
-about completion safety, not effort: a boss arena's encounter is driven by the boss entity (boss bar name from the model, health bar, music/fog events
-that wait for that entity's death, the 15-event Fog boss overlay, the `portableBossSanitization` and activation rules per boss). A regular model has no boss
-name, a different HP/stat scale, a body that the fog-gate and kill-flag events of the arena were not written for, and the boss-defeated flags, rewards and bonfire/
-gate logic depend on that death. A safe version needs a deliberate wrapper (a named boss-bar substitute, boss-scale stats, per-arena activation and a decision about the Fog overlay);
-that is an architecture-level piece of work that must be validated in the game and is deferred. Nothing in the roaming planner prevents it later.
-
 #### Measurements and proofs
 
 All on the real extracted catalog of a clean Dark Souls Remastered copy; zero unexplained failures; nothing was retried and no limit was relaxed.
@@ -1391,6 +1382,155 @@ All on the real extracted catalog of a clean Dark Souls Remastered copy; zero un
 | Tests | backend 393 tests (391 pass, 2 skipped by design), desktop 6/6 |
 
 **Not verified by playing:** wake-up, navigation, killability, souls, "stay dead", textures and crashes with up to ten bosses per map. The six Part E worlds under Advanced, Test worlds for playtesting (`docs/SMOKE_TESTS.md`) are made for that.
+
+---
+
+### 10.8 Part E2 as built (2026-10-07): a regular enemy as the body of a boss encounter (safe subset)
+
+**Scope and verdict.** `sampling-v1` with `enemies.placement.bossReplacement` `normals` or `both` lets a **normal enemy** stand in a boss arena. DS1TR builds this for
+**three audited boss encounters only: the Asylum Demon, the Taurus Demon and the Capra Demon.** Every other boss encounter keeps its boss (`normals`) or gets a boss
+(`both`), for the reasons in "Boss encounter audit". This is a *safe subset*, not the whole legacy feature: the legacy tool puts normal enemies into every boss
+slot; DS1TR does not claim that and shows the three encounters in the control's hint. **The result is STATICALLY VERIFIED / GAMEPLAY UNVERIFIED**: the generated files
+contain what the design needs and the events were proven unchanged beyond Part D's, but nobody has played an E2 world yet (`docs/SMOKE_TESTS.md`).
+
+#### Legacy semantics (pinned Enemy Randomizer `83f008d`; reconstructed, not copied)
+
+Evidence: `randomizer.py` (UI, config string), `randomizer_rng.py` (the draw), `NpcParam.py`, the shipped `eventscripts`. Nothing below is copied; where the legacy source
+shows no code for a question, that is said.
+
+| # | Question | Legacy behavior |
+|---|---|---|
+| 1 | Option name and values | "Boss replacement": 0 don't, 1 only with bosses, 2 only with normal enemies, 3 with bosses or normal enemies. Config position 1. |
+| 2 | Chance | "Boss chance [Bosses] (%)", default 90, config position 8; only enabled with mode 3. A boss slot draws a boss with that chance, otherwise a normal enemy. |
+| 3 | Participation | The replacement chance is the first draw of a slot; a boss slot that fails it keeps its boss in every mode. |
+| 4 | Which slots | Every slot of creature type "1" (boss) in every map the tool covers: no per-boss audit. Mode 2 puts a normal enemy into *every* boss arena. |
+| 5 | Pool | `GetNormalEnemy`: the type "0" rows of the enemy table that pass the difficulty mode, size (Placement fit), Prevent same and, **for boss slots, no unique-enemy limit** (`careAboutLimit` False). |
+| 6 | Entity ID | The part is rewritten in the MSB (model, NpcParam, think); its entity ID stays. The boss events keep waiting for that entity. |
+| 7 | Death detection | Vanilla events: the arena's events wait for the entity's death; the tool shows no change of that logic for the maps it did not replace the events of (15). |
+| 8 | Completion | The boss-defeated flag, the fog gate and the reward event hang on that death; the new body inherits them through the entity. |
+| 9 | Health bar | The vanilla health-bar instruction targets the entity; no code that renames the bar or the name was found, so a normal body shows the bar with the boss's name from the event / name id. |
+| 10 | Name | See 9 (no rename logic found). |
+| 11 | Scaling | No scaling code exists in the legacy tool: the body uses its own NpcParam row (its own HP, damage and souls); `ApplyBossSoulCount` only concerns bosses placed in normal slots. |
+| 12 | HP | The body's own HP (a Hollow in the Asylum Demon arena has Hollow HP). |
+| 13 | Drop / reward | No code found that moves the encounter's reward to the body or the body's lot away: the arena events award the encounter's reward, the part keeps the body's own NpcParam item lot. |
+| 14 | Respawn | No special handling found for a body in a boss slot. |
+| 15 | Exclusions | Hard-coded special cases: Seath (scripted death), the Key Serpent (key drop), Gwynevere, flying Kalameet (`c4510_0000/0002`), the Pinwheel clones/main body; whole-file EMEVD replacements for `m12_01`, `m13_00`, `m14_01`, `m15_00`, `m15_01`, `m17_00`; the Asylum Demon is moved to a fixed position (`c2232`). |
+| 16 | Multi-body | Not generalized: each part is replaced on its own; the encounters with several bodies are covered only by the per-map event replacements and special cases of 15. |
+| 17 | Second Gargoyle | A separate option (Gargoyle mode): the second body is replaced on its own. |
+| 18 | Ornstein & Smough | Replaced part by part inside the Anor Londo event replacement (`m15_01`); no general rule. |
+| 19 | Four Kings | A single catalog part stands for the encounter; no dedicated handling was found in the files read. |
+| 20 | Fog interplay | None (the legacy tool predates FogMod); the combined project must decide it. |
+
+**Reading.** The legacy approach for a body in a boss slot is *entity-preserving*: keep the entity ID, change only the MSB columns, rely on the vanilla events. It works where
+the arena events are plain (Asylum Demon, Taurus Demon, Capra Demon, which sit in maps the legacy tool needed **no event replacement** for) and needs event surgery in the
+maps it replaced. DS1TR keeps exactly that boundary.
+
+#### Boss encounter audit
+
+Categories: SAFE_SINGLE_BODY (one entity, plain events), SAFE_WITH_ADAPTER (one entity, needs an event edit DS1TR already makes), SPECIAL_SINGLE_BODY (one entity,
+special behavior), MULTI_BODY (several bodies or phases), SCRIPTED_MULTI_ENTITY (a script spawns or drives other entities), TRANSFORMATION (the body changes),
+CUTSCENE_DEPENDENT (the fight is started or ended by a cutscene/scripted animation), UNSUPPORTED. *Basis* names the evidence: the catalog flags (`riskFlags`, team,
+`talk`, `patrol`), the legacy event surgery list (15), Part D's special handling in the generator, and the authored boss tables. Where only "not audited" is possible the
+class says so; nothing here was played.
+
+| Encounter (slot) | Class | E2 | Reason |
+|---|---|---|---|
+| Asylum Demon (`m18_01 c2232_0000`, entity 1810800) | SAFE_WITH_ADAPTER | **supported** | One entity; completion depends on its death only. Its intro event `11810310` plays model-specific animations: Part D's `patchAsylumIntro` already removes them and re-enables AI (the same edit; proven identical for an E2 body). Legacy needed no event replacement in this map. |
+| Taurus Demon (`m10_01 c2250_0000`, 1010700) | SAFE_WITH_ADAPTER | **supported** | One entity; `model-specific-event` is handled by the portable-boss sanitization Part D already applies. Map outside the legacy surgery list. |
+| Capra Demon (`m10_01 c2240_0000`, 1010750) | SAFE_SINGLE_BODY | **supported** | One entity, no model-specific flag. The two dogs are regular enemies with their own entities; the fight does not wait for them. |
+| Stray Demon (`m18_01 c2230_0000`) | SPECIAL_SINGLE_BODY | kept | `patrol` and `model-specific-event`: the second Asylum visit with a patrol route; not audited. |
+| Bell Gargoyles (`m10_01 c5350_0000`, `c5350_0002`) | MULTI_BODY | kept | Two bodies, the fight ends when both are dead. The Second Bell Gargoyle option handles the second body on its own. |
+| Gaping Dragon (`m10_00 c5260_0000`) | SPECIAL_SINGLE_BODY | kept | Dragon-class body (classic dragon shuffle only); `model-specific-event`; entrance not audited. |
+| Crossbreed Priscilla (`m11_00 c2730_0000`) | SCRIPTED_MULTI_ENTITY | kept | Neutral until attacked (`talk`, team 1), invisible-tail logic; dragon-class plan. |
+| Moonlight Butterfly (`m12_00 c3230_0000`, also in `m12_00_00_01`) | SPECIAL_SINGLE_BODY | kept | Flier; the same entity exists in two map files; the arena start is scripted. Not audited for a ground body. |
+| Great Grey Wolf Sif (`m12_00 c5210_0000`) | CUTSCENE_DEPENDENT | kept | Starts from the scripted kneeling idle and cutscene; `model-specific-event`. |
+| Sanctuary Guardian (`m12_01 c3471_0000`) | SPECIAL_SINGLE_BODY | kept | Dragon-class plan; Oolacile events are replaced by the legacy tool. |
+| Knight Artorias (`m12_01 c4100_0000`) | CUTSCENE_DEPENDENT | kept | Oolacile arena events (legacy replaced the file); scripted entrance. |
+| Manus (`m12_01 c4500_0000`) | CUTSCENE_DEPENDENT | kept | Same map; scripted entrance, Abyss arena events. |
+| Black Dragon Kalameet (`m12_01 c4510_0000`, `c4510_0002`) | MULTI_BODY | kept | Two entities (ground and flying); the legacy special-cases the flying ones. |
+| Pinwheel (`m13_00 c3320_0000`) | MULTI_BODY | kept | Main body plus 14 clones (Pinwheel Chaos); legacy replaced the map events. |
+| Gravelord Nito (`m13_01 c5220_0000`) | SCRIPTED_MULTI_ENTITY | kept | Skeleton entities are part of the fight; `model-specific-event`. |
+| Chaos Witch Quelaag (`m14_00 c5280_0000`) | CUTSCENE_DEPENDENT | kept | `talk`, her sister's events and an intro; `model-specific-event`. |
+| Demon Firesage (`m14_01 c2231_0000`) | SAFE_WITH_ADAPTER (candidate) | kept | Single entity, but the legacy tool replaced the whole map events of `m14_01`; the map's Fog overlay and Bed of Chaos floor events make a first release unsafe without a game test. |
+| Ceaseless Discharge (`m14_01 c5200_0000`) | UNSUPPORTED | kept | Immobile 10 m body; a normal enemy cannot reach the player. |
+| Bed of Chaos (`m14_01 c5230_0000`) | UNSUPPORTED | kept | Immobile, floor script, two bodies. |
+| Centipede Demon (`m14_01 c5250_0000`) | CUTSCENE_DEPENDENT | kept | Rises from lava on a scripted entrance; the map events are legacy-replaced. |
+| Daughter of Chaos (`m14_01 c5401_0000`) | SCRIPTED_MULTI_ENTITY | kept | 1 HP shell; Part D's own backread edit. |
+| Iron Golem (`m15_00 c2320_0000`) | SAFE_WITH_ADAPTER (candidate) | kept | Single entity, but Sen's Fortress events are legacy-replaced and the fog gate scripts are not audited. |
+| Smough (`m15_01 c2360_0000`), Dragon Slayer Ornstein (`c5270_0000`), Super Ornstein (`c5271_0000`) and the Super Smough semantic slot | MULTI_BODY | kept | Two kinds of body; the second to die is empowered by events (the "Super" bodies); the encounter completes after both. |
+| Dark Sun Gwyndolin (`m15_01 c5320_0000`) | UNSUPPORTED | kept | Neutral team, stationary, scripted; `friendly-or-neutral`. |
+| Anor Londo Gargoyles (`m15_01 c5351_0000`, `_0001`) | MULTI_BODY | kept | Two bodies. |
+| Four Kings (`m16_00 c5390_0000`) | SCRIPTED_MULTI_ENTITY | kept | One catalog part for an encounter whose kings are spawned by script. |
+| Seath the Scaleless (`m17_00 c5290_0001`) | TRANSFORMATION | kept | Immortality phase and scripted death (legacy special case). |
+| Gwyn, Lord of Cinder (`m18_00 c5370_0000`) | CUTSCENE_DEPENDENT | kept | Scripted entrance; Gwyn spawn nerf; not audited. |
+
+**Rule of thumb that produced the three.** An encounter is supported only if (a) it is a single entity whose completion is that entity's death, (b) its map is not on the legacy
+event-surgery list, and (c) the model-specific edits it needs are edits Part D already makes for the same slot. Adding a fourth encounter is a documented decision plus a
+game test, not a change of a constant alone.
+
+#### The encounter wrapper (centralized)
+
+There is no per-boss code. The "participant" is a boss part (its slot, entity ID and events stay) whose *body* is another model; the wrapper is made of rules that already
+existed and one new one:
+
+| Responsibility | Mechanism |
+|---|---|
+| Entity identity | The slot keeps its entity ID (`encounterBody` placements are boss placements; the data tool never changes an entity ID). |
+| Activation and AI wake-up | Part D's portable-boss rules: `forceCombatActivation` (wake-up with the arena), the base think row of the body's model (`activeReplacementThinkParams`), the safe ground position of the arena. |
+| Health bar and name | The vanilla health-bar events keep targeting the entity. The bar keeps the **original boss name** on purpose (see "Deliberate deviations"); `PatchBossNames` is not applied to a body. |
+| HP and scaling | A scaled NpcParam row is written for the body (`forceScaledNpcParam`). With Area / Progressive scaling the body gets the boss's HP and strength (so the fight has a boss's length); with Vanilla scaling it keeps its own stats. |
+| Death and completion | Unchanged vanilla events: they wait for the entity's death. The static verifier proves that no condition, flag-write or event-initializer instruction of an event naming the entity was removed (except the model-specific forced animation `2003[18]` aimed at the encounter's own entity - the Asylum Demon drop and the Taurus Demon entrance - the same sanitization as Part D). |
+| Respawn | `disableRespawn = 1` is written to the body's row (**new, `EncounterOwnedCells` in `DsrDataTool`**). |
+| Reward and drop ownership | `dropType`, `getSoul`, `disableInitializeDead` and the item-lot cells come from the boss row: the encounter owns the reward, the body's own drops do not appear. |
+| Music, camera, cutscene | Not touched; the supported encounters have no cutscene. |
+| Fog compatibility | No new Fog overlay and no new event: the events that Fog rewrites for these arenas are the ones it already rewrites for Part D (proof below). |
+| Event IDs | None added by E2: nothing to allocate; the corrected allocator (`EVENT_ALLOCATION.md`) is unaffected. |
+
+#### What DS1TR builds
+
+| Option | Contract | Neutral | Rule |
+|---|---|---|---|
+| Boss replacement | `bossReplacement`: `classic` / `bosses` / `normals` / `both` | `classic` | `bosses`, `normals`, `both` need `sampling-v1` and boss randomization |
+| Boss chance in boss slots | `bossChanceInBossSlots` 0-100 | 90 | needs `both`; refused otherwise; the control is shown only with `both` |
+| Unique bosses | `uniqueBosses` | `false` | needs `bosses` or `both`; bodies never take part in the cycle |
+
+**Planner.** `planSampledBosses` (`sampling.js`) gains `bodies`. A boss slot that takes part (the participation draw is unchanged) and is in the audited set gets, in `normals`, a body; in
+`both`, a category draw from its own stream `category:slot:<id>` against the chance (so with the chance at 100 `both` equals boss sampling exactly). The body is drawn from `body:slot:<id>`:
+candidates are the audited body models (`c2500` Hollow, `c2540` Armored Hollow, `c2550` Undead Soldier, `c2560` Balder Knight, `c2520` Undead Assassin, `c2790` Black Knight,
+`c2410` Silver Knight, `c2390` Darkwraith, `c2810` Infested Barbarian, `c2690` Serpent Soldier, `c2800` Undead Crystal Soldier: ordinary awake ground melee enemies with a plain brain; no
+passive, ambush, ghost, mimic, flier, statue, NPC or boss-family model), filtered by Placement fit against the destination class, the Custom Pool, the difficulty mode (the curve
+looks for the nearest class the pool has) and the **model budget** `max(30, the map's vanilla model count)` against the running counts of the pass. A slot with no candidate keeps its
+boss in `normals` and draws a boss in `both`. New streams use names that did not exist before: no earlier draw moves, and neutral configurations draw nothing new.
+
+**Seed Codes.** `bossChanceInBossSlots` is an *extension key* stored only when different from 90; `bossReplacement` gains the values `normals` and `both`, which an earlier code cannot
+contain. Every earlier code decodes to the same settings, re-encodes to the same text and generates the same world (all 18 earlier golden fixtures verify byte for byte). The profile stays
+`ds1tr-gen-v1`. New worlds are pinned by `ds1tr-gen-v1.encounter-bodies.json`. Presets: version 12.
+
+**Data tool** (patch 0016). `PatchPlacement.EncounterBody`; for such a placement the scaled row copies the encounter-owned cells (`dropType`, `getSoul`, `disableInitializeDead`, the item-lot cells) from the boss row,
+sets `disableRespawn` to 1 and asserts them. Nothing is added to the events; nothing is added to the Fog whitelist.
+
+**Deliberate deviations.** (1) Only three encounters (above). (2) The health bar keeps the boss's name: a Balder Knight in the Asylum Demon arena shows "Asylum Demon". The alternative, renaming the bar through `PatchBossNames`, needs a boss-name id per
+body model that the game does not have; functional completion beats visual parity. (3) Scaling is a configuration decision (area/progressive = the boss's stats), not a boss-slot special case; with Vanilla scaling a Hollow
+is a very short fight. (4) The body never respawns even if its own row would. (5) The legacy unique-enemy limit does not exist; the model budget of the map does. (6) `bosses` mode is untouched: `both` with the chance at 100 is exactly
+`bosses` (checked by the sweeps).
+
+#### Measurements and proofs
+
+All on the real extracted catalog of a clean Dark Souls Remastered copy; zero unexplained failures; nothing was retried and no limit was relaxed.
+
+| What | Result |
+|---|---|
+| Engine, 18 configurations x 100 seeds (`bodySweep.mjs`: basic, fits, anywhere, curve strict, chance 50, Vanilla and Progressive scaling, + roaming bosses (both directions), `both` at 40 / 90 / unique / + roaming, Type replacement enabled, Custom Pool with and without body models, Prevent same, Gwyn strong + Second Gargoyle) | 1800/1800 worlds: deterministic; bodies only in the three slots and only with the allowed models; entity ID, scaled row and mark present; scaling as configured; no body outside the Custom Pool; the final model count of every map never above `max(30, vanilla)`; `both` at 100 equals `bosses`; `both` at 0 has the bodies of `normals` |
+| Model limit | 30 in every map; with Type replacement enabled the maximum was 28, with a Custom Pool 28 / 27 |
+| Share of bodies | `normals`: 300 bodies per 100 worlds (3 slots x 100); `both` at 40%: 184 (94 worlds with any); at 90% (the default): 36 (35 worlds with any); chance 50 replacement: 158 |
+| Event proof (real data tool, EMEVD diff of E2 against Part D packages of the same slots) | the Asylum Demon intro and every event that names the entity are identical to Part D's edit; E2 adds no event, no event ID and no instruction beyond Part D's (only the boss-name rewrite is absent) |
+| Static verifier (`tools/smoke-verify`, 23 checks per encounter; read back from the real package of one world with a body in **all three slots**: Asylum Demon, Taurus Demon and Capra Demon pass) | entity ID equals the boss's, model replaced, body row differs from the boss row, `dropType` / `getSoul` / `disableInitializeDead` / item lots equal the boss row, `disableRespawn` 1, events naming the entity kept, no condition / flag-write / initializer instruction removed (the only removals are the model-specific forced animations `2003[18]` aimed at the encounter's own entity: the Asylum Demon drop in `11810310`, the Taurus Demon entrance in `11015382`; the same sanitization as Part D), event IDs unique, model count within the limit |
+| Real golden fixtures | all 18 earlier fixtures of `ds1tr-gen-v1` verify byte for byte with the E2 engine and data tool; 4 new fixtures pin E2 worlds (basic, with Fog, with roaming bosses and `both`, Custom Pool edge) |
+| Fog (real format, `fogHostE2e.mjs`, `verify-skips` on every package) | 10 configurations x 10 seeds = 100/100 generated (`normals`, `both`, curve / fits / anywhere, chance 60-100, Unique bosses, Type replacement enabled and except roaming bosses, roaming bosses together, Custom Pool): 0 retries, 0 conflicts, 0 skip mismatches over 11,526 edited events and 33,914 surviving skips; the union of the Fog boss overlays is **inside the 15-event whitelist** (`11005392`, `11010000`, `11210001`, `11405392`, `11415342`, `11415373`, `11415382`, `11515392`, `11600001`, `11700000`, `11810000`, `11810310`, `11815382`, `11815390`, `11815394`): **no new overlay, no new merge ID**; the maximum model count is 33 (the Undead Parish baseline) |
+| Tests | see `IMPLEMENTATION_STATUS.md` |
+
+**Not verified by playing:** the wake-up, killability, the health bar, the unlocking of the way on, rewards and the absence of crashes for a body in each of the three arenas. The seven quick and the seventeen extended worlds
+(`docs/SMOKE_TESTS.md`; quick test "First boss fight - a normal enemy") are made for that.
 
 ---
 

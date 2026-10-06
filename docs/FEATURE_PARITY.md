@@ -35,8 +35,8 @@ a scratch directory for this audit only. The commit ids above are the revisions 
 |---|---|
 | Original options audited (Item 11 + Enemy 27 + FogMod 16) | **54** |
 | FULL | 37 (3 in Part E1: Boss chance for normal-enemy slots, Roaming boss souls, Roaming boss respawn; 34 = 21 + 4 in Batch 1 + 3 in Batch 2 + 1 Second Gargoyle + 2 in Part A: Placement fit, Replacement chance + 2 in Part B: Difficulty mode, Difficulty strictness + 1 in Part C1: Type replacement) |
-| UI_ONLY (engine gap) | 11 (14 before Part E1) |
-| PARTIAL | 4 (I11 hintsheet; I5 Soul items, where Transposed is unavailable; E2 Normal enemy replacement, added in Part A; E22 Custom enemy pool, added in Part C2: regular enemies only) |
+| UI_ONLY (engine gap) | 10 (14 before Part E1, 11 before Part E2) |
+| PARTIAL | 5 (I11 hintsheet; I5 Soul items, where Transposed is unavailable; E2 Normal enemy replacement, added in Part A; E22 Custom enemy pool, added in Part C2: regular enemies only; E9 Boss chance for boss slots, added in Part E2: three of 24 boss encounters) |
 | INTENTIONALLY_UNSUPPORTED | 1 |
 | DUPLICATE | 1 |
 | Newly wired in the audit task | 2 (settings preset import/export; restore default settings) |
@@ -75,7 +75,7 @@ All 21 configuration fields map to one position in the original config string. T
 
 | # | Original option | Original values | Proposed DS1TR control / default | UI | Contract | Backend | Engine | Status |
 |---|---|---|---|---|---|---|---|---|
-| E1 | Replace bosses | 0 don't, 1 only with bosses, 2 only with normal enemies, 3 either | select: Classic shuffle / Random bosses | yes (`enemies.placement.bossReplacement`, `sampling-v1`) | yes | yes | yes for "only with bosses" on single-body bosses (Part D); linked units stay classic; the "with normal enemies" and "either" values for boss slots (Part E2) are not built (`ENEMY_PLACEMENT_MODEL.md` 10.7) | PARTIAL |
+| E1 | Replace bosses | 0 don't, 1 only with bosses, 2 only with normal enemies, 3 either | select: Classic shuffle / Random bosses / Only normal enemies (early fights) / Bosses or normal enemies | yes (`enemies.placement.bossReplacement`, `sampling-v1`) | yes | yes | yes for "only with bosses" on single-body bosses (Part D; linked units stay classic); "only with normal enemies" and "either" (Part E2) for **three audited encounters only** (Asylum Demon, Taurus Demon, Capra Demon: a normal enemy is the body of the encounter, `ENEMY_PLACEMENT_MODEL.md` 10.8); every other boss keeps its boss (`normals`) or gets a boss (`both`) | PARTIAL (a boss with several bodies, a scripted entrance or an event-replaced map never gets a normal enemy) |
 | E2 | Replace normal enemies | same four values | select, `2` | yes (`enemies.placement.normalReplacement`, `sampling-v1`) | yes | yes | yes (`none`, `normals`; Part E1: `bosses` and `both` with the roaming-boss safety list, `ENEMY_PLACEMENT_MODEL.md` 10.7) | PARTIAL (a boss that needs its own arena or has several bodies never roams) |
 | E3 | Replace NPCs | same four values | select, `0` | placeholder | no | no | no | UI_ONLY |
 | E4 | Replace mimics | 0 no, 1 yes | toggle, on | yes (`enemies.replaceMimics`) | yes | yes | yes (Batch 1) | FULL |
@@ -83,7 +83,7 @@ All 21 configuration fields map to one position in the original config string. T
 | E6 | Difficulty mode | 4 curve + easy Asylum, 1 random with curve, 3 random + easy Asylum, 2 fully random | select, `3` | yes (`enemies.placement.difficultyMode`, `sampling-v1`) | yes | yes | yes (Part B, regular enemies; project-derived classes) | FULL |
 | E7 | Replacement chance | 0-100 % | slider, 100 | yes (`enemies.placement.replacementChance`, `sampling-v1`) | yes | yes | yes (Part A, whole range, non-worsening budget) | FULL |
 | E8 | Boss chance for normal-enemy slots | 0-100 % | slider, 10; shown only with "Bosses or normal enemies" | yes (`enemies.placement.bossChanceInNormalSlots`, `sampling-v1`) | yes | yes | yes (Part E1; the roaming pass, `ENEMY_PLACEMENT_MODEL.md` 10.7) | FULL |
-| E9 | Boss chance for boss slots | 0-100 % | slider, 90 | none: no control is shown (Part E2 is not built, `ENEMY_PLACEMENT_MODEL.md` 10.7) | no | no | no | UI_ONLY |
+| E9 | Boss chance for boss slots | 0-100 % | slider, 90 | yes (`enemies.placement.bossChanceInBossSlots`; shown only with "Bosses or normal enemies") | yes | yes | yes (Part E2, three audited encounters: the share of those slots that get a boss, the rest a normal enemy; `ENEMY_PLACEMENT_MODEL.md` 10.8) | PARTIAL (three encounters of 24) |
 | E10 | Replace second Gargoyle | 0 no, 1 yes | select, Replace (legacy default); also Do not replace and Single boss (earlier DS1TR behavior) | yes (`enemies.secondGargoyle`) | yes | yes | yes | FULL |
 | E11 | Difficulty strictness | 0 strict, 1 a bit loose, 2 very loose | select, `1` | yes (`enemies.placement.difficultyStrictness`, `sampling-v1`) | yes | yes | yes (Part B, regular enemies; project-derived classes) | FULL |
 | E12 | T-pose behavior | 0 enabled, 1 disabled | toggle, enabled | placeholder | no | no | no | UI_ONLY |
@@ -222,7 +222,7 @@ mapped one-to-one.
 |---|---|---|---|
 | G8 | Replacement chance (E7) | done (Part A) | Per-slot keep/replace decision before the permutation. A count-preserving permutation must be rebuilt over only the replaced subset. |
 | G9 | Boss replace/normal replace/NPC replace modes (E1, E2, E3) | B-C | Source/target class partitions. NPC replacement is the hardest: friendly NPCs are deliberately kept vanilla by the engine today. |
-| G10 | Boss chance for normal / boss slots (E8, E9) | E8 done (Part E1); E9 not built | The normal-slot side is the roaming pass. The boss-slot side (a regular enemy in a boss arena) is not built: see `ENEMY_PLACEMENT_MODEL.md` 10.7, "Part E2: not built". |
+| G10 | Boss chance for normal / boss slots (E8, E9) | E8 done (Part E1); E9 done for three encounters (Part E2) | The normal-slot side is the roaming pass. The boss-slot side keeps the boss entity and changes only the body, for the Asylum Demon, Taurus Demon and Capra Demon; the audit of every other boss and the reasons are in `ENEMY_PLACEMENT_MODEL.md` 10.8. |
 | G11 | Placement fit (E5) | done for regular slots (Part A) | The engine already checks compatibility via `pickCompatibleEnemy` and `bossGrounding`; "anywhere" requires relaxing these and accepting the crash and softlock risk, which the 40/40 sweeps do not cover. |
 | G12 | Difficulty mode and strictness (E6, E11) | done for regular enemies (Part B) | Needs a per-enemy tier table and area tiers. The prototype data shows tiers, but the real catalog needs them for all enemies. |
 | G13 | Mimics, second Gargoyle, mosquitoes (E4, E10, E21) | done | See 6a. |
