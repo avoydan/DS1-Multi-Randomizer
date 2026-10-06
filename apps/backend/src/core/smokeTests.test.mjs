@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
-import { DEFAULT_GENERATION_SETTINGS, SMOKE_SCENARIOS, SMOKE_TEST_CHECKLIST, SMOKE_TEST_PROFILE, joinConfig, resolveScenarioSettings } from '@ds1tr/contracts';
+import { DEFAULT_GENERATION_SETTINGS, SMOKE_SCENARIOS, SMOKE_START, SMOKE_TEST_CHECKLIST, SMOKE_TEST_PROFILE, describeSmokeExpected, describeSmokeTarget, joinConfig, resolveScenarioSettings } from '@ds1tr/contracts';
 import { validateRandomizerConfig } from '../../dist/core/configValidation.js';
 import { decodeSeedCode, encodeSeedCode } from '../../dist/core/seedCode.js';
 import { smokeTestWorlds } from '../../dist/core/smokeTests.js';
@@ -12,17 +12,73 @@ import { canonicalizeSettings } from '../../dist/core/canonicalSettings.js';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.join(here, '..', '..', '..', '..');
 
-test('the smoke-test worlds are the fourteen documented scenarios with unique ids and seeds', () => {
-  assert.deepEqual(SMOKE_SCENARIOS.map((scenario) => scenario.id), [
+test('the smoke-test worlds are five quick smoke tests and twelve extended gameplay tests with unique ids and seeds', () => {
+  const quick = SMOKE_SCENARIOS.filter((scenario) => scenario.category === 'quick').map((scenario) => scenario.id);
+  const extended = SMOKE_SCENARIOS.filter((scenario) => scenario.category === 'extended').map((scenario) => scenario.id);
+  assert.deepEqual(quick, ['quick-roaming-basic', 'quick-roaming-souls', 'quick-roaming-repeated', 'quick-sampling-asylum', 'quick-boss-asylum-demon']);
+  assert.deepEqual(extended, [
     'classic-triple', 'sampling-regular', 'second-gargoyle', 'parish-models', 'boss-sampling', 'boss-repeat', 'boss-unique', 'boss-partial',
-    'roaming-single', 'roaming-repeat', 'roaming-souls', 'roaming-gargoyle', 'roaming-fog', 'roaming-parish',
+    'roaming-repeat', 'roaming-gargoyle', 'roaming-fog', 'roaming-parish',
   ]);
+  assert.deepEqual(SMOKE_SCENARIOS.map((scenario) => scenario.category), [...quick.map(() => 'quick'), ...extended.map(() => 'extended')], 'quick tests come first');
   assert.equal(new Set(SMOKE_SCENARIOS.map((scenario) => scenario.masterSeed)).size, SMOKE_SCENARIOS.length);
+  assert.equal(new Set(SMOKE_SCENARIOS.map((scenario) => scenario.id)).size, SMOKE_SCENARIOS.length);
   for (const scenario of SMOKE_SCENARIOS) {
     assert.ok(scenario.observe.length > 0, `${scenario.id} says what to look at`);
-    assert.match(scenario.masterSeed, /^smoke-[a-n]-[a-z-]+(-\d+)?$/u);
+    assert.match(scenario.masterSeed, /^smoke-(q[1-9]|[a-n])-[a-z-]+(-\d+)?$/u);
   }
   assert.ok(SMOKE_TEST_CHECKLIST.length >= 10);
+});
+
+test('every quick smoke test states an exact target, an expected replacement and a short time, and never says "find a boss somewhere"', () => {
+  for (const scenario of SMOKE_SCENARIOS.filter((entry) => entry.category === 'quick')) {
+    const id = scenario.id;
+    assert.ok(scenario.expectations?.length >= 1, `${id} has expectations`);
+    assert.ok(scenario.estimateSeconds >= 20 && scenario.estimateSeconds <= 90, `${id}: 20-90 seconds to the target (${scenario.estimateSeconds})`);
+    assert.ok(scenario.observe.length >= 3, `${id} lists specific checks`);
+    for (const line of [...scenario.observe, ...(scenario.afterwards ?? []), scenario.purpose]) {
+      assert.doesNotMatch(line, /find a boss|somewhere|among the regular enemies/iu, `${id}: no vague instruction ("${line}")`);
+    }
+    for (const entry of scenario.expectations) {
+      assert.match(entry.slot, /^c\d{4}_\d{4}$/u, `${id}: an exact slot`);
+      assert.ok(entry.meters > 0 && entry.meters <= 40 || entry.kind === 'boss', `${id}/${entry.slot}: close to the start (${entry.meters} m)`);
+      assert.ok(entry.name && entry.replacedName && entry.model && entry.replacedModel, `${id}/${entry.slot} names both models`);
+      assert.equal(entry.map, SMOKE_START.map, `${id}: the first visit of the Undead Asylum`);
+      const text = `${describeSmokeTarget(entry)} | ${describeSmokeExpected(entry)}`;
+      assert.ok(text.includes(entry.slot) && text.includes(String(entry.meters)) || entry.kind === 'boss', `${id}: the text names the slot and the distance`);
+    }
+    const settings = resolveScenarioSettings(scenario);
+    for (const entry of scenario.expectations.filter((expected) => expected.kind === 'roaming-boss')) {
+      assert.ok(['bosses', 'both'].includes(settings.enemies.placement.normalReplacement), `${id}: roaming bosses are switched on`);
+      assert.equal(entry.disableRespawn === true, entry.disableRespawn === undefined ? false : settings.enemies.placement.roamingBossesStayDead, `${id}: the stay-dead expectation matches the setting`);
+      assert.equal(entry.wakeUpEvent, true, `${id}: a roaming boss is checked for its wake-up event`);
+    }
+  }
+  // The five quick tests cover the five features: basic roaming, souls + stay dead, a repeated boss, regular sampling and boss sampling.
+  const by = (id) => resolveScenarioSettings(SMOKE_SCENARIOS.find((scenario) => scenario.id === id));
+  assert.equal(by('quick-roaming-souls').enemies.placement.roamingBossSouls, 100);
+  assert.equal(by('quick-roaming-souls').enemies.placement.roamingBossesStayDead, true);
+  assert.equal(by('quick-roaming-repeated').enemies.placement.typeReplacement, 'enabled-except-roaming-bosses');
+  assert.equal(new Set(SMOKE_SCENARIOS.find((scenario) => scenario.id === 'quick-roaming-repeated').expectations.map((entry) => entry.model)).size, 1, 'the same boss three times');
+  assert.equal(by('quick-sampling-asylum').enemies.placement.normalReplacement, 'normals');
+  assert.equal(by('quick-boss-asylum-demon').enemies.placement.bossReplacement, 'bosses');
+});
+
+test('quick worlds are ordinary worlds: no override, no forced placement, nothing a Seed Code does not already say', () => {
+  for (const scenario of SMOKE_SCENARIOS) {
+    assert.deepEqual(Object.keys(scenario).filter((key) => /force|override/iu.test(key)), [], `${scenario.id} carries no forced placement`);
+    // The same settings and master seed that the Seed Code holds are the whole definition: the Seed Code decodes to exactly them.
+    const world = smokeTestWorlds().worlds.find((entry) => entry.id === scenario.id);
+    const decoded = decodeSeedCode(world.seedCode);
+    assert.equal(decoded.envelope.masterSeed, scenario.masterSeed);
+  }
+  // Part E1 settings of quick worlds sit inside what presets and Seed Codes already express.
+  for (const id of ['quick-roaming-basic', 'quick-roaming-souls', 'quick-roaming-repeated']) {
+    const placement = resolveScenarioSettings(SMOKE_SCENARIOS.find((scenario) => scenario.id === id)).enemies.placement;
+    assert.equal(placement.algorithm, 'sampling-v1');
+    assert.equal(placement.fit, 'anywhere');
+    assert.equal(placement.difficultyMode, 'random', 'Easy Asylum would keep bosses out of the Asylum');
+  }
 });
 
 test('every smoke-test world is a valid configuration whose Seed Code decodes to exactly its settings, pinned to ds1tr-gen-v1', () => {
@@ -54,17 +110,14 @@ test('the scenarios exercise what they claim: boss sampling options, chance, uni
   assert.equal(by('boss-unique').enemies.placement.uniqueBosses, true);
   assert.equal(by('boss-partial').enemies.placement.replacementChance, 50);
   assert.equal(by('parish-models').enemies.placement.fit, 'anywhere');
-  for (const id of ['roaming-single', 'roaming-repeat', 'roaming-souls', 'roaming-gargoyle', 'roaming-fog', 'roaming-parish']) {
+  for (const id of ['roaming-repeat', 'roaming-gargoyle', 'roaming-fog', 'roaming-parish']) {
     assert.equal(by(id).enemies.placement.algorithm, 'sampling-v1', id);
     assert.ok(['bosses', 'both'].includes(by(id).enemies.placement.normalReplacement), `${id} lets bosses stand in regular slots`);
   }
   assert.equal(by('roaming-repeat').enemies.placement.typeReplacement, 'enabled');
-  assert.equal(by('roaming-souls').enemies.placement.roamingBossSouls, 100);
-  assert.equal(by('roaming-souls').enemies.placement.roamingBossesStayDead, true);
   assert.equal(by('roaming-gargoyle').enemies.secondGargoyle, 'replace');
   assert.equal(by('roaming-fog').fog.enabled, true);
   assert.equal(by('roaming-parish').enemies.placement.normalReplacement, 'bosses');
-  assert.equal(by('roaming-single').enemies.placement.bossChanceInNormalSlots, 20);
 });
 
 test('the documented Seed Codes in docs/SMOKE_TESTS.md are the codes the app creates (the document is generated, never hand-edited)', async () => {

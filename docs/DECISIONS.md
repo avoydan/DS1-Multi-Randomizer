@@ -993,6 +993,24 @@ Date: 2026-10-06.
 8. **Launch game** is a desktop (Electron) concern: Steam `steam://rungameid/570940` first, the game executable as a fallback,
    and the method used is reported. The renderer never starts processes.
 
+## Smoke tests: quick worlds by seed search, no forced placements (backend 0.35.0, desktop 0.22.0, contracts 0.20.0)
+
+Date: 2026-10-06.
+
+1. **Why.** The first Part E test worlds put their targets in the Undead Burg and Parish, an hour of play away. A smoke test has to show one feature within about a minute.
+2. **Quick vs extended.** Quick worlds name an exact slot, the distance from the player start and the expected replacement, and promise 20-90 s from gaining control. Everything that needs
+   travel or progression, or exercises a whole system (Fog, the Bell Gargoyle event, a map full of bosses), stays as an *extended gameplay test* in its own group.
+3. **No test-only override.** A forced-placement mechanism (a config key that overwrites chosen slots) was considered and rejected: it would add an engine path that production never takes,
+   put a second definition of a world next to the Seed Code, and make history, Copy seed and Regenerate files able to drop the override silently. A search over normal master seeds finds
+   worlds with the same properties (the roaming pass visits slots in a fixed order, the Part D sampler at 100% always replaces the Asylum Demon) using only normal settings. The quick worlds
+   are therefore ordinary Seed Codes of `ds1tr-gen-v1`; nothing about Seed Codes, the engine, the data tool or normal Randomize changed.
+4. **First visit.** The Asylum map holds both visits' enemies (event 11810350 switches the sets); a target must have entity id 1810101-1810113 to exist the first time. Dummy slots and the
+   passive Asylum Hollows are not targets.
+5. **The definition is the guard.** A quick world's expectations (slot, model, souls, respawn bit, wake-up event) live next to its seed in `packages/contracts/src/smokeTests.ts`; unit tests pin
+   their shape and the documented Seed Codes, and `smokeTestCatalog.mjs verify` regenerates each world and fails loudly if the files no longer contain the promised target.
+6. **Type replacement is not a quick test.** The Asylum's Hollow kind contains the protected passive slots, so the planner never replaces the whole kind there; the Type + roaming world stays
+   extended (Undead Burg). The "except roaming bosses" behavior (each slot decides) is what the three-Smough quick world runs under.
+
 ## Roaming bosses: bosses in regular enemy slots, Part E1 (backend 0.34.0, desktop 0.21.0, contracts 0.19.0)
 
 Date: 2026-10-06.

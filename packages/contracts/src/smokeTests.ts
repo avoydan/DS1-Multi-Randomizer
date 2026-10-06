@@ -38,17 +38,69 @@ export const DEFAULT_GENERATION_SETTINGS: GenerationSettings = {
 
 type DeepPartial<T> = { [K in keyof T]?: T[K] extends readonly unknown[] | null ? T[K] : T[K] extends object ? DeepPartial<T[K]> : T[K] };
 
+/**
+ * QUICK worlds expose one feature within roughly 20-90 seconds of gaining control, at a place stated exactly (slot, distance from where the
+ * player wakes up). EXTENDED worlds need progression, travel, or exercise a whole system (Fog, Bell Gargoyle, a map full of bosses).
+ */
+export type SmokeCategory = 'quick' | 'extended';
+
+/** Where the player wakes up in a new game: c0000_0000 of m18_01_00_00.msb (the Undead Asylum cell). All distances below start here. */
+export const SMOKE_START = { map: 'm18_01_00_00', mapName: 'Undead Asylum', x: -13.75, y: 184.75, z: -44.5 } as const;
+
+/** One thing a quick world promises, in the words the tester reads and in the terms a static check of the generated files uses. */
+export interface SmokeExpectation {
+  kind: 'roaming-boss' | 'regular-enemy' | 'boss';
+  map: string;
+  mapName: string;
+  /** The part name in the map's MSB (`c2500_0006`), the same as the slot id after the colon. */
+  slot: string;
+  replacedModel: string;
+  replacedName: string;
+  /** The model that must stand there in the generated package, and its name. */
+  model: string;
+  name: string;
+  /** Straight-line distance on the ground from SMOKE_START in meters, and how much higher (+) or lower (-) the slot is. */
+  meters: number;
+  up: number;
+  /** For a roaming boss: the souls its row must carry, and whether the row must carry the stay-dead bit. */
+  souls?: number;
+  disableRespawn?: boolean;
+  /** A roaming boss gets its own wake-up event; a static check looks for it. */
+  wakeUpEvent?: boolean;
+}
+
 export interface SmokeScenario {
   id: string;
   title: string;
+  category: SmokeCategory;
   /** Short plain text: what part of the randomizer this world exercises. */
   purpose: string;
   /** Fixed internal master seed (the Seed Code carries it; nobody has to type it). */
   masterSeed: string;
   /** Changes to DEFAULT_GENERATION_SETTINGS. */
   settings: DeepPartial<GenerationSettings>;
-  /** Where to go and what to look at in this particular world (specific to the scenario). */
+  /** Extended: where to go and what to look at. Quick: the specific checks of this world, in order. */
   observe: string[];
+  /** Quick worlds only: what the generated files must contain (the app shows it; `smokeTestCatalog.mjs verify` checks it). */
+  expectations?: SmokeExpectation[];
+  /** Quick worlds only: seconds from gaining control to seeing the target, estimated from the distance (about 4 m/s, a detour factor and the cell door), not timed in the game. */
+  estimateSeconds?: number;
+  /** Quick worlds only: further steps after the first check (for example dying once to reset the area). */
+  afterwards?: string[];
+}
+
+const upText = (up: number) => (Math.abs(up) < 2 ? ', on the same floor as the start' : `, ${Math.round(Math.abs(up))} m ${up > 0 ? 'higher' : 'lower'} than the start`);
+
+/** "Undead Asylum: the Hollow at slot c2500_0006, 8.7 m from where you wake up, on the same floor as the start". */
+export function describeSmokeTarget(expectation: SmokeExpectation): string {
+  return `${expectation.mapName}: the ${expectation.replacedName} at slot ${expectation.slot}, ${expectation.meters} m from where you wake up${upText(expectation.up)}`;
+}
+
+/** "Capra Demon (c2240) replaces the Hollow at slot c2500_0006". */
+export function describeSmokeExpected(expectation: SmokeExpectation): string {
+  if (expectation.kind === 'boss') return `${expectation.name} (${expectation.model}) takes the place of ${expectation.replacedName}, the first boss`;
+  const extra = expectation.souls === undefined ? '' : `; it carries ${expectation.souls} souls${expectation.disableRespawn ? ' and stays dead' : ''}`;
+  return `${expectation.name} (${expectation.model}) replaces the ${expectation.replacedName} at slot ${expectation.slot}${extra}`;
 }
 
 /** What to check in every smoke-test world. A person ticks these off while playing; nothing marks them as passed. */
@@ -72,15 +124,141 @@ const roamingObserve = [
   'It should wake up when you come close, fight like the boss it is (no boss health bar, no fog gate) and be killable; the souls and drops should look sane.',
 ];
 
+/**
+ * The settings of the QUICK smoke-test worlds, kept apart from the scenarios because two tools need them before a scenario exists:
+ * `apps/backend/scripts/smokeWorldSearch.mjs` searches master seeds for these exact settings, and the scenario below pins the seed it found.
+ * Every quick world is an ordinary world (normal settings, normal master seed, normal Seed Code); nothing about a quick world is forced.
+ */
+export const QUICK_SMOKE_RECIPES: Readonly<Record<string, { seedPrefix: string; settings: DeepPartial<GenerationSettings> }>> = {
+  'quick-roaming-basic': {
+    seedPrefix: 'smoke-q1-capra',
+    settings: {
+      items: { enabled: false }, fog: { enabled: false },
+      enemies: { randomizeBosses: false, placement: { algorithm: 'sampling-v1', fit: 'anywhere', difficultyMode: 'random', replacementChance: 8, normalReplacement: 'bosses' } },
+    },
+  },
+  'quick-roaming-souls': {
+    seedPrefix: 'smoke-q2-taurus',
+    settings: {
+      items: { enabled: false }, fog: { enabled: false },
+      enemies: {
+        randomizeBosses: false,
+        placement: { algorithm: 'sampling-v1', fit: 'anywhere', difficultyMode: 'random', replacementChance: 8, normalReplacement: 'bosses', roamingBossSouls: 100, roamingBossesStayDead: true },
+      },
+    },
+  },
+  'quick-roaming-repeated': {
+    seedPrefix: 'smoke-q3-repeat',
+    settings: {
+      items: { enabled: false }, fog: { enabled: false },
+      enemies: {
+        randomizeBosses: false,
+        placement: { algorithm: 'sampling-v1', fit: 'anywhere', difficultyMode: 'random', replacementChance: 50, normalReplacement: 'bosses', typeReplacement: 'enabled-except-roaming-bosses' },
+      },
+    },
+  },
+  'quick-sampling-asylum': {
+    seedPrefix: 'smoke-q4-sampling',
+    settings: {
+      items: { enabled: false }, fog: { enabled: false },
+      enemies: { randomizeBosses: false, placement: { algorithm: 'sampling-v1', fit: 'fits', difficultyMode: 'random-easy-asylum', replacementChance: 100 } },
+    },
+  },
+  'quick-boss-asylum-demon': {
+    seedPrefix: 'smoke-q5-demon',
+    settings: {
+      items: { enabled: false }, fog: { enabled: false },
+      enemies: { randomizeRegularEnemies: false, gwynNerf: 'strong', secondGargoyle: 'keep', placement: { algorithm: 'sampling-v1', replacementChance: 100, bossReplacement: 'bosses' } },
+    },
+  },
+};
+
 export const SMOKE_SCENARIOS: readonly SmokeScenario[] = [
+  // ---- QUICK: the feature is in front of you within about a minute of gaining control (all in the Undead Asylum, first visit) ----------
   {
-    id: 'classic-triple', title: 'Classic full Triple', masterSeed: 'smoke-a-classic',
+    id: 'quick-roaming-basic', category: 'quick', title: 'Roaming boss - basic', masterSeed: 'smoke-q1-capra-476',
+    purpose: 'A boss stands where a regular enemy stood: the smallest check that a boss works outside its arena.',
+    settings: QUICK_SMOKE_RECIPES['quick-roaming-basic'].settings,
+    expectations: [{ kind: 'roaming-boss', map: 'm18_01_00_00', mapName: 'Undead Asylum', slot: 'c2500_0006', replacedModel: 'c2500', replacedName: 'Hollow', model: 'c2240', name: 'Capra Demon', meters: 8.7, up: 0, souls: 3000, wakeUpEvent: true }],
+    estimateSeconds: 25,
+    observe: [
+      'The Capra Demon is there, fully textured (no T-pose, no invisible body) - not a Hollow.',
+      'It wakes up when you come close, walks to you and attacks.',
+      'It has no boss health bar and there is no fog gate.',
+      'You can kill it. Its souls are 3000 (50% of the 6000 that DS1TR lists for that fight).',
+      'Nothing freezes or crashes when it appears, fights or dies.',
+    ],
+  },
+  {
+    id: 'quick-roaming-souls', category: 'quick', title: 'Roaming boss - souls and respawn', masterSeed: 'smoke-q2-taurus-1193',
+    purpose: 'A roaming boss with 100% souls that stays dead: the reward and the "does not come back" setting in one short loop.',
+    settings: QUICK_SMOKE_RECIPES['quick-roaming-souls'].settings,
+    expectations: [{ kind: 'roaming-boss', map: 'm18_01_00_00', mapName: 'Undead Asylum', slot: 'c2500_0006', replacedModel: 'c2500', replacedName: 'Hollow', model: 'c2250', name: 'Taurus Demon', meters: 8.7, up: 0, souls: 3000, disableRespawn: true, wakeUpEvent: true }],
+    estimateSeconds: 25,
+    observe: [
+      'A Taurus Demon stands where the first Hollow would be; it wakes up, moves and attacks (no boss health bar, no fog gate).',
+      'Note your soul count, then kill the Taurus Demon: you gain exactly 3000 souls (100% of the 3000 that DS1TR lists for that fight).',
+      'Control: the other Hollows of the cell block (slots c2500_0007, 11.4 m, and c2500_0005, 33.2 m from the start) are normal Hollows.',
+    ],
+    afterwards: [
+      'Reset the area: the Asylum has no bonfire (none in its map data), so die once (any way). Everything that respawns comes back when you wake up again.',
+      'Return to the same place: the Hollows are back, the Taurus Demon is NOT (the stay-dead setting; not yet confirmed in the game).',
+    ],
+  },
+  {
+    id: 'quick-roaming-repeated', category: 'quick', title: 'Roaming boss - three at once', masterSeed: 'smoke-q3-repeat-243588',
+    purpose: 'The same boss in three neighbouring slots: separate bodies, separate fights, nothing shared between them.',
+    settings: QUICK_SMOKE_RECIPES['quick-roaming-repeated'].settings,
+    expectations: [
+      { kind: 'roaming-boss', map: 'm18_01_00_00', mapName: 'Undead Asylum', slot: 'c2500_0006', replacedModel: 'c2500', replacedName: 'Hollow', model: 'c2360', name: 'Executioner Smough', meters: 8.7, up: 0, souls: 5000, wakeUpEvent: true },
+      { kind: 'roaming-boss', map: 'm18_01_00_00', mapName: 'Undead Asylum', slot: 'c2500_0007', replacedModel: 'c2500', replacedName: 'Hollow', model: 'c2360', name: 'Executioner Smough', meters: 11.4, up: 0, souls: 5000, wakeUpEvent: true },
+      { kind: 'roaming-boss', map: 'm18_01_00_00', mapName: 'Undead Asylum', slot: 'c2500_0005', replacedModel: 'c2500', replacedName: 'Hollow', model: 'c2360', name: 'Executioner Smough', meters: 33.2, up: 0.9, souls: 5000, wakeUpEvent: true },
+    ],
+    estimateSeconds: 35,
+    observe: [
+      'Three Executioner Smoughs stand in the cell block, 8.7, 11.4 and 33.2 m from the start.',
+      'Each wakes up, moves and attacks on its own; killing one does not touch the others.',
+      'Each gives its own 5000 souls (50% of 10000) and none has a boss bar.',
+      'Nothing else in the Asylum is a boss on this first visit (other roaming bosses of this world are in the part you only reach on the second visit).',
+    ],
+  },
+  {
+    id: 'quick-sampling-asylum', category: 'quick', title: 'Regular enemies - first three change', masterSeed: 'smoke-q4-sampling-3',
+    purpose: 'Legacy-style sampling at runtime: the first Hollows are different enemies and behave like enemies.',
+    settings: QUICK_SMOKE_RECIPES['quick-sampling-asylum'].settings,
+    expectations: [
+      { kind: 'regular-enemy', map: 'm18_01_00_00', mapName: 'Undead Asylum', slot: 'c2500_0006', replacedModel: 'c2500', replacedName: 'Hollow', model: 'c2560', name: 'Balder Knight', meters: 8.7, up: 0 },
+      { kind: 'regular-enemy', map: 'm18_01_00_00', mapName: 'Undead Asylum', slot: 'c2500_0007', replacedModel: 'c2500', replacedName: 'Hollow', model: 'c2550', name: 'Undead Soldier', meters: 11.4, up: 0 },
+      { kind: 'regular-enemy', map: 'm18_01_00_00', mapName: 'Undead Asylum', slot: 'c2500_0005', replacedModel: 'c2500', replacedName: 'Hollow', model: 'c2520', name: 'Undead Assassin', meters: 33.2, up: 0.9 },
+    ],
+    estimateSeconds: 35,
+    observe: [
+      'Where the first three Hollows stood there are a Balder Knight, an Undead Soldier and an Undead Assassin.',
+      'None is in a T-pose or invisible; each wakes up, moves and attacks; none floats or sinks into the floor.',
+      'Their size looks right for the cell block (the setting only allows enemies that fit).',
+    ],
+  },
+  {
+    id: 'quick-boss-asylum-demon', category: 'quick', title: 'Boss sampling - the first boss', masterSeed: 'smoke-q5-demon-9',
+    purpose: 'The first boss of the game is replaced by another boss: model, health bar, AI, death and the way on.',
+    settings: QUICK_SMOKE_RECIPES['quick-boss-asylum-demon'].settings,
+    expectations: [{ kind: 'boss', map: 'm18_01_00_00', mapName: 'Undead Asylum', slot: 'c2232_0000', replacedModel: 'c2232', replacedName: 'Asylum Demon', model: 'c2250', name: 'Taurus Demon', meters: 22.5, up: 13.3 }],
+    estimateSeconds: 90,
+    observe: [
+      'Climb to the balcony where the Asylum Demon normally drops in: a Taurus Demon arrives instead, with its own name on the boss health bar.',
+      'It fights (moves, attacks, no T-pose), can be killed and its death ends the encounter.',
+      'The way on opens as it does after the Asylum Demon (progression: you can leave the Asylum).',
+    ],
+    afterwards: ['Two moments matter: the replacement becomes visible when the encounter starts (about a minute), and the fight can be completed only once you have taken the upper route (about three more).'],
+  },
+  {
+    id: 'classic-triple', category: 'extended', title: 'Classic full Triple', masterSeed: 'smoke-a-classic',
     purpose: 'Everything on with the default classic placement: items, enemies, bosses and the fog randomizer together.',
     settings: {},
     observe: ['Start a new game and walk through the first areas.', 'Check the fog gates and warps you meet, and the first boss you reach.'],
   },
   {
-    id: 'sampling-regular', title: 'Regular enemies, sampling', masterSeed: 'smoke-b-sampling',
+    id: 'sampling-regular', category: 'extended', title: 'Regular enemies, sampling (Asylum to Parish)', masterSeed: 'smoke-b-sampling',
     purpose: 'Regular enemies drawn per slot (legacy-style sampling), no bosses, no items, no fog randomizer.',
     settings: {
       items: { enabled: false }, fog: { enabled: false },
@@ -89,13 +267,13 @@ export const SMOKE_SCENARIOS: readonly SmokeScenario[] = [
     observe: ['Walk through the Undead Asylum, Undead Burg and Undead Parish.', 'Look for enemies that stand in the wrong place or do not attack.'],
   },
   {
-    id: 'second-gargoyle', title: 'Second Bell Gargoyle', masterSeed: 'smoke-c-gargoyle-7',
+    id: 'second-gargoyle', category: 'extended', title: 'Second Bell Gargoyle', masterSeed: 'smoke-c-gargoyle-7',
     purpose: 'The second Bell Gargoyle is replaced by another boss (the first one also changes).',
     settings: { items: { enabled: false }, fog: { enabled: false }, enemies: { randomizeRegularEnemies: false, secondGargoyle: 'replace', gwynNerf: 'none' } },
     observe: ['Go up to the rooftop of the Undead Parish church: the Bell Gargoyles boss fight.', 'The first body starts the fight; the second body joins when the first drops to about 60% health.'],
   },
   {
-    id: 'parish-models', title: 'Undead Parish with many enemy types', masterSeed: 'smoke-d-parish-1',
+    id: 'parish-models', category: 'extended', title: 'Undead Parish with many enemy types', masterSeed: 'smoke-d-parish-1',
     purpose: 'The Undead Parish map holding one of the highest numbers of different enemy models the sampler produces.',
     settings: {
       items: { enabled: false }, fog: { enabled: false },
@@ -104,7 +282,7 @@ export const SMOKE_SCENARIOS: readonly SmokeScenario[] = [
     observe: ['Walk the whole Undead Parish, including the Sunlight Altar side and the church.', 'Look for missing or invisible enemies, textures that do not load, frame drops and crashes.'],
   },
   {
-    id: 'boss-sampling', title: 'Boss sampling', masterSeed: 'smoke-e-bosses-1',
+    id: 'boss-sampling', category: 'extended', title: 'Boss sampling (every arena)', masterSeed: 'smoke-e-bosses-1',
     purpose: 'Every single-body boss slot draws its own replacement (bosses can repeat).',
     settings: {
       items: { enabled: false }, fog: { enabled: false },
@@ -113,7 +291,7 @@ export const SMOKE_SCENARIOS: readonly SmokeScenario[] = [
     observe: bossRoom,
   },
   {
-    id: 'boss-repeat', title: 'The same boss in several places', masterSeed: 'smoke-f-repeat-25',
+    id: 'boss-repeat', category: 'extended', title: 'The same boss in several places', masterSeed: 'smoke-f-repeat-25',
     purpose: 'A boss that appears in more than one arena in the same world (boss sampling draws with repeats).',
     settings: {
       items: { enabled: false }, fog: { enabled: false },
@@ -122,7 +300,7 @@ export const SMOKE_SCENARIOS: readonly SmokeScenario[] = [
     observe: bossRoom,
   },
   {
-    id: 'boss-unique', title: 'Unique bosses', masterSeed: 'smoke-g-unique-4',
+    id: 'boss-unique', category: 'extended', title: 'Unique bosses', masterSeed: 'smoke-g-unique-4',
     purpose: 'Boss sampling where a boss is not used a second time before every boss was used once.',
     settings: {
       items: { enabled: false }, fog: { enabled: false },
@@ -131,7 +309,7 @@ export const SMOKE_SCENARIOS: readonly SmokeScenario[] = [
     observe: bossRoom,
   },
   {
-    id: 'boss-partial', title: 'Some bosses stay as they are', masterSeed: 'smoke-h-partial-1',
+    id: 'boss-partial', category: 'extended', title: 'Some bosses stay as they are', masterSeed: 'smoke-h-partial-1',
     purpose: 'Boss sampling with a 50% replacement chance: about half of the boss slots keep their own boss.',
     settings: {
       items: { enabled: false }, fog: { enabled: false },
@@ -140,16 +318,7 @@ export const SMOKE_SCENARIOS: readonly SmokeScenario[] = [
     observe: [...bossRoom, 'Also visit a boss that stayed vanilla: its fog gate and fight must still be normal.'],
   },
   {
-    id: 'roaming-single', title: 'A boss among regular enemies', masterSeed: 'smoke-i-roaming-1',
-    purpose: 'Bosses stand in some regular enemy slots (Normal enemy replacement: Bosses or normal enemies); the rest of the enemies are normal.',
-    settings: {
-      items: { enabled: false }, fog: { enabled: false },
-      enemies: { randomizeBosses: false, placement: { algorithm: 'sampling-v1', fit: 'anywhere', replacementChance: 25, normalReplacement: 'both', bossChanceInNormalSlots: 20 } },
-    },
-    observe: roamingObserve,
-  },
-  {
-    id: 'roaming-repeat', title: 'The same boss in several regular slots', masterSeed: 'smoke-j-roaming-repeat-1',
+    id: 'roaming-repeat', category: 'extended', title: 'Type replacement + roaming bosses (Undead Burg and later)', masterSeed: 'smoke-j-roaming-repeat-1',
     purpose: 'With Type replacement, every enemy of one kind in a map is replaced by the same boss, so one boss stands in several places of an area.',
     settings: {
       items: { enabled: false }, fog: { enabled: false },
@@ -158,16 +327,7 @@ export const SMOKE_SCENARIOS: readonly SmokeScenario[] = [
     observe: roamingObserve,
   },
   {
-    id: 'roaming-souls', title: 'Roaming boss souls and respawn', masterSeed: 'smoke-k-roaming-souls-1',
-    purpose: 'Bosses in regular slots drop 100% of their fight souls and stay dead once killed.',
-    settings: {
-      items: { enabled: false }, fog: { enabled: false },
-      enemies: { randomizeBosses: false, placement: { algorithm: 'sampling-v1', fit: 'fits', replacementChance: 30, normalReplacement: 'both', bossChanceInNormalSlots: 30, roamingBossSouls: 100, roamingBossesStayDead: true } },
-    },
-    observe: [...roamingObserve, 'Kill a roaming boss and note the souls; rest at a bonfire and check that it does not come back (the "stay dead" setting is untested in the game).'],
-  },
-  {
-    id: 'roaming-gargoyle', title: 'Roaming bosses with the second Bell Gargoyle', masterSeed: 'smoke-l-roaming-gargoyle-1',
+    id: 'roaming-gargoyle', category: 'extended', title: 'Roaming bosses with the second Bell Gargoyle', masterSeed: 'smoke-l-roaming-gargoyle-1',
     purpose: 'Bosses in regular slots together with a replaced second Bell Gargoyle and boss sampling in the boss arenas.',
     settings: {
       items: { enabled: false }, fog: { enabled: false },
@@ -176,7 +336,7 @@ export const SMOKE_SCENARIOS: readonly SmokeScenario[] = [
     observe: ['Go up to the rooftop of the Undead Parish church: the Bell Gargoyles boss fight and the roaming bosses around it.', ...roamingObserve],
   },
   {
-    id: 'roaming-fog', title: 'Roaming bosses with the fog randomizer', masterSeed: 'smoke-m-roaming-fog-1',
+    id: 'roaming-fog', category: 'extended', title: 'Roaming bosses with the fog randomizer', masterSeed: 'smoke-m-roaming-fog-1',
     purpose: 'Bosses in regular slots with the fog randomizer on (fog gates, warps and boss fogs are moved too).',
     settings: {
       items: { enabled: false },
@@ -185,7 +345,7 @@ export const SMOKE_SCENARIOS: readonly SmokeScenario[] = [
     observe: [...roamingObserve, 'Check that fog gates and warps still lead where the fog randomizer says, and that no roaming boss blocks a gate.'],
   },
   {
-    id: 'roaming-parish', title: 'Undead Parish full of bosses', masterSeed: 'smoke-n-roaming-parish-1',
+    id: 'roaming-parish', category: 'extended', title: 'Undead Parish full of bosses', masterSeed: 'smoke-n-roaming-parish-1',
     purpose: 'Every regular slot that can take a boss gets one (at most ten per map): the highest load of different models a roaming world can put on one map.',
     settings: {
       items: { enabled: false }, fog: { enabled: false },

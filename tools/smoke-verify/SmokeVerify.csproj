@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Static check of a generated package against the expectations of a smoke-test world (apps/backend/scripts/smokeTestCatalog.mjs verify).
+       It reads the files the game would load; it never starts the game and proves nothing about runtime behavior. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <NuGetAudit>false</NuGetAudit>
+    <RestoreIgnoreFailedSources>true</RestoreIgnoreFailedSources>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="JuicerMV.SoulsFormats" Version="0.1.3" />
+  </ItemGroup>
+</Project>

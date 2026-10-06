@@ -1,6 +1,7 @@
 // Describes (and helps choose) the runtime smoke-test worlds of packages/contracts/src/smokeTests.ts.
 //
 //   node apps/backend/scripts/smokeTestCatalog.mjs describe [id,id]          generate each scenario's world and print what a tester will meet
+//   node apps/backend/scripts/smokeTestCatalog.mjs verify [id,id]            static check of the QUICK worlds: generate each one twice (identical package) and read the package for what it promises
 //   node apps/backend/scripts/smokeTestCatalog.mjs search <id> [--from A --to B]   try master seeds `<prefix>-A..B` and print the measurements
 //
 // Needs a clean game copy and the built helpers like goldenCompatibility.mjs (DS1TR_GOLDEN_GAME_SOURCE, DS1TR_DATA_TOOL_EXE,
@@ -9,8 +10,11 @@
 import { cp, mkdtemp, mkdir, readFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { SMOKE_SCENARIOS, SMOKE_TEST_PROFILE, SMOKE_TEST_CHECKLIST, resolveScenarioSettings } from '@ds1tr/contracts';
+import { SMOKE_SCENARIOS, SMOKE_START, SMOKE_TEST_PROFILE, SMOKE_TEST_CHECKLIST, describeSmokeExpected, describeSmokeTarget, resolveScenarioSettings } from '@ds1tr/contracts';
 import { writeFile } from 'node:fs/promises';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { packageDigest } from './goldenCompatibility.mjs';
 import { GameStateAuthority, executableName, managedRoots } from '../dist/core/gameState.js';
 import { generateRun } from '../dist/core/generationPipeline.js';
 import { prepareRun } from '../dist/core/seededRun.js';
@@ -19,7 +23,7 @@ import { canonicalizeSettings } from '../dist/core/canonicalSettings.js';
 
 const [mode, argument, ...rest] = process.argv.slice(2);
 const source = process.env.DS1TR_GOLDEN_GAME_SOURCE;
-if (!['describe', 'search', 'docs'].includes(mode) || !source) {
+if (!['describe', 'search', 'docs', 'verify'].includes(mode) || !source) {
   console.error('Usage: DS1TR_GOLDEN_GAME_SOURCE=<clean game dir> node smokeTestCatalog.mjs describe|search <id> [--from A --to B]');
   process.exit(2);
 }
@@ -33,12 +37,14 @@ try {
   const authority = new GameStateAuthority({ stateRoot: path.join(temp, 'state'), isGameRunning: async () => false });
   if (!(await authority.importPristine(game)).ok) throw new Error('pristine import failed');
 
-  const measure = async (scenario, masterSeed) => {
+  let runCounter = 0;
+  const measure = async (scenario, masterSeed, keep = false) => {
     const settings = canonicalizeSettings(resolveScenarioSettings(scenario));
     const seedCode = encodeSeedCode({ profile: SMOKE_TEST_PROFILE, masterSeed, settings });
     const prepared = prepareRun({ gamePath: game, seedCode });
     if (!prepared.ok) throw new Error(`${scenario.id}: ${prepared.code}: ${prepared.technical}`);
-    const workspacePath = path.join(temp, `run-${scenario.id}-${masterSeed}`);
+    runCounter += 1;
+    const workspacePath = path.join(temp, `run-${runCounter}-${scenario.id}`);
     await mkdir(workspacePath, { recursive: true });
     const result = await generateRun({ config: prepared.config, workspacePath, profile: prepared.profile, seedCode }, () => {},
       { getPristineSource: (p) => authority.getPristineSource(p) });
@@ -67,7 +73,7 @@ try {
     const roamingCounts = new Map();
     for (const name of roamingNames) roamingCounts.set(name, (roamingCounts.get(name) ?? 0) + 1);
     const out = {
-      masterSeed, seedCode, ok: true,
+      masterSeed, seedCode, ok: true, ...(keep ? { packagePath: result.packagePath, manifest: result.manifest, workspacePath } : {}),
       roamingCount: roamingRows.length,
       roamingTable: roamingRows.map((p) => `${AREA[p.map] ?? p.map}: a boss replaces enemy ${p.from.split(' [')[0]} (slot ${p.slot.split(':')[1]}): ${BOSS_NAME[p.targetModelName] ?? p.targetModelName}, souls ${p.roamingBossSouls}${p.disableRespawn ? ', stays dead' : ''}`),
       roamingKinds: [...roamingCounts].map(([name, n]) => `${name} x${n}`),
@@ -79,7 +85,7 @@ try {
       maxModels: Math.max(0, ...Object.values(maps).map((map) => map.finalModels ?? 0)),
       mapModels: Object.fromEntries(Object.entries(maps).map(([id, map]) => [id, map.finalModels])),
     };
-    await rm(workspacePath, { recursive: true, force: true });
+    if (!keep) await rm(workspacePath, { recursive: true, force: true });
     return out;
   };
 
@@ -90,19 +96,80 @@ try {
       console.log(`## ${scenario.id} (${scenario.masterSeed})`);
       console.log(JSON.stringify(result, null, 1));
     }
+  } else if (mode === 'verify') {
+    // Static check: the generated FILES contain what a quick world promises. This proves the target is present, not that it plays.
+    const exe = process.env.DS1TR_SMOKE_VERIFY_EXE ?? fileURLToPath(new URL('../../../tools/smoke-verify/bin/Release/net8.0/SmokeVerify.exe', import.meta.url));
+    const paramdef = path.join(source, 'paramdef', 'paramdef.paramdefbnd.dcx');
+    const wanted = argument ? argument.split(',') : null;
+    let failed = 0;
+    for (const scenario of SMOKE_SCENARIOS.filter((entry) => entry.category === 'quick' && (!wanted || wanted.includes(entry.id)))) {
+      const first = await measure(scenario, scenario.masterSeed, true);
+      if (!first.ok) { failed += 1; console.log(`FAIL ${scenario.id}: ${first.error}`); continue; }
+      const digestOf = async (run) => (await packageDigest(run.manifest.files, run.packagePath)).digest;
+      const digest = await digestOf(first);
+      const second = await measure(scenario, scenario.masterSeed, true);
+      const deterministic = second.ok && (await digestOf(second)) === digest;
+      const expectations = scenario.expectations.map((entry) => ({
+        id: `${scenario.id}/${entry.slot}`, map: entry.map, slot: entry.slot, model: entry.model, kind: entry.kind,
+        souls: entry.souls, disableRespawn: entry.disableRespawn, wakeUpEvent: entry.wakeUpEvent,
+      }));
+      const expectationsFile = path.join(temp, `expect-${scenario.id}.json`);
+      await writeFile(expectationsFile, JSON.stringify(expectations));
+      const run = spawnSync(exe, [path.join(first.packagePath, 'mod'), paramdef, expectationsFile, game], { encoding: 'utf8' });
+      let results = [];
+      try { results = JSON.parse(run.stdout.trim().split('\n').pop()); } catch { /* reported below */ }
+      const bad = results.flatMap((result) => result.checks.filter((check) => !check.ok).map((check) => `${result.id}: ${check.name}: ${check.detail}`));
+      const ok = run.status === 0 && results.length === expectations.length && bad.length === 0 && deterministic;
+      if (!ok) failed += 1;
+      console.log(`${ok ? 'PASS' : 'FAIL'} ${scenario.id} (${first.seedCode.slice(0, 20)}...): ${results.length}/${expectations.length} expectations read from the package, ${results.reduce((n, r) => n + r.checks.length, 0)} checks, package ${deterministic ? 'identical on a second run' : 'DIFFERENT on a second run'} (${digest.slice(0, 12)})${run.status !== 0 && results.length === 0 ? ` - verifier: ${String(run.stderr).slice(0, 400)}` : ''}`);
+      for (const line of bad) console.log(`   ${line}`);
+      await rm(first.workspacePath, { recursive: true, force: true });
+      if (second.workspacePath) await rm(second.workspacePath, { recursive: true, force: true });
+    }
+    console.log(failed === 0 ? 'RESULT: PASS (static only: the files contain what the worlds promise; nothing was played)' : `RESULT: FAIL (${failed})`);
+    process.exitCode = failed === 0 ? 0 : 1;
   } else if (mode === 'docs') {
-    const names = { 'm10_01_00_00': 'Undead Burg / Undead Parish' };
     const lines = [
       '# Runtime smoke tests', '',
       '> Generated by `node apps/backend/scripts/smokeTestCatalog.mjs docs <file>`. The Seed Codes below are pinned to generation profile `ds1tr-gen-v1`',
       '> and never change. **Nothing here is verified in the game**: these worlds exist so a person can play them and report what they see.', '',
       'In the app: Advanced, then "Test worlds for playtesting", or paste a code into **Load seed**. Play offline.', '',
-      '## What to check in every world', '', ...SMOKE_TEST_CHECKLIST.map((line) => `- [ ] ${line}`), '',
+      'There are two kinds of world.', '',
+      '- **Quick smoke tests** answer one question - "does this feature work at runtime?" - within about a minute of gaining control. Each one tells you exactly where to look',
+      '  and what you must see there. They are ordinary worlds (normal settings, normal master seed, normal Seed Code) whose master seed was *chosen* so that the target stands next to',
+      '  where you wake up. Nothing is forced and nothing outside normal generation is involved.',
+      '- **Extended gameplay tests** need travel or progression, or exercise a whole system (the fog randomizer, the Bell Gargoyle event, a map full of bosses).', '',
+      '## Quick smoke tests', '',
+      '| Test | What it shows | Where | Time to the target |', '|---|---|---|---|',
     ];
-    for (const scenario of SMOKE_SCENARIOS) {
+    const quick = SMOKE_SCENARIOS.filter((entry) => entry.category === 'quick');
+    const extended = SMOKE_SCENARIOS.filter((entry) => entry.category === 'extended');
+    for (const scenario of quick) lines.push(`| \`${scenario.id}\` | ${scenario.title} | ${scenario.expectations.map((e) => `${e.slot} (${e.meters} m)`).join(', ')} | ~${scenario.estimateSeconds} s |`);
+    lines.push('', '### How the targets were chosen', '',
+      `All quick worlds are in the **${SMOKE_START.mapName}**, first visit. You wake up at x ${SMOKE_START.x}, y ${SMOKE_START.y}, z ${SMOKE_START.z} (the player start of \`m18_01_00_00.msb\`); every distance below is the straight-line distance on the ground from that point, and "same floor" means within 2 m in height.`,
+      'The Asylum is visited twice and the map holds both sets of enemies: event `11810350` keeps the enemies with entity ids 1810200-1810213 disabled until the second visit and disables 1810101-1810113 after it. Every target here that is a regular enemy has an entity id from 1810101 to 1810113, so it exists the first time.',
+      'The Asylum has **no bonfire** (the map data holds none), so there is nowhere to rest. To make the area reset, die once.',
+      '**Estimated time** = about 20 seconds to take what you need from where you wake up and leave the cell, plus the distance times a detour factor of 1.6 at about 4 m/s. It is an estimate from the map data, not a time measured in the game.',
+      'The master seeds were found with `apps/backend/scripts/smokeWorldSearch.mjs` (engine only, on a real catalog) and are pinned in `packages/contracts/src/smokeTests.ts`. The rest of the world is randomized as usual; ignore it.',
+      '`node apps/backend/scripts/smokeTestCatalog.mjs verify` generates every quick world twice through the normal pipeline and reads the package for what is promised here (model of the part, parameter rows, souls, respawn bit, wake-up event, unique event ids, model count). That proves the files contain the target; it does not prove the game plays it.', '');
+    for (const scenario of quick) {
       const result = await measure(scenario, scenario.masterSeed);
       if (!result.ok) throw new Error(`${scenario.id}: ${result.error}`);
-      lines.push(`## ${scenario.title}`, '', scenario.purpose, '', '```', result.seedCode, '```', '', '**In this world**', '', ...scenario.observe.map((line) => `- ${line}`));
+      lines.push(`### ${scenario.title}`, '', `**Quick smoke test** - ID \`${scenario.id}\``, '', scenario.purpose, '',
+        '**Target**', '', ...scenario.expectations.map((entry) => `- ${describeSmokeTarget(entry)}`), '',
+        '**Expected**', '', ...scenario.expectations.map((entry) => `- ${describeSmokeExpected(entry)}`), '',
+        `**Estimated time to the target:** ~${scenario.estimateSeconds} seconds after you gain control.`, '',
+        `**Needs a reset or reload:** ${scenario.afterwards?.some((line) => /die once/u.test(line)) ? 'yes - die once' : 'no'}`, '',
+        '**Check**', '', ...scenario.observe.map((line) => `- [ ] ${line}`), '');
+      if (scenario.afterwards?.length) lines.push('**Afterwards**', '', ...scenario.afterwards.map((line) => `- [ ] ${line}`), '');
+      lines.push('```', result.seedCode, '```', '');
+    }
+    lines.push('## Extended gameplay tests', '', 'These need travel or progression, or exercise a whole system. They are not smoke tests: expect to play for a while to reach what they show.', '',
+      '### What to check in every extended world', '', ...SMOKE_TEST_CHECKLIST.map((line) => `- [ ] ${line}`), '');
+    for (const scenario of extended) {
+      const result = await measure(scenario, scenario.masterSeed);
+      if (!result.ok) throw new Error(`${scenario.id}: ${result.error}`);
+      lines.push(`### ${scenario.title}`, '', `**Extended gameplay test** - ID \`${scenario.id}\``, '', scenario.purpose, '', '```', result.seedCode, '```', '', '**In this world**', '', ...scenario.observe.map((line) => `- ${line}`));
       if (result.bossSlotsChanged > 0 && scenario.settings.enemies?.placement?.bossReplacement === 'bosses') {
         const sampled = result.bossTable.slice(0, 24);
         lines.push('', `Boss replacements of this world (${sampled.length} boss slots; the first ${sampled.length} lines are the sampled ones):`, '', ...sampled.map((line) => `- ${line}`));

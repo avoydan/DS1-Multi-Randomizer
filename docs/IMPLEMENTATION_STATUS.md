@@ -38,6 +38,22 @@ to 80 events, and every other map, are unchanged: the audit shows `IDs used == I
   no reseeding), so no package or Seed Code of such a world ever existed; no profile change is needed.
 - **Tooling:** `apps/backend/scripts/placementMatrix.mjs` (configuration x seed matrix with window audit, retries, deterministic reruns).
 
+**Smoke tests redesigned: quick vs extended (2026-10-06; backend 0.35.0, desktop 0.22.0, contracts 0.20.0; engine, data tool and generation profile `ds1tr-gen-v1` unchanged).**
+The test worlds under Advanced are split into five **quick smoke tests** and twelve **extended gameplay tests**. A quick test puts the feature next to where the player wakes up
+in the Undead Asylum (first visit): a Capra Demon where the first Hollow stood (8.7 m), a Taurus Demon with 100% souls that stays dead, the same Smough in three neighbouring slots,
+three different regular enemies instead of the first three Hollows, and a Taurus Demon in place of the Asylum Demon. Each shows its exact slot, the distance from the start, the expected
+replacement, an estimated time (20-90 s) and specific checks. **No override or forced placement was needed:** the quick worlds are ordinary worlds whose master seeds were *found* by
+`apps/backend/scripts/smokeWorldSearch.mjs` (engine only, real catalog) from normal settings; they stay normal Seed Codes, so nothing in generation, Seed Codes or history changed.
+`smokeTestCatalog.mjs verify` generates each quick world twice through the normal pipeline (identical package) and `tools/smoke-verify` reads the package: the MSB part has the promised
+model, the model is loaded by the map, the NpcParam and NpcThinkParam rows exist, souls and the respawn bit are as promised, a wake-up event was added for the entity, event ids are
+unique and the model count is within the limit. That proves the files contain the target; nothing was played. Details: `docs/SMOKE_TESTS.md`.
+- **Found by the static check, not fixed here:** a roaming boss row is a copy of the boss row, and boss rows carry `disableRespawn = 1`. Part E1 only ever *sets* the bit (stay dead on), so
+  with "Roaming bosses stay dead" **off** the row still has the bit set and the setting has no effect in the data (the UI hint "Off: it respawns like a normal enemy" does not hold).
+  The legacy tool writes the bit explicitly for its roaming copies. The fix is one line in `AddScaledNpcRows` (set the bit to the option's value), but it changes the files of every
+  Part E world with stay-dead off, including two of the three `ds1tr-gen-v1.roaming-bosses.json` fixtures, so it needs a decision (re-record the unreleased fixtures or a new generation
+  profile). The quick worlds do not depend on it (`quick-roaming-basic` does not assert the bit).
+- **Also seen, not changed:** the roaming pass treats dummy slots (`c2500_0004`, `c2500_0008` in the Asylum) as ordinary slots, so a boss can be placed on a part that is never spawned.
+
 **Enemy placement Part E1: bosses in regular enemy slots (2026-10-06; backend 0.34.0, desktop 0.21.0, contracts 0.19.0, patch 0014; RANDOMIZER_VERSION 0.5.66 and FogHost 0.5.0 unchanged; generation profile `ds1tr-gen-v1` unchanged).**
 `sampling-v1` with Normal enemy replacement "Only bosses" or "Bosses or normal enemies" places bosses in regular enemy slots ("roaming bosses"), with a
 "Boss chance in normal slots" (only with "either"), "Roaming boss souls" (percent of the authored fight souls, written to the scaled NpcParam row's `getSoul`) and

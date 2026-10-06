@@ -5,7 +5,197 @@
 
 In the app: Advanced, then "Test worlds for playtesting", or paste a code into **Load seed**. Play offline.
 
-## What to check in every world
+There are two kinds of world.
+
+- **Quick smoke tests** answer one question - "does this feature work at runtime?" - within about a minute of gaining control. Each one tells you exactly where to look
+  and what you must see there. They are ordinary worlds (normal settings, normal master seed, normal Seed Code) whose master seed was *chosen* so that the target stands next to
+  where you wake up. Nothing is forced and nothing outside normal generation is involved.
+- **Extended gameplay tests** need travel or progression, or exercise a whole system (the fog randomizer, the Bell Gargoyle event, a map full of bosses).
+
+## Quick smoke tests
+
+| Test | What it shows | Where | Time to the target |
+|---|---|---|---|
+| `quick-roaming-basic` | Roaming boss - basic | c2500_0006 (8.7 m) | ~25 s |
+| `quick-roaming-souls` | Roaming boss - souls and respawn | c2500_0006 (8.7 m) | ~25 s |
+| `quick-roaming-repeated` | Roaming boss - three at once | c2500_0006 (8.7 m), c2500_0007 (11.4 m), c2500_0005 (33.2 m) | ~35 s |
+| `quick-sampling-asylum` | Regular enemies - first three change | c2500_0006 (8.7 m), c2500_0007 (11.4 m), c2500_0005 (33.2 m) | ~35 s |
+| `quick-boss-asylum-demon` | Boss sampling - the first boss | c2232_0000 (22.5 m) | ~90 s |
+
+### How the targets were chosen
+
+All quick worlds are in the **Undead Asylum**, first visit. You wake up at x -13.75, y 184.75, z -44.5 (the player start of `m18_01_00_00.msb`); every distance below is the straight-line distance on the ground from that point, and "same floor" means within 2 m in height.
+The Asylum is visited twice and the map holds both sets of enemies: event `11810350` keeps the enemies with entity ids 1810200-1810213 disabled until the second visit and disables 1810101-1810113 after it. Every target here that is a regular enemy has an entity id from 1810101 to 1810113, so it exists the first time.
+The Asylum has **no bonfire** (the map data holds none), so there is nowhere to rest. To make the area reset, die once.
+**Estimated time** = about 20 seconds to take what you need from where you wake up and leave the cell, plus the distance times a detour factor of 1.6 at about 4 m/s. It is an estimate from the map data, not a time measured in the game.
+The master seeds were found with `apps/backend/scripts/smokeWorldSearch.mjs` (engine only, on a real catalog) and are pinned in `packages/contracts/src/smokeTests.ts`. The rest of the world is randomized as usual; ignore it.
+`node apps/backend/scripts/smokeTestCatalog.mjs verify` generates every quick world twice through the normal pipeline and reads the package for what is promised here (model of the part, parameter rows, souls, respawn bit, wake-up event, unique event ids, model count). That proves the files contain the target; it does not prove the game plays it.
+
+### Roaming boss - basic
+
+**Quick smoke test** - ID `quick-roaming-basic`
+
+A boss stands where a regular enemy stood: the smallest check that a boss works outside its arena.
+
+**Target**
+
+- Undead Asylum: the Hollow at slot c2500_0006, 8.7 m from where you wake up, on the same floor as the start
+
+**Expected**
+
+- Capra Demon (c2240) replaces the Hollow at slot c2500_0006; it carries 3000 souls
+
+**Estimated time to the target:** ~25 seconds after you gain control.
+
+**Needs a reset or reload:** no
+
+**Check**
+
+- [ ] The Capra Demon is there, fully textured (no T-pose, no invisible body) - not a Hollow.
+- [ ] It wakes up when you come close, walks to you and attacks.
+- [ ] It has no boss health bar and there is no fog gate.
+- [ ] You can kill it. Its souls are 3000 (50% of the 6000 that DS1TR lists for that fight).
+- [ ] Nothing freezes or crashes when it appears, fights or dies.
+
+```
+DS1TR1-06NJDCP6-577CVKTE-TMPK9N2D-9RP2GJPM-6MRKE8TR-YEG1FC53-AQ7N1BBT-T35RG8AT-YWG9E0JR-5CF0QV6N-1RTCP3NA-B83HMD53-TM71BAGX-031DNYGP
+```
+
+### Roaming boss - souls and respawn
+
+**Quick smoke test** - ID `quick-roaming-souls`
+
+A roaming boss with 100% souls that stays dead: the reward and the "does not come back" setting in one short loop.
+
+**Target**
+
+- Undead Asylum: the Hollow at slot c2500_0006, 8.7 m from where you wake up, on the same floor as the start
+
+**Expected**
+
+- Taurus Demon (c2250) replaces the Hollow at slot c2500_0006; it carries 3000 souls and stays dead
+
+**Estimated time to the target:** ~25 seconds after you gain control.
+
+**Needs a reset or reload:** yes - die once
+
+**Check**
+
+- [ ] A Taurus Demon stands where the first Hollow would be; it wakes up, moves and attacks (no boss health bar, no fog gate).
+- [ ] Note your soul count, then kill the Taurus Demon: you gain exactly 3000 souls (100% of the 3000 that DS1TR lists for that fight).
+- [ ] Control: the other Hollows of the cell block (slots c2500_0007, 11.4 m, and c2500_0005, 33.2 m from the start) are normal Hollows.
+
+**Afterwards**
+
+- [ ] Reset the area: the Asylum has no bonfire (none in its map data), so die once (any way). Everything that respawns comes back when you wake up again.
+- [ ] Return to the same place: the Hollows are back, the Taurus Demon is NOT (the stay-dead setting; not yet confirmed in the game).
+
+```
+DS1TR1-06NJDCP6-577CVKTE-TMPK9MHD-94P2TAHD-TRTK9D1M-4SCFF80Q-P6HSBKTG-NNYD0JW9-45DFP84Q-0DCAP7GB-XGAGYD6K-1SCBV8X3-0GPKWG7H-056HDR2T-294KHD9R-Q0JB3MH5-6MRGANMY-CBB5BM70-3JPTSA2G-B40G0NME-YJ3G
+```
+
+### Roaming boss - three at once
+
+**Quick smoke test** - ID `quick-roaming-repeated`
+
+The same boss in three neighbouring slots: separate bodies, separate fights, nothing shared between them.
+
+**Target**
+
+- Undead Asylum: the Hollow at slot c2500_0006, 8.7 m from where you wake up, on the same floor as the start
+- Undead Asylum: the Hollow at slot c2500_0007, 11.4 m from where you wake up, on the same floor as the start
+- Undead Asylum: the Hollow at slot c2500_0005, 33.2 m from where you wake up, on the same floor as the start
+
+**Expected**
+
+- Executioner Smough (c2360) replaces the Hollow at slot c2500_0006; it carries 5000 souls
+- Executioner Smough (c2360) replaces the Hollow at slot c2500_0007; it carries 5000 souls
+- Executioner Smough (c2360) replaces the Hollow at slot c2500_0005; it carries 5000 souls
+
+**Estimated time to the target:** ~35 seconds after you gain control.
+
+**Needs a reset or reload:** no
+
+**Check**
+
+- [ ] Three Executioner Smoughs stand in the cell block, 8.7, 11.4 and 33.2 m from the start.
+- [ ] Each wakes up, moves and attacks on its own; killing one does not touch the others.
+- [ ] Each gives its own 5000 souls (50% of 10000) and none has a boss bar.
+- [ ] Nothing else in the Asylum is a boss on this first visit (other roaming bosses of this world are in the part you only reach on the second visit).
+
+```
+DS1TR1-06NJDCP6-577CVKTE-TMPK9NHD-98PMGK9C-T4TK4C9P-PPR20P7V-M0BV58YN-SX8ATZPG-SE4J2PQZ-42BG8P1B-3X9HRX8F-6KFX5DQA-R5FPC42Q-3X0G6V5M-8AH45184-03T5X1TD
+```
+
+### Regular enemies - first three change
+
+**Quick smoke test** - ID `quick-sampling-asylum`
+
+Legacy-style sampling at runtime: the first Hollows are different enemies and behave like enemies.
+
+**Target**
+
+- Undead Asylum: the Hollow at slot c2500_0006, 8.7 m from where you wake up, on the same floor as the start
+- Undead Asylum: the Hollow at slot c2500_0007, 11.4 m from where you wake up, on the same floor as the start
+- Undead Asylum: the Hollow at slot c2500_0005, 33.2 m from where you wake up, on the same floor as the start
+
+**Expected**
+
+- Balder Knight (c2560) replaces the Hollow at slot c2500_0006
+- Undead Soldier (c2550) replaces the Hollow at slot c2500_0007
+- Undead Assassin (c2520) replaces the Hollow at slot c2500_0005
+
+**Estimated time to the target:** ~35 seconds after you gain control.
+
+**Needs a reset or reload:** no
+
+**Check**
+
+- [ ] Where the first three Hollows stood there are a Balder Knight, an Undead Soldier and an Undead Assassin.
+- [ ] None is in a T-pose or invisible; each wakes up, moves and attacks; none floats or sinks into the floor.
+- [ ] Their size looks right for the cell block (the setting only allows enemies that fit).
+
+```
+DS1TR1-06NJDCP6-577CVKTE-TMPK9MC5-0YJK3GDA-0YYR87DD-FE36NQC3-BS40SMEA-0YWHH85C-WR0SE89R-DCES8MM2-YRTH0D4M-8TNJ0AJM-840CRE6W-HR
+```
+
+### Boss sampling - the first boss
+
+**Quick smoke test** - ID `quick-boss-asylum-demon`
+
+The first boss of the game is replaced by another boss: model, health bar, AI, death and the way on.
+
+**Target**
+
+- Undead Asylum: the Asylum Demon at slot c2232_0000, 22.5 m from where you wake up, 13 m higher than the start
+
+**Expected**
+
+- Taurus Demon (c2250) takes the place of Asylum Demon, the first boss
+
+**Estimated time to the target:** ~90 seconds after you gain control.
+
+**Needs a reset or reload:** no
+
+**Check**
+
+- [ ] Climb to the balcony where the Asylum Demon normally drops in: a Taurus Demon arrives instead, with its own name on the boss health bar.
+- [ ] It fights (moves, attacks, no T-pose), can be killed and its death ends the encounter.
+- [ ] The way on opens as it does after the Asylum Demon (progression: you can leave the Asylum).
+
+**Afterwards**
+
+- [ ] Two moments matter: the replacement becomes visible when the encounter starts (about a minute), and the fight can be completed only once you have taken the upper route (about three more).
+
+```
+DS1TR1-06NJDCP6-577CVKTE-TMPK9NAD-976WVKYK-PMJ5HVX0-2YQT65EF-M2QQHM0X-6VM6M7K8-860ABSG1-2W57HAGX-WG16126N-7684M12N-76T11GAP-3N0M6VDM-7TH44Z84-029JY1N2
+```
+
+## Extended gameplay tests
+
+These need travel or progression, or exercise a whole system. They are not smoke tests: expect to play for a while to reach what they show.
+
+### What to check in every extended world
 
 - [ ] The area loads and the enemy or boss model appears (no invisible body, no T-pose).
 - [ ] The enemy/boss AI wakes up: it notices you, moves and attacks.
@@ -19,7 +209,9 @@ In the app: Advanced, then "Test worlds for playtesting", or paste a code into *
 - [ ] Respawn behaves as expected after resting at a bonfire (regular enemies come back, defeated bosses stay defeated).
 - [ ] The game does not crash when you enter or leave the area, and the map streams in normally.
 
-## Classic full Triple
+### Classic full Triple
+
+**Extended gameplay test** - ID `classic-triple`
 
 Everything on with the default classic placement: items, enemies, bosses and the fog randomizer together.
 
@@ -34,7 +226,9 @@ DS1TR1-06NJDCP6-577CVKTE-TN6X8K86-JQBSKJD3-TQ76HD9K-BBPRRNHV-REHDM080-JEZCRRR
 
 Expected: the second Bell Gargoyle of the Undead Parish fight becomes **Gravelord Nito (c5220)**; the first Gargoyle body becomes Centipede Demon. It is released when the first body drops to about 60% health, on the rooftop.
 
-## Regular enemies, sampling
+### Regular enemies, sampling (Asylum to Parish)
+
+**Extended gameplay test** - ID `sampling-regular`
 
 Regular enemies drawn per slot (legacy-style sampling), no bosses, no items, no fog randomizer.
 
@@ -47,7 +241,9 @@ DS1TR1-06NJDCP6-577CVKTE-TN6X51C5-4K0QM1XX-F0ETTY46-DB2R6QJ2-1K8SM1XS-1JGASPG1-2
 - Walk through the Undead Asylum, Undead Burg and Undead Parish.
 - Look for enemies that stand in the wrong place or do not attack.
 
-## Second Bell Gargoyle
+### Second Bell Gargoyle
+
+**Extended gameplay test** - ID `second-gargoyle`
 
 The second Bell Gargoyle is replaced by another boss (the first one also changes).
 
@@ -62,7 +258,9 @@ DS1TR1-06NJDCP6-577CVKTE-TN6XCKC7-WSV5TWW2-6M7QM09V-BBTGSYNA-0ZEP30XE-XR0HE0D3-6
 
 Expected: the second Bell Gargoyle of the Undead Parish fight becomes **Knight Artorias (c4100)**; the first Gargoyle body becomes Sanctuary Guardian. It is released when the first body drops to about 60% health, on the rooftop.
 
-## Undead Parish with many enemy types
+### Undead Parish with many enemy types
+
+**Extended gameplay test** - ID `parish-models`
 
 The Undead Parish map holding one of the highest numbers of different enemy models the sampler produces.
 
@@ -77,7 +275,9 @@ DS1TR1-06NJDCP6-577CVKTE-TN6X2BA8-5K52SKPG-6MJ5HVX0-2YQT65EF-A2PQHM2B-H0GNNWS0-J
 
 Undead Parish holds 30 different enemy models in this world (the limit is 30). Note: the Parish reaches this count in essentially every sampled seed; it is the map with the most enemy types, so this is the normal worst case, not a rare one.
 
-## Boss sampling
+### Boss sampling (every arena)
+
+**Extended gameplay test** - ID `boss-sampling`
 
 Every single-body boss slot draws its own replacement (bosses can repeat).
 
@@ -122,7 +322,9 @@ Boss slots that keep their own boss: none.
 
 Expected: the second Bell Gargoyle of the Undead Parish fight becomes **Moonlight Butterfly (c3230)**; the first Gargoyle body becomes Centipede Demon. It is released when the first body drops to about 60% health, on the rooftop.
 
-## The same boss in several places
+### The same boss in several places
+
+**Extended gameplay test** - ID `boss-repeat`
 
 A boss that appears in more than one arena in the same world (boss sampling draws with repeats).
 
@@ -167,7 +369,9 @@ Boss slots that keep their own boss: none.
 
 Expected: the second Bell Gargoyle of the Undead Parish fight becomes **Ceaseless Discharge (c5250)**; the first Gargoyle body becomes Sanctuary Guardian. It is released when the first body drops to about 60% health, on the rooftop.
 
-## Unique bosses
+### Unique bosses
+
+**Extended gameplay test** - ID `boss-unique`
 
 Boss sampling where a boss is not used a second time before every boss was used once.
 
@@ -212,7 +416,9 @@ Boss slots that keep their own boss: none.
 
 Expected: the second Bell Gargoyle of the Undead Parish fight becomes **Asylum Demon (c2232)**; the first Gargoyle body becomes Centipede Demon. It is released when the first body drops to about 60% health, on the rooftop.
 
-## Some bosses stay as they are
+### Some bosses stay as they are
+
+**Extended gameplay test** - ID `boss-partial`
 
 Boss sampling with a 50% replacement chance: about half of the boss slots keep their own boss.
 
@@ -254,39 +460,9 @@ Boss slots that keep their own boss: about half (see the list: a slot is missing
 
 Expected: the second Bell Gargoyle of the Undead Parish fight becomes **Pinwheel (c3320)**; the first Gargoyle body becomes Sanctuary Guardian. It is released when the first body drops to about 60% health, on the rooftop.
 
-## A boss among regular enemies
+### Type replacement + roaming bosses (Undead Burg and later)
 
-Bosses stand in some regular enemy slots (Normal enemy replacement: Bosses or normal enemies); the rest of the enemies are normal.
-
-```
-DS1TR1-06NJDCP6-577CVKTE-TQ6R8YY3-J1GCB0TY-QT7DCF23-PQK42BS2-GSMDB0TW-11GATXWC-9JRNEET9-Z4JHJ0TQ-WX02M4C8-3CYZ7Z60-XR5WXJ87-MN0260VC-2M939P26-DCJ2NN28-02HT08KW
-```
-
-**In this world**
-
-- Find a boss among the regular enemies: the list below names the area and the enemy it replaced.
-- It should wake up when you come close, fight like the boss it is (no boss health bar, no fog gate) and be killable; the souls and drops should look sane.
-
-Bosses in regular enemy slots in this world: 65 (Capra Demon x14, Taurus Demon x6, Demon Firesage x7, Artorias x7, Moonlight Butterfly x4, Sif x1, Manus x6, Asylum Demon x9, Smough x3, Pinwheel x1, Stray Demon x1, Quelaag x3, Ornstein x2, Super Ornstein x1). The first 14 by map order:
-
-- Undead Burg / Parish: a boss replaces enemy c2500 (slot c2500_0026): Capra Demon, souls 3000
-- Undead Burg / Parish: a boss replaces enemy c2500 (slot c2500_0035): Capra Demon, souls 3000
-- Undead Burg / Parish: a boss replaces enemy c2500 (slot c2500_0040): Capra Demon, souls 3000
-- Undead Burg / Parish: a boss replaces enemy c2500 (slot c2500_0045): Taurus Demon, souls 1500
-- Undead Burg / Parish: a boss replaces enemy c2520 (slot c2520_0005): Capra Demon, souls 3000
-- Undead Burg / Parish: a boss replaces enemy c2550 (slot c2550_0003): Taurus Demon, souls 1500
-- Undead Burg / Parish: a boss replaces enemy c2550 (slot c2550_0037): Taurus Demon, souls 1500
-- Undead Burg / Parish: a boss replaces enemy c2560 (slot c2560_0008): Taurus Demon, souls 1500
-- Undead Burg / Parish: a boss replaces enemy c3340 (slot c3340_0003): Capra Demon, souls 3000
-- Undead Burg / Parish: a boss replaces enemy c3491 (slot c3491_0001): Capra Demon, souls 3000
-- Painted World: a boss replaces enemy c2500 (slot c2500_0006): Demon Firesage, souls 10000
-- Painted World: a boss replaces enemy c2500 (slot c2500_0018): Artorias, souls 25000
-- Painted World: a boss replaces enemy c2500 (slot c2500_0030): Artorias, souls 25000
-- Darkroot Garden: a boss replaces enemy c2260 (slot c2260_0003): Moonlight Butterfly, souls 5000
-
-Different enemy models in the Undead Parish: 30 (the limit is 30; a map that bosses and dragons already push above it never gets more).
-
-## The same boss in several regular slots
+**Extended gameplay test** - ID `roaming-repeat`
 
 With Type replacement, every enemy of one kind in a map is replaced by the same boss, so one boss stands in several places of an area.
 
@@ -318,40 +494,9 @@ Bosses in regular enemy slots in this world: 22 (Stray Demon x1, Smough x9, Pinw
 
 Different enemy models in the Undead Parish: 28 (the limit is 30; a map that bosses and dragons already push above it never gets more).
 
-## Roaming boss souls and respawn
+### Roaming bosses with the second Bell Gargoyle
 
-Bosses in regular slots drop 100% of their fight souls and stay dead once killed.
-
-```
-DS1TR1-06NJDCP6-577CVKTE-TQ6RCYR3-AGB1DTRT-2AP7XM2B-V78ZMSX8-TRZYG1E5-22PR144B-0APBB3SH-HV52EADZ-4G1NXWW0-SC87NN9T-J1N09RHY-SWY3ZC6V-G9SZ4GD9-1ZJ5GT4P-0K2H6D5S-G0NN0971-TKHE14P4-9ABX9H0M-B18RPPCD-861QKD0Y-MD13T1G0-3P5JDYG
-```
-
-**In this world**
-
-- Find a boss among the regular enemies: the list below names the area and the enemy it replaced.
-- It should wake up when you come close, fight like the boss it is (no boss health bar, no fog gate) and be killable; the souls and drops should look sane.
-- Kill a roaming boss and note the souls; rest at a bonfire and check that it does not come back (the "stay dead" setting is untested in the game).
-
-Bosses in regular enemy slots in this world: 20 (Moonlight Butterfly x5, Pinwheel x7, Capra Demon x2, Taurus Demon x3, Ornstein x2, Quelaag x1). The first 14 by map order:
-
-- Darkroot Basin: a boss replaces enemy c2710 (slot c2710_0003): Moonlight Butterfly, souls 10000, stays dead
-- Darkroot Basin: a boss replaces enemy c3350 (slot c3350_0000): Moonlight Butterfly, souls 10000, stays dead
-- Darkroot Basin: a boss replaces enemy c5360 (slot c5360_0001): Moonlight Butterfly, souls 10000, stays dead
-- Tomb of the Giants: a boss replaces enemy c2910 (slot c2910_0008): Pinwheel, souls 15000, stays dead
-- Tomb of the Giants: a boss replaces enemy c2910 (slot c2910_0010): Pinwheel, souls 15000, stays dead
-- Tomb of the Giants: a boss replaces enemy c2950 (slot c2950_0001): Pinwheel, souls 15000, stays dead
-- Tomb of the Giants: a boss replaces enemy c2960 (slot c2960_0013): Capra Demon, souls 6000, stays dead
-- Blighttown: a boss replaces enemy c2811 (slot c2811_0004): Taurus Demon, souls 3000, stays dead
-- Demon Ruins: a boss replaces enemy c3390 (slot c3390_0006): Capra Demon, souls 6000, stays dead
-- Anor Londo: a boss replaces enemy c2260 (slot c2260_0003): Moonlight Butterfly, souls 10000, stays dead
-- Anor Londo: a boss replaces enemy c2260 (slot c2260_0004): Ornstein, souls 10000, stays dead
-- Anor Londo: a boss replaces enemy c2260 (slot c2260_0008): Ornstein, souls 10000, stays dead
-- Anor Londo: a boss replaces enemy c2870 (slot c2870_0001): Moonlight Butterfly, souls 10000, stays dead
-- Duke's Archives: a boss replaces enemy c2710 (slot c2710_0000): Quelaag, souls 20000, stays dead
-
-Different enemy models in the Undead Parish: 30 (the limit is 30; a map that bosses and dragons already push above it never gets more).
-
-## Roaming bosses with the second Bell Gargoyle
+**Extended gameplay test** - ID `roaming-gargoyle`
 
 Bosses in regular slots together with a replaced second Bell Gargoyle and boss sampling in the boss arenas.
 
@@ -400,7 +545,9 @@ Bosses in regular enemy slots in this world: 7 (Moonlight Butterfly x1, Manus x1
 
 Different enemy models in the Undead Parish: 31 (the limit is 30; a map that bosses and dragons already push above it never gets more).
 
-## Roaming bosses with the fog randomizer
+### Roaming bosses with the fog randomizer
+
+**Extended gameplay test** - ID `roaming-fog`
 
 Bosses in regular slots with the fog randomizer on (fog gates, warps and boss fogs are moved too).
 
@@ -431,7 +578,9 @@ Bosses in regular enemy slots in this world: 12 (Pinwheel x7, Moonlight Butterfl
 
 Different enemy models in the Undead Parish: 30 (the limit is 30; a map that bosses and dragons already push above it never gets more).
 
-## Undead Parish full of bosses
+### Undead Parish full of bosses
+
+**Extended gameplay test** - ID `roaming-parish`
 
 Every regular slot that can take a boss gets one (at most ten per map): the highest load of different models a roaming world can put on one map.
 

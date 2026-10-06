@@ -1348,7 +1348,7 @@ written to the scaled row's `getSoul`; `disableRespawn: true` (when "stay dead")
 wake-up event (`forceCombatActivation`, an entity id is assigned if the slot has none) that every portable boss gets; no boss bar, no fog gate, no
 boss-death event (a regular slot has none).
 
-**Deliberate deviations.** (1) *Respawn is a field, not an event.* The game's `NpcParam.disableRespawn` bit exists in the paramdef; setting it on the
+**Deliberate deviations.** (1) *Respawn is a field, not an event.* (A defect found later: the row is a copy of the boss row, whose `disableRespawn` is already 1, and only "stay dead on" writes the bit, so "stay dead off" does not clear it; see `IMPLEMENTATION_STATUS.md`.) The game's `NpcParam.disableRespawn` bit exists in the paramdef; setting it on the
 scaled row needs no custom event (legacy writes an event per entity). It has not been seen working in the game - treat "stay dead" as unverified.
 (2) The per-map limit of 10 is DS1TR's (legacy has none; `bosses` at 100% would otherwise place a boss in every slot). (3) The exclusion list above.
 (4) Difficulty class of a boss uses the regular formula (map tier and HP rank); a boss's HP is above every regular enemy, so bosses are class 3-7 and the
