@@ -1,4 +1,4 @@
-import type { DifficultyMode, DifficultyStrictness, TypeReplacementMode, EnemyPlacementAlgorithm, NormalEnemyReplacementMode, PlacementFitMode, EnemyScaling, GwynNerfMode, SecondGargoyleMode, SoulItemsMode, StartingItemsMode } from '@ds1tr/contracts';
+import type { BossReplacementMode, DifficultyMode, DifficultyStrictness, TypeReplacementMode, EnemyPlacementAlgorithm, NormalEnemyReplacementMode, PlacementFitMode, EnemyScaling, GwynNerfMode, SecondGargoyleMode, SoulItemsMode, StartingItemsMode } from '@ds1tr/contracts';
 import { enemyPlacementUnavailableMessage, ENEMY_PLACEMENT_UNAVAILABLE, isEnemyPlacementImplemented } from '../core/enemyPlacement.js';
 import type { CombinedRandomizerRequest } from './combinedRandomizerAdapter.js';
 import type { FogTrackedItems } from './fogItemRules.js';
@@ -39,6 +39,8 @@ export interface UpstreamCombinedRandomizerConfig {
   enemyTypeReplacement: TypeReplacementMode;
   /** Canonical custom pool (ascending unique model ids) or null for the full regular pool. */
   enemyCustomPool: string[] | null;
+  enemyBossReplacement: BossReplacementMode;
+  enemyUniqueBosses: boolean;
   placementDiagnosticsLevel: 'summary' | 'detail';
   /** Items the world randomizer follows and the lots it can follow them in; null when it does not run. */
   fogTrackedItems: FogTrackedItems | null;
@@ -105,6 +107,9 @@ export function mapCombinedRandomizerConfig(
     enemyDifficultyStrictness: request.enemies.placement.difficultyStrictness,
     enemyTypeReplacement: request.enemies.placement.typeReplacement,
     enemyCustomPool: request.enemies.placement.customPool === null ? null : [...request.enemies.placement.customPool].sort(),
+    // Part D options are optional on input (a configuration that predates them means the classic boss planner).
+    enemyBossReplacement: request.enemies.placement.bossReplacement ?? 'classic',
+    enemyUniqueBosses: request.enemies.placement.uniqueBosses ?? false,
     placementDiagnosticsLevel: request.placementDiagnosticsLevel ?? 'summary',
     fogTrackedItems: request.fogTrackedItems ?? null,
     generateSpoilerLog: request.generateSpoilerLog,

@@ -70,6 +70,16 @@ export const CANONICAL_ENEMY_KEYS = [
 export const CANONICAL_PLACEMENT_KEYS = [
   'algorithm', 'replacementChance', 'normalReplacement', 'fit', 'difficultyMode', 'difficultyStrictness', 'typeReplacement', 'customPool',
 ] as const;
+/**
+ * Placement options added after format 1 existed (Part D). They are complete in memory (UI, history, settings file) but a Seed Code
+ * stores one only when it differs from its neutral value, so every code that was made before the option existed keeps its exact
+ * text, and decoding fills the neutral value back in. The neutral value of a key is frozen forever: it is "what the world did before
+ * this option existed". Keys are appended in this order.
+ */
+export const CANONICAL_PLACEMENT_EXTENSION_KEYS = [
+  { key: 'bossReplacement', neutral: 'classic' },
+  { key: 'uniqueBosses', neutral: false },
+] as const;
 export const CANONICAL_FOG_KEYS = [
   'enabled', 'traversableFogs', 'bossFogs', 'areaWarps', 'majorPvpFogs', 'minorPvpFogs', 'lordvesselGates', 'randomStart',
   'disconnectedFogs', 'noFallBedOfChaos', 'scaling', 'glitchedLogic', 'requireLordSouls', 'pacifistMode', 'language',
@@ -91,6 +101,7 @@ export const GENERATION_FIELD_POLICY: Readonly<Record<string, GenerationFieldPol
   ...Object.fromEntries(CANONICAL_ITEM_KEYS.map((key) => [`items.${key}`, 'seed' as const])),
   ...Object.fromEntries(CANONICAL_ENEMY_KEYS.filter((key) => key !== 'placement').map((key) => [`enemies.${key}`, 'seed' as const])),
   ...Object.fromEntries(CANONICAL_PLACEMENT_KEYS.map((key) => [`enemies.placement.${key}`, 'seed' as const])),
+  ...Object.fromEntries(CANONICAL_PLACEMENT_EXTENSION_KEYS.map(({ key }) => [`enemies.placement.${key}`, 'seed' as const])),
   ...Object.fromEntries(CANONICAL_FOG_KEYS.map((key) => [`fog.${key}`, 'seed' as const])),
   'output.includeDlc': 'seed',
   'output.generateSpoilerLog': { excluded: 'only decides whether spoiler.txt is written; every placement is identical with or without it' },

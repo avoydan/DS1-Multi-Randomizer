@@ -97,6 +97,15 @@ export type TypeReplacementMode = 'disabled' | 'enabled' | 'enabled-except-roami
 export const TYPE_REPLACEMENT_MODES: readonly TypeReplacementMode[] = ['disabled', 'enabled', 'enabled-except-roaming-bosses'];
 
 /**
+ * Boss replacement (Part D). `classic` keeps the existing boss planner (the archetype permutation); `bosses` draws a replacement
+ * for every single-body boss slot from the portable boss pool, with repeats. Linked units (dragons, Gargoyles, Four Kings, ...)
+ * stay classic in both modes. Sampling only: neutral under permutation-v1.
+ */
+export type BossReplacementMode = 'classic' | 'bosses';
+
+export const BOSS_REPLACEMENT_MODES: readonly BossReplacementMode[] = ['classic', 'bosses'];
+
+/**
  * Placement settings. Everything except `algorithm` applies to `sampling-v1` only; under `permutation-v1` the
  * backend requires the neutral values below and rejects any other (it never ignores a setting silently).
  */
@@ -115,6 +124,10 @@ export interface EnemyPlacementOptions {
    * are not selected. Canonical form: unique ids in ascending order (the backend sorts; duplicates are rejected).
    */
   customPool: string[] | null;
+  /** Part D. Optional on input (older configurations and presets lack it: `classic`); always present once canonicalized. */
+  bossReplacement: BossReplacementMode;
+  /** Part D. Draws every boss of the pool once before any boss repeats. Needs `bossReplacement: 'bosses'`. */
+  uniqueBosses: boolean;
 }
 
 /** One enemy a custom pool can contain, described from the game data of the installation. */
@@ -146,6 +159,8 @@ export const NEUTRAL_ENEMY_PLACEMENT_OPTIONS: Omit<EnemyPlacementOptions, 'algor
   difficultyStrictness: 'loose',
   typeReplacement: 'disabled',
   customPool: null,
+  bossReplacement: 'classic',
+  uniqueBosses: false,
 };
 
 /** The legacy defaults offered when `sampling-v1` is chosen: replace always, only normal enemies, only where they fit. */
@@ -157,6 +172,8 @@ export const LEGACY_ENEMY_PLACEMENT_OPTIONS: Omit<EnemyPlacementOptions, 'algori
   difficultyStrictness: 'loose',
   typeReplacement: 'disabled',
   customPool: null,
+  bossReplacement: 'classic',
+  uniqueBosses: false,
 };
 
 export interface EnemyOptions {
@@ -281,7 +298,7 @@ export type GenerationResult =
   | { ok: false; code: string; message: string; stage: string };
 
 export const PRESET_FORMAT = 'ds1tr-preset';
-export const PRESET_VERSION = 9;
+export const PRESET_VERSION = 10;
 
 /** Shareable settings: everything in RandomizerConfig except the machine-specific game path. */
 export interface PresetDocument {

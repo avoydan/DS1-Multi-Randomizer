@@ -1,4 +1,6 @@
 import {
+  BOSS_REPLACEMENT_MODES,
+  CANONICAL_PLACEMENT_EXTENSION_KEYS,
   DEFAULT_ENEMY_PLACEMENT_ALGORITHM,
   ENEMY_PLACEMENT_ALGORITHMS,
   IMPLEMENTED_ENEMY_PLACEMENT_ALGORITHMS,
@@ -30,6 +32,12 @@ export const SAMPLING_ONLY_OPTIONS: readonly SamplingOnlyOption[] = [
   { key: 'customPool', neutral: NEUTRAL_ENEMY_PLACEMENT_OPTIONS.customPool },
 ];
 
+/**
+ * Options added after the first public Seed Codes (Part D). Optional on input - a configuration, preset or settings file that predates
+ * them means the neutral value - and sampling-only like the others.
+ */
+const EXTENSION_OPTIONS: readonly SamplingOnlyOption[] = CANONICAL_PLACEMENT_EXTENSION_KEYS.map(({ key, neutral }) => ({ key, neutral }));
+
 /** Model ids look like `c2500`; the engine checks them against the catalog of the run. */
 export const MAX_CUSTOM_POOL_ENTRIES = 512;
 const MODEL_ID = /^[A-Za-z][A-Za-z0-9_]{0,15}$/u;
@@ -54,6 +62,13 @@ function validateSamplingOnlyValues(value: Record<string, unknown>, path: string
   }
   if (Object.hasOwn(value, 'typeReplacement') && !(TYPE_REPLACEMENT_MODES as readonly unknown[]).includes(value.typeReplacement)) {
     problems.push(`${path}.typeReplacement must be ${TYPE_REPLACEMENT_MODES.join(', ')}.`);
+  }
+  if (Object.hasOwn(value, 'bossReplacement') && !(BOSS_REPLACEMENT_MODES as readonly unknown[]).includes(value.bossReplacement)) {
+    problems.push(`${path}.bossReplacement must be ${BOSS_REPLACEMENT_MODES.join(' or ')}.`);
+  }
+  if (Object.hasOwn(value, 'uniqueBosses')) {
+    if (typeof value.uniqueBosses !== 'boolean') problems.push(`${path}.uniqueBosses must be true or false.`);
+    else if (value.uniqueBosses && (value.bossReplacement ?? 'classic') !== 'bosses') problems.push(`${path}.uniqueBosses needs ${path}.bossReplacement "bosses".`);
   }
   if (Object.hasOwn(value, 'customPool')) {
     const pool = value.customPool;
@@ -108,8 +123,9 @@ export function validateEnemyPlacement(value: unknown, problems: string[], conte
     problems.push(`${path} must be an object.`);
     return;
   }
-  const allowed = new Set(['algorithm', ...samplingOnly.map((option) => option.key)]);
-  for (const key of allowed) {
+  const required = new Set(['algorithm', ...samplingOnly.map((option) => option.key)]);
+  const allowed = new Set([...required, ...(samplingOnly === SAMPLING_ONLY_OPTIONS ? EXTENSION_OPTIONS.map((option) => option.key) : [])]);
+  for (const key of required) {
     if (!Object.hasOwn(value, key)) problems.push(`${path}.${key} is required.`);
   }
   for (const key of Object.keys(value)) {
@@ -127,7 +143,7 @@ export function validateEnemyPlacement(value: unknown, problems: string[], conte
     return;
   }
   if (algorithm === 'permutation-v1') {
-    for (const option of samplingOnly) {
+    for (const option of [...samplingOnly, ...(samplingOnly === SAMPLING_ONLY_OPTIONS ? EXTENSION_OPTIONS : [])]) {
       if (Object.hasOwn(value, option.key) && JSON.stringify(value[option.key]) !== JSON.stringify(option.neutral)) {
         problems.push(`${path}.${option.key} only applies to sampling-v1; it must be ${JSON.stringify(option.neutral)} with permutation-v1.`);
       }

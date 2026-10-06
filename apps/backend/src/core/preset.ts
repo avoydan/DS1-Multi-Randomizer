@@ -43,12 +43,18 @@ const placementBatch6Defaults: Record<string, unknown> = {
 const placementBatch7Defaults: Record<string, unknown> = { typeReplacement: NEUTRAL_ENEMY_PLACEMENT_OPTIONS.typeReplacement };
 /** Version 9: the custom enemy pool; older presets migrate to the full pool (null). */
 const placementBatch8Defaults: Record<string, unknown> = { customPool: NEUTRAL_ENEMY_PLACEMENT_OPTIONS.customPool };
+/** Version 10: boss sampling (Part D); older presets migrate to the classic boss planner. */
+const placementBatch9Defaults: Record<string, unknown> = {
+  bossReplacement: NEUTRAL_ENEMY_PLACEMENT_OPTIONS.bossReplacement,
+  uniqueBosses: NEUTRAL_ENEMY_PLACEMENT_OPTIONS.uniqueBosses,
+};
 /** Nested `enemies.placement` keys added by each preset version, applied to every older preset. */
 const placementKeysAddedIn: Array<{ version: number; defaults: Record<string, unknown> }> = [
   { version: 6, defaults: placementBatch5Defaults },
   { version: 7, defaults: placementBatch6Defaults },
   { version: 8, defaults: placementBatch7Defaults },
   { version: 9, defaults: placementBatch8Defaults },
+  { version: 10, defaults: placementBatch9Defaults },
 ];
 /** What each older preset version lacks, newest additions last (the nested v6 placement keys are handled apart). */
 const missingByVersion: Record<number, SectionDefaults[]> = {
@@ -60,6 +66,7 @@ const missingByVersion: Record<number, SectionDefaults[]> = {
   6: [],
   7: [],
   8: [],
+  9: [],
 };
 
 const presetKeys = ['format', 'presetVersion', 'masterSeed', 'items', 'enemies', 'fog', 'output'];
@@ -68,8 +75,13 @@ const presetKeys = ['format', 'presetVersion', 'masterSeed', 'items', 'enemies',
 /** The custom pool is stored sorted, so equal selections export identically whatever order the UI built them in. */
 function canonicalEnemies(enemies: RandomizerConfig['enemies']): RandomizerConfig['enemies'] {
   const pool = enemies.placement.customPool;
-  if (pool === null) return enemies;
-  return { ...enemies, placement: { ...enemies.placement, customPool: [...pool].sort() } };
+  // Options added later are always stated in an exported preset (an older configuration means their neutral value).
+  const placement = {
+    ...enemies.placement,
+    bossReplacement: enemies.placement.bossReplacement ?? NEUTRAL_ENEMY_PLACEMENT_OPTIONS.bossReplacement,
+    uniqueBosses: enemies.placement.uniqueBosses ?? NEUTRAL_ENEMY_PLACEMENT_OPTIONS.uniqueBosses,
+  };
+  return { ...enemies, placement: pool === null ? placement : { ...placement, customPool: [...pool].sort() } };
 }
 
 export function exportPreset(config: RandomizerConfig): PresetDocument {
@@ -94,7 +106,7 @@ export function importPreset(text: string): PresetImportResult {
   const problems: string[] = [];
   if (record.format !== PRESET_FORMAT) problems.push(`Preset format must be "${PRESET_FORMAT}".`);
   if (record.presetVersion !== PRESET_VERSION && !(typeof record.presetVersion === 'number' && missingByVersion[record.presetVersion])) {
-    problems.push(`Preset version must be ${PRESET_VERSION} (versions 1 to 8 are migrated).`);
+    problems.push(`Preset version must be ${PRESET_VERSION} (versions 1 to 9 are migrated).`);
   }
   for (const key of Object.keys(record)) {
     if (!presetKeys.includes(key)) problems.push(`preset.${key} is not supported.`);

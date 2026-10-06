@@ -94,7 +94,7 @@ const config = (gamePath, masterSeed = process.env.DS1TR_E2E_SEED ?? 'foghost-e2
     ...(process.env.DS1TR_E2E_ITEMS ? JSON.parse(process.env.DS1TR_E2E_ITEMS) : {}),
   },
   // DS1TR_E2E_ENEMIES=0 runs Items + Fog only.
-  enemies: { enabled: process.env.DS1TR_E2E_ENEMIES !== '0', randomizeRegularEnemies: true, randomizeBosses: process.env.DS1TR_E2E_BOSSES === '1', scaling: 'area',
+  enemies: { enabled: process.env.DS1TR_E2E_ENEMIES !== '0', randomizeRegularEnemies: true, randomizeBosses: process.env.DS1TR_E2E_BOSSES === '1', scaling: process.env.DS1TR_E2E_SCALING ?? 'area',
     replaceMimics: process.env.DS1TR_E2E_MIMICS !== '0',
     replaceRespawningMosquitoes: process.env.DS1TR_E2E_MOSQUITOES !== '0',
     preventSameEnemy: process.env.DS1TR_E2E_PREVENT_SAME === '1',

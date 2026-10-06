@@ -62,7 +62,9 @@ export function formatPlacementDiagnostics(diagnostics: PlacementDiagnosticsSumm
   const poolText = pool && pool.enabled ? `custom pool ${String(pool.selected)}/${String(pool.total)} (${String(pool.hash).slice(0, 12)}), ` : '';
   const typeMode = String(options.typeReplacement ?? 'disabled');
   const groups = typeMode === 'disabled' ? '' : `type replacement ${typeMode} (${summary.counters.typeGroupsReplaced ?? 0}/${summary.counters.typeGroups ?? 0} groups replaced), `;
-  return `Enemy placement sampling-v1 (difficulty ${String(options.difficultyMode ?? 'random')}/${String(options.difficultyStrictness ?? 'loose')}): ${poolText}${groups}${summary.slots} regular slots, ${replaced} sampled, `
+  const bossSlots = summary.counters.bossSlots ?? 0;
+  const bossText = bossSlots > 0 ? `bosses sampled ${summary.counters.bossesReplaced ?? 0}/${bossSlots} (${summary.counters.bossesKeptVanilla ?? 0} kept, ${summary.counters.bossSlotsNotParticipating ?? 0} left by chance), ` : '';
+  return `Enemy placement sampling-v1 (difficulty ${String(options.difficultyMode ?? 'random')}/${String(options.difficultyStrictness ?? 'loose')}): ${poolText}${groups}${bossText}${summary.slots} regular slots, ${replaced} sampled, `
     + `${retried} map(s) retried, ${summary.counters.difficultyLapses ?? 0} difficulty lapses, `
     + `${summary.counters.keptByChance ?? 0} left by replacement chance, ${summary.rejections['model-budget'] ?? 0} model-budget rejections, `
     + `at most ${maxModels} models in a map, stages ${stages || 'none'}, class table ${diagnostics.classTableHash?.slice(0, 12) ?? 'n/a'}.`;

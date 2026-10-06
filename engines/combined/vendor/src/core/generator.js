@@ -17,7 +17,7 @@ import {
   resolveEnemyPlacementAlgorithm,
   resolveEnemyPlacementOptions,
 } from "./placement.js";
-import { deriveRegularClassTable, planSampledRegularEnemies } from "./sampling.js";
+import { deriveRegularClassTable, planSampledBosses, planSampledRegularEnemies } from "./sampling.js";
 import {
   enemies,
   enemySlots,
@@ -1431,7 +1431,7 @@ function shuffledPortableBosses(rng, archetypeKeys, archetypes, excludedModels =
   throw new Error("Could not create a safe boss permutation.");
 }
 
-function randomizeExtractedBosses(config, catalog, dragonPlan) {
+function randomizeExtractedBosses(config, catalog, dragonPlan, placementDiagnostics = null) {
   if (!config.randomizeBosses || !catalog?.bossSlots?.length) return [];
   const rng = createStream(config.seed, "bosses", config.version);
   const areaNames = new Map(
@@ -1461,12 +1461,20 @@ function randomizeExtractedBosses(config, catalog, dragonPlan) {
     (gwynNerfRejection[config.gwynNerf] ?? 0) > 0 &&
     createStream(config.seed, "gwyn-nerf", config.version).next() <
       gwynNerfRejection[config.gwynNerf];
-  const shuffled = shuffledPortableBosses(
-    rng,
-    archetypeKeys,
-    archetypes,
-    gwynRejected ? new Set([gwynModel]) : new Set(),
-  );
+  // Part D: with sampling-v1 and Boss replacement "bosses" every single-body boss slot draws its own replacement
+  // (planSampledBosses). Every other configuration keeps the archetype permutation below, byte for byte.
+  const bossOptions = config.enemyPlacementAlgorithm === "sampling-v1"
+    ? resolveEnemyPlacementOptions(config, "sampling-v1")
+    : null;
+  const sampledBosses = bossOptions?.bossReplacement === "bosses" && placementDiagnostics !== null;
+  const shuffled = sampledBosses
+    ? []
+    : shuffledPortableBosses(
+      rng,
+      archetypeKeys,
+      archetypes,
+      gwynRejected ? new Set([gwynModel]) : new Set(),
+    );
   const replacementsByModel = new Map();
   archetypeKeys.forEach((archetypeKey, index) =>
     replacementsByModel.set(archetypeKey, shuffled[index]),
@@ -1487,7 +1495,9 @@ function randomizeExtractedBosses(config, catalog, dragonPlan) {
       `${replacement.modelName} [NPC ${replacement.npcParamId}]`;
     const deferredActivation = deferredBossActivationRegions.get(slot.id);
     const portableThinkParamId = deferredActivation
-      ? 9_700_000 + sourceArchetypeIndex
+      // The permutation gives every slot of a boss archetype the same replacement, so one think-param definition per source
+      // archetype is consistent. Sampled bosses differ per slot, so each slot gets its own definition (a disjoint id range).
+      ? (sampledBosses ? 9_750_000 + index : 9_700_000 + sourceArchetypeIndex)
       : replacement.thinkParamId;
     return enemyPlacement(config, slot, replacement, 9_200_000 + index, {
       ...(deferredActivation
@@ -1561,12 +1571,37 @@ function randomizeExtractedBosses(config, catalog, dragonPlan) {
       ...overrides,
     });
   };
-  const placements = sources.map((slot, index) =>
-    buildBossPlacement(
-      slot,
-      index,
-      replacementsByModel.get(bossArchetypeKey(slot)),
-    ));
+  let placements;
+  if (sampledBosses) {
+    const { assignment } = planSampledBosses({
+      seed: config.seed,
+      options: bossOptions,
+      slots: sources,
+      pool: archetypes.filter((archetype) => !nonPortableBossReplacementModels.has(archetype.modelName)),
+      keyOf: bossArchetypeKey,
+      gwynRejection: gwynNerfRejection[config.gwynNerf] ?? 0,
+      gwynModel,
+      // Same authored safety rule as the permutation: Ceaseless Discharge's navigation walks into the Taurus tower walls.
+      isUnsafePair: (slot, candidate) =>
+        bossArchetypeKey(slot).split(":")[0] === "c2250" &&
+        (canonicalBossModel.get(candidate.modelName) || candidate.modelName) === "c5250",
+      diagnostics: placementDiagnostics,
+    });
+    placements = sources.flatMap((slot, index) => assignment.has(slot.id)
+      ? [buildBossPlacement(slot, index, assignment.get(slot.id), {
+          // Drops and team follow the slot (model document 6.9); the compatibility tag names the planner.
+          forceScaledNpcParam: true,
+          compatibility: "sampled-boss-replacement",
+        })]
+      : []);
+  } else {
+    placements = sources.map((slot, index) =>
+      buildBossPlacement(
+        slot,
+        index,
+        replacementsByModel.get(bossArchetypeKey(slot)),
+      ));
+  }
   // Legacy "Replace second Gargoyle" = replace: the second Bell Gargoyle is
   // replaced by a boss drawn independently of the first one (repeats allowed),
   // from the same portable pool, honoring the Gwyn nerf and Pinwheel Chaos
@@ -2888,7 +2923,7 @@ export function generate(inputConfig, { gameCatalog = null } = {}) {
     ? buildDragonPlan(config, gameCatalog)
     : null;
   const bossPlan = extractedData
-    ? randomizeExtractedBosses(config, gameCatalog, dragonPlan)
+    ? randomizeExtractedBosses(config, gameCatalog, dragonPlan, placementDiagnostics)
     : null;
   const itemLotPlan = extractedData
     ? randomizeExtractedItemLots(config, gameCatalog)

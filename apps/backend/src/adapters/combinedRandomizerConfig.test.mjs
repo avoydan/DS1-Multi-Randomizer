@@ -116,6 +116,8 @@ test('maps both enabled capabilities deterministically', () => {
       enemyDifficultyStrictness: 'loose',
       enemyTypeReplacement: 'disabled',
       enemyCustomPool: null,
+      enemyBossReplacement: 'classic',
+      enemyUniqueBosses: false,
       placementDiagnosticsLevel: 'summary',
       fogTrackedItems: null,
       generateSpoilerLog: true,

@@ -4,7 +4,7 @@ import {
   GENERATION_PROFILE_V1, SEED_CODE_PREFIX, SEED_ENVELOPE_FORMAT, SEED_FORMAT_VERSION, joinConfig,
 } from '@ds1tr/contracts';
 import type { DecodedSeed, GenerationSettings, SeedEnvelope } from '@ds1tr/contracts';
-import { canonicalizeSettings } from './canonicalSettings.js';
+import { canonicalizeSettings, sparseCanonicalSettings } from './canonicalSettings.js';
 import { InvalidConfigurationError, validateRandomizerConfig } from './configValidation.js';
 import { resolveGenerationProfile } from './generationProfiles.js';
 
@@ -86,7 +86,7 @@ function checksum(bytes: Uint8Array): Buffer {
 
 /** Stable JSON of an envelope: fixed top-level order, canonical settings. */
 export function serializeEnvelope(envelope: Pick<SeedEnvelope, 'profile' | 'masterSeed' | 'settings'>): string {
-  return JSON.stringify({ profile: envelope.profile, masterSeed: envelope.masterSeed, settings: canonicalizeSettings(envelope.settings) });
+  return JSON.stringify({ profile: envelope.profile, masterSeed: envelope.masterSeed, settings: sparseCanonicalSettings(envelope.settings) });
 }
 
 export function encodeSeedCode(envelope: Pick<SeedEnvelope, 'profile' | 'masterSeed' | 'settings'>): string {

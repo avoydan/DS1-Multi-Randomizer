@@ -1,0 +1,280 @@
+diff --git a/engines/combined/vendor/src/core/config.js b/engines/combined/vendor/src/core/config.js
+index 5c7b479..a638002 100644
+--- a/engines/combined/vendor/src/core/config.js
++++ b/engines/combined/vendor/src/core/config.js
+@@ -55,6 +55,10 @@ export const defaultConfig = Object.freeze({
+   // Part C2 (patches/0010): custom enemy pool for the replacement types. null = the full regular pool (neutral for
+   // permutation-v1); otherwise a non-empty list of unique model ids.
+   enemyCustomPool: null,
++  // Part D (patches/0012): boss sampling. "classic" (the existing boss planner, neutral for permutation-v1) or "bosses": every
++  // single-body boss slot draws its own replacement from the portable boss pool. Unique bosses cycles through that pool.
++  enemyBossReplacement: "classic",
++  enemyUniqueBosses: false,
+   // Items that the world randomizer (FogMod) follows by lot: null (no world randomizer) or
+   // { items: [{ equipType, itemId, required }], lotStarts: [itemLotRowId] }. FogMod needs exactly one copy of each required
+   // item in the lots it annotates (a start row or the rows that follow it without a gap) and at most one of any other;
+diff --git a/engines/combined/vendor/src/core/generator.js b/engines/combined/vendor/src/core/generator.js
+index 2710fac..c3a0dce 100644
+--- a/engines/combined/vendor/src/core/generator.js
++++ b/engines/combined/vendor/src/core/generator.js
+@@ -17,7 +17,7 @@ import {
+   resolveEnemyPlacementAlgorithm,
+   resolveEnemyPlacementOptions,
+ } from "./placement.js";
+-import { deriveRegularClassTable, planSampledRegularEnemies } from "./sampling.js";
++import { deriveRegularClassTable, planSampledBosses, planSampledRegularEnemies } from "./sampling.js";
+ import {
+   enemies,
+   enemySlots,
+@@ -1431,7 +1431,7 @@ function shuffledPortableBosses(rng, archetypeKeys, archetypes, excludedModels =
+   throw new Error("Could not create a safe boss permutation.");
+ }
+ 
+-function randomizeExtractedBosses(config, catalog, dragonPlan) {
++function randomizeExtractedBosses(config, catalog, dragonPlan, placementDiagnostics = null) {
+   if (!config.randomizeBosses || !catalog?.bossSlots?.length) return [];
+   const rng = createStream(config.seed, "bosses", config.version);
+   const areaNames = new Map(
+@@ -1461,12 +1461,20 @@ function randomizeExtractedBosses(config, catalog, dragonPlan) {
+     (gwynNerfRejection[config.gwynNerf] ?? 0) > 0 &&
+     createStream(config.seed, "gwyn-nerf", config.version).next() <
+       gwynNerfRejection[config.gwynNerf];
+-  const shuffled = shuffledPortableBosses(
+-    rng,
+-    archetypeKeys,
+-    archetypes,
+-    gwynRejected ? new Set([gwynModel]) : new Set(),
+-  );
++  // Part D: with sampling-v1 and Boss replacement "bosses" every single-body boss slot draws its own replacement
++  // (planSampledBosses). Every other configuration keeps the archetype permutation below, byte for byte.
++  const bossOptions = config.enemyPlacementAlgorithm === "sampling-v1"
++    ? resolveEnemyPlacementOptions(config, "sampling-v1")
++    : null;
++  const sampledBosses = bossOptions?.bossReplacement === "bosses" && placementDiagnostics !== null;
++  const shuffled = sampledBosses
++    ? []
++    : shuffledPortableBosses(
++      rng,
++      archetypeKeys,
++      archetypes,
++      gwynRejected ? new Set([gwynModel]) : new Set(),
++    );
+   const replacementsByModel = new Map();
+   archetypeKeys.forEach((archetypeKey, index) =>
+     replacementsByModel.set(archetypeKey, shuffled[index]),
+@@ -1487,7 +1495,9 @@ function randomizeExtractedBosses(config, catalog, dragonPlan) {
+       `${replacement.modelName} [NPC ${replacement.npcParamId}]`;
+     const deferredActivation = deferredBossActivationRegions.get(slot.id);
+     const portableThinkParamId = deferredActivation
+-      ? 9_700_000 + sourceArchetypeIndex
++      // The permutation gives every slot of a boss archetype the same replacement, so one think-param definition per source
++      // archetype is consistent. Sampled bosses differ per slot, so each slot gets its own definition (a disjoint id range).
++      ? (sampledBosses ? 9_750_000 + index : 9_700_000 + sourceArchetypeIndex)
+       : replacement.thinkParamId;
+     return enemyPlacement(config, slot, replacement, 9_200_000 + index, {
+       ...(deferredActivation
+@@ -1561,12 +1571,37 @@ function randomizeExtractedBosses(config, catalog, dragonPlan) {
+       ...overrides,
+     });
+   };
+-  const placements = sources.map((slot, index) =>
+-    buildBossPlacement(
+-      slot,
+-      index,
+-      replacementsByModel.get(bossArchetypeKey(slot)),
+-    ));
++  let placements;
++  if (sampledBosses) {
++    const { assignment } = planSampledBosses({
++      seed: config.seed,
++      options: bossOptions,
++      slots: sources,
++      pool: archetypes.filter((archetype) => !nonPortableBossReplacementModels.has(archetype.modelName)),
++      keyOf: bossArchetypeKey,
++      gwynRejection: gwynNerfRejection[config.gwynNerf] ?? 0,
++      gwynModel,
++      // Same authored safety rule as the permutation: Ceaseless Discharge's navigation walks into the Taurus tower walls.
++      isUnsafePair: (slot, candidate) =>
++        bossArchetypeKey(slot).split(":")[0] === "c2250" &&
++        (canonicalBossModel.get(candidate.modelName) || candidate.modelName) === "c5250",
++      diagnostics: placementDiagnostics,
++    });
++    placements = sources.flatMap((slot, index) => assignment.has(slot.id)
++      ? [buildBossPlacement(slot, index, assignment.get(slot.id), {
++          // Drops and team follow the slot (model document 6.9); the compatibility tag names the planner.
++          forceScaledNpcParam: true,
++          compatibility: "sampled-boss-replacement",
++        })]
++      : []);
++  } else {
++    placements = sources.map((slot, index) =>
++      buildBossPlacement(
++        slot,
++        index,
++        replacementsByModel.get(bossArchetypeKey(slot)),
++      ));
++  }
+   // Legacy "Replace second Gargoyle" = replace: the second Bell Gargoyle is
+   // replaced by a boss drawn independently of the first one (repeats allowed),
+   // from the same portable pool, honoring the Gwyn nerf and Pinwheel Chaos
+@@ -2888,7 +2923,7 @@ export function generate(inputConfig, { gameCatalog = null } = {}) {
+     ? buildDragonPlan(config, gameCatalog)
+     : null;
+   const bossPlan = extractedData
+-    ? randomizeExtractedBosses(config, gameCatalog, dragonPlan)
++    ? randomizeExtractedBosses(config, gameCatalog, dragonPlan, placementDiagnostics)
+     : null;
+   const itemLotPlan = extractedData
+     ? randomizeExtractedItemLots(config, gameCatalog)
+diff --git a/engines/combined/vendor/src/core/placement.js b/engines/combined/vendor/src/core/placement.js
+index 267e3b6..9edf59d 100644
+--- a/engines/combined/vendor/src/core/placement.js
++++ b/engines/combined/vendor/src/core/placement.js
+@@ -71,8 +71,17 @@ export const DIFFICULTY_STRICTNESS = Object.freeze(["strict", "loose", "very-loo
+  */
+ export const TYPE_REPLACEMENT_MODES = Object.freeze(["disabled", "enabled", "enabled-except-roaming-bosses"]);
+ 
++/**
++ * Boss replacement (Part D): "classic" keeps the archetype permutation of the existing boss planner; "bosses" samples every
++ * single-body boss slot from the portable boss pool with replacement. Linked units (dragons, Gargoyles, Four Kings, ...)
++ * stay classic in both modes.
++ */
++export const BOSS_REPLACEMENT_MODES = Object.freeze(["classic", "bosses"]);
++
+ /** Values under which permutation-v1 behaves exactly as it always did; anything else is refused there. */
+ export const SAMPLING_NEUTRAL_OPTIONS = Object.freeze({
++  enemyBossReplacement: "classic",
++  enemyUniqueBosses: false,
+   enemyReplacementChance: 100,
+   enemyNormalReplacement: "normals",
+   enemyPlacementFit: "anywhere",
+@@ -158,6 +167,14 @@ export function resolveEnemyPlacementOptions(config, algorithm = config.enemyPla
+   if (!TYPE_REPLACEMENT_MODES.includes(config.enemyTypeReplacement)) {
+     problems.push(`enemyTypeReplacement must be ${TYPE_REPLACEMENT_MODES.join(", ")} (got ${String(config.enemyTypeReplacement)}).`);
+   }
++  if (!BOSS_REPLACEMENT_MODES.includes(config.enemyBossReplacement)) {
++    problems.push(`enemyBossReplacement must be ${BOSS_REPLACEMENT_MODES.join(" or ")} (got ${String(config.enemyBossReplacement)}).`);
++  }
++  if (typeof config.enemyUniqueBosses !== "boolean") {
++    problems.push(`enemyUniqueBosses must be true or false (got ${String(config.enemyUniqueBosses)}).`);
++  } else if (config.enemyUniqueBosses && config.enemyBossReplacement !== "bosses") {
++    problems.push("enemyUniqueBosses needs enemyBossReplacement \"bosses\" (it only changes how bosses are drawn).");
++  }
+   if (config.enemyCustomPool !== null && config.enemyCustomPool !== undefined && algorithm === "permutation-v1") {
+     problems.push("enemyCustomPool only applies to sampling-v1; it must be null with permutation-v1.");
+   } else if (algorithm === "sampling-v1") {
+@@ -177,6 +194,8 @@ export function resolveEnemyPlacementOptions(config, algorithm = config.enemyPla
+     difficultyStrictness: config.enemyDifficultyStrictness,
+     typeReplacement: config.enemyTypeReplacement,
+     customPool: customPoolOf(config),
++    bossReplacement: config.enemyBossReplacement,
++    uniqueBosses: config.enemyUniqueBosses,
+   };
+ }
+ 
+diff --git a/engines/combined/vendor/src/core/sampling.js b/engines/combined/vendor/src/core/sampling.js
+index 4520bda..d79a427 100644
+--- a/engines/combined/vendor/src/core/sampling.js
++++ b/engines/combined/vendor/src/core/sampling.js
+@@ -669,8 +669,10 @@ export function planSampledRegularEnemies({
+   seed, options, preventSame, slots, extraSlots = [], fixedModelsByMap, diagnostics, cap = MODEL_BUDGET_CAP,
+   mapAttempts = MAP_ATTEMPTS, candidateFilter = undefined,
+ }) {
++  // The boss options belong to planSampledBosses; they never reach the regular-slot settings (and so not their diagnostics).
++  const { bossReplacement: _bossReplacement, uniqueBosses: _uniqueBosses, ...regularOptions } = options;
+   const settings = {
+-    ...options,
++    ...regularOptions,
+     difficultyMode: options.difficultyMode ?? "random",
+     difficultyStrictness: options.difficultyStrictness ?? "loose",
+     typeReplacement: options.typeReplacement ?? "disabled",
+@@ -749,6 +751,89 @@ export function planSampledRegularEnemies({
+   return { assignment, table };
+ }
+ 
++// ---- boss sampling (Part D) -------------------------------------------------------------------------------------------
++
++/**
++ * Plans sampling-v1 for SINGLE-BODY boss slots (docs/ENEMY_PLACEMENT_MODEL.md, Part D). Linked units (dragons, Gargoyles, Four
++ * Kings, Bed of Chaos, ...) are not slots of this planner: they stay with their own planners in both boss modes.
++ *
++ * Per slot, in stable slot-id order, each with its own stream (`slot:<id>`, "enemy-placement-v1"; boss slot ids never
++ * collide with regular slot ids):
++ *   1. replacement chance - the first draw of the slot's stream; a slot that fails it stays vanilla (no placement);
++ *   2. candidates         - the portable boss archetypes except the slot's own boss and the authored unsafe pairs;
++ *   3. draw               - uniform over the surviving archetypes with list shrink; a candidate is rejected
++ *                           a. Gwyn nerf: Lord Gwyn with the legacy probability (a draw per evaluation, same stream),
++ *                           b. Unique bosses: an already used boss while an unused candidate remains;
++ *   4. nothing left       - the slot stays vanilla (recorded as kept-vanilla).
++ * Unique bosses uses one list for the whole run (slot order); it starts again once every boss of the pool was used.
++ * A boss may otherwise repeat any number of times. There is no model budget here: the fixed models of the boss
++ * placements are what the regular-enemy planner then respects.
++ *
++ * @param {object} input
++ * @param {string} input.seed
++ * @param {{replacementChance:number, uniqueBosses:boolean}} input.options
++ * @param {Array<object>} input.slots                 single-body boss slots (catalog slots)
++ * @param {Array<object>} input.pool                  portable boss archetypes (catalog slots, one per archetype)
++ * @param {(slot: object) => string} input.keyOf      archetype key of a slot or archetype
++ * @param {number} input.gwynRejection                probability that Lord Gwyn is rejected as a candidate (0 = nerf off)
++ * @param {string} input.gwynModel
++ * @param {(slot: object, candidate: object) => boolean} input.isUnsafePair
++ * @param {object} input.diagnostics
++ * @returns {{assignment: Map<string, object>}}
++ */
++export function planSampledBosses({ seed, options, slots, pool, keyOf, gwynRejection, gwynModel, isUnsafePair, diagnostics }) {
++  const byKey = new Map();
++  for (const archetype of pool) if (!byKey.has(keyOf(archetype))) byKey.set(keyOf(archetype), archetype);
++  const archetypes = [...byKey.entries()].sort(([a], [b]) => compare(a, b)).map(([, archetype]) => archetype);
++  const assignment = new Map();
++  const used = new Set();
++  const ordered = [...slots].sort((left, right) => compare(left.id, right.id));
++  diagnostics.count("bossSlots", ordered.length);
++
++  for (const slot of ordered) {
++    const rng = createSlotStream(seed, slot);
++    const participates = rng.int(100) + 1 <= options.replacementChance;
++    if (!participates) {
++      diagnostics.count("bossSlotsNotParticipating");
++      continue;
++    }
++    const slotKey = keyOf(slot);
++    const rejected = [];
++    const list = archetypes.filter((candidate) => {
++      if (keyOf(candidate) === slotKey) return false; // a boss is never replaced by itself
++      if (isUnsafePair(slot, candidate)) { rejected.push({ model: candidate.modelName, reason: "pair-exclusion" }); return false; }
++      return true;
++    });
++    let chosen = null;
++    while (list.length > 0 && !chosen) {
++      const index = rng.int(list.length);
++      const candidate = list[index];
++      if (gwynRejection > 0 && candidate.modelName === gwynModel && rng.next() < gwynRejection) {
++        rejected.push({ model: candidate.modelName, reason: "gwyn-nerf" });
++      } else if (options.uniqueBosses && used.has(keyOf(candidate)) && list.some((other) => !used.has(keyOf(other)))) {
++        rejected.push({ model: candidate.modelName, reason: "unique-boss" });
++      } else {
++        chosen = candidate;
++        break;
++      }
++      list.splice(index, 1);
++    }
++    if (chosen) {
++      assignment.set(slot.id, chosen);
++      if (options.uniqueBosses) {
++        used.add(keyOf(chosen));
++        if (used.size >= archetypes.length) used.clear();
++      }
++      diagnostics.count("bossesReplaced");
++    } else {
++      diagnostics.count("bossesKeptVanilla");
++    }
++    // Boss counters stay apart from the regular-slot summary (slots, stages, rejections describe regular enemies only).
++    for (const entry of rejected) diagnostics.count(`bossRejections:${entry.reason}`);
++  }
++  return { assignment };
++}
++
+ /** Per-map diagnostics of the custom pool model cap (restricted pools only; nothing is added for the full pool). */
+ function modelInfo(model, nominalCap) {
+   if (!model) return {};

@@ -55,6 +55,10 @@ export const defaultConfig = Object.freeze({
   // Part C2 (patches/0010): custom enemy pool for the replacement types. null = the full regular pool (neutral for
   // permutation-v1); otherwise a non-empty list of unique model ids.
   enemyCustomPool: null,
+  // Part D (patches/0012): boss sampling. "classic" (the existing boss planner, neutral for permutation-v1) or "bosses": every
+  // single-body boss slot draws its own replacement from the portable boss pool. Unique bosses cycles through that pool.
+  enemyBossReplacement: "classic",
+  enemyUniqueBosses: false,
   // Items that the world randomizer (FogMod) follows by lot: null (no world randomizer) or
   // { items: [{ equipType, itemId, required }], lotStarts: [itemLotRowId] }. FogMod needs exactly one copy of each required
   // item in the lots it annotates (a start row or the rows that follow it without a gap) and at most one of any other;

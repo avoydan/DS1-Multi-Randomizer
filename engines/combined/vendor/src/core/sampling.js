@@ -669,8 +669,10 @@ export function planSampledRegularEnemies({
   seed, options, preventSame, slots, extraSlots = [], fixedModelsByMap, diagnostics, cap = MODEL_BUDGET_CAP,
   mapAttempts = MAP_ATTEMPTS, candidateFilter = undefined,
 }) {
+  // The boss options belong to planSampledBosses; they never reach the regular-slot settings (and so not their diagnostics).
+  const { bossReplacement: _bossReplacement, uniqueBosses: _uniqueBosses, ...regularOptions } = options;
   const settings = {
-    ...options,
+    ...regularOptions,
     difficultyMode: options.difficultyMode ?? "random",
     difficultyStrictness: options.difficultyStrictness ?? "loose",
     typeReplacement: options.typeReplacement ?? "disabled",
@@ -747,6 +749,89 @@ export function planSampledRegularEnemies({
     diagnostics.setMap(mapId, { ...planned.info, attempts: planned.attempt + 1 });
   }
   return { assignment, table };
+}
+
+// ---- boss sampling (Part D) -------------------------------------------------------------------------------------------
+
+/**
+ * Plans sampling-v1 for SINGLE-BODY boss slots (docs/ENEMY_PLACEMENT_MODEL.md, Part D). Linked units (dragons, Gargoyles, Four
+ * Kings, Bed of Chaos, ...) are not slots of this planner: they stay with their own planners in both boss modes.
+ *
+ * Per slot, in stable slot-id order, each with its own stream (`slot:<id>`, "enemy-placement-v1"; boss slot ids never
+ * collide with regular slot ids):
+ *   1. replacement chance - the first draw of the slot's stream; a slot that fails it stays vanilla (no placement);
+ *   2. candidates         - the portable boss archetypes except the slot's own boss and the authored unsafe pairs;
+ *   3. draw               - uniform over the surviving archetypes with list shrink; a candidate is rejected
+ *                           a. Gwyn nerf: Lord Gwyn with the legacy probability (a draw per evaluation, same stream),
+ *                           b. Unique bosses: an already used boss while an unused candidate remains;
+ *   4. nothing left       - the slot stays vanilla (recorded as kept-vanilla).
+ * Unique bosses uses one list for the whole run (slot order); it starts again once every boss of the pool was used.
+ * A boss may otherwise repeat any number of times. There is no model budget here: the fixed models of the boss
+ * placements are what the regular-enemy planner then respects.
+ *
+ * @param {object} input
+ * @param {string} input.seed
+ * @param {{replacementChance:number, uniqueBosses:boolean}} input.options
+ * @param {Array<object>} input.slots                 single-body boss slots (catalog slots)
+ * @param {Array<object>} input.pool                  portable boss archetypes (catalog slots, one per archetype)
+ * @param {(slot: object) => string} input.keyOf      archetype key of a slot or archetype
+ * @param {number} input.gwynRejection                probability that Lord Gwyn is rejected as a candidate (0 = nerf off)
+ * @param {string} input.gwynModel
+ * @param {(slot: object, candidate: object) => boolean} input.isUnsafePair
+ * @param {object} input.diagnostics
+ * @returns {{assignment: Map<string, object>}}
+ */
+export function planSampledBosses({ seed, options, slots, pool, keyOf, gwynRejection, gwynModel, isUnsafePair, diagnostics }) {
+  const byKey = new Map();
+  for (const archetype of pool) if (!byKey.has(keyOf(archetype))) byKey.set(keyOf(archetype), archetype);
+  const archetypes = [...byKey.entries()].sort(([a], [b]) => compare(a, b)).map(([, archetype]) => archetype);
+  const assignment = new Map();
+  const used = new Set();
+  const ordered = [...slots].sort((left, right) => compare(left.id, right.id));
+  diagnostics.count("bossSlots", ordered.length);
+
+  for (const slot of ordered) {
+    const rng = createSlotStream(seed, slot);
+    const participates = rng.int(100) + 1 <= options.replacementChance;
+    if (!participates) {
+      diagnostics.count("bossSlotsNotParticipating");
+      continue;
+    }
+    const slotKey = keyOf(slot);
+    const rejected = [];
+    const list = archetypes.filter((candidate) => {
+      if (keyOf(candidate) === slotKey) return false; // a boss is never replaced by itself
+      if (isUnsafePair(slot, candidate)) { rejected.push({ model: candidate.modelName, reason: "pair-exclusion" }); return false; }
+      return true;
+    });
+    let chosen = null;
+    while (list.length > 0 && !chosen) {
+      const index = rng.int(list.length);
+      const candidate = list[index];
+      if (gwynRejection > 0 && candidate.modelName === gwynModel && rng.next() < gwynRejection) {
+        rejected.push({ model: candidate.modelName, reason: "gwyn-nerf" });
+      } else if (options.uniqueBosses && used.has(keyOf(candidate)) && list.some((other) => !used.has(keyOf(other)))) {
+        rejected.push({ model: candidate.modelName, reason: "unique-boss" });
+      } else {
+        chosen = candidate;
+        break;
+      }
+      list.splice(index, 1);
+    }
+    if (chosen) {
+      assignment.set(slot.id, chosen);
+      if (options.uniqueBosses) {
+        used.add(keyOf(chosen));
+        if (used.size >= archetypes.length) used.clear();
+      }
+      diagnostics.count("bossesReplaced");
+    } else {
+      diagnostics.count("bossesKeptVanilla");
+    }
+    // Boss counters stay apart from the regular-slot summary (slots, stages, rejections describe regular enemies only).
+    for (const entry of rejected) diagnostics.count(`bossRejections:${entry.reason}`);
+  }
+  return { assignment };
 }
 
 /** Per-map diagnostics of the custom pool model cap (restricted pools only; nothing is added for the full pool). */

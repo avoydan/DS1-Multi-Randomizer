@@ -71,8 +71,17 @@ export const DIFFICULTY_STRICTNESS = Object.freeze(["strict", "loose", "very-loo
  */
 export const TYPE_REPLACEMENT_MODES = Object.freeze(["disabled", "enabled", "enabled-except-roaming-bosses"]);
 
+/**
+ * Boss replacement (Part D): "classic" keeps the archetype permutation of the existing boss planner; "bosses" samples every
+ * single-body boss slot from the portable boss pool with replacement. Linked units (dragons, Gargoyles, Four Kings, ...)
+ * stay classic in both modes.
+ */
+export const BOSS_REPLACEMENT_MODES = Object.freeze(["classic", "bosses"]);
+
 /** Values under which permutation-v1 behaves exactly as it always did; anything else is refused there. */
 export const SAMPLING_NEUTRAL_OPTIONS = Object.freeze({
+  enemyBossReplacement: "classic",
+  enemyUniqueBosses: false,
   enemyReplacementChance: 100,
   enemyNormalReplacement: "normals",
   enemyPlacementFit: "anywhere",
@@ -158,6 +167,14 @@ export function resolveEnemyPlacementOptions(config, algorithm = config.enemyPla
   if (!TYPE_REPLACEMENT_MODES.includes(config.enemyTypeReplacement)) {
     problems.push(`enemyTypeReplacement must be ${TYPE_REPLACEMENT_MODES.join(", ")} (got ${String(config.enemyTypeReplacement)}).`);
   }
+  if (!BOSS_REPLACEMENT_MODES.includes(config.enemyBossReplacement)) {
+    problems.push(`enemyBossReplacement must be ${BOSS_REPLACEMENT_MODES.join(" or ")} (got ${String(config.enemyBossReplacement)}).`);
+  }
+  if (typeof config.enemyUniqueBosses !== "boolean") {
+    problems.push(`enemyUniqueBosses must be true or false (got ${String(config.enemyUniqueBosses)}).`);
+  } else if (config.enemyUniqueBosses && config.enemyBossReplacement !== "bosses") {
+    problems.push("enemyUniqueBosses needs enemyBossReplacement \"bosses\" (it only changes how bosses are drawn).");
+  }
   if (config.enemyCustomPool !== null && config.enemyCustomPool !== undefined && algorithm === "permutation-v1") {
     problems.push("enemyCustomPool only applies to sampling-v1; it must be null with permutation-v1.");
   } else if (algorithm === "sampling-v1") {
@@ -177,6 +194,8 @@ export function resolveEnemyPlacementOptions(config, algorithm = config.enemyPla
     difficultyStrictness: config.enemyDifficultyStrictness,
     typeReplacement: config.enemyTypeReplacement,
     customPool: customPoolOf(config),
+    bossReplacement: config.enemyBossReplacement,
+    uniqueBosses: config.enemyUniqueBosses,
   };
 }
 

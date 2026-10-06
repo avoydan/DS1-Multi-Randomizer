@@ -62,7 +62,7 @@ const defaults = {
   enemies: { enabled: true, randomizeRegularEnemies: true, randomizeBosses: true, scaling: 'area', replaceMimics: true, replaceRespawningMosquitoes: true,
     preventSameEnemy: false, pinwheelChaos: false, gwynNerf: 'medium', secondGargoyle: 'replace',
     placement: { algorithm: 'permutation-v1', replacementChance: 100, normalReplacement: 'normals', fit: 'anywhere', difficultyMode: 'random',
-      difficultyStrictness: 'loose', typeReplacement: 'disabled', customPool: null } },
+      difficultyStrictness: 'loose', typeReplacement: 'disabled', customPool: null, bossReplacement: 'classic', uniqueBosses: false } },
   fog: { enabled: true, traversableFogs: true, bossFogs: true, areaWarps: true, majorPvpFogs: false, minorPvpFogs: false, lordvesselGates: false,
     randomStart: false, disconnectedFogs: false, noFallBedOfChaos: false, scaling: true, glitchedLogic: false, requireLordSouls: true,
     pacifistMode: false, language: 'ENGLISH' },
@@ -105,6 +105,13 @@ export const v1Cases = [
  * byte-identical when boss sampling is added behind a non-neutral option.
  */
 export const v1ExtraCaseSets = {
+  /** Boss sampling (Part D): worlds that use the non-neutral extension keys, frozen from the day they exist. */
+  'boss-sampling': [
+    { name: 'boss-sampling-fog', masterSeed: 'golden-v1-bosssample-fog', patch: { enemies: { gwynNerf: 'strong', secondGargoyle: 'replace',
+      placement: { algorithm: 'sampling-v1', replacementChance: 100, fit: 'fits', difficultyMode: 'curve', difficultyStrictness: 'strict', bossReplacement: 'bosses' } } } },
+    { name: 'boss-sampling-unique-combined', masterSeed: 'golden-v1-bosssample-unique', patch: { items: { enabled: false }, fog: { enabled: false },
+      enemies: { gwynNerf: 'medium', secondGargoyle: 'keep', placement: { algorithm: 'sampling-v1', replacementChance: 70, fit: 'anywhere', bossReplacement: 'bosses', uniqueBosses: true } } } },
+  ],
   'boss-baseline': [
     { name: 'sampling-bosses-fog', masterSeed: 'golden-v1-boss-fog', patch: { enemies: { gwynNerf: 'strong', secondGargoyle: 'replace',
       placement: { algorithm: 'sampling-v1', replacementChance: 70, fit: 'fits', difficultyMode: 'curve', difficultyStrictness: 'strict' } } } },

@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
-  CANONICAL_ENEMY_KEYS, CANONICAL_FOG_KEYS, CANONICAL_ITEM_KEYS, CANONICAL_OUTPUT_KEYS, CANONICAL_PLACEMENT_KEYS, GENERATION_FIELD_POLICY,
+  CANONICAL_ENEMY_KEYS, CANONICAL_FOG_KEYS, CANONICAL_ITEM_KEYS, CANONICAL_OUTPUT_KEYS, CANONICAL_PLACEMENT_EXTENSION_KEYS, CANONICAL_PLACEMENT_KEYS, GENERATION_FIELD_POLICY,
   isLoadedSeedModified, joinConfig, splitConfig,
 } from '@ds1tr/contracts';
-import { canonicalSettingsJson, canonicalizeSettings } from '../../dist/core/canonicalSettings.js';
+import { canonicalSettingsJson, canonicalizeSettings, sparseCanonicalSettings } from '../../dist/core/canonicalSettings.js';
 import { validateRandomizerConfig } from '../../dist/core/configValidation.js';
 import { base32Decode, base32Encode, decodeSeedCode, encodeSeedCode, serializeEnvelope } from '../../dist/core/seedCode.js';
 import { prepareRun } from '../../dist/core/seededRun.js';
@@ -125,7 +125,7 @@ test('every generation-affecting field is in the Seed Code or explicitly documen
   // The canonical key lists are the validator's keys.
   assert.deepEqual([...CANONICAL_ITEM_KEYS].sort(), Object.keys(config.items).sort());
   assert.deepEqual([...CANONICAL_ENEMY_KEYS].sort(), Object.keys(config.enemies).sort());
-  assert.deepEqual([...CANONICAL_PLACEMENT_KEYS].sort(), Object.keys(config.enemies.placement).sort());
+  assert.deepEqual([...CANONICAL_PLACEMENT_KEYS, ...CANONICAL_PLACEMENT_EXTENSION_KEYS.map((entry) => entry.key)].sort(), Object.keys(config.enemies.placement).sort());
   assert.deepEqual([...CANONICAL_FOG_KEYS].sort(), Object.keys(config.fog).sort());
   assert.deepEqual([...CANONICAL_OUTPUT_KEYS], ['includeDlc']);
 });
@@ -210,4 +210,34 @@ test('the master seed is made when a run starts, never earlier; a Seed Code deci
   // A bad code or bad settings is a plain, typed refusal.
   assert.equal(prepareRun({ ...fullConfig(), seedCode: 'DS1TR1-NOPE' }).ok, false);
   assert.equal(prepareRun({ ...fullConfig(), items: undefined }).ok, false);
+});
+
+test('placement options added after format 1 are stored only when they differ from their neutral value, so old codes keep their text', () => {
+  const complete = fullSettings();
+  const withoutExtensions = structuredClone(complete);
+  delete withoutExtensions.enemies.placement.bossReplacement;
+  delete withoutExtensions.enemies.placement.uniqueBosses;
+  // A settings object that predates the options is completed with their neutral value ...
+  assert.equal(canonicalizeSettings(withoutExtensions).enemies.placement.bossReplacement, 'classic');
+  assert.equal(canonicalizeSettings(withoutExtensions).enemies.placement.uniqueBosses, false);
+  // ... and has exactly the same Seed Code as one that states the neutral values.
+  assert.equal(encodeSeedCode(envelopeOf(withoutExtensions)), encodeSeedCode(envelopeOf(complete)));
+  assert.doesNotMatch(canonicalSettingsJson(complete), /bossReplacement|uniqueBosses/u, 'the stored form omits neutral extension keys');
+  // A non-neutral value is stored, changes the code and round-trips; the order of the keys is fixed (after customPool).
+  const sampled = fullSettings({ enemies: { placement: { algorithm: 'sampling-v1', fit: 'fits', bossReplacement: 'bosses', uniqueBosses: true } } });
+  assert.match(canonicalSettingsJson(sampled), /"customPool":null,"bossReplacement":"bosses","uniqueBosses":true\}/u);
+  assert.notEqual(encodeSeedCode(envelopeOf(sampled)), encodeSeedCode(envelopeOf(complete)));
+  const decoded = decodeSeedCode(encodeSeedCode(envelopeOf(sampled)));
+  assert.equal(decoded.ok, true);
+  assert.equal(decoded.envelope.settings.enemies.placement.bossReplacement, 'bosses');
+  assert.equal(decoded.envelope.settings.enemies.placement.uniqueBosses, true);
+  assert.equal(decoded.seedCode, encodeSeedCode(envelopeOf(sampled)));
+  // The decoded settings of an old code are complete again.
+  const old = decodeSeedCode(encodeSeedCode(envelopeOf(withoutExtensions)));
+  assert.equal(old.envelope.settings.enemies.placement.bossReplacement, 'classic');
+  assert.deepEqual(sparseCanonicalSettings(old.envelope.settings), sparseCanonicalSettings(complete));
+  // Unique bosses without boss sampling is refused when a code is loaded.
+  const invalid = decodeSeedCode(encodeSeedCode(envelopeOf(fullSettings({ enemies: { placement: { uniqueBosses: true } } }))));
+  assert.equal(invalid.ok, false);
+  assert.equal(invalid.code, 'INVALID_SETTINGS');
 });

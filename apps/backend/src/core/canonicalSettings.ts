@@ -1,5 +1,6 @@
 import {
-  CANONICAL_ENEMY_KEYS, CANONICAL_FOG_KEYS, CANONICAL_ITEM_KEYS, CANONICAL_OUTPUT_KEYS, CANONICAL_PLACEMENT_KEYS,
+  CANONICAL_ENEMY_KEYS, CANONICAL_FOG_KEYS, CANONICAL_ITEM_KEYS, CANONICAL_OUTPUT_KEYS, CANONICAL_PLACEMENT_EXTENSION_KEYS,
+  CANONICAL_PLACEMENT_KEYS,
 } from '@ds1tr/contracts';
 import type { GenerationSettings } from '@ds1tr/contracts';
 
@@ -26,10 +27,17 @@ const object = (value: unknown, path: string): Json => {
   return value as Json;
 };
 
+/**
+ * The complete canonical settings (every key present, fixed order). Placement options that were added after format 1 are filled with
+ * their neutral value when the input predates them, so an old code, preset or settings file is complete again without changing
+ * what it meant.
+ */
 export function canonicalizeSettings(input: unknown): GenerationSettings {
   const source = object(input, 'settings');
   const enemiesSource = object(source.enemies, 'settings.enemies');
-  const placement = pick(object(enemiesSource.placement, 'settings.enemies.placement'), CANONICAL_PLACEMENT_KEYS, 'settings.enemies.placement', {
+  const placementSource = { ...object(enemiesSource.placement, 'settings.enemies.placement') };
+  for (const { key, neutral } of CANONICAL_PLACEMENT_EXTENSION_KEYS) if (!Object.hasOwn(placementSource, key)) placementSource[key] = neutral;
+  const placement = pick(placementSource, [...CANONICAL_PLACEMENT_KEYS, ...CANONICAL_PLACEMENT_EXTENSION_KEYS.map((entry) => entry.key)], 'settings.enemies.placement', {
     customPool: (pool) => (Array.isArray(pool) ? [...(pool as string[])].sort() : pool),
   });
   const enemies = pick(enemiesSource, CANONICAL_ENEMY_KEYS, 'settings.enemies', { placement: () => placement });
@@ -42,7 +50,18 @@ export function canonicalizeSettings(input: unknown): GenerationSettings {
   return top as unknown as GenerationSettings;
 }
 
-/** Compact, order-stable JSON of the canonical settings. */
+/**
+ * The settings as a Seed Code stores them: complete, except that a placement option added after format 1 is left out while it has its
+ * neutral value. A code made before such an option existed therefore keeps its exact text.
+ */
+export function sparseCanonicalSettings(settings: GenerationSettings): Record<string, unknown> {
+  const complete = canonicalizeSettings(settings) as unknown as { enemies: { placement: Record<string, unknown> } };
+  const placement = { ...complete.enemies.placement };
+  for (const { key, neutral } of CANONICAL_PLACEMENT_EXTENSION_KEYS) if (placement[key] === neutral) delete placement[key];
+  return { ...complete, enemies: { ...complete.enemies, placement } } as Record<string, unknown>;
+}
+
+/** Compact, order-stable JSON of the settings in their Seed Code form (see {@link sparseCanonicalSettings}). */
 export function canonicalSettingsJson(settings: GenerationSettings): string {
-  return JSON.stringify(canonicalizeSettings(settings));
+  return JSON.stringify(sparseCanonicalSettings(settings));
 }

@@ -73,3 +73,13 @@ test('the user-facing wording says Fog, and the LUDOS artwork is a small decorat
   const css = await read('styles.css');
   assert.match(css, /\.hero-ludos \{[^}]*width: clamp\(110px, 11vw, 150px\)/u);
 });
+
+test('Boss replacement and Unique bosses are real controls (not planned placeholders) and are reset with the algorithm', async () => {
+  const app = await read('App.tsx');
+  assert.match(app, /<label className="field-label">Boss replacement<\/label>/u);
+  assert.match(app, /Random bosses \(legacy-style\)/u);
+  assert.match(app, /label="Unique bosses"/u);
+  assert.doesNotMatch(app, /\['Boss replacement', 'NPC replacement'\]/u);
+  assert.doesNotMatch(app, /'Allow T-pose behavior', 'Unique bosses'/u);
+  assert.match(app, /bossReplacement: 'classic', uniqueBosses: false/u);
+});
