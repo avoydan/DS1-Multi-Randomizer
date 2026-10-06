@@ -56,6 +56,62 @@ foreach (var expectation in expectations)
             var original = EMEVD.Read(Path.Combine(originalDir, "event", expectation.Map + ".emevd.dcx"));
             Check("a wake-up event was added for the entity", References(emevd) > References(original), $"events naming entity {part.EntityID}: {References(emevd)} now, {References(original)} in the clean game");
         }
+        if (expectation.Kind == "encounter-body" && originalDir != null)
+        {
+            // Part E2: the encounter stays the boss's. Entity, rewards and completion bits come from the boss row; the body never respawns.
+            var originalMsb = MSB1.Read(Path.Combine(originalDir, "map", "MapStudio", expectation.Map + ".msb"));
+            var originalPart = originalMsb.Parts.Enemies.SingleOrDefault(entry => entry.Name == expectation.Slot);
+            Check("the boss part exists in the clean game", originalPart != null, expectation.Slot);
+            if (originalPart != null)
+            {
+                Check("entity id is the boss's", part.EntityID == originalPart.EntityID, $"{part.EntityID} (clean game: {originalPart.EntityID})");
+                Check("the boss model was replaced", originalPart.ModelName != part.ModelName, $"{originalPart.ModelName} -> {part.ModelName}");
+                var originalParam = BND3.Read(Path.Combine(originalDir, "param", "GameParam", "GameParam.parambnd.dcx"));
+                var originalNpc = ReadParam(originalParam, "NpcParam.param").Rows.ToDictionary(entry => entry.ID);
+                if (originalNpc.TryGetValue(originalPart.NPCParamID, out var bossRow) && npc.TryGetValue(part.NPCParamID, out var bodyRow))
+                {
+                    Check("body row is not the boss row", part.NPCParamID != originalPart.NPCParamID, $"row {part.NPCParamID} (boss row {originalPart.NPCParamID})");
+                    foreach (var cellName in new[] { "dropType", "getSoul", "disableInitializeDead" })
+                        Check($"{cellName} is the encounter's", Cell(bodyRow, cellName) == Cell(bossRow, cellName), $"{Cell(bodyRow, cellName)} (boss row: {Cell(bossRow, cellName)})");
+                    foreach (var cell in bossRow.Cells.Where(cell => cell.Def.InternalName.StartsWith("itemLotId", StringComparison.Ordinal)))
+                    {
+                        var name = cell.Def.InternalName;
+                        Check($"{name} is the encounter's", Convert.ToInt32(bodyRow.Cells.Single(entry => entry.Def.InternalName == name).Value) == Convert.ToInt32(cell.Value), $"{bodyRow.Cells.Single(entry => entry.Def.InternalName == name).Value} (boss row: {cell.Value})");
+                    }
+                    Check("the body never respawns", Cell(bodyRow, "disableRespawn") == 1, $"disableRespawn={Cell(bodyRow, "disableRespawn")}");
+                }
+                else Check("NpcParam rows readable", false, $"rows {originalPart.NPCParamID} / {part.NPCParamID}");
+                // Every event of the clean game that names the entity still exists (the death, the defeated flag, the fog, the exit all hang on them).
+                var originalEmevd = EMEVD.Read(Path.Combine(originalDir, "event", expectation.Map + ".emevd.dcx"));
+                bool Names(EMEVD.Event entry) => entry.Instructions.Any(instruction =>
+                {
+                    var data = instruction.ArgData;
+                    for (var offset = 0; offset + 4 <= data.Length; offset += 4) if (BitConverter.ToInt32(data, offset) == part.EntityID) return true;
+                    return false;
+                });
+                var kept = emevd.Events.Select(entry => entry.ID).ToHashSet();
+                var lost = originalEmevd.Events.Where(Names).Select(entry => entry.ID).Where(id => !kept.Contains(id)).ToList();
+                Check("events naming the entity are kept", lost.Count == 0, lost.Count == 0 ? $"{originalEmevd.Events.Count(Names)} events" : $"missing: {string.Join(",", lost)}");
+                // Conditions (bank 3), flag writes and event initializers (banks 2003, 2000) are what completion rests on and must not disappear.
+                // The one allowed removal is the model-specific 2003[18] aimed at the encounter's own entity (a forced animation of the boss model:
+                // the Asylum Demon drop, the Taurus Demon entrance); it is the same sanitization boss sampling applies to the same slot.
+                var weakened = new List<string>();
+                int FirstArg(EMEVD.Instruction instruction) => instruction.ArgData.Length >= 4 ? BitConverter.ToInt32(instruction.ArgData, 0) : int.MinValue;
+                string Signature(EMEVD.Instruction instruction) => $"{instruction.Bank}.{instruction.ID}:{Convert.ToHexString(instruction.ArgData)}";
+                bool Monitored(EMEVD.Instruction instruction) =>
+                    (instruction.Bank == 3 || instruction.Bank == 2003 || instruction.Bank == 2000) &&
+                    !(instruction.Bank == 2003 && instruction.ID == 18 && FirstArg(instruction) == part.EntityID);
+                foreach (var originalEvent in originalEmevd.Events.Where(Names))
+                {
+                    var current = emevd.Events.FirstOrDefault(entry => entry.ID == originalEvent.ID);
+                    if (current == null) continue;
+                    var after = current.Instructions.Select(Signature).GroupBy(entry => entry).ToDictionary(group => group.Key, group => group.Count());
+                    foreach (var group in originalEvent.Instructions.Where(Monitored).Select(Signature).GroupBy(entry => entry))
+                        if (!after.TryGetValue(group.Key, out var present) || present < group.Count()) weakened.Add($"{originalEvent.ID}:{group.Key.Split(':')[0]}");
+                }
+                Check("completion conditions are kept", weakened.Count == 0, weakened.Count == 0 ? "no condition or flag instruction was removed from an event naming the entity" : $"weakened: {string.Join(",", weakened)}");
+            }
+        }
         int Models(MSB1 file) => file.Parts.Enemies.Where(entry => entry.ModelName.StartsWith('c')).Select(entry => entry.ModelName).Distinct().Count();
         var now = Models(msb);
         var vanilla = originalDir != null ? Models(MSB1.Read(Path.Combine(originalDir, "map", "MapStudio", expectation.Map + ".msb"))) : 0;

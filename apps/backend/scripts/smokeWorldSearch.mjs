@@ -62,6 +62,12 @@ const ACCEPT = {
     if (rows.length !== 3 || new Set(rows.map((row) => row.model)).size !== 3 || rows.some((row) => !allowed.includes(row.model))) return null;
     return { near: rows };
   },
+  'quick-encounter-body': ({ plan }) => {
+    const body = plan.placements.bosses.find((entry) => entry.slot === `${ASYLUM}:c2232_0000` && entry.compatibility === 'sampled-encounter-body');
+    if (!body || body.targetModelName !== 'c2560') return null;
+    const others = plan.placements.bosses.filter((entry) => entry.compatibility === 'sampled-encounter-body').map((entry) => `${entry.slot.split(':')[1]}>${entry.targetModelName}`);
+    return { bodies: others, source: body.sourceSlot, scaledNpcParamId: body.scaledNpcParamId, think: body.targetThinkParamId };
+  },
   'quick-boss-asylum-demon': ({ plan }) => {
     const placement = plan.placements.bosses.find((entry) => entry.slot === `${ASYLUM}:c2232_0000`);
     if (!placement || !['c2250', 'c2240'].includes(placement.targetModelName)) return null;

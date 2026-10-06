@@ -72,6 +72,19 @@ export const sets = {
     { name: 'roaming-both-fog', patch: merge2(noItems, sampling({ normalReplacement: 'both', bossChanceInNormalSlots: 25, fit: 'fits' })), seeds: 20 },
     { name: 'roaming-bosses-fog', patch: merge2(noItems, sampling({ normalReplacement: 'bosses', replacementChance: 40, fit: 'anywhere', typeReplacement: 'enabled-except-roaming-bosses' })), seeds: 20 },
   ],
+  /** Part E2: a normal enemy as the body of a boss encounter through the real data tool (Fog is covered by the fogHostE2e sweeps). */
+  'encounter-e2': [
+    { name: 'body-normals-anywhere', patch: merge2(noItems, noFog, sampling({ bossReplacement: 'normals', fit: 'anywhere', difficultyMode: 'random' })) },
+    { name: 'body-normals-fits-curve', patch: merge2(noItems, noFog, sampling({ bossReplacement: 'normals', fit: 'fits', difficultyMode: 'curve', difficultyStrictness: 'strict' })) },
+    { name: 'body-normals-c50', patch: merge2(noItems, noFog, sampling({ bossReplacement: 'normals', replacementChance: 50, fit: 'fits' })) },
+    { name: 'body-both-40', patch: merge2(noItems, noFog, sampling({ bossReplacement: 'both', bossChanceInBossSlots: 40, fit: 'anywhere' })) },
+    { name: 'body-both-unique', patch: merge2(noItems, noFog, sampling({ bossReplacement: 'both', bossChanceInBossSlots: 50, uniqueBosses: true, fit: 'anywhere' })) },
+    { name: 'body-plus-roaming', patch: merge2(noItems, noFog, sampling({ bossReplacement: 'normals', normalReplacement: 'both', bossChanceInNormalSlots: 25, fit: 'fits' })) },
+    { name: 'body-type-enabled', patch: merge2(noItems, noFog, sampling({ bossReplacement: 'normals', typeReplacement: 'enabled', fit: 'anywhere' })) },
+    { name: 'body-custom-pool', patch: merge2(noItems, noFog, sampling({ bossReplacement: 'normals', fit: 'anywhere', customPool: ['c1200', 'c1201', 'c1202', 'c2260', 'c2270', 'c2280', 'c2500', 'c2560', 'c2390', 'c2711', 'c2860', 'c2940'] })) },
+    { name: 'body-vanilla-scaling', patch: merge2(noItems, noFog, sampling({ bossReplacement: 'normals', fit: 'anywhere' }, { scaling: 'vanilla' })) },
+    { name: 'body-second-gargoyle-gwyn', patch: merge2(noItems, noFog, sampling({ bossReplacement: 'normals', fit: 'fits' }, { secondGargoyle: 'replace', gwynNerf: 'strong' })) },
+  ],
 };
 
 const deterministicSeed = (set, name, index) => `matrix-${set}-${name}-${index}`;
