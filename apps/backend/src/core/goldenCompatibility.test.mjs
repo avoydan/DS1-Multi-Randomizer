@@ -25,12 +25,12 @@ const REQUIRED_CASES = [
 
 async function fixtures() {
   const out = [];
-  for (const name of (await readdir(directory)).filter((file) => file.endsWith('.json')).sort()) out.push(JSON.parse(await readFile(path.join(directory, name), 'utf8')));
+  for (const name of (await readdir(directory)).filter((file) => file.endsWith('.json')).sort()) out.push({ ...JSON.parse(await readFile(path.join(directory, name), 'utf8')), file: name });
   return out;
 }
 
 test('the v1 golden fixtures cover every required scenario', async () => {
-  const v1 = (await fixtures()).find((fixture) => fixture.profile === 'ds1tr-gen-v1');
+  const v1 = (await fixtures()).find((fixture) => fixture.file === 'ds1tr-gen-v1.json');
   assert.ok(v1, 'the ds1tr-gen-v1 fixture file exists');
   assert.deepEqual(v1.cases.map((entry) => entry.name), REQUIRED_CASES);
   for (const entry of v1.cases) {

@@ -99,6 +99,20 @@ export const v1Cases = [
     fog: { majorPvpFogs: true, minorPvpFogs: true, lordvesselGates: true, disconnectedFogs: true, glitchedLogic: true, requireLordSouls: false, language: 'POLISH' } } },
 ];
 
+/**
+ * Further permanent v1 cases, recorded in their own files (`<profile>.<set>.json`) and never mixed into the first ten. The
+ * boss baseline was recorded BEFORE boss sampling existed: sampling-v1 with bosses on (the classic boss planner) must stay
+ * byte-identical when boss sampling is added behind a non-neutral option.
+ */
+export const v1ExtraCaseSets = {
+  'boss-baseline': [
+    { name: 'sampling-bosses-fog', masterSeed: 'golden-v1-boss-fog', patch: { enemies: { gwynNerf: 'strong', secondGargoyle: 'replace',
+      placement: { algorithm: 'sampling-v1', replacementChance: 70, fit: 'fits', difficultyMode: 'curve', difficultyStrictness: 'strict' } } } },
+    { name: 'sampling-bosses-combined-only', masterSeed: 'golden-v1-boss-combined', patch: { items: { enabled: false }, fog: { enabled: false },
+      enemies: { preventSameEnemy: true, gwynNerf: 'medium', secondGargoyle: 'keep', placement: { algorithm: 'sampling-v1', replacementChance: 100, fit: 'anywhere' } } } },
+  ],
+};
+
 function buildSettings(patch) {
   const merged = merge(defaults, patch);
   return JSON.parse(JSON.stringify(merged));
@@ -165,11 +179,14 @@ async function main() {
     }
     if (mode === 'record') {
       const profile = argument;
-      const target = path.join(fixtureDirectory, `${profile}.json`);
+      const setName = process.argv[4] && !process.argv[4].startsWith('--') ? process.argv[4] : null;
+      const caseList = setName ? v1ExtraCaseSets[setName] : v1Cases;
+      if (!caseList) throw new Error(`Unknown extra case set ${setName}.`);
+      const target = path.join(fixtureDirectory, setName ? `${profile}.${setName}.json` : `${profile}.json`);
       const exists = await access(target).then(() => true, () => false);
       if (exists) throw new Error(`${target} exists. Golden fixtures are never re-recorded; a changed output needs a NEW generation profile.`);
       const cases = [];
-      for (const spec of v1Cases) {
+      for (const spec of caseList) {
         const settings = buildSettings(spec.patch);
         const { prepared, result } = await run(context, { masterSeed: spec.masterSeed, ...settings }, spec.name, appVersion);
         if (!result.ok) throw new Error(`${spec.name}: ${result.code}: ${result.message}`);
