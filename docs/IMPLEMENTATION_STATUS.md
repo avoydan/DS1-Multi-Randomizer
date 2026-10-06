@@ -1,5 +1,25 @@
 # Implementation status
 
+**Fix: custom event window vs the Bed of Chaos floor event (2026-10-06; backend 0.32.1, data tool only; `ds1tr-gen-v1` unchanged).**
+`sampling-v1` with Type replacement `enabled`, Placement `anywhere` and bosses on sometimes failed in `patch-enemies` with
+`Randomizer event ID is already used: 11419980`. Root cause (reproduced deterministically, details in `docs/EVENT_ALLOCATION.md`): the
+per-map window of randomizer events (`x19900`...) is chosen before the fixed-ID Bed of Chaos floor event `11419980` is added, so a
+Lost Izalith with more than 80 event-requiring placements (96 in the reproduction) ran into it. The floor event ID is now reserved before the
+window is chosen (`FindFreeCustomEventRange(..., reserved)`), and the tool asserts that no map uses more IDs than were reserved. Windows of up
+to 80 events, and every other map, are unchanged: the audit shows `IDs used == IDs reserved` in every map of every run.
+
+- **Before / after on the same seed:** index 59 of the 100-seed set (and `golden-v1-boss-combined`) fails with the old tool exactly with
+  the 11419980 message and succeeds with the fixed one (window moved to `11419981`). 1 of 100 seeds triggers it in this configuration.
+- **100 seeds** of the formerly failing configuration, isolated run: 100/100 success, first attempt, deterministic reruns, 0 window overruns.
+  A first run of the same 100 seeds, made while other heavy jobs ran in parallel, had one `DATA_TOOL_FAILED` (index 26) whose details were not
+  captured; it did not recur in the isolated run, in three more runs of the same seed, nor in 52 runs under four-fold contention. Not
+  explained; the matrix runner now records the tool's message for every failure.
+- **Fog:** 30 seeds Type enabled + anywhere + bosses + Fog: 30/30, `verify-skips` clean on every package, the same 15 boss overlay events.
+- **Compatibility:** all 14 earlier golden fixtures, the 24 lock hashes and the sampling pins are identical with the fixed tool; one new
+  permanent fixture (`ds1tr-gen-v1.event-window.json`) pins the relocated window. A colliding run ended in `DATA_TOOL_FAILED` (one attempt,
+  no reseeding), so no package or Seed Code of such a world ever existed; no profile change is needed.
+- **Tooling:** `apps/backend/scripts/placementMatrix.mjs` (configuration x seed matrix with window audit, retries, deterministic reruns).
+
 **Enemy placement Part D: boss sampling (2026-10-06; backend 0.32.0, desktop 0.19.0, contracts 0.16.0, patch 0012; RANDOMIZER_VERSION 0.5.66 and FogHost 0.5.0 unchanged; generation profile `ds1tr-gen-v1` unchanged).**
 `sampling-v1` can draw a replacement for every single-body boss slot from the boss pool (`Boss replacement: Random bosses`), with the
 replacement chance per boss slot, the Gwyn nerf per candidate and an optional `Unique bosses` cycle; the controls replace two PLANNED

@@ -105,6 +105,15 @@ export const v1Cases = [
  * byte-identical when boss sampling is added behind a non-neutral option.
  */
 export const v1ExtraCaseSets = {
+  /**
+   * The configuration that used to fail with "Randomizer event ID is already used: 11419980": Type replacement enabled, Placement
+   * anywhere, bosses on (the Bed of Chaos floor event exists) and enough event-requiring placements in Lost Izalith that the custom
+   * event window had to move off the floor event. Recorded with the fixed data tool; it pins the relocated window.
+   */
+  'event-window': [
+    { name: 'type-anywhere-relocated-window', masterSeed: 'golden-v1-boss-combined', patch: { items: { enabled: false }, fog: { enabled: false },
+      enemies: { preventSameEnemy: true, gwynNerf: 'medium', secondGargoyle: 'keep', placement: { algorithm: 'sampling-v1', replacementChance: 100, fit: 'anywhere', typeReplacement: 'enabled' } } } },
+  ],
   /** Boss sampling (Part D): worlds that use the non-neutral extension keys, frozen from the day they exist. */
   'boss-sampling': [
     { name: 'boss-sampling-fog', masterSeed: 'golden-v1-bosssample-fog', patch: { enemies: { gwynNerf: 'strong', secondGargoyle: 'replace',
@@ -120,7 +129,7 @@ export const v1ExtraCaseSets = {
   ],
 };
 
-function buildSettings(patch) {
+export function buildSettings(patch) {
   const merged = merge(defaults, patch);
   return JSON.parse(JSON.stringify(merged));
 }

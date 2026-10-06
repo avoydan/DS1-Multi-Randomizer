@@ -1017,3 +1017,16 @@ Date: 2026-10-06.
 5. **Known defect found (not part of this change):** `sampling-v1` with Type replacement `enabled` and Placement fit `anywhere` fails for
    some seeds in `DsrDataTool patch-enemies` with "Randomizer event ID is already used: 11419980". Logged in `IMPLEMENTATION_STATUS.md`.
 
+## Event windows reserve fixed IDs (backend 0.32.1)
+
+Date: 2026-10-06.
+
+1. **Root cause, not a retry.** The `Randomizer event ID is already used: 11419980` failure came from the allocator, not from a seed: the
+   custom event window of a map is chosen before the fixed-ID Bed of Chaos floor event is added. The tool now reserves every fixed ID it
+   will add before it chooses the window, and asserts that no map uses more IDs than it reserved. The duplicate check at registration stays
+   (no overwrite is ever allowed). Details and the namespace table: `docs/EVENT_ALLOCATION.md`.
+2. **No behaviour change for valid worlds.** Windows that did not reach the reserved ID get the same base and IDs as before; only worlds that
+   could not be created before are different (they are now created). Therefore no generation profile change.
+3. **Rule for new events:** an event with a fixed ID must be added to the reserved set before the window is chosen; a feature that can add
+   many events must be measured with the audit (`DS1TR_AUDIT_EVENTS=1`).
+

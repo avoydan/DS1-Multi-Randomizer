@@ -1,0 +1,75 @@
+diff --git a/engines/combined/vendor/tools/DsrDataTool/Program.cs b/engines/combined/vendor/tools/DsrDataTool/Program.cs
+index 770be77..7a91389 100644
+--- a/engines/combined/vendor/tools/DsrDataTool/Program.cs
++++ b/engines/combined/vendor/tools/DsrDataTool/Program.cs
+@@ -1965,19 +1965,26 @@ static void InsertEventInstruction(
+     entry.Instructions.Insert(index, instruction);
+ }
+ 
++// Finds the first range of `count` consecutive event IDs at or after `preferredEventId` that no existing event uses and that
++// contains none of the `reserved` IDs. Events that are added to the file LATER with a fixed ID (the Bed of Chaos floor event)
++// are invisible to the first check, so they have to be named as reserved: otherwise a window that is long enough runs straight
++// into them (the Type replacement + Placement anywhere failure, "Randomizer event ID is already used: 11419980").
+ static int FindFreeCustomEventRange(
+     EMEVD emevd,
+     int preferredEventId,
+-    int count)
++    int count,
++    IReadOnlyCollection<int>? reserved = null)
+ {
+     if (count <= 0)
+         return preferredEventId;
+     var usedEventIds = emevd.Events
+         .Select(entry => entry.ID)
+         .ToHashSet();
++    var reservedIds = reserved ?? Array.Empty<int>();
+     var candidate = preferredEventId;
+     while (Enumerable.Range(0, count).Any(offset =>
+-               usedEventIds.Contains((long)candidate + offset)))
++               usedEventIds.Contains((long)candidate + offset) ||
++               reservedIds.Contains(candidate + offset)))
+     {
+         candidate = checked(candidate + 1);
+     }
+@@ -2342,10 +2349,16 @@ static List<PatchedFile> PatchBossNames(
+         var mapNumber = int.Parse(mapId.Substring(1, 2));
+         var preferredCustomEventId =
+             10_000_000 + mapNumber * 100_000 + 19_900;
++        // The Bed of Chaos floor event has a fixed preferred ID inside the 100-ID window of this map's custom events. It is
++        // added further down, so its ID is chosen now and kept out of the custom range.
++        var bedFloorEventId = preserveBedFloor && mapId == "m14_01_00_00"
++            ? FindFreeCustomEventRange(emevd, 11419980, 1)
++            : (int?)null;
+         var customEventBase = FindFreeCustomEventRange(
+             emevd,
+             preferredCustomEventId,
+-            customEventCount);
++            customEventCount,
++            bedFloorEventId.HasValue ? new[] { bedFloorEventId.Value } : null);
+         var patchAsylumIntro =
+             mapId == "m18_01_00_00" &&
+             mapGroup.Any(placement =>
+@@ -2474,7 +2487,7 @@ static List<PatchedFile> PatchBossNames(
+                     removeInstructionParameters: true);
+                 changed++;
+             }
+-            var floorEventId = FindFreeCustomEventRange(emevd, 11419980, 1);
++            var floorEventId = bedFloorEventId!.Value;
+             var floorEvent = new EMEVD.Event(
+                 floorEventId,
+                 EMEVD.Event.RestBehaviorType.Restart);
+@@ -2965,6 +2978,14 @@ static List<PatchedFile> PatchBossNames(
+                     Array.Empty<object>()));
+                 RegisterCustomEvent(visibilityEvent);
+             }
++            // The window was sized for customEventCount events; using more would walk into events that are not ours.
++            var consumedCustomEvents = nextCustomEventId - customEventBase;
++            if (Environment.GetEnvironmentVariable("DS1TR_AUDIT_EVENTS") == "1")
++                Console.Error.WriteLine(
++                    $"audit-events {mapId} count={customEventCount} consumed={consumedCustomEvents} base={customEventBase} floor={bedFloorEventId?.ToString() ?? "-"}");
++            if (consumedCustomEvents > customEventCount)
++                throw new InvalidDataException(
++                    $"Randomizer events of {mapId} used {consumedCustomEvents} IDs but {customEventCount} were reserved.");
+         }
+         foreach (var entry in emevd.Events)
+         {
