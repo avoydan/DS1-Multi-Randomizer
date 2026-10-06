@@ -81,7 +81,15 @@ placements (it embeds the run folder path). Verified stable across workspaces.
 
 ## Proof status (ds1tr-gen-v1)
 
-* Recorded on 2026-10-06 with backend 0.30.0; verified from the Seed Codes alone, also under the simulated application version
-  `99.1.0-future`: identical profile, settings, master seed and package hashes for all ten cases.
-* Pin tests of the earlier work (permutation lock hashes, parity, sampling pins) are unchanged: nothing about the generated worlds
-  changed in this work.
+* **v1 is the pre-change behavior, not just self-consistent.** The fixtures were recorded by backend 0.30.0, so they were
+  cross-checked against the code that existed before profiles: a worktree at `afec8bf` (backend 0.29.1, desktop 0.16.1) built on its
+  own, its plain `generateRun({config, workspacePath})` fed with each fixture's decoded settings and master seed, same clean game
+  copy and helpers: **10 of 10 package digests are identical** to the recorded ones.
+* **Verified from the Seed Codes alone**, also under the simulated application version `99.1.0-future`: identical profile,
+  settings, master seed and package hashes, 10/10 (`goldenCompatibility.mjs verify --app-version 99.1.0-future`).
+* **The spoiler preference does not change a world** (it is excluded from Seed Codes): the engine's `placementHash` and plan are
+  identical with and without it for 30 seed/option combinations (it is only read when the output files are written), and
+  `scripts/spoilerIndependence.mjs` shows the package digest of golden cases generated with the spoiler log on equals the
+  recorded one once `spoiler.txt` is left out. (The world randomizer packages do not contain `spoiler.txt` at all.)
+* **Packaged app:** a fresh profile of the packaged 0.17.0 build, Randomize, restart, Load seed, Apply, Restore through its own UI:
+  the Seed Code made by Randomize and the one loaded after the restart produce byte-identical packages.
