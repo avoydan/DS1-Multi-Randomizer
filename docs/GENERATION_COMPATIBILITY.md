@@ -88,7 +88,8 @@ master seed, the SHA-256 of every package file (and one digest over all of them)
 `items-only`, `enemies-classic-permutation`, `enemies-sampling-v1`, `items-enemies-bosses`, `items-enemies-bosses-fog`,
 `broad-items-shops-fog`, `custom-enemy-pool`, `second-gargoyle-keep`, `custom-pool-model-grace` (the one-model grace of the
 custom pool, `docs/ENEMY_PLACEMENT_MODEL.md` 10.5) and `world-options` (Polish messages, PvP fogs, Lordvessel gates,
-disconnected fogs, glitched logic).
+disconnected fogs, glitched logic). Further sets were recorded the day their option appeared and never touched again: `event-window`, `boss-baseline`, `boss-sampling` (Part D),
+`roaming-bosses` (Part E1) and `encounter-bodies` (Part E2: basic, with Fog, with roaming bosses and `both`, a Custom Pool edge). **Part E2 changed no earlier world**: all 18 earlier fixtures verify byte for byte with the E2 engine and data tool; the new option is an extension key whose neutral value (`bossChanceInBossSlots` 90, `bossReplacement` `classic`) is the old behavior.
 
 Package digest: SHA-256 over the sorted `path:sha256` list of the package files except `config.json`, `patch-manifest.json` and
 `run-manifest.json` (they carry run folder paths and the application version); `randomizer.json` is replaced by the hash of its

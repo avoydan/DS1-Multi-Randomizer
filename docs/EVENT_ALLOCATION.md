@@ -69,3 +69,11 @@ map's custom event window. It edits no vanilla event and adds nothing to the Fog
 10 roaming bosses, which bounds the growth of the window; `DS1TR_AUDIT_EVENTS=1` reports reserved against consumed IDs and the matrix
 (`placementMatrix.mjs roaming-e1`) records the highest count per map. A slot without an entity id gets one from `16099000 + index` (the range every
 combat event uses).
+
+## A regular enemy as the body of a boss encounter (Part E2)
+
+Adds **no event and no event ID**. The slot keeps its boss entity ID, so the vanilla events of the arena keep working; the data tool applies to the event files exactly the portable-boss edits Part D
+already applies for the same slots (proven by diffing the EMEVD of an E2 package against a Part D package: the Asylum Demon intro `11810310` and every event naming the entity are identical, the boss-name
+rewrite is the only absent edit). Nothing is added to the custom event window, to the Fog boss overlay or to the reserved IDs. A body in the Taurus Demon or Capra Demon arena uses the wake-up
+event every portable boss gets (inside the window, as in Part D). `tools/smoke-verify` checks, for the quick world, that event IDs are unique and that no condition, flag-write or event-initializer
+instruction of an event naming the entity was removed (the model-specific forced animation `2003[18]` aimed at the encounter's own entity excepted: the Asylum Demon drop in `11810310` and the Taurus Demon entrance in `11015382`, both Part D's sanitization).
