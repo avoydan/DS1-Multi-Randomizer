@@ -42,7 +42,7 @@ world cannot be forgotten in the Seed Code.
    All keys of the settings are present in a fixed order (`canonicalSettings.ts`); the custom enemy pool is a list of stable model
    ids sorted lexicographically (`null` = full pool). Same configuration, same bytes, whatever order the UI or a preset built it in.
    **Extension keys.** An option added after format 1 existed (the first ones are `enemies.placement.bossReplacement` and
-   `uniqueBosses`, Part D; then `bossChanceInNormalSlots` 10, `roamingBossSouls` 50 and `roamingBossesStayDead` false, Part E1, then `bossChanceInBossSlots` 90, Part E2, appended in
+   `uniqueBosses`, Part D; then `bossChanceInNormalSlots` 10, `roamingBossSouls` 50 and `roamingBossesStayDead` false, Part E1, then `bossChanceInBossSlots` 90, Part E2, then `hostileNpcs` false, Part F1, appended in
    this order; `normalReplacement` itself is a base key that gained the values `bosses` and `both`, and `bossReplacement` gained `normals` and `both`) is complete in memory, in history and in the settings file, but a Seed Code stores it **only when it
    differs from its neutral value**, appended after `customPool` in a fixed order (`CANONICAL_PLACEMENT_EXTENSION_KEYS`). The neutral
    value is "what the world did before the option existed" and is frozen forever. So every code made before the option keeps its exact

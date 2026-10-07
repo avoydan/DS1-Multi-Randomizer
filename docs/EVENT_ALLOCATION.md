@@ -77,3 +77,10 @@ already applies for the same slots (proven by diffing the EMEVD of an E2 package
 rewrite is the only absent edit). Nothing is added to the custom event window, to the Fog boss overlay or to the reserved IDs. A body in the Taurus Demon or Capra Demon arena uses the wake-up
 event every portable boss gets (inside the window, as in Part D). `tools/smoke-verify` checks, for the quick world, that event IDs are unique and that no condition, flag-write or event-initializer
 instruction of an event naming the entity was removed (the model-specific forced animation `2003[18]` aimed at the encounter's own entity excepted: the Asylum Demon drop in `11810310` and the Taurus Demon entrance in `11015382`, both Part D's sanitization).
+
+## Hostile NPCs (Part F1)
+
+A hostile NPC in a live regular slot adds exactly one custom event (the wake-up every portable boss gets, `forceCombatActivation`) inside the map's custom event window, assigned deterministically like every other custom event (`16099000 + slot index` is the entity id of a slot that has none). It edits no vanilla event and adds nothing to the Fog boss overlay. A dummy part gets no event. The planner limits a map to **12** hostile NPCs
+(an uncapped run measured up to 117 in one map under strict curve and 73 under Type replacement, which would have been that many events); a Type replacement group counts every slot of the group. The Darkroot Basin (`m12_00_00_01`), which has no event file of its own (the data tool writes no event for a part there), never holds one.
+The cap is a DS1TR limit, not a legacy rule; the window measurements are in `ENEMY_PLACEMENT_MODEL.md` 10.9.
+
