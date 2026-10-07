@@ -1,8 +1,16 @@
 ﻿import { spawn } from 'node:child_process';
-import { cp, mkdir, rm, writeFile, access } from 'node:fs/promises';
+import { cp, mkdir, rm, writeFile, access, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// Modes (docs/RELEASE_TRUST.md):
+//   npm run package:win -w @ds1tr/desktop                 development / test build: the installer and the portable build, NOT signed
+//   npm run package:win -w @ds1tr/desktop -- --release    PUBLIC release: signing is mandatory and the credentials come from the environment
+//                                                          (CSC_LINK + CSC_KEY_PASSWORD, or DS1TR_SIGN_CERT_SHA1 / DS1TR_SIGN_CERT_SUBJECT for a certificate in the
+//                                                          Windows store such as a hardware token, or DS1TR_ARTIFACT_SIGNING=1 with the Azure variables); without
+//                                                          them the build stops before it starts. Nothing is ever read from the repository.
+const releaseMode = process.argv.includes('--release');
+const appVersion = JSON.parse(await readFile(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'package.json'), 'utf8')).version;
 const desktop = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const root = path.resolve(desktop, '../..');
 const runtime = path.join(desktop, 'release', 'runtime');
@@ -20,6 +28,18 @@ const copy = async (source, destination) => {
 };
 
 if (process.platform !== 'win32') throw new Error('Windows packaging must run on Windows.');
+if (releaseMode) {
+  const certificate = process.env.CSC_LINK || process.env.WIN_CSC_LINK;
+  const artifactSigning = process.env.DS1TR_ARTIFACT_SIGNING === '1' && process.env.AZURE_TENANT_ID && process.env.AZURE_CLIENT_ID && process.env.AZURE_CLIENT_SECRET
+    && process.env.DS1TR_ARTIFACT_SIGNING_ENDPOINT && process.env.DS1TR_ARTIFACT_SIGNING_ACCOUNT && process.env.DS1TR_ARTIFACT_SIGNING_PROFILE;
+  const storeCertificate = process.env.DS1TR_SIGN_CERT_SHA1 || process.env.DS1TR_SIGN_CERT_SUBJECT;
+  if (!certificate && !storeCertificate && !artifactSigning) {
+    throw new Error('PUBLIC RELEASE refused: no signing credentials in the environment. Set CSC_LINK (and CSC_KEY_PASSWORD) for a code-signing certificate file, DS1TR_SIGN_CERT_SHA1 or DS1TR_SIGN_CERT_SUBJECT for a certificate in the Windows certificate store (a hardware token), or DS1TR_ARTIFACT_SIGNING=1 with the Azure Artifact Signing variables (docs/RELEASE_TRUST.md). A public release is never built unsigned.');
+  }
+  if (!process.env.DS1TR_EXPECTED_PUBLISHER) {
+    throw new Error('PUBLIC RELEASE refused: DS1TR_EXPECTED_PUBLISHER is not set (the text the certificate subject must contain), so the signer could not be verified after the build.');
+  }
+}
 await rm(runtime, { recursive: true, force: true });
 await mkdir(runtime, { recursive: true });
 const buildAppData = path.join(desktop, 'release', 'build-appdata');
@@ -32,10 +52,12 @@ await run(process.execPath, [npmCli, 'run', 'build', '-w', '@ds1tr/backend']);
 await rm(path.join(desktop, 'dist-electron'), { recursive: true, force: true });
 await run(process.execPath, [npmCli, 'run', 'build', '-w', '@ds1tr/desktop']);
 // The helpers are published self-contained for win-x64, so a computer without any .NET installation can run them.
-// Nothing at run time uses the dotnet CLI, PATH or a global runtime. Single-file with compression keeps the two helpers
-// (each carries its own runtime) at about 35 MB instead of 75 MB each.
+// Nothing at run time uses the dotnet CLI, PATH or a global runtime. Single file, NOT compressed: a compressed single-file bundle is one
+// 34 MB block of 7.8 bits-per-byte data, the profile antivirus heuristics associate with packed executables, and it starts three times slower (every start
+// decompresses it). The uncompressed bundle (6.7 bits per byte, like the Electron executable itself) is 32 MB larger on disk, signs and starts the same
+// (docs/RELEASE_TRUST.md, "Helper packaging experiment"; tools/release/helper-format-experiment.mjs reproduces the numbers).
 const publishArgs = ['-c', 'Release', '-r', 'win-x64', '--self-contained', 'true', '--no-restore',
-  '-p:PublishSingleFile=true', '-p:EnableCompressionInSingleFile=true', '-p:DebugType=None', '-p:DebugSymbols=false'];
+  '-p:PublishSingleFile=true', '-p:DebugType=None', '-p:DebugSymbols=false'];
 const dataTool = path.join(runtime, 'engines', 'combined', 'vendor', 'tools', 'DsrDataTool');
 const fogHost = path.join(runtime, 'tools', 'fog-host');
 for (const [project, output, probe] of [
@@ -83,8 +105,19 @@ await rm(packageApp, { recursive: true, force: true });
 await copy(path.join(desktop, 'dist'), path.join(packageApp, 'dist'));
 await copy(path.join(desktop, 'dist-electron'), path.join(packageApp, 'dist-electron'));
 await writeFile(path.join(packageApp, 'package.json'), JSON.stringify({
-  name: 'ds1-triple-randomizer-desktop', version: '0.25.0', main: 'dist-electron/main.js',
+  name: 'ds1-triple-randomizer-desktop', version: appVersion, main: 'dist-electron/main.js', author: { name: 'DS1 Triple Randomizer project' },
   type: 'module', license: 'GPL-3.0-only', description: 'Dark Souls Remastered triple randomizer',
 }, null, 2));
-await run(process.execPath, [path.join(root, 'node_modules', 'electron-builder', 'cli.js'), '--win', 'portable', '--x64', '--config', 'electron-builder.yml', '--publish', 'never'], desktop,
+const signingOverrides = !releaseMode ? [] : [
+  '-c.win.signExecutable=true', '-c.win.forceCodeSigning=true',
+  ...(process.env.DS1TR_SIGN_CERT_SHA1 ? [`-c.win.signtoolOptions.certificateSha1=${process.env.DS1TR_SIGN_CERT_SHA1}`] : []),
+  ...(process.env.DS1TR_SIGN_CERT_SUBJECT ? [`-c.win.signtoolOptions.certificateSubjectName=${process.env.DS1TR_SIGN_CERT_SUBJECT}`] : []),
+  ...(process.env.DS1TR_TIMESTAMP_URL ? [`-c.win.signtoolOptions.rfc3161TimeStampServer=${process.env.DS1TR_TIMESTAMP_URL}`] : []),
+  ...(process.env.DS1TR_ARTIFACT_SIGNING === '1' ? [
+    `-c.win.azureSignOptions.endpoint=${process.env.DS1TR_ARTIFACT_SIGNING_ENDPOINT}`, `-c.win.azureSignOptions.codeSigningAccountName=${process.env.DS1TR_ARTIFACT_SIGNING_ACCOUNT}`,
+    `-c.win.azureSignOptions.certificateProfileName=${process.env.DS1TR_ARTIFACT_SIGNING_PROFILE}`] : []),
+];
+await run(process.execPath, [path.join(root, 'node_modules', 'electron-builder', 'cli.js'), '--win', '--x64', '--config', 'electron-builder.yml', '--publish', 'never', ...signingOverrides], desktop,
   { ...process.env, ELECTRON_BUILDER_CACHE: path.join(desktop, 'release', 'builder-cache') });
+// Whatever was built is verified at once: structure, versions, metadata, and (public mode) the signatures. Development builds report UNSIGNED and pass.
+await run(process.execPath, [path.join(root, 'tools', 'release', 'release-verify.mjs'), '--manifest', path.join(desktop, 'release', 'release-manifest.json'), ...(releaseMode ? ['--require-signature'] : [])], root);

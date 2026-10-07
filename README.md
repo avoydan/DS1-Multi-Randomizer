@@ -6,8 +6,8 @@ FogMod settings.
 
 ## For players
 
-1. Download **DS1 Triple Randomizer** and run it.
-2. Choose your settings.
+1. Download the **installer** (`DS1-Triple-Randomizer-Setup-<version>.exe`) and run it. It installs for your user only and never asks for administrator rights. A **portable** build (`DS1-Triple-Randomizer-<version>-x64.exe`) is also offered: it unpacks itself to a temporary folder every time it starts, which some antivirus products dislike, so the installer is the recommended one.
+2. Choose your settings. New settings start with the recommended **Sampling** enemy placement; older Seed Codes and saved settings keep the algorithm they were made with.
 3. Click **Randomize**, then **Apply to game**.
 4. Click **Launch game** (or start Dark Souls Remastered from Steam) and play offline.
 
@@ -15,6 +15,8 @@ Every run gets a **Seed Code** (it starts with `DS1TR`). Share it with a friend:
 exactly the same world. Seed Codes include the randomizer settings needed to reproduce the same world, and they keep working in
 later versions of the app. The app also remembers your settings and lists your earlier runs in **History**, where you can apply,
 copy any of them, or create their files again. After **Apply to game** you can start Dark Souls Remastered with **Launch game**.
+
+**Builds are not code-signed yet** (`docs/RELEASE_TRUST.md`): Windows SmartScreen and some antivirus products may warn about an unrecognised publisher. Check the SHA-256 of your download against the one published with the release. Nothing is uploaded or collected by the app (`docs/SECURITY_AND_PRIVACY.md`).
 
 You need Windows and your own copy of Dark Souls Remastered on Steam. Nothing else has to be installed or downloaded by
 hand: the app finds the game, prepares everything it needs (the world randomizer fetches a small set of data files once

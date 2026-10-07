@@ -1,5 +1,6 @@
 appId: com.ds1tr.desktop
 productName: DS1 Triple Randomizer
+copyright: Copyright © 2026 DS1 Triple Randomizer project
 artifactName: DS1-Triple-Randomizer-${version}-${arch}.${ext}
 directories:
   app: release/package-app
@@ -15,13 +16,48 @@ extraResources:
     to: icon.ico
 win:
   icon: build/icon.ico
+  # The installer is the recommended download, the portable build the secondary one (docs/RELEASE_TRUST.md).
   target:
+    - target: nsis
+      arch:
+        - x64
     - target: portable
       arch:
         - x64
-  # Edit the executable resources (icon, version info) but do not sign it.
+  # DS1TR runs as the user who starts it and never asks for elevation (checked by tools/release/release-verify.mjs).
+  requestedExecutionLevel: asInvoker
+  legalTrademarks: DS1 Triple Randomizer is a fan-made tool. It is not affiliated with or endorsed by FromSoftware or Bandai Namco.
+  # Always edit the executable resources (icon, version information). Signing is OFF here, for development and test builds: a public release is built
+  # with `npm run package:win -w @ds1tr/desktop -- --release`, which turns signing on, makes it mandatory and reads the credentials from the environment
+  # (CSC_LINK / CSC_KEY_PASSWORD, or the Azure Artifact Signing variables). No certificate, key or password is ever stored in the repository.
   signAndEditExecutable: true
   signExecutable: false
+  signtoolOptions:
+    signingHashAlgorithms:
+      - sha256
+nsis:
+  # A normal wizard installer for the current user: no administrator, no per-machine files, a choice of folder, the uninstaller removes the
+  # program and the shortcuts and keeps what the person generated (settings, history and runs live in the user data folder).
+  oneClick: false
+  perMachine: false
+  allowElevation: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: DS1 Triple Randomizer
+  uninstallDisplayName: DS1 Triple Randomizer
+  deleteAppDataOnUninstall: false
+  runAfterFinish: true
+  # The elevation helper (resources/elevate.exe) is only needed for per-machine installs; DS1TR has none, and an elevation helper in the package is a
+  # needless heuristic red flag.
+  packElevateHelper: false
+  artifactName: DS1-Triple-Randomizer-Setup-${version}.${ext}
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico
+  menuCategory: false
+portable:
+  artifactName: DS1-Triple-Randomizer-${version}-x64.${ext}
+  requestExecutionLevel: user
 beforeBuild: ./scripts/skip-node-modules.cjs
 afterPack: ./scripts/stage-runtime-modules.cjs
 asar: true

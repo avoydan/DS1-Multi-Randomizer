@@ -2,6 +2,7 @@ node_modules/
 dist/
 dist-electron/
 release/
+!/tools/release/
 .npm-cache/
 *.log
 .DS_Store
@@ -22,3 +23,11 @@ tools/smoke-verify/obj/
 # Repository-authored combined-engine tests.
 engines/combined/tests/**/bin/
 engines/combined/tests/**/obj/
+
+# Signing material never belongs in the repository (docs/RELEASE_TRUST.md).
+*.pfx
+*.p12
+*.pem
+*.key
+.env
+.env.*

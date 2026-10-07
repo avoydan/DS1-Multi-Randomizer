@@ -9,6 +9,12 @@
          endpoint is temporarily unreachable (common in restricted networks). -->
     <NuGetAudit>false</NuGetAudit>
     <RestoreIgnoreFailedSources>true</RestoreIgnoreFailedSources>
+    <!-- Windows file properties: the project that ships this build, never the game's publisher. -->
+    <Company>DS1 Triple Randomizer project</Company>
+    <Product>DS1 Triple Randomizer</Product>
+    <AssemblyTitle>DsrDataTool</AssemblyTitle>
+    <Description>DsrDataTool: reads and patches Dark Souls Remastered game data into a workspace for DS1 Triple Randomizer</Description>
+    <Copyright>Copyright © 2026 DS1 Triple Randomizer project (GPL-3.0-only, derived from ds-randomizer)</Copyright>
   </PropertyGroup>
 
   <ItemGroup>

@@ -1,0 +1,49 @@
+{
+  "$comment": "What a DS1 Triple Randomizer release contains and what must be signed. Paths are relative to the unpacked app folder (apps/desktop/release/win-unpacked). Edited by hand, read by release-verify.mjs and release-gate.mjs.",
+  "product": "DS1 Triple Randomizer",
+  "publisherPlaceholder": "DS1 Triple Randomizer project",
+  "ds1trExecutables": [
+    { "path": "DS1 Triple Randomizer.exe", "role": "the Electron application (renamed electron.exe, DS1TR resources and icon)", "launchedAs": "the application itself" },
+    { "path": "resources/runtime/engines/combined/vendor/tools/DsrDataTool/DsrDataTool.exe", "role": "DsrDataTool: reads and patches the game files into a workspace (self-contained .NET, single file, not compressed)", "launchedAs": "child process of the backend, arguments array, no shell" },
+    { "path": "resources/runtime/tools/fog-host/FogHost.exe", "role": "FogHost: runs the fog randomizer (FogMod) on the prepared data (self-contained .NET, single file, not compressed)", "launchedAs": "child process of the backend, arguments array, no shell" }
+  ],
+  "ds1trArtifacts": [
+    { "pattern": "DS1-Triple-Randomizer-Setup-*.exe", "role": "the installer (recommended download)" },
+    { "pattern": "DS1-Triple-Randomizer-*-x64.exe", "role": "the portable build (secondary download)" }
+  ],
+  "installedExtras": [
+    { "path": "Uninstall DS1 Triple Randomizer.exe", "role": "the uninstaller the installer writes (checked after an install, not inside the unpacked folder)" }
+  ],
+  "thirdPartyBinaries": [
+    { "path": "d3dcompiler_47.dll", "owner": "Microsoft (already signed)" },
+    { "path": "ffmpeg.dll", "owner": "Electron / Chromium" },
+    { "path": "libEGL.dll", "owner": "Electron / Chromium (ANGLE)" },
+    { "path": "libGLESv2.dll", "owner": "Electron / Chromium (ANGLE)" },
+    { "path": "vk_swiftshader.dll", "owner": "Electron / Chromium (SwiftShader)" },
+    { "path": "vulkan-1.dll", "owner": "Electron / Chromium (Vulkan loader)" }
+  ],
+  "forbiddenBinaries": [
+    { "path": "resources/elevate.exe", "why": "a UAC elevation helper of the installer toolchain; DS1TR runs as the invoking user and never elevates, so it is not shipped" }
+  ],
+  "requiredFiles": [
+    "resources/icon.ico",
+    "resources/app.asar",
+    "resources/runtime/licenses/README.txt",
+    "resources/runtime/licenses/combined-engine-GPL-3.0.txt",
+    "resources/runtime/licenses/FogMod-Apache-2.0.txt",
+    "resources/runtime/licenses/distribution-policy.md",
+    "LICENSE.electron.txt",
+    "LICENSES.chromium.html"
+  ],
+  "forbiddenPatterns": [
+    "\\.pdb$",
+    "\\.map$",
+    "(^|/)node_modules/\\.cache/",
+    "\\.log$",
+    "\\.pfx$",
+    "\\.p12$",
+    "\\.pem$",
+    "\\.key$",
+    "(^|/)\\.env"
+  ]
+}

@@ -1144,3 +1144,13 @@ Date: 2026-10-07.
 4. **Order of the planners is a contract**, locked by tests (`docs/ENEMY_PLACEMENT_MODEL.md` 10.10): items, boss plan, class tables, hostile NPC types, regular sampler, roaming pass, own rows and events; every draw comes from a named stream, a neutral option draws nothing.
 5. **The placement validation summary is recorded** in the run manifest (`enemyPlacement.validation`), outside the placement hash.
 6. **Status wording.** "Enemy Placement core complete with documented safe-subset deviations": E2 (three boss encounters), F (hostile NPCs only), E1 (supported single-body bosses) and the frozen classic quirks. Part F, E2 Capra and the extended worlds remain not verified by playing.
+
+## Release trust: unsigned until the owner supplies a trusted certificate (desktop 0.26.0)
+
+Date: 2026-10-07.
+
+1. **Primary download is the installer** (per-user NSIS, no administrator, `requestedExecutionLevel asInvoker`); the portable executable is the secondary download. The installer is not claimed to prevent antivirus reports.
+2. **Signing is architecture, not a claim.** `npm run package:win -w @ds1tr/desktop -- --release` is the only mode that signs; it refuses to run without credentials from the environment (`CSC_LINK` / `CSC_KEY_PASSWORD`, or Azure Artifact Signing variables) and without `DS1TR_EXPECTED_PUBLISHER`, and it verifies every DS1TR executable (application, DsrDataTool, FogHost), the installer and the portable with `tools/release/release-verify.mjs --require-signature`. No certificate, key or password is ever stored in the repository. The pipeline was exercised with a throwaway certificate in a scratch folder (results: TEST-SIGNED, never trusted; nothing from it was kept).
+3. **Helpers are published as an uncompressed single file** (a compressed bundle is one 34 MB block of 7.8 bits-per-byte data, the profile antivirus heuristics associate with packers, and it started three times slower). No UPX, no obfuscation, no elevation helper in the package.
+4. **No automatic uploads** of any build to an online scanner; no telemetry; no network use besides the one-time world data download.
+5. See `docs/RELEASE_TRUST.md` and `docs/SECURITY_AND_PRIVACY.md`.

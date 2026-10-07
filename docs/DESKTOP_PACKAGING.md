@@ -1,11 +1,11 @@
-﻿# Windows desktop packaging
+# Windows desktop packaging
 
-`npm run package:win -w @ds1tr/desktop` builds the contracts, backend and desktop, builds the two .NET 8 tools, stages an isolated runtime, and creates an unsigned x64 portable executable under `apps/desktop/release/`. It does not publish or install anything. Build prerequisites are Node/npm and the .NET 8 SDK (`DS1TR_DOTNET_SDK` may point to a specific `dotnet.exe`). The package uses framework-dependent .NET 8 binaries because the Windows self-contained runtime packs were unavailable in this build environment. Users need the **.NET 8 runtime** installed. The desktop itself does not need a separate Node installation.
+`npm run package:win -w @ds1tr/desktop` builds the contracts, backend and desktop, builds the two .NET 8 tools, stages an isolated runtime, and creates an **unsigned** x64 **installer** (NSIS, per-user, no administrator) and an unsigned **portable** executable under `apps/desktop/release/`, then verifies them (`tools/release/release-verify.mjs`). It does not publish or install anything. Signing, the release mode (`-- --release`), the gate and what users will see are in `docs/RELEASE_TRUST.md`. Build prerequisites are Node/npm and the .NET 8 SDK (`DS1TR_DOTNET_SDK` may point to a specific `dotnet.exe`). The helpers are self-contained, so users need **no** .NET installation; the desktop itself does not need a separate Node installation.
 
-The portable executable extracts Electron and its `resources/runtime` payload. The same payload is visible in `release/win-unpacked` for inspection. It includes:
+The installer copies Electron and its `resources/runtime` payload to the install folder; the portable executable extracts them to a temporary folder at every start. The same payload is visible in `release/win-unpacked` for inspection. It includes:
 
 - compiled backend and vendored combined JavaScript core;
-- DsrDataTool and FogHost as **self-contained win-x64 single-file executables** (about 36 MB each, compressed, with the
+- DsrDataTool and FogHost as **self-contained win-x64 single-file executables** (about 66 MB each, **not compressed** - a compressed bundle is one block of packer-like data and starts three times slower, see `docs/RELEASE_TRUST.md` section 3 - with the
   .NET 8 runtime inside); a computer without .NET runs them. The packager smoke-tests both with every .NET location hidden
   (no `DOTNET_ROOT`, a PATH that holds only System32) and fails the build if one does not start;
 - `@ds1tr/contracts`, which the backend imports at run time. electron-builder never copies a `node_modules` folder through
@@ -26,7 +26,7 @@ First run: the app looks for Dark Souls Remastered through Steam (registry, libr
 it, imports the clean snapshot and, when the world randomizer is switched on, prepares its data, showing plain progress
 ("Dark Souls Remastered found", "World randomizer ready"). Only when the game cannot be found does it ask for the game
 folder, and a choice is offered when several copies exist. Failures are phrased for players and the exact reason is kept
-under Advanced and in the run manifest. A backend startup failure is shown in the app. The executable is unsigned and currently uses the default Electron icon; public GPL corresponding source and a matching release tag remain prerequisites before any external release.
+under Advanced and in the run manifest. A backend startup failure is shown in the app. The builds are unsigned; public GPL corresponding source and a matching release tag remain prerequisites before any external release.
 
 The build uses a minimal staged Electron app with no runtime npm dependencies: React is bundled by Vite, and the backend is separate in `extraResources`. The full source repository and its pre-existing orchestrator files are not copied into the package.
 
