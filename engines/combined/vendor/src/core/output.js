@@ -162,6 +162,16 @@ function spoilerText(result) {
       lines.push(`[${placement.rowId}] ${placement.from} -> ${placement.to}`);
     }
   }
+  // Only with Key placement (Part H): every key with the place the game puts it and the pickup it lies in now.
+  const keyPlacements = ["items", "gifts", "enemyDrops", "shops", "bossRewards"].flatMap((list) => result.placements[list] || []).filter((placement) => placement.keyName);
+  if (keyPlacements.length > 0) {
+    lines.push("", "=== KEY PLACEMENT ===");
+    for (const placement of keyPlacements.sort((left, right) => left.keyName.localeCompare(right.keyName))) {
+      const from = placement.originalLocation?.area ?? "?";
+      const to = placement.randomizedLocation?.area ?? "?";
+      lines.push(`${placement.itemName}: ${from} -> ${to} (item lot ${placement.rowId})`);
+    }
+  }
   lines.push("", "=== VALIDATION ===", `Valid seed: ${result.validation.valid ? "YES" : "NO"}`);
   return `${lines.join("\n")}\n`;
 }

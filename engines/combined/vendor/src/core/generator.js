@@ -19,6 +19,7 @@ import {
   resolveEnemyPlacementAlgorithm,
   resolveEnemyPlacementOptions,
 } from "./placement.js";
+import { KeyPlacementError, checkCompletable, coveredRowAreas, pairDisplaced, placeKeys, prepareModel } from "./keys.js";
 import { bossDestinationClass, deriveBodyTypes, deriveRegularClassTable, deriveRoamingBossTypes, planRoamingBosses, planSampledBosses, planSampledRegularEnemies } from "./sampling.js";
 import {
   enemies,
@@ -2132,6 +2133,8 @@ function randomizeExtractedItemLots(config, catalog) {
       catalog,
     ));
   }
+  // Key placement (Part H, patches/0023): the keys are placed first, by their own planner; what they displace is placed at the pickups they free.
+  const keyPlan = config.keyPlacement === "shuffled" ? planKeys(config, catalog, lotTargets) : null;
   // Legacy "Fashion Souls" off: world armor sets move as whole sets.
   const armorSetHomes = config.fashionSouls ? [] : findArmorSetHomes(lotTargets);
   const armorSetTargets = new Set(armorSetHomes.flat());
@@ -2140,7 +2143,7 @@ function randomizeExtractedItemLots(config, catalog) {
     ...shopTargets.filter((entry) => !isBulkShopConsumable(entry)),
   ];
   const result = { items: [], gifts: [], enemyDrops: [], shops: [] };
-  if (config.soulItems === "transposed") result.bossRewards = [];
+  if (config.soulItems === "transposed" || config.keyPlacement === "shuffled") result.bossRewards = [];
   if (globalTargets.length + shopOnlyTargets.length < 2 && armorSetHomes.length === 0) {
     return result;
   }
@@ -2205,6 +2208,8 @@ function randomizeExtractedItemLots(config, catalog) {
       originalLocation: describeLocation(source),
       randomizedLocation: describeLocation(target),
       progression: source.progression,
+      // Only a key placed by the key planner says which key it is (hint metadata); every other placement keeps its exact shape.
+      ...(source.keyName ? { keyName: source.keyName } : {}),
       // Only a transposed boss soul says what it was (hint metadata); every other placement keeps its exact shape.
       ...(source.pool === "boss" && source.transmuted ? { transposedFrom: source.originalName } : {}),
       preserved:
@@ -2244,6 +2249,10 @@ function randomizeExtractedItemLots(config, catalog) {
     }
     targets.forEach((target, index) => addPlacement(target, sources[index]));
   }
+  if (keyPlan) {
+    for (const { target, source } of [...keyPlan.keyPlacements, ...keyPlan.pairs]) addPlacement(target, source);
+    result.keyPlacement = keyPlan.diagnostics;
+  }
   if (armorSetHomes.length > 0) {
     const rng = createStream(config.seed, "armor-sets", config.version);
     for (const [home, sourceSet] of permutedArmorSets(rng, armorSetHomes)) {
@@ -2251,6 +2260,132 @@ function randomizeExtractedItemLots(config, catalog) {
     }
   }
   return result;
+}
+
+// Key placement (Part H, patches/0023; docs/ITEM_PROGRESSION_MODEL.md). The keys are the progression items of FogMod's annotation. A key is MOVABLE when
+// its vanilla pickup is one lot entry the model covers (a map treasure, a boss reward) or a gift (it may leave a gift, never arrive in one: gifts depend on
+// NPCs the player can lose), when it is not a permanently fixed lot and when its switch is on (Lordvessel, Lord Souls). Everything else stays: the keys
+// of NPC drops and shops, the three Archive Tower keys (the capture), the two Asylum escape keys, "random only" items. A key may arrive only in a pickup that
+// is awarded for certain (a single entry, as every world lot and every boss reward row is), is covered by the model's lot areas (FogMod finds it there), is not in
+// the DLC and is not part of an armor set that moves as a whole. The finished placement is checked as a whole against the model.
+const KEY_EQUIP_CATEGORY = { 0: 0, 1: 0x10000000, 2: 0x20000000, 3: 0x40000000 };
+const DLC_MAP = "m12_01_00_00";
+
+function keySourceEntries(catalog) {
+  const entries = [];
+  const permanentlyFixedGoods = new Set([2010, 2015]);
+  const permanentlyFixedNames = new Set(["Archive Prison Extra Key", "Archive Tower Giant Cell Key", "Archive Tower Giant Door Key", "Dungeon Cell Key", "Undead Asylum F2 East Key"]);
+  for (const lot of catalog?.worldItemLots ?? []) {
+    const fixed = (lot.entries ?? []).some((entry) => entry.category === 0x40000000 && permanentlyFixedGoods.has(entry.itemId))
+      || lot.name === "Dungeon Cell Key" || lot.name === "Undead Asylum F2 East Key" || permanentlyFixedNames.has(lot.name);
+    for (const entry of lot.entries ?? []) entries.push({ ...entry, rowId: lot.rowId, mapId: lot.mapId, pool: "world", kind: "lot", lotEntries: lot.entries.length, fixedLot: fixed, lotName: lot.name });
+  }
+  for (const lot of catalog?.gifts ?? []) {
+    for (const entry of lot.entries ?? []) entries.push({ ...entry, rowId: lot.rowId, mapId: null, pool: "gift", kind: "lot", lotEntries: lot.entries.length, fixedLot: false, lotName: lot.name });
+  }
+  for (const reward of catalog?.bossRewards ?? []) {
+    for (const lot of reward.lots) {
+      for (const row of lot.chain) {
+        for (const entry of row.entries) {
+          entries.push({ ...entry, rowId: row.rowId, mapId: reward.dlc ? DLC_MAP : (reward.mapId ?? null), pool: "boss", kind: "lot", lotEntries: row.entries.length, fixedLot: false, lotName: row.name, bossReward: reward.id });
+        }
+      }
+    }
+  }
+  return entries;
+}
+
+function planKeys(config, catalog, lotTargets) {
+  const prepared = prepareModel(config.progressionModel);
+  const all = keySourceEntries(catalog);
+  const known = new Set(all.map((entry) => entry.rowId));
+  const rowArea = coveredRowAreas(prepared, known);
+  const bySignature = new Map();
+  for (const entry of all) {
+    const signature = `${entry.equipType}:${entry.itemId}`;
+    if (!bySignature.has(signature)) bySignature.set(signature, []);
+    bySignature.get(signature).push(entry);
+  }
+  const diagnostics = { mode: "shuffled", movableKeys: [], fixedKeys: [], notMovable: {} };
+  const movableSources = new Map();
+  const fixed = new Map();
+  for (const key of prepared.raw.keys) {
+    const [category, itemId] = key.id.split(":").map(Number);
+    const reason = (() => {
+      if ((key.tags ?? []).includes("randomonly")) return "random-only";
+      if (key.name === "lordvessel" && !config.keyRandomizeLordvessel) return "switch-off";
+      if (key.name.startsWith("lord_soul") && !config.keyRandomizeLordSouls) return "switch-off";
+      const copies = (bySignature.get(`${category}:${itemId}`) ?? []).filter((entry) => rowArea.has(entry.rowId));
+      if (copies.length !== 1) return copies.length === 0 ? "no-catalog-pickup" : "several-pickups";
+      const [source] = copies;
+      if (source.fixedLot) return "permanently-fixed";
+      if (source.lotEntries !== 1) return "pickup-is-not-certain";
+      if (rowArea.get(source.rowId) !== key.area) return "area-mismatch";
+      movableSources.set(key.name, source);
+      return null;
+    })();
+    if (reason) { fixed.set(key.name, key.area); diagnostics.notMovable[key.name] = reason; diagnostics.fixedKeys.push(key.name); }
+  }
+  const movable = [...movableSources.keys()].sort();
+  diagnostics.movableKeys = movable;
+  if (movable.length === 0) throw new KeyPlacementError("KEY_PLACEMENT_NOTHING_TO_PLACE", "No key of the catalog can be moved.", diagnostics);
+  // The vanilla pickups of the movable keys leave the pool (they are keys, not pool items); they are pickups the keys free or fill.
+  const sourceSignature = (entry) => `${entry.rowId}:${entry.slot}`;
+  const keyRows = new Map([...movableSources.values()].map((entry) => [sourceSignature(entry), entry]));
+  for (let index = lotTargets.length - 1; index >= 0; index -= 1) if (keyRows.has(sourceSignature(lotTargets[index]))) lotTargets.splice(index, 1);
+  const armorMembers = config.fashionSouls ? new Set() : new Set(findArmorSetHomes(lotTargets).flat().map(sourceSignature));
+  const eligible = (entry) => (entry.pool === "world" || entry.pool === "boss") && entry.kind === "lot" && rowArea.has(entry.rowId) && entry.mapId !== DLC_MAP
+    && !armorMembers.has(sourceSignature(entry)) && lotEntriesOf(catalog, entry) === 1 && !isUnsupportedCutItem(entry);
+  const poolDestinations = lotTargets.filter((entry) => eligible(entry) && entry.pool !== "gift");
+  const keyDestinations = [...keyRows.values()].filter(eligible);
+  const destinationEntries = new Map();
+  for (const entry of [...poolDestinations, ...keyDestinations]) destinationEntries.set(sourceSignature(entry), entry);
+  const destinations = [...destinationEntries.values()]
+    .sort((left, right) => left.rowId - right.rowId || left.slot - right.slot)
+    .map((entry) => ({ id: sourceSignature(entry), area: rowArea.get(entry.rowId), entry }));
+  const result = placeKeys({ prepared, seed: config.seed, version: config.version, movable, fixed, destinations });
+  const byId = new Map(destinations.map((destination) => [destination.id, destination.entry]));
+  const keyPlacements = [];
+  const takenIds = new Set();
+  for (const key of movable) {
+    const target = byId.get(result.placed.get(key));
+    takenIds.add(sourceSignature(target));
+    keyPlacements.push({ source: { ...movableSources.get(key), progression: true, keyName: key }, target });
+  }
+  // What the keys displaced lies at the pickups the keys left; a displaced item goes where it is accepted (the DLC rule).
+  const displaced = lotTargets.filter((entry) => takenIds.has(sourceSignature(entry)));
+  const freed = [...keyRows.values()].filter((entry) => !takenIds.has(sourceSignature(entry)));
+  const pairs = displaced.length === 0 && freed.length === 0 ? [] : pairDisplaced({
+    seed: config.seed, version: config.version, displaced, freed,
+    accepts: { restricted: (row) => row.mapId === DLC_MAP, fits: (item, row) => !(row.mapId === DLC_MAP && isDlcRestrictedItem(item)) },
+  });
+  for (let index = lotTargets.length - 1; index >= 0; index -= 1) if (takenIds.has(sourceSignature(lotTargets[index]))) lotTargets.splice(index, 1);
+  // The finished world is checked once more, from the placements as they will be written.
+  const finalAreas = new Map(fixed);
+  for (const { source, target } of keyPlacements) finalAreas.set(source.keyName, rowArea.get(target.rowId));
+  const check = checkCompletable(prepared, finalAreas);
+  if (!check.completable || !check.prisonEscapable) throw new KeyPlacementError("KEY_PLACEMENT_INVALID", "The written key placement failed the final check.", { unvisited: check.unvisited, prisonEscapable: check.prisonEscapable });
+  diagnostics.attempts = result.attempts;
+  diagnostics.deadEnds = result.diagnostics.deadEnds;
+  diagnostics.destinations = destinations.length;
+  diagnostics.displacedItems = displaced.length;
+  diagnostics.freedPickups = freed.length;
+  diagnostics.annotationSha256 = prepared.raw.annotationSha256;
+  // The area every key lies in at the end (the same names as the model); the sweeps compare them with FogMod's own reading of the written lots.
+  diagnostics.keyAreas = Object.fromEntries([...finalAreas].sort((left, right) => (left[0] < right[0] ? -1 : 1)));
+  diagnostics.keysMoved = keyPlacements.filter(({ source, target }) => source.rowId !== target.rowId || source.slot !== target.slot).length;
+  diagnostics.completable = check.completable;
+  diagnostics.prisonEscapable = check.prisonEscapable;
+  return { keyPlacements, pairs, diagnostics };
+}
+
+/** Entries in the lot a pickup belongs to, from the catalog (a key may only lie in a pickup that is awarded for certain: one entry). */
+function lotEntriesOf(catalog, entry) {
+  if (entry.lotEntries !== undefined) return entry.lotEntries;
+  const lots = entry.pool === "boss"
+    ? (catalog?.bossRewards ?? []).flatMap((reward) => reward.lots.flatMap((lot) => lot.chain))
+    : catalog?.worldItemLots ?? [];
+  return lots.find((lot) => lot.rowId === entry.rowId)?.entries?.length ?? 0;
 }
 
 // Legacy "Soul items" Transposed (Part H, patches/0022; docs/ITEM_PROGRESSION_MODEL.md). The boss souls (goods 700-711) are the item lot rows of
@@ -3339,7 +3474,10 @@ export function generate(inputConfig, { gameCatalog = null } = {}) {
       ? "Real game data detected. The output uses conservative slots and validated MSB/PARAM edits."
       : "This result uses development data and does not contain real IDs for a game patch.",
     seed: config.seed,
-    config,
+    // The exported progression model is large; the result keeps only its identity.
+    config: config.progressionModel
+      ? { ...config, progressionModel: { format: config.progressionModel.format, annotationSha256: config.progressionModel.annotationSha256, areas: config.progressionModel.areas.length, edges: config.progressionModel.edges.length } }
+      : config,
     placements: {
       enemies: extractedData
         ? planExtractedEnemies(
@@ -3371,6 +3509,7 @@ export function generate(inputConfig, { gameCatalog = null } = {}) {
     validation: {
       valid: true,
       finalBossReachable: !config.randomizeProtectedItems,
+      ...(extractedData && itemLotPlan.keyPlacement ? { keyPlacement: itemLotPlan.keyPlacement } : {}),
       notes: extractedData
         ? [
             "All hostile regular-enemy slots use a count-preserving global permutation within a 30-character-model total map budget; friendly NPCs and invisible technical helpers stay vanilla.",
@@ -3410,6 +3549,9 @@ export function generate(inputConfig, { gameCatalog = null } = {}) {
               : ["The six respawning Blighttown mosquitoes were left in place and kept out of the enemy pool."]),
             ...(config.soulItems === "replaced"
               ? ["Soul items replaced: lesser souls (goods 400-409) were swapped for other consumables before shuffling."]
+              : []),
+            ...(config.keyPlacement === "shuffled"
+              ? ["Key items shuffled: the keys were placed with a progression-safe assumed fill over the progression model; the finished placement passed the final check."]
               : []),
             ...(config.soulItems === "transposed"
               ? ["Soul items transposed: the boss souls joined the item pool and each had a 75% chance to become a boss weapon of its boss."]

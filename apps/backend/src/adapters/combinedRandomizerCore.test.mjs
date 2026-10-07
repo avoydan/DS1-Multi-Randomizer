@@ -26,6 +26,7 @@ const allowedSpecifiers = new Set([
   './config.js',
   './placement.js',
   './sampling.js',
+  './keys.js',
   '../data/prototype-data.js',
 ]);
 
@@ -33,6 +34,7 @@ const allowedSpecifiers = new Set([
 const expectedVendoredFiles = [
   'core/config.js',
   'core/generator.js',
+  'core/keys.js',
   'core/output.js',
   'core/placement.js',
   'core/rng.js',

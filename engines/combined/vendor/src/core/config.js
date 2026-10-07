@@ -23,6 +23,13 @@ export const defaultConfig = Object.freeze({
   guaranteedEnemyDrops: false,
   randomizeShops: false,
   includeDlc: true,
+  // Part H (patches/0023): key placement. "vanilla" keeps every key where the game puts it (the behavior before the option existed); "shuffled" places the
+  // keys of FogMod's annotation with a progression-safe assumed fill over the exported progression model (keys.js). Lordvessel and Lord Souls join only
+  // with their own switches. Needs the exported model (progressionModel) and the world items.
+  keyPlacement: "vanilla",
+  keyRandomizeLordvessel: false,
+  keyRandomizeLordSouls: false,
+  progressionModel: null,
   generateSpoilerLog: true,
   // DS1TR legacy-parity options (patches/0002). Defaults reproduce the
   // unmodified upstream behavior exactly.
@@ -104,6 +111,8 @@ const booleanKeys = [
   "replaceRespawningMosquitoes",
   "preventSameEnemy",
   "pinwheelChaos",
+  "keyRandomizeLordvessel",
+  "keyRandomizeLordSouls",
   "useExtractedData",
   "dryRun",
 ];
@@ -123,6 +132,7 @@ export function normalizeConfig(input = {}) {
   config.gameDirectory = String(config.gameDirectory || "").trim();
   config.outputDirectory = String(config.outputDirectory || "output").trim();
   config.lastPackageDirectory = String(config.lastPackageDirectory || "").trim();
+  config.progressionModel = config.progressionModel && typeof config.progressionModel === "object" ? config.progressionModel : null;
   config.enemyScaling = ["vanilla", "area", "progressive"].includes(config.enemyScaling)
     ? config.enemyScaling
     : defaultConfig.enemyScaling;
@@ -132,6 +142,7 @@ export function normalizeConfig(input = {}) {
     ["startingItems", ["shield-1h", "shield-2h", "mixed-pool"]],
     ["gwynNerf", ["none", "medium", "strong"]],
     ["secondGargoyle", ["single-boss", "replace", "keep"]],
+    ["keyPlacement", ["vanilla", "shuffled"]],
   ]) {
     if (!allowed.includes(config[key])) config[key] = defaultConfig[key];
   }
@@ -164,6 +175,13 @@ export function validateConfig(config, { requireGame = false } = {}) {
     !config.randomizeShops
   ) {
     errors.push("Enable at least one category to randomize.");
+  }
+  if (config.keyPlacement === "shuffled") {
+    if (!config.progressionModel) errors.push("KEY_PLACEMENT_MODEL_MISSING: key placement needs the progression model of the world data.");
+    if (!config.randomizeItems) errors.push("KEY_PLACEMENT_NEEDS_WORLD_ITEMS: key placement needs the world items.");
+    if (config.randomizeProtectedItems) errors.push("KEY_PLACEMENT_CONFLICT: key placement and protected-item randomization cannot be combined.");
+  } else if (config.keyRandomizeLordvessel || config.keyRandomizeLordSouls) {
+    errors.push("KEY_PLACEMENT_OFF: the Lordvessel and Lord Souls switches need key placement.");
   }
   return errors;
 }
