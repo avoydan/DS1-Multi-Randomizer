@@ -81,6 +81,31 @@ instruction of an event naming the entity was removed (the model-specific forced
 ## Hostile NPCs (Part F1)
 
 A hostile NPC in a live regular slot adds exactly one custom event (the wake-up every portable boss gets, `forceCombatActivation`) inside the map's custom event window, assigned deterministically like every other custom event (`16099000 + slot index` is the entity id of a slot that has none). It edits no vanilla event and adds nothing to the Fog boss overlay. A dummy part gets no event. The planner limits a map to **12** hostile NPCs
-(an uncapped run measured up to 117 in one map under strict curve and 73 under Type replacement, which would have been that many events); a Type replacement group counts every slot of the group. The Darkroot Basin (`m12_00_00_01`), which has no event file of its own (the data tool writes no event for a part there), never holds one.
+(an uncapped run measured up to 117 in one map under strict curve and 73 under Type replacement, which would have been that many events); a Type replacement group counts every slot of the group. 
 The cap is a DS1TR limit, not a legacy rule; the window measurements are in `ENEMY_PLACEMENT_MODEL.md` 10.9.
+
+## Event owners: which event file serves a map (the Darkroot Basin)
+
+**Root cause.** A map's custom events were written to `event/<MSB map>.emevd.dcx`. The Darkroot Basin (`m12_00_00_01`) has **no event file**, so every generated event for a part there (a roaming boss or hostile NPC wake-up, a passive or deferred
+activation, a disabled entity, the Moonlight Butterfly's deferred entrance, the hydra's disabled bodies) was silently dropped, and the model-specific analysis of its entities (which instructions of the owner file are tied to a model)
+found nothing to lock. The body, the params and the AI were correct; the runtime event was missing.
+
+**Proof from the game data** (`msbdump ownership` over a clean copy; every MSB's enemy and object entity IDs against every event file): `m12_00_00_01` has the same **108** entity IDs as `m12_00_00_00` (the two MSBs are two instances of the Darkroot area
+that use the same numbers); **96** of them are named in `m12_00_00_00.emevd.dcx` (4 in the DLC file) and in no other file. Every other gameplay MSB (`m10_00` ... `m18_01`, 17 maps) has its own event file and is named mainly by it
+(for example `m18_01_00_00`: 82 of 98 in its own file). So the Garden's file is the owner of the Basin, and the Basin is the only map that shares one. The same holds for the AI bundle (`script/m12_00_00_00.luabnd.dcx`; the tool always shared that).
+The legacy tool treats the Basin the same way for the AI bundle (`aiFileName = "m12_00_00_00"` when `inFile` is the Basin; "doesn't have one (This is supposed to happen)") and has no event file of its own to open for it.
+
+**Resolver.** One function, `EventOwnerMap(mapId)` in DsrDataTool, answers every generated-event path (the catalog's model-specific analysis, the list of maps to patch, the filters of every event kind, the Quelaag and Asylum special cases, the source-file list);
+nothing else mentions the Basin for events. `EnsureEventOwnersExist` proves at scan time that the owner of every gameplay map has an event file, so a future shared map fails loudly instead of losing events. The AI bundle uses its own, always-on mapping.
+
+**Allocation.** Events are allocated per *owner file*: one custom window per file (`10_000_000 + mapNumber(owner) * 100_000 + 19_900`, moved up past used and reserved IDs by `FindFreeCustomEventRange` once for the whole file), so the Garden and the Basin never allocate
+twice from the same range, never overlap each other, the vanilla events, the Bed of Chaos floor event or Fog's additions, and the allocation does not depend on retries (the tool runs once per package). Entity IDs the Basin shares with the Garden stay shared:
+a placement in either map wakes the entity in whichever instance is loaded (an event per placement; the vanilla file already does this for the shared entities).
+
+**Mode.** The classic permutation is frozen: its worlds keep the pre-fix behavior byte for byte. The backend asks the scan for `--event-owners shared` only for `sampling-v1`; the mode is written into the catalog (`eventOwners`), and the patch step reads it from there, so the scan and the patch cannot
+disagree. The Basin's classic placements without events are a documented frozen quirk (`docs/GENERATION_COMPATIBILITY.md`).
+
+**Guard.** `SmokeVerify audit` (and `placementMatrix.mjs` / `smokeTestCatalog.mjs verify`, which call it for every generated world) resolves the owner of every placement that needs an event, requires its event file in the package, a **new** event (an ID the clean file does not have) that names the entity,
+and unique event IDs in the file. It fails on the pre-fix tool (a 100%-replacement world with roaming bosses, hostile NPCs, boss sampling and the second Gargoyle: 381 placements, every Basin one missing) and passes on the fixed one (381 checked, 0 missing, 0 duplicates). In that world the Basin holds 10 roaming bosses,
+3 hostile NPCs, 31 other wake-ups and 7 disabled entities; all have their events.
 

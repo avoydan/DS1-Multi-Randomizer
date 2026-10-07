@@ -1,6 +1,6 @@
 {
   "profile": "ds1tr-gen-v1",
-  "recordedAt": "2026-10-06T09:51:35.232Z",
+  "recordedAt": "2026-10-07T01:14:02.305Z",
   "cases": [
     {
       "name": "type-anywhere-relocated-window",
@@ -70,7 +70,7 @@
       },
       "expected": {
         "fileCount": 57,
-        "digest": "d1b2d61f01e7a0a51384c5068474979bdb820b9097d3987bba8e9391022a2527",
+        "digest": "0d415553c4263dd08d00ff8922f71227b2dc7597f64ac3110727343c71a3fa4b",
         "files": {
           "README.txt": "b240aafb06a818df97625bbb8703058b5f2d281056a760479329b2ebbbb5440f",
           "cheat-locations.txt": "ab3e3f1857829a5ade5910fa50d658fec43a916a8bce1530120f03add4ea5426",
@@ -78,7 +78,7 @@
           "mod/event/m10_01_00_00.emevd.dcx": "8dc60878f3af0b96516912483bd8c0fab98362c6bbd18f5697e3a49898e780f3",
           "mod/event/m10_02_00_00.emevd.dcx": "65345e05bfe226d9fc38ef5eac5c384c5f18262b99c1391f244ab08d4d402dbb",
           "mod/event/m11_00_00_00.emevd.dcx": "b1b7acd4818447ed984a31333065b8a8e81462f8b59b0d2d6a8010d7cb80b939",
-          "mod/event/m12_00_00_00.emevd.dcx": "574ed6f02a35c60aaf7612c97492bc4f9ba0d0f86dada8089c5da5aaed53b8c6",
+          "mod/event/m12_00_00_00.emevd.dcx": "2dae0d7abca8883e9f9c054688ec021db2f391ebd98cc93326dbdf88636dd4ee",
           "mod/event/m12_01_00_00.emevd.dcx": "518852d026b62e4248cc133c3df5dab74b313b07b78593e30990b2448999a736",
           "mod/event/m13_00_00_00.emevd.dcx": "64916113a5ebcc19c806518b18d5045522cd86e5e394eb035d986c8e4b95dd9b",
           "mod/event/m13_01_00_00.emevd.dcx": "e9077e2b11a1e2c3da3437324e7afc4b21f2228758da1d9d906a536c6d69218e",

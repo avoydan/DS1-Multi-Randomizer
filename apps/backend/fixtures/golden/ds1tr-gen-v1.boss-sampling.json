@@ -1,6 +1,6 @@
 {
   "profile": "ds1tr-gen-v1",
-  "recordedAt": "2026-10-06T08:25:52.198Z",
+  "recordedAt": "2026-10-07T01:13:15.723Z",
   "cases": [
     {
       "name": "boss-sampling-fog",
@@ -71,14 +71,14 @@
       },
       "expected": {
         "fileCount": 73,
-        "digest": "41870a13aa06ef22e0b50d3cc96e294e8a3a14b7910831904c3cbb294f114147",
+        "digest": "0401c7d6bf26148fdd5983186d797d2c5295660aeea2ab18924ea1d73579a449",
         "files": {
           "event/common.emevd.dcx": "58cb34d86e88c7482f1ec6603741a9bf5763720daa052406d1b3958f29ac6ee0",
           "event/m10_00_00_00.emevd.dcx": "706674bbcdfc87022e49b0554107a30d881b1339b57e51f54fdebe9c37a39159",
           "event/m10_01_00_00.emevd.dcx": "2eb8e9734971f08b8706bdd6edac7afcefcc0de16dc3adef7a9a19e0f0ad1ef1",
           "event/m10_02_00_00.emevd.dcx": "bdeb5158b9b1a82ce5dbfd4795081baad8d8c90bff552733c88e7003a792f7a4",
           "event/m11_00_00_00.emevd.dcx": "1bada40356d6bc34ae61d9e8b5af3cee3e053de8c8478cc4a88c5746100692b4",
-          "event/m12_00_00_00.emevd.dcx": "41bf11cf4f000ecb27d6822340eee450da16acc2b1d60ed0686c1e15f4a60cca",
+          "event/m12_00_00_00.emevd.dcx": "ce8dfa14654b02fb645e7ad41c1fb4e5907e94c9cef85072ca087e068dd8ef16",
           "event/m12_01_00_00.emevd.dcx": "34f49e224f71838385101c97d2a245c27bf401ea397bdf50d88726389d4f93ee",
           "event/m13_00_00_00.emevd.dcx": "3e3c766314a36eb45275ea7b3dc4ff889f46f3e5f07bb7c1d17ea4acc3bf254f",
           "event/m13_01_00_00.emevd.dcx": "40099e5c8a8f09d35ce80f76deda0a1ed1ebfd8395aedba7bd85b6cb7cc45d9d",
@@ -223,7 +223,7 @@
       },
       "expected": {
         "fileCount": 56,
-        "digest": "68ec7e90bb1cf6c7ce3558418d9b17c61117b357e62872a1092fe648a1a9e991",
+        "digest": "bad0426813e8aea31fd27039d727c6a8f41a70dea2de37ba0f04ca8d6cfed465",
         "files": {
           "README.txt": "b240aafb06a818df97625bbb8703058b5f2d281056a760479329b2ebbbb5440f",
           "cheat-locations.txt": "c5eef753c79b52b0dc04ecaf64b5525e62d38631524469ef4f4ed0a828b15ba9",
@@ -231,7 +231,7 @@
           "mod/event/m10_01_00_00.emevd.dcx": "d7ab2b1cc2c2920cf1507d9b26327e7e0b9dba4c3539839fd6284cb42f6bbaf8",
           "mod/event/m10_02_00_00.emevd.dcx": "4186d2083e0b55c7bd5fe0cfa693df1fb508ccf6568d9cfe0ba0940d057702e7",
           "mod/event/m11_00_00_00.emevd.dcx": "7b0a6eacde040de12469ac36ac88b66f0b7faf1641918ddbd61ad30d8a43b864",
-          "mod/event/m12_00_00_00.emevd.dcx": "f120cc3df8a4b1fc0e0a3d6f5e6fd3af6fc4677e0741e9b1131d5f119e0e3bff",
+          "mod/event/m12_00_00_00.emevd.dcx": "7e0dd202d341ba3ad84aa0bf37b6398a35e85c455308dcafc879dd0d98088389",
           "mod/event/m12_01_00_00.emevd.dcx": "f3cded88f7fcf08506ff1a361dbf33ab509d1f087bfecca81ae5c10add89fbb2",
           "mod/event/m13_00_00_00.emevd.dcx": "a274b0ac1998a5d2a94e7f10875bcbd03b034f022296eab5ab8fa3e6b814d0fb",
           "mod/event/m13_01_00_00.emevd.dcx": "04f1cc5a4c4588fe377de7351ca3ec7b773d88e9a520db394b3f52cfea9ab925",

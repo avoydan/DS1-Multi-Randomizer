@@ -38,6 +38,7 @@ try
     {
         var gameDirectory = RequireDirectory(options, "game");
         var outputPath = RequireValue(options, "output");
+        EventOwners.Shared = options.TryGetValue("event-owners", out var eventOwnerMode) && eventOwnerMode == "shared";
         var catalog = ScanGame(gameDirectory);
         var fullOutputPath = Path.GetFullPath(outputPath);
         Directory.CreateDirectory(Path.GetDirectoryName(fullOutputPath)!);
@@ -225,10 +226,12 @@ static GameCatalog ScanGame(string gameDirectory)
         }
         sourceFiles.Add(DescribeSource(mapPath, gameDirectory));
         var eventPath = Path.Combine(
-            gameDirectory, "event", $"{mapId}.emevd.dcx");
+            gameDirectory, "event", $"{EventOwnerMap(mapId)}.emevd.dcx");
         if (File.Exists(eventPath))
         {
-            sourceFiles.Add(DescribeSource(eventPath, gameDirectory));
+            var eventSource = DescribeSource(eventPath, gameDirectory);
+            if (!sourceFiles.Any(entry => entry.Path == eventSource.Path))
+                sourceFiles.Add(eventSource);
             eventAwardItemLotIds.UnionWith(
                 ReadEventAwardItemLots(eventPath));
         }
@@ -261,6 +264,8 @@ static GameCatalog ScanGame(string gameDirectory)
                 error.Message));
         }
     }
+
+    EnsureEventOwnersExist(gameDirectory, maps.Select(map => map.Id));
 
     var aiBundlePaths = maps
         .Select(map => NormalizeAiMapId(map.Id))
@@ -405,7 +410,8 @@ static GameCatalog ScanGame(string gameDirectory)
         bossNames,
         aiGoalIds,
         errors,
-        ignoredFiles);
+        ignoredFiles,
+        EventOwners.Shared ? "shared" : null);
 }
 
 static RandomizerParamData ReadRandomizerParamData(
@@ -857,8 +863,35 @@ static bool IsGameplayMap(string mapId)
     return mapId[2] is >= '0' and <= '8';
 }
 
+// The map whose EMEVD file and AI bundle serve an MSB. Every gameplay MSB has its own event file except the Darkroot Basin
+// (m12_00_00_01), which names exactly the entity IDs of the Darkroot Garden (108 of 108 entities are the same numbers, 96 of them are named in
+// m12_00_00_00.emevd.dcx and in no other file but the DLC one) and has neither an event file nor an AI bundle: the Garden's runs for both.
+// The one table every generated-event path asks (docs/EVENT_ALLOCATION.md, "Event owners"); EnsureEventOwnersExist proves it against the files.
+//
+// Worlds of the classic permutation keep the behavior they were frozen with (the Basin got no generated events: the catalog and the patch run with
+// EventOwners.Shared false and every map owns itself); legacy-style sampling (sampling-v1) runs with Shared true. The mode is decided once, by the
+// backend, when it scans (`--event-owners shared`), and it travels in the catalog so the patch step cannot disagree with the scan.
+static string EventOwnerMap(string mapId) =>
+    EventOwners.Shared && mapId == "m12_00_00_01" ? "m12_00_00_00" : mapId;
+
+// The AI bundles were always shared (there is no bundle for the Basin): this one is not mode dependent.
 static string NormalizeAiMapId(string mapId) =>
     mapId == "m12_00_00_01" ? "m12_00_00_00" : mapId;
+
+// Every gameplay MSB must resolve to an owner whose event file exists; a map that would silently get no events fails loudly instead.
+static void EnsureEventOwnersExist(string gameDirectory, IEnumerable<string> mapIds)
+{
+    if (!EventOwners.Shared)
+        return;
+    foreach (var mapId in mapIds)
+    {
+        var owner = EventOwnerMap(mapId);
+        var eventPath = Path.Combine(gameDirectory, "event", $"{owner}.emevd.dcx");
+        if (!File.Exists(eventPath))
+            throw new InvalidDataException(
+                $"Map {mapId} has no event owner: {owner}.emevd.dcx does not exist. Generated events for this map would be lost.");
+    }
+}
 
 static List<LUAINFO.Goal> ReadLuaGoals(string bundlePath)
 {
@@ -956,6 +989,7 @@ static PatchReport PatchEnemies(
         throw new InvalidDataException(
             $"Catalog schema {catalog.SchemaVersion} is obsolete. " +
             "Import the clean game data again.");
+    EventOwners.Shared = catalog.EventOwners == "shared";
     using var placementDocument = JsonDocument.Parse(File.ReadAllText(placementsPath));
     var guaranteedEnemyDrops =
         placementDocument.RootElement.TryGetProperty("config", out var configRoot) &&
@@ -2229,50 +2263,50 @@ static List<PatchedFile> PatchBossNames(
         placement.MapId == "m14_01_00_00" &&
         placement.PreserveBedOfChaosFloor);
     var eventMapIds = namedBossPlacements
-        .Select(placement => placement.MapId)
-        .Concat(passivePlacements.Select(placement => placement.MapId))
-        .Concat(deferredActivationPlacements.Select(placement => placement.MapId))
-        .Concat(containedCombatPlacements.Select(placement => placement.MapId))
-        .Concat(staticBridgePlacements.Select(placement => placement.MapId))
-        .Concat(disabledPlacements.Select(placement => placement.MapId))
-        .Concat(forceCombatPlacements.Select(placement => placement.MapId))
-        .Concat(modelSpecificPlacements.Select(placement => placement.MapId))
-        .Concat(portableBossPlacements.Select(placement => placement.MapId))
+        .Select(placement => EventOwnerMap(placement.MapId))
+        .Concat(passivePlacements.Select(placement => EventOwnerMap(placement.MapId)))
+        .Concat(deferredActivationPlacements.Select(placement => EventOwnerMap(placement.MapId)))
+        .Concat(containedCombatPlacements.Select(placement => EventOwnerMap(placement.MapId)))
+        .Concat(staticBridgePlacements.Select(placement => EventOwnerMap(placement.MapId)))
+        .Concat(disabledPlacements.Select(placement => EventOwnerMap(placement.MapId)))
+        .Concat(forceCombatPlacements.Select(placement => EventOwnerMap(placement.MapId)))
+        .Concat(modelSpecificPlacements.Select(placement => EventOwnerMap(placement.MapId)))
+        .Concat(portableBossPlacements.Select(placement => EventOwnerMap(placement.MapId)))
         .Concat(preserveBedFloor ? new[] { "m14_01_00_00" } : Array.Empty<string>())
         .Distinct(StringComparer.Ordinal)
         .Order(StringComparer.Ordinal);
     foreach (var mapId in eventMapIds)
     {
         var mapGroup = namedBossPlacements
-            .Where(placement => placement.MapId == mapId)
+            .Where(placement => EventOwnerMap(placement.MapId) == mapId)
             .ToList();
         var passiveMapPlacements = passivePlacements
-            .Where(placement => placement.MapId == mapId)
+            .Where(placement => EventOwnerMap(placement.MapId) == mapId)
             .ToList();
         var deferredMapPlacements = deferredActivationPlacements
-            .Where(placement => placement.MapId == mapId)
+            .Where(placement => EventOwnerMap(placement.MapId) == mapId)
             .ToList();
         var containedMapPlacements = containedCombatPlacements
-            .Where(placement => placement.MapId == mapId)
+            .Where(placement => EventOwnerMap(placement.MapId) == mapId)
             .ToList();
         var staticBridgeMapPlacements = staticBridgePlacements
-            .Where(placement => placement.MapId == mapId)
+            .Where(placement => EventOwnerMap(placement.MapId) == mapId)
             .ToList();
         var visiblePriscillaMapPlacements = visiblePriscillaPlacements
-            .Where(placement => placement.MapId == mapId)
+            .Where(placement => EventOwnerMap(placement.MapId) == mapId)
             .ToList();
         var disabledMapPlacements = disabledPlacements
-            .Where(placement => placement.MapId == mapId)
+            .Where(placement => EventOwnerMap(placement.MapId) == mapId)
             .ToList();
         var forceCombatMapPlacements = forceCombatPlacements
-            .Where(placement => placement.MapId == mapId)
+            .Where(placement => EventOwnerMap(placement.MapId) == mapId)
             .ToList();
         var modelSpecificEntityIds = modelSpecificPlacements
-            .Where(placement => placement.MapId == mapId)
+            .Where(placement => EventOwnerMap(placement.MapId) == mapId)
             .Select(placement => placement.EntityId)
             .ToHashSet();
         var portableBossEntityIds = portableBossPlacements
-            .Where(placement => placement.MapId == mapId)
+            .Where(placement => EventOwnerMap(placement.MapId) == mapId)
             .Select(placement => placement.EntityId)
             .ToHashSet();
         var namesByEntity = mapGroup
@@ -2318,7 +2352,7 @@ static List<PatchedFile> PatchBossNames(
         var protectQuelaagFireKeeper =
             mapId == "m14_00_00_00" &&
             portableBossPlacements.Any(placement =>
-                placement.MapId == mapId && placement.EntityId == 1400800);
+                EventOwnerMap(placement.MapId) == mapId && placement.EntityId == 1400800);
         if (protectQuelaagFireKeeper)
         {
             // Quelaag's entrance cutscene temporarily disables the Daughter
@@ -3137,7 +3171,7 @@ static List<PatchedFile> PatchBossNames(
         {
             var secondVisitEntityIds = allEnemyPlacements
                 .Where(placement =>
-                    placement.MapId == mapId &&
+                    EventOwnerMap(placement.MapId) == mapId &&
                     placement.EntityId is >= 1810200 and <= 1810213)
                 .Select(placement => placement.EntityId)
                 .ToHashSet();
@@ -5228,7 +5262,14 @@ record GameCatalog(
     Dictionary<string, string> BossNames,
     List<int> AiGoalIds,
     List<ScanError> Errors,
-    List<string> IgnoredFiles);
+    List<string> IgnoredFiles,
+    string? EventOwners = null);
+
+// Which map's event file serves a map: see EventOwnerMap. One mode per run.
+static class EventOwners
+{
+    public static bool Shared;
+}
 
 record SourceFile(string Path, long Size, DateTime LastWriteTimeUtc, string Sha256);
 record LuaBundleSource(

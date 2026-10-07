@@ -1,6 +1,6 @@
 {
   "profile": "ds1tr-gen-v1",
-  "recordedAt": "2026-10-06T00:37:06.629Z",
+  "recordedAt": "2026-10-07T01:12:21.678Z",
   "cases": [
     {
       "name": "items-only",
@@ -283,14 +283,14 @@
       },
       "expected": {
         "fileCount": 56,
-        "digest": "a9d8bf5d8cbe4e390112274ae15570e5f522e0b08cac74d467e73798b9059919",
+        "digest": "b28045c5c73f216aed5f0a24da6dcfeb20847b88c03efe465c150e62ece46991",
         "files": {
           "README.txt": "b240aafb06a818df97625bbb8703058b5f2d281056a760479329b2ebbbb5440f",
           "mod/event/m10_00_00_00.emevd.dcx": "6d05895aa6d3b39551cdd42b2d20944115fa694e104cc3fce65a6af3e67c542a",
           "mod/event/m10_01_00_00.emevd.dcx": "32d9c41c56ab470fa0b3fd91fa005c439337673b51dfd7b8d4f809031ac4f93f",
           "mod/event/m10_02_00_00.emevd.dcx": "5161274c8568c9033ecc10786f1f6c1c24170bd1ad10635e9966e8b109438d65",
           "mod/event/m11_00_00_00.emevd.dcx": "6cefc4818e5a4271d6fb135ef4983c2c9687a1b707ead5336ba2b256fbc2cd34",
-          "mod/event/m12_00_00_00.emevd.dcx": "45f01dc50446ff334b26765933838ea58fc01f62a086887720bf6ace3337e741",
+          "mod/event/m12_00_00_00.emevd.dcx": "4967d3dd8d40cd0a2872c561cd706b0088135bb5ea65a9e2489ba8b51ebbacb0",
           "mod/event/m12_01_00_00.emevd.dcx": "8cab1e9fd8a20972abcceae77c09851cdf0669d04f6b7b93b1a9f8b5a41c255c",
           "mod/event/m13_00_00_00.emevd.dcx": "2197686f2acc2431e26d419729c5cc05f70b8afe02e75e8649fc6d332bc09abd",
           "mod/event/m13_01_00_00.emevd.dcx": "e8d3481ad2289928f9e3071c7a005011bbde1797c0d4fb7b5bf1443334238f12",
@@ -861,14 +861,14 @@
       },
       "expected": {
         "fileCount": 56,
-        "digest": "ad1c704c129568a0607fd2023149de9f8862aebfda0728116bd51c1723956cc8",
+        "digest": "5e9075854c1d5f0e89edeb5c714275bca93f3f306f1d992e4e74e1689497d4ac",
         "files": {
           "README.txt": "b240aafb06a818df97625bbb8703058b5f2d281056a760479329b2ebbbb5440f",
           "mod/event/m10_00_00_00.emevd.dcx": "0b70f22b50fa8aad2eff560895eea9be510f5f76c8011f69b925933f8fbf1584",
           "mod/event/m10_01_00_00.emevd.dcx": "138a85700e21b9675d3af7517e7ac0b5ff6e743036a7a2dc4322418a0a1c2633",
           "mod/event/m10_02_00_00.emevd.dcx": "65345e05bfe226d9fc38ef5eac5c384c5f18262b99c1391f244ab08d4d402dbb",
           "mod/event/m11_00_00_00.emevd.dcx": "d154863c2679f16ecc01f6d3f5ac382f44c1b6cec8af51be31f4796b59b1573b",
-          "mod/event/m12_00_00_00.emevd.dcx": "51de44b0c8d93e772c8da91986614f452b5ad7fd6903f783beaa03047fe49775",
+          "mod/event/m12_00_00_00.emevd.dcx": "0a8cb3e506d1b87d51b762d312bd8aa54bed9b4bbf7ff9063a98b02f08cfe315",
           "mod/event/m12_01_00_00.emevd.dcx": "f7d5105e2e8a9e5caae6437acc7eb7e554dbf6e7612dc72dd22f41cb00e9b15d",
           "mod/event/m13_00_00_00.emevd.dcx": "d29d551888a82dc9a013f165c9faac8e7f0c2627ce72d4c01894a00c14db8853",
           "mod/event/m13_01_00_00.emevd.dcx": "240046e7051278278e283116b581f0f4f79f52ba0edb477c8b75e7e00cabd2d7",
@@ -1131,14 +1131,14 @@
       },
       "expected": {
         "fileCount": 56,
-        "digest": "8a1d2d640f890a95f75a7af4d4479bf71b6768dd4010d19b295e3a83d9d453e1",
+        "digest": "d8484b2aa726aea8773f4533234bf9b634c3b0de488b1b5e6a23be3f6698e495",
         "files": {
           "README.txt": "b240aafb06a818df97625bbb8703058b5f2d281056a760479329b2ebbbb5440f",
           "mod/event/m10_00_00_00.emevd.dcx": "ba0c47365979c59646a63578454541cdd5a2a612229276ef04dc1a2abd78eca6",
           "mod/event/m10_01_00_00.emevd.dcx": "e27bf842f8f31c0317727f7e487a9cca86570e7c786b56a82e8aa3e3cfdf198c",
           "mod/event/m10_02_00_00.emevd.dcx": "44d39e5a7542e8388f6c32b592909ff6c38d7844e6abdbd1254f3aa940362877",
           "mod/event/m11_00_00_00.emevd.dcx": "1fb8189cd6383deaa8ac6af1f0782e242b18111730990d302d922663dd0df772",
-          "mod/event/m12_00_00_00.emevd.dcx": "4bd9287cf2ffb77c4b1e6ac00be547d553e06fe1017ef640e4160070dfe1a607",
+          "mod/event/m12_00_00_00.emevd.dcx": "5689667da966cbde0b4c5f7b01e3c432638cab47b88e2410ba2afd4e6e19fd78",
           "mod/event/m12_01_00_00.emevd.dcx": "d289b7eb9731e3f260ef03208f4dae5c1f817daf64aa0f5c6909d9647fc00dd7",
           "mod/event/m13_00_00_00.emevd.dcx": "9f09c7c1ed3e78bbd736898e384b6f49fbbaa7787ecae366e7b47a09b9341ed8",
           "mod/event/m13_01_00_00.emevd.dcx": "609e365af897d93a05551f1124cc02d7db0cdc400076cf5a7a4dfddd175aa045",

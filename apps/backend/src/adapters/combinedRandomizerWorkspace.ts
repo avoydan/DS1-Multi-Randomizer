@@ -14,6 +14,8 @@ export interface CombinedRandomizerWorkspaceRequest {
   gamePath: string;
   workspacePath: string;
   combinedSeed: string;
+  /** Legacy-style sampling: the Darkroot Basin's events are written to the Garden's event file (`docs/EVENT_ALLOCATION.md`, "Event owners"). The classic permutation stays frozen. */
+  sharedEventOwners?: boolean;
 }
 
 export interface CombinedRandomizerWorkspacePlan {
@@ -78,7 +80,7 @@ export function planCombinedRandomizerWorkspace(
       catalogPath,
       seedDirectory,
       randomizerPlacementsPath,
-      scanArgs: ['scan', '--game', gameDirectory, '--output', catalogPath],
+      scanArgs: ['scan', '--game', gameDirectory, '--output', catalogPath, ...(request.sharedEventOwners ? ['--event-owners', 'shared'] : [])],
       patchEnemiesArgs: [
         'patch-enemies',
         '--game', gameDirectory,

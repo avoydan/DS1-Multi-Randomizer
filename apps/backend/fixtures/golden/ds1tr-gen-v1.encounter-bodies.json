@@ -1,6 +1,6 @@
 {
   "profile": "ds1tr-gen-v1",
-  "recordedAt": "2026-10-06T20:58:56.343Z",
+  "recordedAt": "2026-10-07T01:13:50.198Z",
   "cases": [
     {
       "name": "encounter-body-basic",
@@ -316,7 +316,7 @@
       },
       "expected": {
         "fileCount": 57,
-        "digest": "3e3378d802b84d693096da94dddcad2724e7efb14dff4cdb8c08beca732b0c7d",
+        "digest": "db910be055cd11bdf786f7e06495a2b2439b9b7521bcc6a520487da8bf7f9bc6",
         "files": {
           "README.txt": "b240aafb06a818df97625bbb8703058b5f2d281056a760479329b2ebbbb5440f",
           "cheat-locations.txt": "95428b426d0e708fefe869c0e158e86840e7e14bbe48e5e702da4b7cad18cc6f",
@@ -324,7 +324,7 @@
           "mod/event/m10_01_00_00.emevd.dcx": "8b618d7ace5b2827188b086f8ae0ec94173c1b570e32a274a4dd82bdb67fccc8",
           "mod/event/m10_02_00_00.emevd.dcx": "a928106bbc3daa69a99d63bbd72c9c9399c8342587c98d614242884774003604",
           "mod/event/m11_00_00_00.emevd.dcx": "ab630ace0835caea740e555c7d770b4a7f1be0b5072ad3d1eb8f1c139ead7152",
-          "mod/event/m12_00_00_00.emevd.dcx": "05a574c55da7c502528c57514b5345e35616168e78eb776f512f63692bcfe892",
+          "mod/event/m12_00_00_00.emevd.dcx": "e5fe39fc4a0226c7ab2fbf469d26da8b123c6835b3c662a04bb222d5a83c4120",
           "mod/event/m12_01_00_00.emevd.dcx": "b8507ff75d5a7720ea1874289aa6c2ee16d67fd306d0677d33c661e7a359870b",
           "mod/event/m13_00_00_00.emevd.dcx": "730d4c54d9fa25149a26f73c67c1784d980c9ebff629ed323da966286532c34a",
           "mod/event/m13_01_00_00.emevd.dcx": "62e581828321a0883a656f74c83fbdaa0a0f50140efef3f29dd53562e8ecb0ba",

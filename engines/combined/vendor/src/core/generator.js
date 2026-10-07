@@ -436,9 +436,6 @@ function hostileNpcSources(catalog) {
   return sources.size === 0 ? null : sources;
 }
 
-/** The Darkroot Basin has no event file of its own (the data tool writes no event for a part there), so a hostile NPC, which needs its wake-up event, never stands there. */
-const hostileNpcForbiddenMaps = new Set(["m12_00_00_01"]);
-
 const hostileNpcSourceIds = (catalog) => new Set([...(hostileNpcSources(catalog)?.values() ?? [])].flat().map((slot) => slot.id));
 
 /** Regular slots that keep their own enemy even when bosses may roam (they have special handling that a boss would break). */
@@ -1605,7 +1602,6 @@ function sampleExtractedEnemies(config, catalog, dragonPlan, bossPlan, diagnosti
     fixedModelsByMap,
     diagnostics,
     hostileNpcSources: options.hostileNpcs ? hostileNpcSources(catalog) : null,
-    hostileNpcForbiddenMaps,
   });
   const allSlots = [...slots, ...pinwheelClones];
   let assignment = regularAssignment;

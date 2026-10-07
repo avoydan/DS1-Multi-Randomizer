@@ -4,6 +4,68 @@ using SoulsFormats;
 // SmokeVerify <package mod dir> <paramdef.paramdefbnd.dcx> <expectations.json> [<original game dir>]
 // expectations.json: [{ "id", "map", "slot", "model", "kind", "souls"?, "disableRespawn"? }]
 // Prints one JSON object per expectation: { id, ok, checks: [{ name, ok, detail }] }.
+// SmokeVerify audit <package mod dir> <randomizer.json> <original game dir> <sampling|classic>
+// For every generated placement that needs a custom event (a wake-up, a passive or deferred activation, a disabled entity, a static bridge),
+// the event owner of its map is resolved, the owner's event file must exist in the package, and a NEW event (an ID that the clean game file
+// does not have) must name the placement's entity. Event IDs must be unique in the owner file. In "classic" mode the classic permutation keeps
+// the behavior it was frozen with (the Darkroot Basin has no events): those placements are counted, not failed.
+if (args.Length > 0 && args[0] == "audit")
+{
+    var packageDir = args[1];
+    var planDoc = JsonDocument.Parse(File.ReadAllText(args[2]));
+    var cleanDir = args[3];
+    var sampling = args.Length > 4 && args[4] == "sampling";
+    string OwnerOf(string map) => sampling && map == "m12_00_00_01" ? "m12_00_00_00" : map;
+    var cache = new Dictionary<string, (EMEVD? now, HashSet<int> originalIds)>();
+    (EMEVD? now, HashSet<int> originalIds) Load(string owner)
+    {
+        if (cache.TryGetValue(owner, out var hit)) return hit;
+        var nowPath = Path.Combine(packageDir, "event", owner + ".emevd.dcx");
+        var originalPath = Path.Combine(cleanDir, "event", owner + ".emevd.dcx");
+        var original = File.Exists(originalPath) ? EMEVD.Read(originalPath).Events.Select(entry => (int)entry.ID).ToHashSet() : new HashSet<int>();
+        return cache[owner] = (File.Exists(nowPath) ? EMEVD.Read(nowPath) : null, original);
+    }
+    var missing = new List<string>();
+    var frozen = 0;
+    var checkedCount = 0;
+    var duplicateOwners = new List<string>();
+    foreach (var group in new[] { "enemies", "bosses" })
+    {
+        if (!planDoc.RootElement.GetProperty("placements").TryGetProperty(group, out var list)) continue;
+        foreach (var placement in list.EnumerateArray())
+        {
+            bool Flag(string name) => placement.TryGetProperty(name, out var value) && (value.ValueKind == JsonValueKind.True || (value.ValueKind == JsonValueKind.Number));
+            var needsEvent = Flag("forceCombatActivation") || Flag("passiveUntilAttacked") || Flag("disableEntity") || Flag("activationRegionId") || Flag("combatRegionId") || Flag("staticBridgeDragon");
+            if (!needsEvent) continue;
+            var entity = placement.GetProperty("entityId").GetInt32();
+            if (entity < 0) continue;
+            var map = placement.GetProperty("map").GetString()!;
+            var slotName = placement.GetProperty("slot").GetString()!;
+            var owner = OwnerOf(map);
+            if (!sampling && map == "m12_00_00_01") { frozen++; continue; }
+            checkedCount++;
+            var (now, originalIds) = Load(owner);
+            if (now == null) { missing.Add($"{slotName}: owner {owner} has no event file in the package"); continue; }
+            bool Names(EMEVD.Event entry) => entry.Instructions.Any(instruction =>
+            {
+                var data = instruction.ArgData;
+                for (var offset = 0; offset + 4 <= data.Length; offset += 4) if (BitConverter.ToInt32(data, offset) == entity) return true;
+                return false;
+            });
+            if (!now.Events.Any(entry => !originalIds.Contains((int)entry.ID) && Names(entry)))
+                missing.Add($"{slotName}: no new event of {owner} names entity {entity}");
+        }
+    }
+    foreach (var (owner, (now, _)) in cache)
+    {
+        if (now == null) continue;
+        var duplicates = now.Events.GroupBy(entry => entry.ID).Where(entry => entry.Count() > 1).Select(entry => entry.Key).ToList();
+        if (duplicates.Count > 0) duplicateOwners.Add($"{owner}: {string.Join(",", duplicates)}");
+    }
+    Console.WriteLine(JsonSerializer.Serialize(new { checkedCount, frozenWithoutEvents = frozen, missing, duplicateOwners, owners = cache.Keys.OrderBy(entry => entry).ToArray() }));
+    return missing.Count == 0 && duplicateOwners.Count == 0 ? 0 : 1;
+}
+
 var modDir = args[0];
 var paramdefs = BND3.Read(args[1]).Files.Select(file => PARAMDEF.Read(file.Bytes)).ToList();
 var expectations = JsonSerializer.Deserialize<List<Expectation>>(File.ReadAllText(args[2]), new JsonSerializerOptions { PropertyNameCaseInsensitive = true })!;

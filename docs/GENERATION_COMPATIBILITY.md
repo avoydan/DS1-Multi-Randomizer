@@ -79,6 +79,24 @@ profile would preserve a defect. Consequences: the two affected golden cases wer
 byte-identical to the old record, the 15 older fixtures and the Part D fixtures were not touched), and the played test records say which packages changed after they were played.
 **This is not a precedent**: it applies to options introduced after the last public release only; once the app is released, any such change needs a new profile.
 
+## Recorded exception 2: the Darkroot Basin event owner (backend 0.37.1, 2026-10-07)
+
+**What changed.** The Darkroot Basin (`m12_00_00_01`) has no event file; its generated events were dropped. DsrDataTool now resolves the event owner (`m12_00_00_00`) for legacy-style sampling worlds (`docs/EVENT_ALLOCATION.md`, "Event owners";
+`patches/0018-event-owners.patch`). Hostile NPCs may now stand in the Basin (their wake-up exists).
+
+**What changes, proven** (the 27 golden fixtures regenerated before and after, same Seed Codes):
+
+| Worlds | Package |
+|---|---|
+| the classic permutation (`enemies-classic-permutation`, `items-enemies-bosses`, `items-enemies-bosses-fog`, `broad-items-shops-fog`, `second-gargoyle-keep`), items-only, world options, and the three Part E2 fixtures with no Basin placement | **identical** |
+| 12 legacy-style sampling worlds (`enemies-sampling-v1`, `custom-enemy-pool`, `custom-pool-model-grace`, `sampling-bosses-fog`, `sampling-bosses-combined-only`, `boss-sampling-fog`, `boss-sampling-unique-combined`, `type-anywhere-relocated-window`, `roaming-both-combined`, `roaming-bosses-souls-stay-dead`, `roaming-both-boss-sampling-fog`, `encounter-body-roaming-both`) | **different in exactly one file**: the owner event file (`event/m12_00_00_00.emevd.dcx`): the events that were missing. Nothing else |
+| 5 hostile NPC worlds (recorded the day before; Part F1 is younger than this fix) | different: the Basin may now take a hostile NPC (`m12_00_00_01.msb`, `GameParam`, the AI bundle, the plan) besides the events |
+
+The quick worlds that were played in the game (`quick-roaming-*`, `quick-sampling-asylum`, `quick-boss-asylum-demon`) are Asylum worlds; their packages now differ in the Garden's event file only (extra events for Basin parts that the test never visits); the Asylum content is unchanged.
+
+**Decision.** Same reasoning as exception 1: the missing events were a defect against the world's own plan, sampling-v1, Part E and Part F are younger than any public release (there is none), and the change is the missing events and nothing else. The 12 + 5 affected fixtures were re-recorded
+(the five classic-family fixtures and the others are untouched, checked per case against the previous record). **Classic stays frozen: its Basin placements keep having no events** (a documented quirk, not fixed because it would change old Seed Codes). **This is not a precedent**: after the first public release any such change needs a new profile.
+
 ## Golden fixtures
 
 `apps/backend/fixtures/golden/<profile>.json` holds, per scenario: the Seed Code, the decoded canonical settings, the profile, the

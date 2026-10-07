@@ -63,6 +63,15 @@ test('builds scan args using only workspace/output paths, never install or resto
   }
 });
 
+test('the shared event owner mode (legacy-style sampling) is asked of the scan only, and the classic permutation never gets it', () => {
+  const classic = planCombinedRandomizerWorkspace({ gamePath, workspacePath, combinedSeed });
+  const sampling = planCombinedRandomizerWorkspace({ gamePath, workspacePath, combinedSeed, sharedEventOwners: true });
+  assert.equal(classic.ok && sampling.ok, true);
+  assert.deepEqual(sampling.plan.scanArgs, [...classic.plan.scanArgs, '--event-owners', 'shared']);
+  assert.deepEqual(sampling.plan.patchEnemiesArgs, classic.plan.patchEnemiesArgs, 'the patch step reads the mode from the catalog it was given');
+  assert.ok(!classic.plan.scanArgs.includes('--event-owners'), 'a classic world scans exactly as before');
+});
+
 test('is deterministic for the same request', () => {
   const request = { gamePath, workspacePath, combinedSeed };
   const first = planCombinedRandomizerWorkspace(request);

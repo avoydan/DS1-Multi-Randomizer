@@ -95,7 +95,6 @@ for (const [name, overrides] of Object.entries(sets)) {
       const destination = slotById.get(placement.slot);
       const source = slotById.get(placement.sourceSlot);
       if (!SOURCES.has(placement.sourceSlot) || !NPC_MODELS.has(placement.targetModelName)) bad = `${placement.sourceSlot} (${placement.targetModelName}) is not an authored hostile source`;
-      else if (placement.map === 'm12_00_00_01') bad = 'a hostile NPC in the Darkroot Basin (no event file for its wake-up)';
       else if (destination?.teamType !== 0) bad = `destination ${placement.slot} is not a regular slot (team ${destination?.teamType})`;
       else if (placement.scaledNpcParamId === null || placement.scaledNpcParamId === undefined) bad = 'hostile NPC without a scaled NpcParam row';
       else if (placement.makeTangible !== true) bad = 'hostile NPC without the tangible mark';

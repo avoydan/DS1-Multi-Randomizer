@@ -58,6 +58,7 @@ test('hostile NPCs come only from the authored sources and stand only in regular
   const sourceIds = new Set(['m10_01_00_00:c2510_0000', 'm10_01_00_00:c2640_0000', 'm13_00_00_00:c2920_0000']);
   const seen = new Set();
   let total = 0;
+  let basin = 0;
   for (let seed = 0; seed < 25; seed += 1) {
     const catalog = catalogOf();
     const result = generate({ ...base, seed: `hn-${seed}`, enemyHostileNpcs: true }, { gameCatalog: catalog });
@@ -69,7 +70,7 @@ test('hostile NPCs come only from the authored sources and stand only in regular
       assert.ok(Number.isInteger(entry.scaledNpcParamId), 'the slot owns the row: drops, team, respawn and rewards');
       assert.equal(entry.makeTangible, true);
       assert.notEqual(entry.targetModelName, 'c4110', 'Gough is not a source');
-      assert.notEqual(entry.map, 'm12_00_00_01', 'the Darkroot Basin has no event file for the wake-up');
+      if (entry.map === 'm12_00_00_01') basin += 1; // the Basin shares the Garden's event file: it is a normal destination
       if (entry.passiveUntilAttacked) {
         assert.equal(entry.compatibility, 'passive-until-attacked-sampled', 'a passive slot keeps its own wake-up rule');
         assert.equal(entry.forceCombatActivation, undefined);
@@ -85,6 +86,7 @@ test('hostile NPCs come only from the authored sources and stand only in regular
     for (const placement of result.placements.enemies) assert.equal(npcSlots.includes(placement.slot), false, `${placement.slot} is not a destination`);
   }
   assert.ok(total > 50, 'hostile NPCs appear');
+  assert.ok(basin > 0, 'the Darkroot Basin is a destination like any other map');
   assert.deepEqual([...seen].sort(), ['c2510', 'c2640', 'c2920']);
 });
 

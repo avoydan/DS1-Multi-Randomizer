@@ -993,6 +993,16 @@ Date: 2026-10-06.
 8. **Launch game** is a desktop (Electron) concern: Steam `steam://rungameid/570940` first, the game executable as a fallback,
    and the method used is reported. The renderer never starts processes.
 
+## Event owners: one resolver for which event file serves a map (backend 0.37.1)
+
+Date: 2026-10-07.
+
+1. **The bug.** The Darkroot Basin has no event file; custom events for its parts were silently dropped (roaming bosses, hostile NPCs, deferred and disabled entities, model-specific locks). Proven from the game data: it shares the Garden's 108 entity IDs and the Garden's file names 96 of them.
+2. **One resolver, in the data tool.** `EventOwnerMap`; no `if m12_00_00_01` anywhere else. `EnsureEventOwnersExist` fails loudly when a map would have no owner. Allocation is per owner file.
+3. **The classic permutation stays frozen.** The mode is chosen by the backend for `sampling-v1`, travels in the catalog, and the patch step reads it from there. 10 of the 27 golden fixtures are identical, 12 sampling fixtures change in the owner event file only, 5 hostile NPC fixtures change because the Basin is now a legal destination. Recorded exception 2.
+4. **The Basin is not excluded.** The earlier exclusion of hostile NPCs from the Basin was a workaround for this bug and is removed.
+5. **A guard that fails on the old behavior.** `SmokeVerify audit` runs in every matrix world and every quick-world check.
+
 ## Hostile NPCs: a body in a regular slot, owned by the slot; NPC replacement not built (Part F1; backend 0.37.0, desktop 0.25.0, contracts 0.23.0)
 
 Date: 2026-10-07.

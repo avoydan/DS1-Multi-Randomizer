@@ -297,6 +297,7 @@ export async function executeCombinedGeneration(
     gamePath: request.gamePath,
     workspacePath: request.workspacePath,
     combinedSeed: normalizedSeed,
+    sharedEventOwners: config.enemyPlacementAlgorithm === 'sampling-v1',
   });
   if (!planResult.ok) {
     return { ok: false, code: planResult.code, message: planResult.message, retryable: false };

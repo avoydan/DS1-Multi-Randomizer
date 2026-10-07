@@ -669,7 +669,7 @@ export const MAP_ATTEMPTS = 3;
  */
 export function planSampledRegularEnemies({
   seed, options, preventSame, slots, extraSlots = [], fixedModelsByMap, diagnostics, cap = MODEL_BUDGET_CAP,
-  mapAttempts = MAP_ATTEMPTS, candidateFilter = undefined, hostileNpcSources = null, hostileNpcForbiddenMaps = new Set(),
+  mapAttempts = MAP_ATTEMPTS, candidateFilter = undefined, hostileNpcSources = null,
 }) {
   // The boss options belong to planSampledBosses; they never reach the regular-slot settings (and so not their diagnostics).
   // The roaming-boss options (Part E1) belong to planRoamingBosses in the same way.
@@ -701,7 +701,7 @@ export function planSampledRegularEnemies({
     enabled: customModels !== null, hash: customPoolHash(customModels),
     ...analyzePoolCoverage({ table, pool, slots: [...slots, ...extraSlots], fit: settings.fit, preventSame }),
   };
-  // A map that cannot hold a hostile NPC (no event file for its wake-up) plans with the pool minus the hostile NPC types.
+  // The pool minus the hostile NPC types: what a map plans with once it holds its limit of them.
   const poolWithoutHostileNpcs = hostileNpcTypes.length > 0
     ? createCandidatePool(table, (type) => !type.hostileNpc && (customSet === null || customSet.has(type.model)) && (candidateFilter === undefined || candidateFilter(type)))
     : pool;
@@ -739,8 +739,8 @@ export function planSampledRegularEnemies({
       const scratch = createPlacementDiagnostics({ algorithm: "sampling-v1", level: diagnostics.level });
       try {
         planned = planMap({
-          seed, settings, preventSame, table, pool: hostileNpcForbiddenMaps.has(mapId) ? poolWithoutHostileNpcs : pool, mapId, mapSlots, attempt, fixedModelsByMap, cap, diagnostics: scratch,
-          hostile: hostileNpcTypes.length === 0 ? null : { limit: hostileNpcForbiddenMaps.has(mapId) ? 0 : HOSTILE_NPC_MAP_CAP, without: poolWithoutHostileNpcs },
+          seed, settings, preventSame, table, pool, mapId, mapSlots, attempt, fixedModelsByMap, cap, diagnostics: scratch,
+          hostile: hostileNpcTypes.length === 0 ? null : { limit: HOSTILE_NPC_MAP_CAP, without: poolWithoutHostileNpcs },
         });
       } catch (error) {
         if (!(error instanceof EnemyPlacementInfeasibleError)) throw error;
