@@ -154,6 +154,15 @@ export const v1ExtraCaseSets = {
     { name: 'hostile-npc-boss-bodies', masterSeed: 'golden-v1-npc-bodies', patch: { items: { enabled: false }, fog: { enabled: false },
       enemies: { gwynNerf: 'medium', secondGargoyle: 'keep', placement: { algorithm: 'sampling-v1', replacementChance: 100, fit: 'anywhere', bossReplacement: 'both', bossChanceInBossSlots: 50, hostileNpcs: true } } } },
   ],
+  /** Soul items Transposed (Part H): worlds that use the non-neutral value, frozen from the day they exist. */
+  'soul-items': [
+    { name: 'souls-transposed-items', masterSeed: 'golden-v1-souls-items', patch: { fog: { enabled: false }, enemies: { enabled: false }, items: { soulItems: 'transposed' } } },
+    { name: 'souls-transposed-all-pools', masterSeed: 'golden-v1-souls-pools', patch: { fog: { enabled: false }, enemies: { enabled: false },
+      items: { soulItems: 'transposed', randomizeGifts: true, randomizeEnemyDrops: true, randomizeShops: true } } },
+    { name: 'souls-transposed-fog', masterSeed: 'golden-v1-souls-fog', patch: { enemies: { enabled: false }, items: { soulItems: 'transposed' } } },
+    { name: 'souls-transposed-triple', masterSeed: 'golden-v1-souls-triple', patch: { items: { soulItems: 'transposed' },
+      enemies: { gwynNerf: 'medium', secondGargoyle: 'replace', placement: { algorithm: 'sampling-v1', replacementChance: 100, fit: 'fits', bossReplacement: 'bosses', normalReplacement: 'both', bossChanceInNormalSlots: 15 } } } },
+  ],
   'boss-baseline': [
     { name: 'sampling-bosses-fog', masterSeed: 'golden-v1-boss-fog', patch: { enemies: { gwynNerf: 'strong', secondGargoyle: 'replace',
       placement: { algorithm: 'sampling-v1', replacementChance: 70, fit: 'fits', difficultyMode: 'curve', difficultyStrictness: 'strict' } } } },
@@ -182,7 +191,10 @@ async function run({ authority, game, temp }, request, label, appVersion) {
   if (!prepared.ok) throw new Error(`${label}: ${prepared.code}: ${prepared.technical}`);
   const workspacePath = path.join(temp, `run-${label}-${Math.random().toString(16).slice(2)}`);
   await mkdir(workspacePath, { recursive: true });
-  const result = await generateRun({ config: prepared.config, workspacePath, profile: prepared.profile, seedCode: prepared.seedCode }, () => {}, {
+  const result = await generateRun({ config: prepared.config, workspacePath, profile: prepared.profile, seedCode: prepared.seedCode }, (event) => {
+    // DS1TR_GOLDEN_VERBOSE=1 prints the warnings and failures of the helpers (a failing case says why).
+    if (process.env.DS1TR_GOLDEN_VERBOSE && event.type === 'log' && (event.level === 'warning' || /fail|error|exception|Details/iu.test(event.message))) console.error(`[${label}] ${event.message.slice(0, 600)}`);
+  }, {
     getPristineSource: (gamePath) => authority.getPristineSource(gamePath),
     ...(appVersion ? { appVersion } : {}),
   });
@@ -258,6 +270,8 @@ async function main() {
     for (const file of (await readdir(fixtureDirectory)).filter((name) => name.endsWith('.json')).sort()) {
       const fixture = JSON.parse(await readFile(path.join(fixtureDirectory, file), 'utf8'));
       for (const entry of fixture.cases) {
+        // DS1TR_GOLDEN_ONLY=name,name verifies only those cases.
+        if (process.env.DS1TR_GOLDEN_ONLY && !process.env.DS1TR_GOLDEN_ONLY.split(',').includes(entry.name)) continue;
         const { prepared, result } = await run(context, { seedCode: entry.seedCode }, entry.name, appVersion);
         const actual = result.ok ? await packageDigest(result.manifest.files, result.packagePath) : null;
         const good = result.ok && actual.digest === entry.expected.digest && prepared.profile.id === entry.profile

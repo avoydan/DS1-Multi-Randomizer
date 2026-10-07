@@ -66,6 +66,90 @@ if (args.Length > 0 && args[0] == "audit")
     return missing.Count == 0 && duplicateOwners.Count == 0 ? 0 : 1;
 }
 
+// SmokeVerify lots <package mod dir> <paramdef.paramdefbnd.dcx> <randomizer.json> <original game dir>
+// Item lot rows of the package against the plan: every item placement that targets a lot row (world lots, gifts, enemy drops, boss rewards) must
+// be in the row; no other ItemLotParam row may differ from the clean game (except the guaranteed-drop normalization, which only touches rates);
+// no NpcParam row of the package (the scaled copies included) may name a boss reward chain; and the boss reward event of the common event file
+// (event 970 and every initialisation of it) must be exactly the clean game's: a reward belongs to its trigger flag, never to a boss body.
+if (args.Length > 0 && args[0] == "lots")
+{
+    var defs = BND3.Read(args[2]).Files.Select(file => PARAMDEF.Read(file.Bytes)).ToList();
+    PARAM Read(BND3 bnd, string suffix)
+    {
+        var file = bnd.Files.Single(entry => entry.Name.EndsWith(suffix, StringComparison.OrdinalIgnoreCase));
+        var param = PARAM.Read(file.Bytes);
+        param.ApplyParamdef(defs.First(definition => definition.ParamType == param.ParamType));
+        return param;
+    }
+    var nowBnd = BND3.Read(Path.Combine(args[1], "param", "GameParam", "GameParam.parambnd.dcx"));
+    var thenBnd = BND3.Read(Path.Combine(args[4], "param", "GameParam", "GameParam.parambnd.dcx"));
+    var nowLots = Read(nowBnd, "ItemLotParam.param").Rows.ToDictionary(row => row.ID);
+    var thenLots = Read(thenBnd, "ItemLotParam.param").Rows.ToDictionary(row => row.ID);
+    var plan = JsonDocument.Parse(File.ReadAllText(args[3])).RootElement.GetProperty("placements");
+    int LotCell(PARAM.Row row, string name) => Convert.ToInt32(row[name].Value);
+    var problems = new List<string>();
+    var targeted = new HashSet<int>();
+    var checkedTargets = 0;
+    var bossRows = new HashSet<int>();
+    foreach (var group in new[] { "items", "gifts", "enemyDrops", "bossRewards" })
+    {
+        if (!plan.TryGetProperty(group, out var list)) continue;
+        foreach (var placement in list.EnumerateArray())
+        {
+            if (!placement.TryGetProperty("targetKind", out var kind) || kind.GetString() != "lot") continue;
+            var rowId = placement.GetProperty("rowId").GetInt32();
+            var slot = placement.GetProperty("targetSlot").GetInt32();
+            targeted.Add(rowId);
+            if (group == "bossRewards") bossRows.Add(rowId);
+            checkedTargets++;
+            if (!nowLots.TryGetValue(rowId, out var row)) { problems.Add($"{group}: row {rowId} is missing from the package"); continue; }
+            var suffix = slot.ToString("00");
+            if (LotCell(row, "lotItemId" + suffix) != placement.GetProperty("itemId").GetInt32() ||
+                LotCell(row, "lotItemCategory" + suffix) != placement.GetProperty("itemCategory").GetInt32() ||
+                LotCell(row, "lotItemNum" + suffix) != placement.GetProperty("itemQuantity").GetInt32())
+                problems.Add($"{group}: row {rowId} slot {slot} does not hold the planned item");
+        }
+    }
+    var changedOutside = new List<int>();
+    foreach (var (id, row) in nowLots)
+    {
+        if (targeted.Contains(id)) continue;
+        if (!thenLots.TryGetValue(id, out var original)) { changedOutside.Add(id); continue; }
+        foreach (var cell in row.Cells)
+        {
+            var name = cell.Def.InternalName;
+            if (!name.StartsWith("lotItem", StringComparison.Ordinal)) continue;
+            if (name.StartsWith("lotItemBasePoint", StringComparison.Ordinal)) continue;   // the guaranteed-drop normalization only changes rates
+            if (!Equals(cell.Value, original[name].Value)) { changedOutside.Add(id); break; }
+        }
+    }
+    if (changedOutside.Count > 0) problems.Add($"ItemLotParam rows changed without a placement: {string.Join(",", changedOutside.Take(20))}");
+    // A boss reward chain is every row of an awarded lot; the scan recorded them in the plan only for the placed rows, so the reference check
+    // uses the rows of the placements and their consecutive neighbours.
+    var chainRows = new HashSet<int>();
+    foreach (var id in bossRows) { for (var n = id; thenLots.ContainsKey(n); n++) chainRows.Add(n); }
+    var npcNow = Read(nowBnd, "NpcParam.param");
+    foreach (var row in npcNow.Rows)
+        foreach (var cell in row.Cells.Where(cell => cell.Def.InternalName.StartsWith("itemLotId_", StringComparison.OrdinalIgnoreCase)))
+            if (chainRows.Contains(Convert.ToInt32(cell.Value))) problems.Add($"NpcParam {row.ID} names the boss reward row {cell.Value}");
+    var rewardEventChecks = 0;
+    var packageCommon = Path.Combine(args[1], "event", "common.emevd.dcx");
+    if (File.Exists(packageCommon))
+    {
+        List<string> Inits(string path) => EMEVD.Read(path).Events.SelectMany(entry => entry.Instructions)
+            .Where(instruction => instruction.Bank == 2000 && (instruction.ID == 0 || instruction.ID == 6) && instruction.ArgData.Length >= 8 && BitConverter.ToUInt32(instruction.ArgData, 4) == 970)
+            .Select(instruction => Convert.ToHexString(instruction.ArgData)).ToList();
+        string Body(string path) => string.Join("|", EMEVD.Read(path).Events.Where(entry => entry.ID == 970)
+            .SelectMany(entry => entry.Instructions.Select(instruction => instruction.Bank + ":" + instruction.ID + ":" + Convert.ToHexString(instruction.ArgData))));
+        var clean = Path.Combine(args[4], "event", "common.emevd.dcx");
+        rewardEventChecks = 1;
+        if (!Inits(packageCommon).SequenceEqual(Inits(clean)) || Body(packageCommon) != Body(clean))
+            problems.Add("the boss reward event (970) or one of its initialisations differs from the clean game");
+    }
+    Console.WriteLine(JsonSerializer.Serialize(new { checkedTargets, bossRewardTargets = bossRows.Count, rewardEventChecked = rewardEventChecks, problems }));
+    return problems.Count == 0 ? 0 : 1;
+}
+
 var modDir = args[0];
 var paramdefs = BND3.Read(args[1]).Files.Select(file => PARAMDEF.Read(file.Bytes)).ToList();
 var expectations = JsonSerializer.Deserialize<List<Expectation>>(File.ReadAllText(args[2]), new JsonSerializerOptions { PropertyNameCaseInsensitive = true })!;
@@ -102,6 +186,20 @@ foreach (var expectation in expectations)
 {
     var checks = new List<object>();
     void Check(string name, bool ok, string detail) => checks.Add(new { name, ok, detail });
+    if (expectation.Kind == "item-lot")
+    {
+        // Part H: an item lot row of the package holds the item the world promises (a transposed boss weapon where a pickup lies).
+        var lotRows = ReadParam(gameParam, "ItemLotParam.param").Rows.ToDictionary(entry => entry.ID);
+        var found = lotRows.TryGetValue(expectation.LotRow ?? -1, out var lotRow);
+        Check("the item lot row exists", found, $"row {expectation.LotRow}");
+        if (found)
+        {
+            var holds = Enumerable.Range(1, 8).Any(slot => Cell(lotRow!, "lotItemId" + slot.ToString("00")) == expectation.ItemId && Cell(lotRow!, "lotItemCategory" + slot.ToString("00")) == expectation.ItemCategory);
+            Check("the row holds the item", holds, $"item {expectation.ItemId} category {expectation.ItemCategory}");
+        }
+        results.Add(new { id = expectation.Id, ok = checks.All(check => (bool)check.GetType().GetProperty("ok")!.GetValue(check)!), checks });
+        continue;
+    }
     var msbPath = Path.Combine(modDir, "map", "MapStudio", expectation.Map + ".msb");
     var msb = MSB1.Read(msbPath);
     var part = FindPart(msb, expectation.Slot, expectation.Dummy);
@@ -252,4 +350,4 @@ Console.WriteLine(JsonSerializer.Serialize(results));
 return results.All(result => (bool)result.GetType().GetProperty("ok")!.GetValue(result)!) ? 0 : 1;
 
 record PartView(string Name, string ModelName, int EntityID, int NPCParamID, int ThinkParamID, int TalkID);
-record Expectation(string Id, string Map, string Slot, string Model, string Kind, int? Souls, bool? DisableRespawn, bool? WakeUpEvent, bool Dummy = false, bool Passive = false);
+record Expectation(string Id, string Map, string Slot, string Model, string Kind, int? Souls, bool? DisableRespawn, bool? WakeUpEvent, bool Dummy = false, bool Passive = false, int? LotRow = null, int? ItemId = null, int? ItemCategory = null);

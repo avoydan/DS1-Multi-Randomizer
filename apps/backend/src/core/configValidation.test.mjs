@@ -140,7 +140,7 @@ test('requires the Batch 2 options and validates their values', () => {
   wrongBoolean.enemies.pinwheelChaos = 'yes';
   assert.throws(() => validateRandomizerConfig(wrongBoolean), /config\.enemies\.pinwheelChaos must be a boolean/);
   for (const [section, key, bad] of [
-    ['items', 'soulItems', 'transposed'], ['items', 'startingItems', 'shield-1h-2h'], ['enemies', 'gwynNerf', 'weak'],
+    ['items', 'soulItems', 'sublimated'], ['items', 'startingItems', 'shield-1h-2h'], ['enemies', 'gwynNerf', 'weak'],
   ]) {
     const invalid = validConfig();
     invalid[section][key] = bad;

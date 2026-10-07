@@ -93,6 +93,18 @@ export const sets = {
     { name: 'owner-second-gargoyle', patch: merge2(noItems, noFog, sampling({ bossReplacement: 'bosses', fit: 'anywhere' }, { secondGargoyle: 'replace', gwynNerf: 'strong' })), seeds: 60 },
     { name: 'owner-classic-frozen', patch: merge2(noItems, noFog, { enemies: { placement: { algorithm: 'permutation-v1' } } }), seeds: 30 },
   ],
+  /**
+   * Part H (docs/ITEM_PROGRESSION_MODEL.md): Soul items "Transposed" through the real data tool and, where Fog is on, the real FogHost. Every run is also checked
+   * by the lots verifier (the planned rows are in the package, no other item lot changed, no NpcParam names a boss reward, the reward event is the clean game's).
+   */
+  'souls-h': [
+    { name: 'souls-items', patch: merge2({ enemies: { enabled: false } }, noFog, { items: { soulItems: 'transposed' } }), seeds: 100 },
+    { name: 'souls-all-pools', patch: merge2({ enemies: { enabled: false } }, noFog, { items: { soulItems: 'transposed', randomizeGifts: true, randomizeEnemyDrops: true, randomizeShops: true } }), seeds: 60 },
+    { name: 'souls-with-enemies-bosses', patch: merge2(noFog, { items: { soulItems: 'transposed' } }), seeds: 60 },
+    { name: 'souls-boss-sampling-e2', patch: merge2(noFog, sampling({ bossReplacement: 'both', bossChanceInBossSlots: 60, normalReplacement: 'both', bossChanceInNormalSlots: 20, fit: 'anywhere' }, { secondGargoyle: 'replace' }), { items: { soulItems: 'transposed' } }), seeds: 40 },
+    { name: 'souls-triple-fog', patch: merge2(structuredClone(DEFAULT_GENERATION_SETTINGS), { items: { soulItems: 'transposed' } }), seeds: 100 },
+    { name: 'souls-replaced-fog', patch: merge2(structuredClone(DEFAULT_GENERATION_SETTINGS), { items: { soulItems: 'replaced' } }), seeds: 20 },
+  ],
   /** Part F1: hostile NPCs through the real data tool (Fog is covered by the fogHostE2e sweeps): events, rows and AI bundles of every placed NPC. */
   'hostile-npc-f1': [
     { name: 'npc-anywhere', patch: merge2(noItems, noFog, sampling({ hostileNpcs: true, fit: 'anywhere', difficultyMode: 'random' })) },
@@ -175,6 +187,21 @@ async function main() {
       try { return JSON.parse(out.stdout.trim().split(/\r?\n/u).pop()); } catch { return { checkedCount: 0, missing: [`the audit did not run: ${String(out.stderr).slice(0, 200)}`], duplicateOwners: [] }; }
     };
 
+    // Item lot rows of the FINAL package (a Fog merge included) against the plan of the combined run (SmokeVerify lots).
+    const auditLots = async (run) => {
+      let dir = run.result.packagePath;
+      const has = async (candidate) => readFile(path.join(candidate, 'randomizer.json')).then(() => true, () => false);
+      if (!(await has(dir))) {
+        const attempts = (await readdir(run.workspacePath)).filter((name) => /^combined-\d+$/u.test(name)).sort((a, b) => Number(b.slice(9)) - Number(a.slice(9)));
+        const seedDirectory = (await readdir(path.join(run.workspacePath, attempts[0]))).find((name) => name.startsWith('seed_'));
+        dir = path.join(run.workspacePath, attempts[0], seedDirectory);
+      }
+      // A combined-only package keeps its game tree under mod/; a Fog package IS the staged game tree.
+      const tree = await readdir(path.join(run.result.packagePath, 'param')).then(() => run.result.packagePath, () => path.join(run.result.packagePath, 'mod'));
+      const out = spawnSync(verifier, ['lots', tree, path.join(source, 'paramdef', 'paramdef.paramdefbnd.dcx'), path.join(dir, 'randomizer.json'), source], { encoding: 'utf8' });
+      try { return JSON.parse(out.stdout.trim().split(/\r?\n/u).pop()); } catch { return { checkedTargets: 0, bossRewardTargets: 0, problems: [`the lots verifier did not run: ${String(out.stderr).slice(0, 200)}`] }; }
+    };
+
     const generate = async (spec, seed, label) => {
       const prepared = prepareRun({ gamePath: game, masterSeed: seed, ...buildSettings(spec.patch) });
       if (!prepared.ok) throw new Error(`${label}: ${prepared.code}: ${prepared.technical}`);
@@ -194,7 +221,7 @@ async function main() {
 
     for (const spec of caseList.filter((entry) => !args.cases || args.cases.includes(entry.name))) {
       const seeds = args.seeds ?? spec.seeds ?? 12;
-      const stats = { case: spec.name, seeds, ok: 0, failed: [], retries: 0, windowOverruns: 0, windowInexact: 0, eventOwnerChecked: 0, eventOwnerFrozen: 0, eventOwnerFailures: [], floorReserved: 0, windowMoved: 0, movedSeeds: [], maxEvents: 0, maxEventsMap: '', nonDeterministic: 0, maxModels: 0, started: Date.now() };
+      const stats = { case: spec.name, seeds, ok: 0, failed: [], retries: 0, windowOverruns: 0, windowInexact: 0, eventOwnerChecked: 0, eventOwnerFrozen: 0, eventOwnerFailures: [], lotsChecked: 0, bossRewardsChecked: 0, lotFailures: [], floorReserved: 0, windowMoved: 0, movedSeeds: [], maxEvents: 0, maxEventsMap: '', nonDeterministic: 0, maxModels: 0, started: Date.now() };
       const indices = args.only ?? Array.from({ length: seeds }, (_, offset) => offset + 1);
       stats.seeds = indices.length;
       for (const index of indices) {
@@ -209,6 +236,10 @@ async function main() {
           stats.eventOwnerChecked += owners.checkedCount;
           stats.eventOwnerFrozen += owners.frozenWithoutEvents ?? 0;
           if (owners.missing.length > 0 || owners.duplicateOwners.length > 0) stats.eventOwnerFailures.push(`#${index}: ${[...owners.missing.slice(0, 2), ...owners.duplicateOwners.slice(0, 1)].join(' | ')}`);
+          const lots = await auditLots(run);
+          stats.lotsChecked += lots.checkedTargets;
+          stats.bossRewardsChecked += lots.bossRewardTargets;
+          if (lots.problems.length > 0) stats.lotFailures.push(`#${index}: ${lots.problems.slice(0, 2).join(' | ')}`);
           const maps = Object.values(run.result.manifest.enemyPlacement.summary?.maps ?? {});
           stats.maxModels = Math.max(stats.maxModels, ...maps.map((map) => map.finalModels ?? 0), 0);
           for (const line of run.audit) {
@@ -238,7 +269,7 @@ async function main() {
       console.log(JSON.stringify(stats));
     }
     const failed = summary.reduce((total, entry) => total + entry.failed.length, 0);
-    const bad = summary.reduce((total, entry) => total + entry.windowOverruns + entry.nonDeterministic + entry.eventOwnerFailures.length, 0);
+    const bad = summary.reduce((total, entry) => total + entry.windowOverruns + entry.nonDeterministic + entry.eventOwnerFailures.length + entry.lotFailures.length, 0);
     console.log(`MATRIX ${args.set}: ${summary.reduce((total, entry) => total + entry.ok, 0)} ok, ${failed} failed, ${bad} invariant violations (window overruns / non-deterministic reruns / event owner audit)`);
     if (failed > 0 || bad > 0) process.exitCode = 1;
   } finally {
