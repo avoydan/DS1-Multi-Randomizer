@@ -1,0 +1,20 @@
+{
+  "title": "Run history",
+  "empty": "Your randomized worlds will be listed here.",
+  "status": {
+    "generated": "Generated",
+    "applied": "Applied",
+    "restored": "Restored"
+  },
+  "regenerate": "Regenerate files",
+  "regenerateHint": "The generated files were cleaned up. This creates the same world again.",
+  "applyPlay": "Apply / Play",
+  "restoreFirst": "Restore the original game first.",
+  "viewSettings": "View settings",
+  "viewSpoiler": "View spoiler log",
+  "delete": "Delete from history",
+  "detailsTitle": {
+    "settings": "Settings of this world",
+    "spoiler": "Spoiler log"
+  }
+}

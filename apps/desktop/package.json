@@ -1,6 +1,6 @@
 {
   "name": "@ds1tr/desktop",
-  "version": "0.29.0",
+  "version": "0.30.0",
   "license": "GPL-3.0-only",
   "private": true,
   "type": "module",
@@ -9,13 +9,15 @@
     "dev": "concurrently -k \"vite\" \"tsc -p electron/tsconfig.json --watch\" \"wait-on http://127.0.0.1:5173 && electron .\"",
     "build": "vite build --configLoader runner && tsc -p electron/tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p electron/tsconfig.json --noEmit",
-    "test": "node --test electron/settings.test.mjs electron/launchGame.test.mjs ../../tools/release/release-tools.test.mjs",
+    "test": "node --test electron/settings.test.mjs electron/language.test.mjs src/i18n/locales.test.mjs electron/launchGame.test.mjs ../../tools/release/release-tools.test.mjs",
     "package:win": "node scripts/package-win.mjs"
   },
   "dependencies": {
-    "@ds1tr/contracts": "0.3.0",
+    "@ds1tr/contracts": "*",
+    "i18next": "^26.4.2",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "react-i18next": "^17.0.16"
   },
   "devDependencies": {
     "@types/node": "^22.10.5",

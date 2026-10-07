@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { decideStartupInstallation } from '@ds1tr/contracts';
 import type { GameStateReport } from '@ds1tr/contracts';
 import { api, type DetectedInstallation } from './api';
+import { useErrorText, type ErrorInfo } from './ErrorNotice';
 
 interface Props {
   gamePath: string;
@@ -15,31 +17,24 @@ interface Props {
   busy: boolean;
 }
 
+/** `problem` holds a key of `game.problem.*` or `game.state.*`, never a sentence: the text is chosen at render time in the current language. */
 type GameStatus =
   | { kind: 'searching' }
   | { kind: 'choose'; options: DetectedInstallation[] }
   | { kind: 'missing' }
   | { kind: 'checking' }
   | { kind: 'ready' }
-  | { kind: 'problem'; message: string };
+  | { kind: 'problem'; problem: 'notComplete' | 'notVerified' | 'cannotCheck' | Exclude<GameStateReport['state'], 'vanilla' | 'active'> };
 
-type WorldStatus = { kind: 'idle' } | { kind: 'preparing'; message: string } | { kind: 'ready' } | { kind: 'failed'; message: string };
-
-const plainState: Record<GameStateReport['state'], string> = {
-  invalid: 'This folder does not look like Dark Souls Remastered.',
-  'no-snapshot': 'Dark Souls Remastered is being checked.',
-  'version-changed': 'Dark Souls Remastered was updated. Restore the original game files, then try again.',
-  vanilla: '',
-  active: '',
-  interrupted: 'A previous change to the game was interrupted. Use "Restore original game" to repair it.',
-  modified: 'Some game files were changed by another tool. Verify the game files in Steam, then try again.',
-};
+type WorldStatus = { kind: 'idle' } | { kind: 'preparing' } | { kind: 'ready' } | { kind: 'failed'; error: ErrorInfo };
 
 /**
  * First-run readiness: finds Dark Souls Remastered, checks it and prepares the fog randomizer, all without asking the
  * person for anything but, at most, which installation to use. Technical details stay in the backend log.
  */
 export function Readiness({ gamePath, backendReady, worldNeeded, onPath, onState, refreshKey, busy }: Props) {
+  const { t } = useTranslation();
+  const errorText = useErrorText();
   const [game, setGame] = useState<GameStatus>({ kind: 'searching' });
   const [world, setWorld] = useState<WorldStatus>({ kind: 'idle' });
   const [showFolder, setShowFolder] = useState(false);
@@ -57,7 +52,7 @@ export function Readiness({ gamePath, backendReady, worldNeeded, onPath, onState
       const validation = await api.validateInstallation(path);
       if (validation.valid && manual.current === path) void window.desktop?.rememberGamePath(path);
       if (!validation.valid) {
-        setGame({ kind: 'problem', message: 'This folder does not look like a complete Dark Souls Remastered installation. Verify the game files in Steam, or choose another folder.' });
+        setGame({ kind: 'problem', problem: 'notComplete' });
         onState(null);
         return;
       }
@@ -65,17 +60,16 @@ export function Readiness({ gamePath, backendReady, worldNeeded, onPath, onState
       if (state.state === 'no-snapshot') {
         const imported = await api.importPristine(path);
         if (!imported.ok) {
-          setGame({ kind: 'problem', message: 'Dark Souls Remastered could not be verified. If you used other randomizers on it, verify the game files in Steam and try again.' });
+          setGame({ kind: 'problem', problem: 'notVerified' });
           onState(state);
           return;
         }
         state = await api.state(path);
       }
       onState(state);
-      const hint = plainState[state.state];
-      setGame(hint && state.state !== 'vanilla' && state.state !== 'active' ? { kind: 'problem', message: hint } : { kind: 'ready' });
+      setGame(state.state === 'vanilla' || state.state === 'active' ? { kind: 'ready' } : { kind: 'problem', problem: state.state });
     } catch {
-      setGame({ kind: 'problem', message: 'Dark Souls Remastered could not be checked. Restart the app and try again.' });
+      setGame({ kind: 'problem', problem: 'cannotCheck' });
     }
   }, [onState]);
 
@@ -111,12 +105,12 @@ export function Readiness({ gamePath, backendReady, worldNeeded, onPath, onState
   }, [backendReady, gamePath, refreshKey, checkGame]);
 
   const prepareWorld = useCallback(async () => {
-    setWorld({ kind: 'preparing', message: 'Preparing fog randomizer...' });
+    setWorld({ kind: 'preparing' });
     try {
       const result = await api.prepareWorldData(gamePath);
-      setWorld(result.ok ? { kind: 'ready' } : { kind: 'failed', message: result.userMessage });
+      setWorld(result.ok ? { kind: 'ready' } : { kind: 'failed', error: { code: result.code, detail: result.userMessage } });
     } catch {
-      setWorld({ kind: 'failed', message: 'The fog randomizer could not be prepared. Click Retry.' });
+      setWorld({ kind: 'failed', error: { code: 'FOG_PREREQUISITES_MISSING' } });
     }
   }, [gamePath]);
 
@@ -135,40 +129,40 @@ export function Readiness({ gamePath, backendReady, worldNeeded, onPath, onState
         <span className="readiness-mark">{game.kind === 'ready' ? '✓' : game.kind === 'problem' || game.kind === 'missing' ? '!' : '…'}</span>
         <div>
           <strong>
-            {game.kind === 'ready' && 'Dark Souls Remastered found'}
-            {game.kind === 'searching' && 'Looking for Dark Souls Remastered...'}
-            {game.kind === 'checking' && 'Checking Dark Souls Remastered...'}
-            {game.kind === 'choose' && 'We found more than one copy of Dark Souls Remastered'}
-            {game.kind === 'missing' && "We couldn't find Dark Souls Remastered automatically."}
-            {game.kind === 'problem' && 'Dark Souls Remastered needs attention'}
+            {game.kind === 'ready' && t('game.status.ready')}
+            {game.kind === 'searching' && t('game.status.searching')}
+            {game.kind === 'checking' && t('game.status.checking')}
+            {game.kind === 'choose' && t('game.status.choose')}
+            {game.kind === 'missing' && t('game.status.missing')}
+            {game.kind === 'problem' && t('game.status.problem')}
           </strong>
-          {game.kind === 'problem' && <p>{game.message}</p>}
+          {game.kind === 'problem' && <p>{t(`game.problem.${game.problem}`)}</p>}
           {game.kind === 'choose' && (
             <div className="readiness-choices">
-              {game.options.map((item) => <button key={item.gamePath} className="secondary" onClick={() => pick(item.gamePath)}>Use the copy in {item.gamePath}</button>)}
+              {game.options.map((item) => <button key={item.gamePath} className="secondary" onClick={() => pick(item.gamePath)}>{t('game.useCopy', { path: item.gamePath })}</button>)}
             </div>
           )}
           {gamePath && game.kind === 'ready' && <small className="field-note">{gamePath}</small>}
         </div>
         <button className="secondary" disabled={busy} onClick={() => (game.kind === 'missing' ? void choose() : setShowFolder((open) => !open))}>
-          {game.kind === 'missing' ? 'Select game folder' : 'Change game folder'}
+          {game.kind === 'missing' ? t('game.selectFolder') : t('game.changeFolder')}
         </button>
       </div>
       {showFolder && (
         <div className="path-row">
-          <input value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Type the Dark Souls Remastered folder, or use Browse" aria-label="Dark Souls Remastered folder" />
-          <button className="secondary" onClick={() => void choose()}>Browse</button>
-          <button className="secondary" disabled={!draft.trim()} onClick={() => { pick(draft.trim()); setShowFolder(false); }}>Use this folder</button>
+          <input value={draft} onChange={(event) => setDraft(event.target.value)} placeholder={t('game.folderPlaceholder')} aria-label={t('game.folderLabel')} />
+          <button className="secondary" onClick={() => void choose()}>{t('game.browse')}</button>
+          <button className="secondary" disabled={!draft.trim()} onClick={() => { pick(draft.trim()); setShowFolder(false); }}>{t('game.useFolder')}</button>
         </div>
       )}
       {worldNeeded && game.kind === 'ready' && (
         <div className={`readiness-row ${world.kind}`}>
           <span className="readiness-mark">{world.kind === 'ready' ? '✓' : world.kind === 'failed' ? '!' : '…'}</span>
           <div>
-            <strong>{world.kind === 'ready' ? 'Fog randomizer ready' : world.kind === 'failed' ? 'Fog randomizer needs attention' : world.kind === 'preparing' ? world.message : 'Fog randomizer'}</strong>
-            {world.kind === 'failed' && <p>{world.message}</p>}
+            <strong>{world.kind === 'ready' ? t('game.world.ready') : world.kind === 'failed' ? t('game.world.attention') : world.kind === 'preparing' ? t('game.world.preparing') : t('game.world.label')}</strong>
+            {world.kind === 'failed' && <p>{errorText(world.error)}</p>}
           </div>
-          {world.kind === 'failed' && <button className="secondary" onClick={() => void prepareWorld()}>Retry</button>}
+          {world.kind === 'failed' && <button className="secondary" onClick={() => void prepareWorld()}>{t('game.world.retry')}</button>}
         </div>
       )}
     </div>

@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
+import { ErrorNotice, type ErrorInfo } from './ErrorNotice';
+import { LanguageSelect } from './LanguageSelect';
 import { EnemyPoolEditor } from './EnemyPoolEditor';
 import { Readiness } from './Readiness';
 import { SeedPanel, SummaryChips, shortSeedCode, type LoadedSeed } from './SeedPanel';
 import { RunHistoryPanel } from './RunHistoryPanel';
 import { SmokeTestPanel } from './SmokeTestPanel';
-import { DEFAULT_GENERATION_SETTINGS, OUTCOME_MESSAGES, deriveRunPhase, isLoadedSeedModified, joinConfig, splitConfig } from '@ds1tr/contracts';
+import { DEFAULT_GENERATION_SETTINGS, deriveRunPhase, isLoadedSeedModified, joinConfig, splitConfig } from '@ds1tr/contracts';
 import type { RunPhase, RunHistoryEntry, EnemyPlacementAlgorithm, FogLanguage, GameStateReport, GwynNerfMode, SecondGargoyleMode, KeyPlacementMode, ItemDifficultyMode, SoulItemsMode, StartingItemsMode, GenerationResult, PipelinePlan, RandomizerConfig } from '@ds1tr/contracts';
 import { api } from './api';
 import ludos from './assets/branding/ludos.png';
@@ -27,9 +31,10 @@ interface ToggleProps {
 }
 
 function Toggle({ checked, onChange, label, disabled = false, inactive = false, hint }: ToggleProps) {
+  const { t } = useTranslation();
   return (
     <label className={`toggle-row ${disabled ? 'planned-option' : ''}`} title={hint}>
-      <span>{label}{disabled && <small>Planned extension</small>}</span>
+      <span>{label}{disabled && <small>{t('common.plannedExtension')}</small>}</span>
       <input type="checkbox" checked={checked} disabled={disabled || inactive} onChange={(event) => onChange(event.target.checked)} />
     </label>
   );
@@ -44,74 +49,75 @@ function RangeOption({ label, value, onChange, disabled = false, inactive = fals
   inactive?: boolean;
   hint?: string;
 }) {
+  const { t } = useTranslation();
   return (
     <label className={`range-option ${disabled ? 'planned-option' : ''}`} title={hint}>
-      <span>{label}{disabled && <small>Planned extension</small>}</span>
+      <span>{label}{disabled && <small>{t('common.plannedExtension')}</small>}</span>
       <div><input type="range" min="0" max="100" value={value} disabled={disabled || inactive} onChange={(event) => onChange(Number(event.target.value))} /><strong>{value}%</strong></div>
     </label>
   );
 }
 
-function stateText(state: GameStateReport | null): string {
+function stateText(state: GameStateReport | null, t: TFunction): string {
   switch (state?.state) {
-    case 'vanilla': return 'Your game is original and ready to be randomized.';
-    case 'active': return 'A randomized game is applied. Restore the original game before making a new one.';
-    case 'interrupted': return 'A previous change was interrupted. Click "Restore original game" to repair it.';
-    case 'version-changed': return 'Dark Souls Remastered was updated. Restore the original game files, then try again.';
-    case 'modified': return 'Some game files were changed by another tool. Verify the game files in Steam first.';
-    case 'invalid': return 'This folder is not a Dark Souls Remastered installation.';
-    case 'no-snapshot': return 'Checking your game...';
-    default: return 'Looking for your game...';
+    case 'vanilla': case 'active': case 'interrupted': case 'version-changed': case 'modified': case 'invalid': case 'no-snapshot':
+      return t(`app.state.${state.state}`);
+    default: return t('app.state.looking');
   }
 }
 
-function phaseTitle(phase: RunPhase): string {
+function phaseTitle(phase: RunPhase, t: TFunction): string {
   switch (phase) {
-    case 'generated': return 'Ready to apply';
-    case 'applied': return 'Randomized game';
-    case 'repair': return 'Repair needed';
-    case 'blocked': return 'Your game';
-    case 'working': return 'Working';
-    default: return 'Randomize';
+    case 'generated': return t('app.phase.generated');
+    case 'applied': return t('app.phase.applied');
+    case 'repair': return t('app.phase.repair');
+    case 'blocked': return t('app.phase.blocked');
+    case 'working': return t('app.phase.working');
+    default: return t('app.phase.ready');
   }
 }
 
-function progressLabel(stage: string): string {
+function progressLabel(stage: string, t: TFunction): string {
   switch (stage) {
-    case 'verify': case 'import': return 'Checking your game';
-    case 'combined': return 'Randomizing items and enemies';
-    case 'fog': return 'Randomizing fog gates and warps';
-    default: return 'Working';
+    case 'verify': case 'import': return t('app.progress.checking');
+    case 'combined': return t('app.progress.combined');
+    case 'fog': return t('app.progress.fog');
+    default: return t('app.progress.working');
   }
 }
+
+type WorkKey = 'working' | 'applying' | 'restoring' | 'preparingFog';
+type NoticeKey = 'applied' | 'restored';
+type LaunchKey = 'steam' | 'executable' | 'failed' | 'noBridge';
 
 export function App() {
+  const { t, i18n } = useTranslation();
   const [config, setConfig] = useState(initialConfig);
   const [backendOnline, setBackendOnline] = useState<boolean | null>(null);
   const [startupError, setStartupError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [plan, setPlan] = useState<PipelinePlan | null>(null);
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState('Choose your settings, then click Randomize.');
+  const [message, setMessage] = useState('');
   const [gameState, setGameState] = useState<GameStateReport | null>(null);
   const [generation, setGeneration] = useState<GenerationResult | null>(null);
   const [progress, setProgress] = useState(0);
   const [progressStage, setProgressStage] = useState('');
   const [logs, setLogs] = useState<string[]>([]);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [problem, setProblem] = useState<ErrorInfo | null>(null);
   const [presetText, setPresetText] = useState('');
   const [presetProblems, setPresetProblems] = useState<string[]>([]);
   const [seedPanelOpen, setSeedPanelOpen] = useState(false);
   const [lastRun, setLastRun] = useState<{ seedCode: string; profile: string; masterSeed: string } | null>(null);
-  const [notice, setNotice] = useState<{ text: string; sub: string } | null>(null);
+  const [notice, setNotice] = useState<NoticeKey | null>(null);
   const [history, setHistory] = useState<RunHistoryEntry[]>([]);
   const [settingsReady, setSettingsReady] = useState(false);
   const [settingsWarning, setSettingsWarning] = useState<string | null>(null);
-  const [launchMessage, setLaunchMessage] = useState<string | null>(null);
+  const [launchMessage, setLaunchMessage] = useState<LaunchKey | null>(null);
   const [copied, setCopied] = useState(false);
   /** A shared world waiting for the game to be original again (restoring is the one thing the person has to do). */
   const [pendingSeed, setPendingSeed] = useState<LoadedSeed | null>(null);
-  const [workLabel, setWorkLabel] = useState('Working');
+  const [workLabel, setWorkLabel] = useState<WorkKey>('working');
   const [runMenuOpen, setRunMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -122,6 +128,9 @@ export function App() {
   useEffect(() => {
     setPlan(null);
   }, [config]);
+
+  // The transient status message is text in one language: drop it when the language changes (the plan preview is data and is re-rendered).
+  useEffect(() => { setMessage(''); }, [i18n.language]);
 
   const refreshHistory = useCallback(async () => {
     try { setHistory((await api.history()).entries); } catch { /* the list is a convenience */ }
@@ -164,8 +173,8 @@ export function App() {
   const reportError = (error: unknown) => {
     const detail = error instanceof Error ? error.message : String(error);
     setLogs((current) => [...current, `error: ${detail}`]);
-    setErrorMessage('Something went wrong. Please try again; the details are under Advanced.');
-    setMessage('Something went wrong.');
+    setProblem({ kind: 'unexpected', detail });
+    setMessage(t('app.message.failed'));
   };
 
   const setItem = <K extends keyof RandomizerConfig['items']>(key: K, value: RandomizerConfig['items'][K]) =>
@@ -223,11 +232,11 @@ export function App() {
   const importPristine = async () => {
     setBusy(true);
     setProgressStage('');
-    setErrorMessage(null);
+    setProblem(null);
     try {
       const result = await api.importPristine(config.gamePath);
-      setMessage(result.ok ? 'Dark Souls Remastered checked.' : result.message);
-      if (!result.ok) setErrorMessage(result.message);
+      setMessage(result.ok ? t('app.message.gameChecked') : t(`errors.codes.${result.code}` as never, { defaultValue: result.message }) as string);
+      if (!result.ok) setProblem({ code: result.code, detail: result.message, problems: result.problems });
       setGameState(await api.state(config.gamePath));
       setRefreshKey((value) => value + 1);
     } catch (error) { reportError(error); }
@@ -243,13 +252,13 @@ export function App() {
     setPendingSeed(null);
     setLogs([]);
     setGeneration(null);
-    setErrorMessage(null);
+    setProblem(null);
     setNotice(null);
     setLaunchMessage(null);
     setCopied(false);
     try {
       const result = await api.generate(config, (event) => {
-        if (event.type === 'progress') { setProgress(event.progress); setProgressStage(event.stage); setMessage(event.message); }
+        if (event.type === 'progress') { setProgress(event.progress); setProgressStage(event.stage); setMessage(progressLabel(event.stage, t)); }
         else setLogs((current) => [...current, `[${event.stage}] ${event.level}: ${event.message}`]);
       }, seedCode);
       setGeneration(result);
@@ -258,29 +267,29 @@ export function App() {
         setLastRun({ seedCode: result.seedCode, profile: result.profile, masterSeed: detail.masterSeed ?? result.manifest.masterSeed });
         void refreshHistory();
       } else {
-        setErrorMessage(result.message);
+        setProblem({ code: result.code, detail: result.message });
         setLogs((current) => [...current, `[${result.stage}] failed: ${result.code}`]);
       }
-      setMessage(result.ok ? 'Your randomized game is ready.' : result.message);
+      setMessage(result.ok ? t('app.message.worldReady') : t(`errors.codes.${result.code}` as never, { defaultValue: result.message }) as string);
     } catch (error) { reportError(error); }
     finally { setBusy(false); }
   };
 
   const applyPackage = async (packagePath: string) => {
     setBusy(true);
-    setWorkLabel('Applying the randomized game');
+    setWorkLabel('applying');
     setProgressStage('');
-    setErrorMessage(null);
+    setProblem(null);
     setNotice(null);
     setLaunchMessage(null);
     try {
       const result = await api.activate(config.gamePath, packagePath);
       if (result.ok) {
-        setNotice({ ...OUTCOME_MESSAGES.applied });
-        setMessage(OUTCOME_MESSAGES.applied.text);
+        setNotice('applied');
+        setMessage(t('app.outcome.applied.text'));
       } else {
-        setMessage(result.message);
-        setErrorMessage(`${result.message}${result.problems.length ? ` ${result.problems.join(' ')}` : ''}`);
+        setMessage(t(`errors.codes.${result.code}` as never, { defaultValue: result.message }) as string);
+        setProblem({ code: result.code, detail: result.message, problems: result.problems });
       }
       setGameState(await api.state(config.gamePath));
       setRefreshKey((value) => value + 1);
@@ -295,20 +304,20 @@ export function App() {
 
   const restore = async () => {
     setBusy(true);
-    setWorkLabel('Restoring the original game');
+    setWorkLabel('restoring');
     setProgressStage('');
-    setErrorMessage(null);
+    setProblem(null);
     setNotice(null);
     setLaunchMessage(null);
     try {
       const result = await api.restore(config.gamePath);
       if (result.ok) {
         setGeneration(null);
-        setNotice({ ...OUTCOME_MESSAGES.restored });
-        setMessage(OUTCOME_MESSAGES.restored.text);
+        setNotice('restored');
+        setMessage(t('app.outcome.restored.text'));
       } else {
-        setMessage(result.message);
-        setErrorMessage(`${result.message}${result.problems.length ? ` ${result.problems.join(' ')}` : ''}`);
+        setMessage(t(`errors.codes.${result.code}` as never, { defaultValue: result.message }) as string);
+        setProblem({ code: result.code, detail: result.message, problems: result.problems });
       }
       setGameState(await api.state(config.gamePath));
       setRefreshKey((value) => value + 1);
@@ -321,17 +330,17 @@ export function App() {
     setLaunchMessage(null);
     try {
       const result = await window.desktop?.launchGame(config.gamePath);
-      if (!result) { setLaunchMessage('Start Dark Souls Remastered from Steam.'); return; }
-      setLaunchMessage(result.message);
+      if (!result) { setLaunchMessage('noBridge'); return; }
+      setLaunchMessage(result.ok ? (result.method === 'steam' ? 'steam' : 'executable') : 'failed');
       if (result.technical) setLogs((current) => [...current, `launch (${result.method}): ${result.technical}`]);
     } catch (error) {
-      setLaunchMessage('Dark Souls Remastered could not be started. Please start it from Steam.');
+      setLaunchMessage('failed');
       setLogs((current) => [...current, `launch: ${error instanceof Error ? error.message : String(error)}`]);
     }
   };
 
   const copySeed = async (code: string) => {
-    try { await navigator.clipboard.writeText(code); setCopied(true); setMessage('Seed code copied.'); } catch { setMessage('Select the seed code and copy it with Ctrl+C.'); }
+    try { await navigator.clipboard.writeText(code); setCopied(true); setMessage(t('app.message.seedCopied')); } catch { setMessage(t('app.message.seedCopyFailed')); }
   };
 
   /** Puts the settings of a world into the controls and remembers that they came from a Seed Code. */
@@ -344,7 +353,7 @@ export function App() {
   const loadSeed = async (seed: LoadedSeed) => {
     adoptSeed(seed);
     setNotice(null);
-    setErrorMessage(null);
+    setProblem(null);
     if (gameState?.state === 'vanilla') await generateShared(seed);
     else setPendingSeed(seed);
   };
@@ -353,10 +362,10 @@ export function App() {
   const generateShared = async (seed: LoadedSeed) => {
     if (seed.settings.fog.enabled) {
       setBusy(true);
-      setWorkLabel('Preparing the fog randomizer');
+      setWorkLabel('preparingFog');
       try {
         const prepared = await api.prepareWorldData(config.gamePath);
-        if (!prepared.ok) { setErrorMessage(prepared.userMessage); setBusy(false); return; }
+        if (!prepared.ok) { setProblem({ code: prepared.code, detail: prepared.userMessage }); setBusy(false); return; }
       } catch (error) { setBusy(false); reportError(error); return; }
       setBusy(false);
     }
@@ -386,15 +395,15 @@ export function App() {
   const spoilerOf = async (entry: RunHistoryEntry): Promise<string> => {
     try {
       const result = await api.spoiler(entry.id);
-      return result.ok ? result.text : result.message;
-    } catch { return 'The spoiler log could not be read.'; }
+      return result.ok ? result.text : t(`app.spoiler.${result.code === 'SPOILER_NONE' || result.code === 'SPOILER_UNAVAILABLE' ? result.code : 'unreadable'}`);
+    } catch { return t('app.spoiler.unreadable'); }
   };
 
   const exportPreset = async () => {
     setPresetProblems([]);
     try {
       setPresetText(JSON.stringify(await api.exportPreset({ ...config, masterSeed: 'preset' }), null, 2));
-      setMessage('Preset exported. Copy the text to share these settings.');
+      setMessage(t('app.preset.exported'));
     } catch (error) { reportError(error); }
   };
 
@@ -405,23 +414,23 @@ export function App() {
       if (!result.ok) { setPresetProblems(result.problems); return; }
       const { format: _format, presetVersion: _version, masterSeed: _ignoredSeed, ...settings } = result.preset;
       setConfig((current) => ({ ...current, ...settings }));
-      setMessage('Preset applied. Review the settings, then click Randomize.');
+      setMessage(t('app.preset.applied'));
     } catch (error) { reportError(error); }
   };
 
   const resetSettings = () => {
     setConfig((current) => ({ ...initialConfig, gamePath: current.gamePath }));
     setPresetProblems([]);
-    setMessage('Settings restored to the defaults.');
+    setMessage(t('app.preset.resetDone'));
   };
 
   const previewPlan = async () => {
     setBusy(true);
     setProgressStage('');
-    setErrorMessage(null);
+    setProblem(null);
     try {
       setPlan(await api.plan({ ...config, masterSeed: lastRun?.masterSeed ?? 'preview' }));
-      setMessage('Pipeline plan generated. Planned extensions remain disabled until implemented.');
+      setMessage(t('app.message.planDone'));
     } catch (error) {
       reportError(error);
     } finally {
@@ -432,192 +441,193 @@ export function App() {
   return (
     <div className="app-shell">
       <header className="hero">
-        <div className="hero-brand"><div className="eyebrow">DARK SOULS REMASTERED</div><h1>Triple Randomizer</h1><p>Randomize items, enemies and fog gates of Dark Souls Remastered.</p></div>
+        <div className="hero-brand"><div className="eyebrow">{t('app.header.eyebrow')}</div><h1>{t('app.header.title')}</h1><p>{t('app.header.tagline')}</p></div>
         <div className="hero-side">
-          <div className={`status ${backendOnline ? 'online' : 'offline'}`}><span /> {backendOnline === null ? 'Starting...' : backendOnline ? 'Ready' : 'Not running'}</div>
+          <div className={`status ${backendOnline ? 'online' : 'offline'}`}><span /> {backendOnline === null ? t('app.status.starting') : backendOnline ? t('app.status.ready') : t('app.status.offline')}</div>
+          <LanguageSelect />
           <img className="hero-ludos" src={ludos} alt="" aria-hidden="true" draggable={false} />
         </div>
       </header>
 
       <main>
         {settingsWarning && <div className="notice">{settingsWarning}</div>}
-        {startupError && <div className="notice error">DS1 Triple Randomizer could not start its engine. Close and reopen the app; if it keeps happening, download the app again.<details><summary>Details</summary>{startupError}</details></div>}
+        {startupError && <div className="notice error">{t('app.startupError.text')}<details><summary>{t('app.startupError.details')}</summary>{startupError}</details></div>}
         <section className="card setup-card">
-          <div className="section-title"><span>01</span><h2>Your game</h2></div>
+          <div className="section-title"><span>01</span><h2>{t('app.sections.game')}</h2></div>
           <Readiness
             gamePath={config.gamePath}
             backendReady={backendOnline === true}
             worldNeeded={config.fog.enabled}
             busy={busy}
             refreshKey={refreshKey}
-            onPath={(path) => { setConfig((current) => ({ ...current, gamePath: path })); setGameState(null); setGeneration(null); setErrorMessage(null); }}
+            onPath={(path) => { setConfig((current) => ({ ...current, gamePath: path })); setGameState(null); setGeneration(null); setProblem(null); }}
             onState={setGameState}
           />
           <div className="inline-options">
-            <Toggle disabled label="Include DLC" checked hint="Excluding the DLC is not implemented; the DLC is always included." onChange={() => undefined} />
-            <Toggle label="Generate spoiler log" checked={config.output.generateSpoilerLog} onChange={(value) => setConfig({ ...config, output: { ...config.output, generateSpoilerLog: value } })} />
+            <Toggle disabled label={t('app.options.includeDlc.label')} checked hint={t('app.options.includeDlc.hint')} onChange={() => undefined} />
+            <Toggle label={t('app.options.spoilerLog')} checked={config.output.generateSpoilerLog} onChange={(value) => setConfig({ ...config, output: { ...config.output, generateSpoilerLog: value } })} />
           </div>
-          <details className="log-panel"><summary>Settings preset (import / export)</summary>
-            <textarea className="run-logs" aria-label="Settings preset" rows={8} value={presetText} onChange={(event) => setPresetText(event.target.value)} placeholder="Paste a DS1TR preset here, or export the current settings." />
-            <div className="run-actions"><button className="secondary" onClick={exportPreset}>Export current settings</button><button className="secondary" onClick={importPreset} disabled={!presetText.trim()}>Apply preset</button><button className="secondary" onClick={resetSettings}>Restore default settings</button></div>
+          <details className="log-panel"><summary>{t('app.preset.summary')}</summary>
+            <textarea className="run-logs" aria-label={t('app.preset.aria')} rows={8} value={presetText} onChange={(event) => setPresetText(event.target.value)} placeholder={t('app.preset.placeholder')} />
+            <div className="run-actions"><button className="secondary" onClick={exportPreset}>{t('app.preset.export')}</button><button className="secondary" onClick={importPreset} disabled={!presetText.trim()}>{t('app.preset.apply')}</button><button className="secondary" onClick={resetSettings}>{t('app.preset.reset')}</button></div>
             {presetProblems.length > 0 && <div className="notice error" role="alert">{presetProblems.join(' ')}</div>}
           </details>
         </section>
 
         <div className="grid-3">
           <section className={`card engine-card ${config.items.enabled ? '' : 'disabled-card'}`}>
-            <div className="engine-heading"><div><span className="engine-index">ITEMS</span><h2>Item settings</h2></div><input type="checkbox" checked={config.items.enabled} onChange={(event) => setItem('enabled', event.target.checked)} /></div>
-            <div className="option-group"><h3>Main options</h3>
-              <Toggle label="World items" checked={config.items.randomizeWorldItems} onChange={(value) => setItem('randomizeWorldItems', value)} />
-              <Toggle disabled label="Protected items (unsafe: may softlock)" checked={config.items.randomizeProtectedItems} onChange={(value) => setItem('randomizeProtectedItems', value)} />
-              <Toggle label="Protect selected gift/shop progression entries" checked={config.items.progressionLogic} onChange={(value) => setItem('progressionLogic', value)} />
-              <Toggle label="Guarantee early weapon" checked={config.items.guaranteeEarlyWeapon} onChange={(value) => setItem('guaranteeEarlyWeapon', value)} />
-              <Toggle label="Balanced early loot" checked={config.items.balancedEarlyLoot} onChange={(value) => setItem('balancedEarlyLoot', value)} />
-              <Toggle label="Starting class" checked={config.items.randomizeStartingClass} onChange={(value) => setItem('randomizeStartingClass', value)} />
-              <Toggle label="Starting equipment" checked={config.items.randomizeStartingEquipment} onChange={(value) => setItem('randomizeStartingEquipment', value)} />
-              <Toggle label="NPC gifts" checked={config.items.randomizeGifts} onChange={(value) => setItem('randomizeGifts', value)} />
-              <Toggle label="Enemy drops" checked={config.items.randomizeEnemyDrops} onChange={(value) => setItem('randomizeEnemyDrops', value)} />
-              <Toggle label="Guaranteed enemy drops" checked={config.items.guaranteedEnemyDrops} onChange={(value) => setItem('guaranteedEnemyDrops', value)} />
-              <Toggle label="Shops" checked={config.items.randomizeShops} onChange={(value) => setItem('randomizeShops', value)} />
+            <div className="engine-heading"><div><span className="engine-index">{t('settings.items.index')}</span><h2>{t('settings.items.title')}</h2></div><input type="checkbox" checked={config.items.enabled} onChange={(event) => setItem('enabled', event.target.checked)} /></div>
+            <div className="option-group"><h3>{t('settings.items.groups.main')}</h3>
+              <Toggle label={t('settings.items.worldItems.label')} checked={config.items.randomizeWorldItems} onChange={(value) => setItem('randomizeWorldItems', value)} />
+              <Toggle disabled label={t('settings.items.protectedItems.label')} checked={config.items.randomizeProtectedItems} onChange={(value) => setItem('randomizeProtectedItems', value)} />
+              <Toggle label={t('settings.items.progressionLogic.label')} checked={config.items.progressionLogic} onChange={(value) => setItem('progressionLogic', value)} />
+              <Toggle label={t('settings.items.earlyWeapon.label')} checked={config.items.guaranteeEarlyWeapon} onChange={(value) => setItem('guaranteeEarlyWeapon', value)} />
+              <Toggle label={t('settings.items.balancedEarlyLoot.label')} checked={config.items.balancedEarlyLoot} onChange={(value) => setItem('balancedEarlyLoot', value)} />
+              <Toggle label={t('settings.items.startingClass.label')} checked={config.items.randomizeStartingClass} onChange={(value) => setItem('randomizeStartingClass', value)} />
+              <Toggle label={t('settings.items.startingEquipment.label')} checked={config.items.randomizeStartingEquipment} onChange={(value) => setItem('randomizeStartingEquipment', value)} />
+              <Toggle label={t('settings.items.npcGifts.label')} checked={config.items.randomizeGifts} onChange={(value) => setItem('randomizeGifts', value)} />
+              <Toggle label={t('settings.items.enemyDrops.label')} checked={config.items.randomizeEnemyDrops} onChange={(value) => setItem('randomizeEnemyDrops', value)} />
+              <Toggle label={t('settings.items.guaranteedDrops.label')} checked={config.items.guaranteedEnemyDrops} onChange={(value) => setItem('guaranteedEnemyDrops', value)} />
+              <Toggle label={t('settings.items.shops.label')} checked={config.items.randomizeShops} onChange={(value) => setItem('randomizeShops', value)} />
             </div>
-            <div className="option-group"><h3>Legacy options</h3>
-              <Toggle inactive={!config.items.randomizeWorldItems} label="Fashion Souls" hint="On: armor pieces are shuffled individually. Off: complete armor sets stay together and are exchanged between set locations." checked={config.items.fashionSouls} onChange={(value) => setItem('fashionSouls', value)} />
-              <label className="field-label">Soul items</label>
-              <select value={config.items.soulItems} disabled={!(config.items.randomizeWorldItems || config.items.randomizeGifts || config.items.randomizeEnemyDrops)} title="Replaced: the lesser souls (Soul of a Lost Undead through Soul of a Great Hero) become other consumables before shuffling. Transposed: the boss souls join the item pool and each has a 75% chance to become a weapon made from that soul." onChange={(event) => setItem('soulItems', event.target.value as SoulItemsMode)}><option value="shuffled">Shuffled</option><option value="replaced">Replaced</option><option value="transposed">Transposed</option></select>
-              <label className="field-label">Starting items</label>
-              <select value={config.items.startingItems} disabled={!config.items.randomizeStartingEquipment} title="Needs Starting equipment. Shield modes give the left hand a shield; mixed pool also allows weapons." onChange={(event) => setItem('startingItems', event.target.value as StartingItemsMode)}><option value="shield-1h">Shield + 1H weapon</option><option value="shield-2h">Shield + 1H/2H weapon</option><option value="mixed-pool">Shield/weapon + weapon</option></select>
-              <Toggle label="Laundromat Mixup" hint="NPC characters wear armor pieces other NPCs wear instead of their usual sets (only a cosmetic change and the armor stats of the NPC; nothing you can pick up changes). With Fashion Souls off each NPC wears one complete set; on, the pieces are mixed. Hollowed NPC variants keep their look." checked={config.items.laundromat ?? false} onChange={(value) => setItem('laundromat', value)} />
+            <div className="option-group"><h3>{t('settings.items.groups.legacy')}</h3>
+              <Toggle inactive={!config.items.randomizeWorldItems} label={t('settings.items.fashionSouls.label')} hint={t('settings.items.fashionSouls.hint')} checked={config.items.fashionSouls} onChange={(value) => setItem('fashionSouls', value)} />
+              <label className="field-label">{t('settings.items.soulItems.label')}</label>
+              <select value={config.items.soulItems} disabled={!(config.items.randomizeWorldItems || config.items.randomizeGifts || config.items.randomizeEnemyDrops)} title={t('settings.items.soulItems.hint')} onChange={(event) => setItem('soulItems', event.target.value as SoulItemsMode)}><option value="shuffled">{t('settings.items.soulItems.options.shuffled')}</option><option value="replaced">{t('settings.items.soulItems.options.replaced')}</option><option value="transposed">{t('settings.items.soulItems.options.transposed')}</option></select>
+              <label className="field-label">{t('settings.items.startingItems.label')}</label>
+              <select value={config.items.startingItems} disabled={!config.items.randomizeStartingEquipment} title={t('settings.items.startingItems.hint')} onChange={(event) => setItem('startingItems', event.target.value as StartingItemsMode)}><option value="shield-1h">{t('settings.items.startingItems.options.shield-1h')}</option><option value="shield-2h">{t('settings.items.startingItems.options.shield-2h')}</option><option value="mixed-pool">{t('settings.items.startingItems.options.mixed-pool')}</option></select>
+              <Toggle label={t('settings.items.laundromat.label')} hint={t('settings.items.laundromat.hint')} checked={config.items.laundromat ?? false} onChange={(value) => setItem('laundromat', value)} />
             </div>
-            <div className="option-group"><h3>Key items</h3>
-              <label className="field-label">Key placement</label>
-              <select value={config.items.keyPlacement ?? 'vanilla'} title="Vanilla: every key stays where the game puts it. Shuffled: the keys of the world graph (Basement Key, Master Key, Crest of Artorias, the bell keys and the like) move to other world pickups, and the placement is checked so every area stays reachable and Firelink Altar can be reached. Race Mode: like Shuffled, but the keys and the embers lie only in boss rewards, chests and the places where keys normally are (good for races). Race Mode +: like Race Mode, but the world may need skips and glitches (the Capra skip, the Seal skip and the like); softlocking is possible without them. Needs World items." onChange={(event) => setKeyPlacement(event.target.value as KeyPlacementMode)}><option value="vanilla">Vanilla</option><option value="shuffled">Shuffled</option><option value="race">Race Mode</option><option value="race-plus">Race Mode +</option></select>
+            <div className="option-group"><h3>{t('settings.items.groups.keyItems')}</h3>
+              <label className="field-label">{t('settings.items.keyPlacement.label')}</label>
+              <select value={config.items.keyPlacement ?? 'vanilla'} title={t('settings.items.keyPlacement.hint')} onChange={(event) => setKeyPlacement(event.target.value as KeyPlacementMode)}><option value="vanilla">{t('settings.items.keyPlacement.options.vanilla')}</option><option value="shuffled">{t('settings.items.keyPlacement.options.shuffled')}</option><option value="race">{t('settings.items.keyPlacement.options.race')}</option><option value="race-plus">{t('settings.items.keyPlacement.options.race-plus')}</option></select>
               <small className="field-note">{(config.items.keyPlacement ?? 'vanilla') === 'vanilla'
-                ? 'Every key stays where the game puts it.'
+                ? t('settings.items.keyNotes.vanilla')
                 : !config.items.randomizeWorldItems
-                  ? 'Key placement needs World items: turn on World items, or set Key placement to Vanilla.'
+                  ? t('settings.items.keyNotes.needsWorld')
                   : config.items.keyPlacement === 'shuffled'
-                    ? 'Keys are placed by a safety-checked fill over the world graph.'
+                    ? t('settings.items.keyNotes.shuffled')
                     : config.items.keyPlacement === 'race'
-                      ? 'Keys and embers lie only in boss rewards, chests and where keys normally are. The same safety check applies.'
-                      : 'Like Race Mode, but a world may need skips and glitches to be completed. Item difficulty is Fair. With the fog randomizer on, the world is made as Race Mode.'}</small>
-              <Toggle inactive={(config.items.keyPlacement ?? 'vanilla') === 'vanilla'} label="Lordvessel placement" hint="The Lordvessel joins the key shuffle: it lies at another world pickup, and Gwynevere hands over another item of the pool instead. The Firelink Altar still needs the Lordvessel in your inventory. Needs a Key placement other than Vanilla. (The fog option Lordvessel gates is separate.)" checked={config.items.randomizeLordvessel ?? false} onChange={(value) => setItem('randomizeLordvessel', value)} />
-              <Toggle inactive={(config.items.keyPlacement ?? 'vanilla') === 'vanilla'} label="Lord Soul placement" hint="The four Lord Souls join the key shuffle (the Bed of Chaos, Nito, Quelaag and Seath pickups). Needs a Key placement other than Vanilla. (The fog option Require Lord Souls is separate.)" checked={config.items.randomizeLordSouls ?? false} onChange={(value) => setItem('randomizeLordSouls', value)} />
+                      ? t('settings.items.keyNotes.race')
+                      : t('settings.items.keyNotes.racePlus')}</small>
+              <Toggle inactive={(config.items.keyPlacement ?? 'vanilla') === 'vanilla'} label={t('settings.items.lordvessel.label')} hint={t('settings.items.lordvessel.hint')} checked={config.items.randomizeLordvessel ?? false} onChange={(value) => setItem('randomizeLordvessel', value)} />
+              <Toggle inactive={(config.items.keyPlacement ?? 'vanilla') === 'vanilla'} label={t('settings.items.lordSouls.label')} hint={t('settings.items.lordSouls.hint')} checked={config.items.randomizeLordSouls ?? false} onChange={(value) => setItem('randomizeLordSouls', value)} />
             </div>
-            <div className="option-group"><h3>Item difficulty</h3>
-              <label className="field-label">Difficulty</label>
-              <select value={config.items.itemDifficulty ?? 'fair'} disabled={config.items.keyPlacement === 'race-plus'} title="Fair: items have an equal chance to be placed anywhere. Unfair: desirable items are not placed in plain view. Very Unfair: desirable items are hidden and rarely in early areas. This is about where items lie, never about whether the world can be completed. Race Mode + is always Fair." onChange={(event) => setItem('itemDifficulty', event.target.value as ItemDifficultyMode)}><option value="fair">Fair</option><option value="unfair">Unfair</option><option value="very-unfair">Very Unfair</option></select>
+            <div className="option-group"><h3>{t('settings.items.groups.difficulty')}</h3>
+              <label className="field-label">{t('settings.items.difficulty.label')}</label>
+              <select value={config.items.itemDifficulty ?? 'fair'} disabled={config.items.keyPlacement === 'race-plus'} title={t('settings.items.difficulty.hint')} onChange={(event) => setItem('itemDifficulty', event.target.value as ItemDifficultyMode)}><option value="fair">{t('settings.items.difficulty.options.fair')}</option><option value="unfair">{t('settings.items.difficulty.options.unfair')}</option><option value="very-unfair">{t('settings.items.difficulty.options.very-unfair')}</option></select>
               <small className="field-note">{config.items.keyPlacement === 'race-plus'
-                ? 'Race Mode + is always Fair.'
+                ? t('settings.items.difficultyNotes.racePlus')
                 : (config.items.itemDifficulty ?? 'fair') === 'fair'
-                  ? 'Items have an equal chance to be placed anywhere.'
+                  ? t('settings.items.difficultyNotes.fair')
                   : config.items.itemDifficulty === 'unfair'
-                    ? 'Desirable items are not placed in plain view.'
-                    : 'Desirable items are hidden and rarely in early areas.'}</small>
+                    ? t('settings.items.difficultyNotes.unfair')
+                    : t('settings.items.difficultyNotes.veryUnfair')}</small>
             </div>
           </section>
 
           <section className={`card engine-card ${config.enemies.enabled ? '' : 'disabled-card'}`}>
-            <div className="engine-heading"><div><span className="engine-index">ENEMIES</span><h2>Enemy settings</h2></div><input type="checkbox" checked={config.enemies.enabled} onChange={(event) => setEnemy('enabled', event.target.checked)} /></div>
-            <div className="option-group"><h3>Main options</h3>
-              <Toggle label="Regular enemies" checked={config.enemies.randomizeRegularEnemies} onChange={(value) => setEnemy('randomizeRegularEnemies', value)} />
-              <Toggle label="Bosses" checked={config.enemies.randomizeBosses} onChange={(value) => setEnemy('randomizeBosses', value)} />
-              <label className="field-label">Scaling</label><select value={config.enemies.scaling} onChange={(event) => setEnemy('scaling', event.target.value as RandomizerConfig['enemies']['scaling'])}><option value="vanilla">Vanilla</option><option value="area">Area</option><option value="progressive">Progressive</option></select>
+            <div className="engine-heading"><div><span className="engine-index">{t('settings.enemies.index')}</span><h2>{t('settings.enemies.title')}</h2></div><input type="checkbox" checked={config.enemies.enabled} onChange={(event) => setEnemy('enabled', event.target.checked)} /></div>
+            <div className="option-group"><h3>{t('settings.enemies.groups.main')}</h3>
+              <Toggle label={t('settings.enemies.regular.label')} checked={config.enemies.randomizeRegularEnemies} onChange={(value) => setEnemy('randomizeRegularEnemies', value)} />
+              <Toggle label={t('settings.enemies.bosses.label')} checked={config.enemies.randomizeBosses} onChange={(value) => setEnemy('randomizeBosses', value)} />
+              <label className="field-label">{t('settings.enemies.scaling.label')}</label><select value={config.enemies.scaling} onChange={(event) => setEnemy('scaling', event.target.value as RandomizerConfig['enemies']['scaling'])}><option value="vanilla">{t('settings.enemies.scaling.options.vanilla')}</option><option value="area">{t('settings.enemies.scaling.options.area')}</option><option value="progressive">{t('settings.enemies.scaling.options.progressive')}</option></select>
             </div>
-            <div className="option-group"><h3>Enemy placement</h3>
-              <label className="field-label">Placement algorithm</label>
-              <select value={config.enemies.placement.algorithm} disabled={!config.enemies.randomizeRegularEnemies} title="Sampling: each enemy slot independently chooses a compatible replacement, which enables replacement chance, placement fit, difficulty, type replacement, a custom enemy pool and the boss and NPC options. It may repeat a type. Classic permutation: shuffles the existing enemy population between locations while preserving overall counts; it reproduces old seeds." onChange={(event) => setPlacementAlgorithm(event.target.value as EnemyPlacementAlgorithm)}><option value="sampling-v1">Sampling (recommended)</option><option value="permutation-v1">Classic permutation</option></select>
+            <div className="option-group"><h3>{t('settings.enemies.groups.placement')}</h3>
+              <label className="field-label">{t('settings.enemies.algorithm.label')}</label>
+              <select value={config.enemies.placement.algorithm} disabled={!config.enemies.randomizeRegularEnemies} title={t('settings.enemies.algorithm.hint')} onChange={(event) => setPlacementAlgorithm(event.target.value as EnemyPlacementAlgorithm)}><option value="sampling-v1">{t('settings.enemies.algorithm.options.sampling-v1')}</option><option value="permutation-v1">{t('settings.enemies.algorithm.options.permutation-v1')}</option></select>
               <small className="field-note">{config.enemies.placement.algorithm === 'sampling-v1'
-                ? 'Each enemy slot independently chooses a compatible replacement. The options below apply.'
-                : 'Shuffles the existing enemy population between locations while preserving overall counts. Reproduces old seeds; the sampling options are not shown.'}</small>
+                ? t('settings.enemies.algorithmNotes.sampling')
+                : t('settings.enemies.algorithmNotes.permutation')}</small>
               {config.enemies.placement.algorithm === 'sampling-v1' && (
                 <>
-              <RangeOption label="Replacement chance" hint="Chance that each regular enemy slot is replaced at all. The 30-model map limit never gets worse: maps that bosses and dragons already push above 30 (Undead Parish) stay at or below their current count." value={config.enemies.placement.replacementChance} inactive={!config.enemies.randomizeRegularEnemies || config.enemies.placement.algorithm !== 'sampling-v1'} onChange={(value) => setPlacement('replacementChance', value)} />
-              <label className="field-label">Normal enemy replacement</label>
-              <select value={config.enemies.placement.normalReplacement} disabled={!config.enemies.randomizeRegularEnemies || config.enemies.placement.algorithm !== 'sampling-v1'} title="Only normal enemies: the usual replacement. Only bosses: bosses stand in the regular enemy slots that take part (a boss that wanders the world, with a share of its souls). Bosses or normal enemies: each slot that takes part gets a boss with the chance set below, otherwise a normal enemy. Bosses that need their own arena (Bed of Chaos, Ceaseless Discharge, Dark Sun Gwyndolin, Lord Gwyn) and the multi-body bosses never appear in a regular slot." onChange={(event) => setNormalReplacement(event.target.value as RandomizerConfig['enemies']['placement']['normalReplacement'])}><option value="none">Disabled</option><option value="normals">Only normal enemies</option><option value="bosses">Only bosses</option><option value="both">Bosses or normal enemies</option></select>
+              <RangeOption label={t('settings.enemies.replacementChance.label')} hint={t('settings.enemies.replacementChance.hint')} value={config.enemies.placement.replacementChance} inactive={!config.enemies.randomizeRegularEnemies || config.enemies.placement.algorithm !== 'sampling-v1'} onChange={(value) => setPlacement('replacementChance', value)} />
+              <label className="field-label">{t('settings.enemies.normalReplacement.label')}</label>
+              <select value={config.enemies.placement.normalReplacement} disabled={!config.enemies.randomizeRegularEnemies || config.enemies.placement.algorithm !== 'sampling-v1'} title={t('settings.enemies.normalReplacement.hint')} onChange={(event) => setNormalReplacement(event.target.value as RandomizerConfig['enemies']['placement']['normalReplacement'])}><option value="none">{t('settings.enemies.normalReplacement.options.none')}</option><option value="normals">{t('settings.enemies.normalReplacement.options.normals')}</option><option value="bosses">{t('settings.enemies.normalReplacement.options.bosses')}</option><option value="both">{t('settings.enemies.normalReplacement.options.both')}</option></select>
               {config.enemies.placement.algorithm === 'sampling-v1' && config.enemies.placement.normalReplacement === 'both' && (
-                <RangeOption label="Boss chance in normal slots" hint="Of the regular enemy slots that take part, the share that get a boss instead of a normal enemy." value={config.enemies.placement.bossChanceInNormalSlots} inactive={!config.enemies.randomizeRegularEnemies} onChange={(value) => setPlacement('bossChanceInNormalSlots', value)} />
+                <RangeOption label={t('settings.enemies.bossChanceNormal.label')} hint={t('settings.enemies.bossChanceNormal.hint')} value={config.enemies.placement.bossChanceInNormalSlots} inactive={!config.enemies.randomizeRegularEnemies} onChange={(value) => setPlacement('bossChanceInNormalSlots', value)} />
               )}
               {config.enemies.placement.algorithm === 'sampling-v1' && (config.enemies.placement.normalReplacement === 'bosses' || config.enemies.placement.normalReplacement === 'both') && (
                 <>
-                  <RangeOption label="Roaming boss souls" hint="How many of its fight souls a boss drops when it stands in a regular enemy slot (percent of the souls the boss gives in its own arena)." value={config.enemies.placement.roamingBossSouls} inactive={!config.enemies.randomizeRegularEnemies} onChange={(value) => setPlacement('roamingBossSouls', value)} />
-                  <Toggle inactive={!config.enemies.randomizeRegularEnemies} label="Roaming bosses stay dead" hint="On: a boss in a regular slot does not come back once the area is reset (played in the game: it stayed dead). Off: it respawns like a normal enemy (written to the game's data; not yet confirmed in a playthrough)." checked={config.enemies.placement.roamingBossesStayDead} onChange={(value) => setPlacement('roamingBossesStayDead', value)} />
+                  <RangeOption label={t('settings.enemies.roamingSouls.label')} hint={t('settings.enemies.roamingSouls.hint')} value={config.enemies.placement.roamingBossSouls} inactive={!config.enemies.randomizeRegularEnemies} onChange={(value) => setPlacement('roamingBossSouls', value)} />
+                  <Toggle inactive={!config.enemies.randomizeRegularEnemies} label={t('settings.enemies.roamingDead.label')} hint={t('settings.enemies.roamingDead.hint')} checked={config.enemies.placement.roamingBossesStayDead} onChange={(value) => setPlacement('roamingBossesStayDead', value)} />
                 </>
               )}
-              <label className="field-label">Placement</label>
-              <select value={config.enemies.placement.fit} disabled={!config.enemies.randomizeRegularEnemies || config.enemies.placement.algorithm !== 'sampling-v1'} title="Only where they fit: a replacement is never larger than the slot. Anywhere: any size. For regular enemies the last option equals Anywhere (it differs only for NPC slots)." onChange={(event) => setPlacement('fit', event.target.value as RandomizerConfig['enemies']['placement']['fit'])}><option value="fits">Only where they fit</option><option value="anywhere">Anywhere</option><option value="anywhere-except-npcs">Anywhere, fit NPCs</option></select>
-              <label className="field-label">Difficulty mode</label>
-              <select value={config.enemies.placement.difficultyMode} disabled={!config.enemies.randomizeRegularEnemies || config.enemies.placement.algorithm !== 'sampling-v1'} title="Difficulty curve: a regular enemy is replaced by one of comparable difficulty (strictness decides how far it may differ). Fully random: any enemy anywhere. Easy Asylum: the Asylum only receives the easiest enemies. Difficulty classes are derived by DS1TR from the enemies' areas and HP, so they approximate the original ones." onChange={(event) => setPlacement('difficultyMode', event.target.value as RandomizerConfig['enemies']['placement']['difficultyMode'])}><option value="curve-easy-asylum">Curve + easy Asylum</option><option value="curve">Difficulty curve</option><option value="random-easy-asylum">Random + easy Asylum</option><option value="random">Fully random</option></select>
-              <label className="field-label">Difficulty strictness</label>
-              <select value={config.enemies.placement.difficultyStrictness} disabled={!config.enemies.randomizeRegularEnemies || config.enemies.placement.algorithm !== 'sampling-v1' || !config.enemies.placement.difficultyMode.startsWith('curve')} title="Only used by the difficulty-curve modes. Strict: mostly the same difficulty class, harder ones are rare. A bit loose: harder enemies appear more often. Very loose: any difficulty can appear anywhere." onChange={(event) => setPlacement('difficultyStrictness', event.target.value as RandomizerConfig['enemies']['placement']['difficultyStrictness'])}><option value="strict">Strict</option><option value="loose">A bit loose</option><option value="very-loose">Very loose</option></select>
-              <label className="field-label">Type replacement</label>
-              <select value={config.enemies.placement.typeReplacement} disabled={!config.enemies.randomizeRegularEnemies || config.enemies.placement.algorithm !== 'sampling-v1'} title="Enabled: all enemies of one kind in a map (every Hollow in the Parish) are replaced by the same new kind, and two kinds in one map never get the same replacement. The replacement chance then applies to the kind, not to each enemy. With bosses in regular slots, Enabled gives every enemy of one kind the same boss; the exception lets each slot draw its own boss instead." onChange={(event) => setPlacement('typeReplacement', event.target.value as RandomizerConfig['enemies']['placement']['typeReplacement'])}><option value="enabled">Enabled</option><option value="enabled-except-roaming-bosses">Enabled, except roaming bosses</option><option value="disabled">Disabled</option></select>
-              <label className="field-label">Boss replacement</label>
-              <select value={config.enemies.placement.bossReplacement} disabled={!config.enemies.randomizeBosses || config.enemies.placement.algorithm !== 'sampling-v1'} title="Classic shuffle: the bosses are shuffled among the boss slots as before. Random bosses: every single-body boss slot draws its own replacement from the boss pool, so a boss can appear more than once. Only normal enemies / Bosses or normal enemies: a normal enemy takes the place of the boss in three early fights (Asylum Demon, Taurus Demon, Capra Demon); the fight stays the boss's (its health bar and its name, its fog gate, what it unlocks and its rewards) and the normal enemy never comes back. With Area or Progressive scaling it takes the boss's health and strength, with Vanilla scaling its own. Every other boss keeps its own boss in Only normal enemies and gets a random boss in Bosses or normal enemies. The dragons, Seath, Priscilla, the Sanctuary Guardian, the Bell Gargoyles and the Centipede Demon keep the classic shuffle. Lord Gwyn follows the Gwyn spawn nerf." onChange={(event) => setBossReplacement(event.target.value as RandomizerConfig['enemies']['placement']['bossReplacement'])}><option value="classic">Classic shuffle</option><option value="bosses">Random bosses</option><option value="normals">Only normal enemies (early fights)</option><option value="both">Bosses or normal enemies</option></select>
+              <label className="field-label">{t('settings.enemies.fit.label')}</label>
+              <select value={config.enemies.placement.fit} disabled={!config.enemies.randomizeRegularEnemies || config.enemies.placement.algorithm !== 'sampling-v1'} title={t('settings.enemies.fit.hint')} onChange={(event) => setPlacement('fit', event.target.value as RandomizerConfig['enemies']['placement']['fit'])}><option value="fits">{t('settings.enemies.fit.options.fits')}</option><option value="anywhere">{t('settings.enemies.fit.options.anywhere')}</option><option value="anywhere-except-npcs">{t('settings.enemies.fit.options.anywhere-except-npcs')}</option></select>
+              <label className="field-label">{t('settings.enemies.difficultyMode.label')}</label>
+              <select value={config.enemies.placement.difficultyMode} disabled={!config.enemies.randomizeRegularEnemies || config.enemies.placement.algorithm !== 'sampling-v1'} title={t('settings.enemies.difficultyMode.hint')} onChange={(event) => setPlacement('difficultyMode', event.target.value as RandomizerConfig['enemies']['placement']['difficultyMode'])}><option value="curve-easy-asylum">{t('settings.enemies.difficultyMode.options.curve-easy-asylum')}</option><option value="curve">{t('settings.enemies.difficultyMode.options.curve')}</option><option value="random-easy-asylum">{t('settings.enemies.difficultyMode.options.random-easy-asylum')}</option><option value="random">{t('settings.enemies.difficultyMode.options.random')}</option></select>
+              <label className="field-label">{t('settings.enemies.strictness.label')}</label>
+              <select value={config.enemies.placement.difficultyStrictness} disabled={!config.enemies.randomizeRegularEnemies || config.enemies.placement.algorithm !== 'sampling-v1' || !config.enemies.placement.difficultyMode.startsWith('curve')} title={t('settings.enemies.strictness.hint')} onChange={(event) => setPlacement('difficultyStrictness', event.target.value as RandomizerConfig['enemies']['placement']['difficultyStrictness'])}><option value="strict">{t('settings.enemies.strictness.options.strict')}</option><option value="loose">{t('settings.enemies.strictness.options.loose')}</option><option value="very-loose">{t('settings.enemies.strictness.options.very-loose')}</option></select>
+              <label className="field-label">{t('settings.enemies.typeReplacement.label')}</label>
+              <select value={config.enemies.placement.typeReplacement} disabled={!config.enemies.randomizeRegularEnemies || config.enemies.placement.algorithm !== 'sampling-v1'} title={t('settings.enemies.typeReplacement.hint')} onChange={(event) => setPlacement('typeReplacement', event.target.value as RandomizerConfig['enemies']['placement']['typeReplacement'])}><option value="enabled">{t('settings.enemies.typeReplacement.options.enabled')}</option><option value="enabled-except-roaming-bosses">{t('settings.enemies.typeReplacement.options.enabled-except-roaming-bosses')}</option><option value="disabled">{t('settings.enemies.typeReplacement.options.disabled')}</option></select>
+              <label className="field-label">{t('settings.enemies.bossReplacement.label')}</label>
+              <select value={config.enemies.placement.bossReplacement} disabled={!config.enemies.randomizeBosses || config.enemies.placement.algorithm !== 'sampling-v1'} title={t('settings.enemies.bossReplacement.hint')} onChange={(event) => setBossReplacement(event.target.value as RandomizerConfig['enemies']['placement']['bossReplacement'])}><option value="classic">{t('settings.enemies.bossReplacement.options.classic')}</option><option value="bosses">{t('settings.enemies.bossReplacement.options.bosses')}</option><option value="normals">{t('settings.enemies.bossReplacement.options.normals')}</option><option value="both">{t('settings.enemies.bossReplacement.options.both')}</option></select>
               {config.enemies.placement.algorithm === 'sampling-v1' && config.enemies.placement.bossReplacement === 'both' && (
-                <RangeOption label="Boss chance in boss slots" hint="Of the boss slots that take part and can take a normal enemy, the share that get a boss; the rest get a normal enemy." value={config.enemies.placement.bossChanceInBossSlots} inactive={!config.enemies.randomizeBosses} onChange={(value) => setPlacement('bossChanceInBossSlots', value)} />
+                <RangeOption label={t('settings.enemies.bossChanceBoss.label')} hint={t('settings.enemies.bossChanceBoss.hint')} value={config.enemies.placement.bossChanceInBossSlots} inactive={!config.enemies.randomizeBosses} onChange={(value) => setPlacement('bossChanceInBossSlots', value)} />
               )}
-              <Toggle inactive={!config.enemies.randomizeBosses || config.enemies.placement.algorithm !== 'sampling-v1' || (config.enemies.placement.bossReplacement !== 'bosses' && config.enemies.placement.bossReplacement !== 'both')} label="Unique bosses" hint="Needs Random bosses or Bosses or normal enemies. Every boss of the pool is used once before any boss appears a second time." checked={config.enemies.placement.uniqueBosses} onChange={(value) => setPlacement('uniqueBosses', value)} />
+              <Toggle inactive={!config.enemies.randomizeBosses || config.enemies.placement.algorithm !== 'sampling-v1' || (config.enemies.placement.bossReplacement !== 'bosses' && config.enemies.placement.bossReplacement !== 'both')} label={t('settings.enemies.uniqueBosses.label')} hint={t('settings.enemies.uniqueBosses.hint')} checked={config.enemies.placement.uniqueBosses} onChange={(value) => setPlacement('uniqueBosses', value)} />
               <EnemyPoolEditor gamePath={config.gamePath} active={config.enemies.randomizeRegularEnemies && config.enemies.placement.algorithm === 'sampling-v1'} fit={config.enemies.placement.fit} customPool={config.enemies.placement.customPool} onChange={(pool) => setConfig((current) => ({ ...current, enemies: { ...current.enemies, placement: { ...current.enemies.placement, customPool: pool, ...(pool !== null ? { hostileNpcs: false } : {}) } } }))} />
                 </>
               )}
             </div>
-            <div className="option-group"><h3>Legacy options</h3>
-              <Toggle inactive={!config.enemies.randomizeRegularEnemies} label="Replace mimics" hint="Off: Mimics stay in place and are kept out of the enemy pool." checked={config.enemies.replaceMimics} onChange={(value) => setEnemy('replaceMimics', value)} />
+            <div className="option-group"><h3>{t('settings.enemies.groups.legacy')}</h3>
+              <Toggle inactive={!config.enemies.randomizeRegularEnemies} label={t('settings.enemies.mimics.label')} hint={t('settings.enemies.mimics.hint')} checked={config.enemies.replaceMimics} onChange={(value) => setEnemy('replaceMimics', value)} />
               {config.enemies.placement.algorithm === 'sampling-v1' && (config.enemies.placement.normalReplacement === 'normals' || config.enemies.placement.normalReplacement === 'both') && config.enemies.placement.customPool === null && (
-                <Toggle inactive={!config.enemies.randomizeRegularEnemies} label="Hostile NPCs" hint="Randomizes hostile NPC combatants: the Undead Merchant, Andre of Astora and Vamos can appear as enemies in place of regular enemies. Quest and service NPCs are kept safe: the real ones are never touched and nothing they sell or teach changes. Not used together with a custom enemy pool." checked={config.enemies.placement.hostileNpcs} onChange={(value) => setPlacement('hostileNpcs', value)} />
+                <Toggle inactive={!config.enemies.randomizeRegularEnemies} label={t('settings.enemies.hostileNpcs.label')} hint={t('settings.enemies.hostileNpcs.hint')} checked={config.enemies.placement.hostileNpcs} onChange={(value) => setPlacement('hostileNpcs', value)} />
               )}
-              <Toggle inactive={!config.enemies.randomizeRegularEnemies} label="Replace respawning mosquitoes" hint="Off: the six respawning Blighttown swamp mosquitoes stay in place." checked={config.enemies.replaceRespawningMosquitoes} onChange={(value) => setEnemy('replaceRespawningMosquitoes', value)} />
-              <Toggle inactive={!config.enemies.randomizeRegularEnemies} label="Prevent same enemy" hint="On: no regular enemy is replaced by an enemy of its own kind (a Hollow never becomes a Hollow). Bosses are never replaced by the same boss." checked={config.enemies.preventSameEnemy} onChange={(value) => setEnemy('preventSameEnemy', value)} />
-              <Toggle inactive={!config.enemies.randomizeRegularEnemies} label="Pinwheel Chaos" hint="On: the main Pinwheel is not replaced; its clones are replaced by regular enemies with their own stats." checked={config.enemies.pinwheelChaos} onChange={(value) => setEnemy('pinwheelChaos', value)} />
-              <label className="field-label">Replace second Gargoyle</label>
-              <select value={config.enemies.secondGargoyle} disabled={!config.enemies.randomizeBosses} title="Needs boss randomization. Replace: the second Bell Gargoyle becomes an independently drawn boss. Do not replace: it stays a Bell Gargoyle. Single boss: the earlier DS1TR behavior (the extra Gargoyle is removed)." onChange={(event) => setEnemy('secondGargoyle', event.target.value as SecondGargoyleMode)}><option value="replace">Replace</option><option value="keep">Do not replace</option><option value="single-boss">Single boss (earlier DS1TR behavior)</option></select>
-              <label className="field-label">Gwyn spawn nerf</label>
-              <select value={config.enemies.gwynNerf} disabled={!config.enemies.randomizeBosses} title="Chance that Lord Gwyn is rejected as a boss replacement: strong 85%, medium 60%." onChange={(event) => setEnemy('gwynNerf', event.target.value as GwynNerfMode)}><option value="strong">Strong</option><option value="medium">Medium</option><option value="none">None</option></select>
+              <Toggle inactive={!config.enemies.randomizeRegularEnemies} label={t('settings.enemies.mosquitoes.label')} hint={t('settings.enemies.mosquitoes.hint')} checked={config.enemies.replaceRespawningMosquitoes} onChange={(value) => setEnemy('replaceRespawningMosquitoes', value)} />
+              <Toggle inactive={!config.enemies.randomizeRegularEnemies} label={t('settings.enemies.sameEnemy.label')} hint={t('settings.enemies.sameEnemy.hint')} checked={config.enemies.preventSameEnemy} onChange={(value) => setEnemy('preventSameEnemy', value)} />
+              <Toggle inactive={!config.enemies.randomizeRegularEnemies} label={t('settings.enemies.pinwheel.label')} hint={t('settings.enemies.pinwheel.hint')} checked={config.enemies.pinwheelChaos} onChange={(value) => setEnemy('pinwheelChaos', value)} />
+              <label className="field-label">{t('settings.enemies.gargoyle.label')}</label>
+              <select value={config.enemies.secondGargoyle} disabled={!config.enemies.randomizeBosses} title={t('settings.enemies.gargoyle.hint')} onChange={(event) => setEnemy('secondGargoyle', event.target.value as SecondGargoyleMode)}><option value="replace">{t('settings.enemies.gargoyle.options.replace')}</option><option value="keep">{t('settings.enemies.gargoyle.options.keep')}</option><option value="single-boss">{t('settings.enemies.gargoyle.options.single-boss')}</option></select>
+              <label className="field-label">{t('settings.enemies.gwyn.label')}</label>
+              <select value={config.enemies.gwynNerf} disabled={!config.enemies.randomizeBosses} title={t('settings.enemies.gwyn.hint')} onChange={(event) => setEnemy('gwynNerf', event.target.value as GwynNerfMode)}><option value="strong">{t('settings.enemies.gwyn.options.strong')}</option><option value="medium">{t('settings.enemies.gwyn.options.medium')}</option><option value="none">{t('settings.enemies.gwyn.options.none')}</option></select>
             </div>
           </section>
 
           <section className={`card engine-card ${config.fog.enabled ? '' : 'disabled-card'}`}>
-            <div className="engine-heading"><div><span className="engine-index">FOG</span><h2>Fog randomizer settings</h2><p className="engine-note">Randomizes fog gates, warps and world progression.</p></div><input type="checkbox" checked={config.fog.enabled} onChange={(event) => setFog('enabled', event.target.checked)} /></div>
-            <div className="option-group"><h3>Entrances</h3>
-              <Toggle label="Traversable non-boss fogs" checked={config.fog.traversableFogs} onChange={(value) => setFog('traversableFogs', value)} />
-              <Toggle label="Boss fog gates" checked={config.fog.bossFogs} onChange={(value) => setFog('bossFogs', value)} />
-              <Toggle label="Warps between areas" checked={config.fog.areaWarps} onChange={(value) => setFog('areaWarps', value)} />
-              <Toggle label="Major PvP fog gates" checked={config.fog.majorPvpFogs} onChange={(value) => setFog('majorPvpFogs', value)} />
-              <Toggle label="Minor PvP fog gates" checked={config.fog.minorPvpFogs} onChange={(value) => setFog('minorPvpFogs', value)} />
-              <Toggle label="Lordvessel gates" checked={config.fog.lordvesselGates} onChange={(value) => setFog('lordvesselGates', value)} />
+            <div className="engine-heading"><div><span className="engine-index">{t('settings.fog.index')}</span><h2>{t('settings.fog.title')}</h2><p className="engine-note">{t('settings.fog.note')}</p></div><input type="checkbox" checked={config.fog.enabled} onChange={(event) => setFog('enabled', event.target.checked)} /></div>
+            <div className="option-group"><h3>{t('settings.fog.groups.entrances')}</h3>
+              <Toggle label={t('settings.fog.traversable.label')} checked={config.fog.traversableFogs} onChange={(value) => setFog('traversableFogs', value)} />
+              <Toggle label={t('settings.fog.bossFogs.label')} checked={config.fog.bossFogs} onChange={(value) => setFog('bossFogs', value)} />
+              <Toggle label={t('settings.fog.warps.label')} checked={config.fog.areaWarps} onChange={(value) => setFog('areaWarps', value)} />
+              <Toggle label={t('settings.fog.majorPvp.label')} checked={config.fog.majorPvpFogs} onChange={(value) => setFog('majorPvpFogs', value)} />
+              <Toggle label={t('settings.fog.minorPvp.label')} checked={config.fog.minorPvpFogs} onChange={(value) => setFog('minorPvpFogs', value)} />
+              <Toggle label={t('settings.fog.lordvesselGates.label')} checked={config.fog.lordvesselGates} onChange={(value) => setFog('lordvesselGates', value)} />
             </div>
-            <div className="option-group"><h3>Logic & gameplay</h3>
-              <Toggle label="Random start outside Asylum" checked={config.fog.randomStart} onChange={(value) => setFog('randomStart', value)} />
-              <Toggle label="Disconnected fog gates" checked={config.fog.disconnectedFogs} onChange={(value) => setFog('disconnectedFogs', value)} />
-              <Toggle label="No-Fall Bed of Chaos" checked={config.fog.noFallBedOfChaos} onChange={(value) => setFog('noFallBedOfChaos', value)} />
-              <Toggle label="Scale enemies and bosses" checked={config.fog.scaling} onChange={(value) => setFog('scaling', value)} />
-              <Toggle label="Glitched logic" checked={config.fog.glitchedLogic} onChange={(value) => setFog('glitchedLogic', value)} />
-              <Toggle label="Require Lord Souls" checked={config.fog.requireLordSouls} onChange={(value) => setFog('requireLordSouls', value)} />
-              <Toggle label="Pacifist Mode" checked={config.fog.pacifistMode} onChange={(value) => setFog('pacifistMode', value)} />
-              <label className="field-label">Game language</label><select value={config.fog.language} onChange={(event) => setFog('language', event.target.value as FogLanguage)}><option value="ENGLISH">English</option><option value="FRENCH">French</option><option value="GERMAN">German</option><option value="ITALIAN">Italian</option><option value="JAPANESE">Japanese</option><option value="KOREAN">Korean</option><option value="NSPANISH">Latin American Spanish</option><option value="POLISH">Polish</option><option value="PORTUGUESE">Portuguese</option><option value="RUSSIAN">Russian</option><option value="SCHINESE">Simplified Chinese</option><option value="SPANISH">Spanish</option><option value="TCHINESE">Traditional Chinese</option></select>
+            <div className="option-group"><h3>{t('settings.fog.groups.logic')}</h3>
+              <Toggle label={t('settings.fog.randomStart.label')} checked={config.fog.randomStart} onChange={(value) => setFog('randomStart', value)} />
+              <Toggle label={t('settings.fog.disconnected.label')} checked={config.fog.disconnectedFogs} onChange={(value) => setFog('disconnectedFogs', value)} />
+              <Toggle label={t('settings.fog.noFall.label')} checked={config.fog.noFallBedOfChaos} onChange={(value) => setFog('noFallBedOfChaos', value)} />
+              <Toggle label={t('settings.fog.scaling.label')} checked={config.fog.scaling} onChange={(value) => setFog('scaling', value)} />
+              <Toggle label={t('settings.fog.glitched.label')} checked={config.fog.glitchedLogic} onChange={(value) => setFog('glitchedLogic', value)} />
+              <Toggle label={t('settings.fog.requireLordSouls.label')} checked={config.fog.requireLordSouls} onChange={(value) => setFog('requireLordSouls', value)} />
+              <Toggle label={t('settings.fog.pacifist.label')} checked={config.fog.pacifistMode} onChange={(value) => setFog('pacifistMode', value)} />
+              <label className="field-label">{t('settings.fog.gameLanguage.label')}</label><select value={config.fog.language} title={t('settings.fog.gameLanguage.hint')} onChange={(event) => setFog('language', event.target.value as FogLanguage)}><option value="ENGLISH">{t('settings.fog.gameLanguage.options.ENGLISH')}</option><option value="FRENCH">{t('settings.fog.gameLanguage.options.FRENCH')}</option><option value="GERMAN">{t('settings.fog.gameLanguage.options.GERMAN')}</option><option value="ITALIAN">{t('settings.fog.gameLanguage.options.ITALIAN')}</option><option value="JAPANESE">{t('settings.fog.gameLanguage.options.JAPANESE')}</option><option value="KOREAN">{t('settings.fog.gameLanguage.options.KOREAN')}</option><option value="NSPANISH">{t('settings.fog.gameLanguage.options.NSPANISH')}</option><option value="POLISH">{t('settings.fog.gameLanguage.options.POLISH')}</option><option value="PORTUGUESE">{t('settings.fog.gameLanguage.options.PORTUGUESE')}</option><option value="RUSSIAN">{t('settings.fog.gameLanguage.options.RUSSIAN')}</option><option value="SCHINESE">{t('settings.fog.gameLanguage.options.SCHINESE')}</option><option value="SPANISH">{t('settings.fog.gameLanguage.options.SPANISH')}</option><option value="TCHINESE">{t('settings.fog.gameLanguage.options.TCHINESE')}</option></select>
             </div>
           </section>
         </div>
 
         <section className={`card run-card phase-${phase}`}>
-          <div className="section-title"><span>02</span><h2>{phaseTitle(phase)}</h2></div>
-          <p className="sr-only" role="status">{message}</p>
+          <div className="section-title"><span>02</span><h2>{phaseTitle(phase, t)}</h2></div>
+          <p className="sr-only" role="status">{message || t('app.run.chooseSettings')}</p>
           {phase === 'working' && (
             <div className="progress-status">
-              <span>{progressStage ? `${progressLabel(progressStage)}: ${Math.round(progress * 100)}%` : `${workLabel}...`}</span>
-              {progressStage ? <progress value={progress} max={1} aria-label="Progress" /> : <progress aria-label="Progress" />}
+              <span>{progressStage ? `${progressLabel(progressStage, t)}: ${Math.round(progress * 100)}%` : `${t(`app.work.${workLabel}`)}...`}</span>
+              {progressStage ? <progress value={progress} max={1} aria-label={t('app.progressAria')} /> : <progress aria-label={t('app.progressAria')} />}
             </div>
           )}
-          {phase !== 'working' && <p className="run-state">{stateText(gameState)}</p>}
-          {errorMessage && <div className="notice error" role="alert">{errorMessage}</div>}
+          {phase !== 'working' && <p className="run-state">{stateText(gameState, t)}</p>}
+          {problem && <ErrorNotice error={problem} />}
 
           {phase === 'ready' && (
             <>
-              {notice && <div className="notice success apply-notice" role="status"><strong>{notice.text}</strong><span>{notice.sub}</span></div>}
+              {notice && <div className="notice success apply-notice" role="status"><strong>{t(`app.outcome.${notice}.text`)}</strong><span>{t(`app.outcome.${notice}.sub`)}</span></div>}
               <SummaryChips settings={currentSettings} />
               <div className="run-actions">
-                <button className="primary" onClick={() => void generateRun()} disabled={!config.gamePath || enabledCount === 0}>Randomize</button>
-                <button className="secondary" onClick={() => setSeedPanelOpen((open) => !open)}>Load seed</button>
+                <button className="primary" onClick={() => void generateRun()} disabled={!config.gamePath || enabledCount === 0}>{t('app.run.randomize')}</button>
+                <button className="secondary" onClick={() => setSeedPanelOpen((open) => !open)}>{t('common.loadSeed')}</button>
               </div>
             </>
           )}
@@ -625,20 +635,20 @@ export function App() {
           {phase === 'generated' && generation?.ok && (
             <>
               <div className="generated-status" role="status">
-                <strong>Your randomized game is ready</strong>
-                <textarea className="run-logs seed-output" readOnly rows={2} aria-label="Seed code" value={generation.seedCode} onFocus={(event) => event.currentTarget.select()} />
+                <strong>{t('app.run.readyTitle')}</strong>
+                <textarea className="run-logs seed-output" readOnly rows={2} aria-label={t('app.run.seedAria')} value={generation.seedCode} onFocus={(event) => event.currentTarget.select()} />
                 <SummaryChips settings={generation.settings ?? currentSettings} />
-                {generation.settings && isLoadedSeedModified(generation.settings, currentSettings) && <span className="stale-warning">You changed the settings after this world was created. Apply installs the world shown above; Randomize creates a new one.</span>}
+                {generation.settings && isLoadedSeedModified(generation.settings, currentSettings) && <span className="stale-warning">{t('app.run.stale')}</span>}
               </div>
               <div className="run-actions">
-                <button className="primary" onClick={() => void activate()}>Apply to game</button>
-                <button className="secondary" onClick={() => void copySeed(generation.seedCode)}>{copied ? 'Copied' : 'Copy seed'}</button>
+                <button className="primary" onClick={() => void activate()}>{t('app.run.apply')}</button>
+                <button className="secondary" onClick={() => void copySeed(generation.seedCode)}>{copied ? t('common.copied') : t('common.copySeed')}</button>
                 <div className="menu-anchor">
-                  <button className="secondary" aria-label="More actions" aria-haspopup="menu" aria-expanded={runMenuOpen} onClick={() => setRunMenuOpen((open) => !open)}>…</button>
+                  <button className="secondary" aria-label={t('common.moreActions')} aria-haspopup="menu" aria-expanded={runMenuOpen} onClick={() => setRunMenuOpen((open) => !open)}>…</button>
                   {runMenuOpen && (
                     <div className="menu" role="menu">
-                      <button role="menuitem" onClick={() => void generateRun()} disabled={!config.gamePath || enabledCount === 0}>Randomize again</button>
-                      <button role="menuitem" onClick={() => { setRunMenuOpen(false); setSeedPanelOpen(true); }}>Load seed</button>
+                      <button role="menuitem" onClick={() => void generateRun()} disabled={!config.gamePath || enabledCount === 0}>{t('app.run.randomizeAgain')}</button>
+                      <button role="menuitem" onClick={() => { setRunMenuOpen(false); setSeedPanelOpen(true); }}>{t('common.loadSeed')}</button>
                     </div>
                   )}
                 </div>
@@ -648,18 +658,18 @@ export function App() {
 
           {phase === 'applied' && (
             <>
-              {notice && <div className="notice success apply-notice" role="status"><strong>{notice.text}</strong><span>{notice.sub}</span></div>}
-              {launchMessage && <div className="notice" role="status">{launchMessage}</div>}
-              {pendingSeed && <div className="notice" role="status">To create the shared world, restore the original game first. It is created automatically afterwards.</div>}
+              {notice && <div className="notice success apply-notice" role="status"><strong>{t(`app.outcome.${notice}.text`)}</strong><span>{t(`app.outcome.${notice}.sub`)}</span></div>}
+              {launchMessage && <div className="notice" role="status">{t(`app.launch.${launchMessage}`)}</div>}
+              {pendingSeed && <div className="notice" role="status">{t('app.run.pendingRestore')}</div>}
               <div className="run-actions">
-                <button className="primary" onClick={() => void launch()} disabled={!config.gamePath}>Launch game</button>
-                <button className="secondary" onClick={restore}>{pendingSeed ? 'Restore and create shared world' : 'Restore original game'}</button>
-                {appliedEntry && <button className="secondary" onClick={() => void copySeed(appliedEntry.seedCode)} title={appliedEntry.seedCode}>{copied ? 'Copied' : `Copy seed ${shortSeedCode(appliedEntry.seedCode)}`}</button>}
+                <button className="primary" onClick={() => void launch()} disabled={!config.gamePath}>{t('common.launchGame')}</button>
+                <button className="secondary" onClick={restore}>{pendingSeed ? t('app.run.restoreShared') : t('app.run.restore')}</button>
+                {appliedEntry && <button className="secondary" onClick={() => void copySeed(appliedEntry.seedCode)} title={appliedEntry.seedCode}>{copied ? t('common.copied') : t('app.run.copySeedShort', { seed: shortSeedCode(appliedEntry.seedCode) })}</button>}
                 <div className="menu-anchor">
-                  <button className="secondary" aria-label="More actions" aria-haspopup="menu" aria-expanded={runMenuOpen} onClick={() => setRunMenuOpen((open) => !open)}>…</button>
+                  <button className="secondary" aria-label={t('common.moreActions')} aria-haspopup="menu" aria-expanded={runMenuOpen} onClick={() => setRunMenuOpen((open) => !open)}>…</button>
                   {runMenuOpen && (
                     <div className="menu" role="menu">
-                      <button role="menuitem" onClick={() => { setRunMenuOpen(false); setSeedPanelOpen(true); }}>Load seed</button>
+                      <button role="menuitem" onClick={() => { setRunMenuOpen(false); setSeedPanelOpen(true); }}>{t('common.loadSeed')}</button>
                     </div>
                   )}
                 </div>
@@ -669,13 +679,13 @@ export function App() {
 
           {phase === 'repair' && (
             <>
-              {pendingSeed && <div className="notice" role="status">To create the shared world, repair the game first. It is created automatically afterwards.</div>}
-              <div className="run-actions"><button className="primary" onClick={restore}>Restore original game</button></div>
+              {pendingSeed && <div className="notice" role="status">{t('app.run.pendingRepair')}</div>}
+              <div className="run-actions"><button className="primary" onClick={restore}>{t('app.run.restore')}</button></div>
             </>
           )}
 
-          {phase === 'blocked' && pendingSeed && <div className="notice" role="status">The shared world is created as soon as your game is ready.</div>}
-          {phase === 'blocked' && gameState?.state === 'version-changed' && <div className="run-actions"><button className="primary" onClick={restore}>Restore original game</button></div>}
+          {phase === 'blocked' && pendingSeed && <div className="notice" role="status">{t('app.run.pendingBlocked')}</div>}
+          {phase === 'blocked' && gameState?.state === 'version-changed' && <div className="run-actions"><button className="primary" onClick={restore}>{t('app.run.restore')}</button></div>}
 
           {seedPanelOpen && phase !== 'working' && <SeedPanel busy={busy} onLoaded={(seed) => void loadSeed(seed)} onClose={() => setSeedPanelOpen(false)} />}
 
@@ -685,25 +695,25 @@ export function App() {
             onCopy={(entry) => void copySeed(entry.seedCode)} onLaunch={() => void launch()}
             onDelete={(entry) => void deleteEntry(entry)} onSpoiler={spoilerOf}
           />
-          <details className="log-panel" open={logs.length > 0}><summary>Advanced</summary>
+          <details className="log-panel" open={logs.length > 0}><summary>{t('app.advanced.title')}</summary>
             <div className="run-actions">
-              <button className="secondary" onClick={previewPlan} disabled={busy}>Preview randomization plan</button>
-              <button className="secondary" onClick={importPristine} disabled={busy || !config.gamePath}>Check game files again</button>
+              <button className="secondary" onClick={previewPlan} disabled={busy}>{t('app.advanced.preview')}</button>
+              <button className="secondary" onClick={importPristine} disabled={busy || !config.gamePath}>{t('app.advanced.checkAgain')}</button>
             </div>
-            {lastRun && <p>Internal master seed: <code>{lastRun.masterSeed}</code> - generation profile: <code>{lastRun.profile}</code></p>}
-            {generation?.ok && <p>Files: <code>{generation.packagePath}</code> ({generation.manifest.files.length} files)</p>}
+            {lastRun && <p>{t('app.advanced.internalSeed', { seed: lastRun.masterSeed, profile: lastRun.profile })}</p>}
+            {generation?.ok && <p>{t('app.advanced.files', { path: generation.packagePath, count: generation.manifest.files.length })}</p>}
             <SmokeTestPanel busy={busy} onCreate={(seed) => void loadSeed(seed)} />
-            <pre className="run-logs" aria-label="Details">{logs.length ? logs.join('\n') : 'Nothing to show yet.'}</pre>
+            <pre className="run-logs" aria-label={t('app.advanced.detailsAria')}>{logs.length ? logs.join('\n') : t('app.advanced.nothing')}</pre>
           </details>
         </section>
 
-        {plan && <section className="card plan-card"><div className="section-title"><span>02</span><h2>Pipeline preview</h2></div>{plan.behaviors && plan.behaviors.length > 0 && <ul className="plan-behaviors" aria-label="What the selected settings do">{plan.behaviors.map((line) => <li key={line.label}><strong>{line.label}</strong><span>{line.value}</span></li>)}</ul>}<div className="seed-grid">{plan.stages.map((stage) => <div key={stage.engine}><span>{stage.engine}</span><strong>{stage.enabled ? stage.seed : 'disabled'}</strong></div>)}</div><div className="engine-status-list">{plan.engineStatus.map((status) => <div key={status.name} className="engine-status"><strong>{status.name}</strong><span className={`pill ${status.ready ? 'ready' : ''}`}>{status.mode}</span><p>{status.detail}</p></div>)}</div></section>}
+        {plan && <section className="card plan-card"><div className="section-title"><span>02</span><h2>{t('app.plan.title')}</h2></div>{plan.behaviors && plan.behaviors.length > 0 && <ul className="plan-behaviors" aria-label={t('app.plan.behaviorsAria')}>{plan.behaviors.map((line) => <li key={line.label}><strong>{line.label}</strong><span>{line.value}</span></li>)}</ul>}<div className="seed-grid">{plan.stages.map((stage) => <div key={stage.engine}><span>{stage.engine}</span><strong>{stage.enabled ? stage.seed : t('app.plan.disabled')}</strong></div>)}</div><div className="engine-status-list">{plan.engineStatus.map((status) => <div key={status.name} className="engine-status"><strong>{status.name}</strong><span className={`pill ${status.ready ? 'ready' : ''}`}>{status.mode}</span><p>{status.detail}</p></div>)}</div></section>}
 
         <section className="card legal-card">
-          <div><div className="eyebrow">ABOUT & LEGAL</div><h2>Free software under GPL-3.0-only</h2></div>
-          <p>Copyright © 2026 DS1 Triple Randomizer contributors. This program comes with absolutely no warranty. You may redistribute and modify it under GNU GPL version 3. Corresponding source and the full license accompany every release.</p>
-          <p>This unofficial project is not affiliated with FromSoftware or Bandai Namco Entertainment. Use only with your own game installation and play modified game data offline.</p>
-          <a href="https://www.gnu.org/licenses/gpl-3.0.html" target="_blank" rel="noreferrer">Read the GNU GPL v3 license</a>
+          <div><div className="eyebrow">{t('app.legal.eyebrow')}</div><h2>{t('app.legal.title')}</h2></div>
+          <p>{t('app.legal.copyright')}</p>
+          <p>{t('app.legal.disclaimer')}</p>
+          <a href="https://www.gnu.org/licenses/gpl-3.0.html" target="_blank" rel="noreferrer">{t('app.legal.readLicense')}</a>
         </section>
       </main>
     </div>

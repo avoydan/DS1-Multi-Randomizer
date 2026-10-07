@@ -1,0 +1,24 @@
+{
+  "language": {
+    "label": "Language",
+    "auto": "Automatic",
+    "english": "English",
+    "polish": "Polski"
+  },
+  "plannedExtension": "Planned extension",
+  "cancel": "Cancel",
+  "close": "Close",
+  "launchGame": "Launch game",
+  "copySeed": "Copy seed",
+  "copied": "Copied",
+  "moreActions": "More actions",
+  "loadSeed": "Load seed",
+  "apply": "Apply",
+  "retry": "Retry",
+  "chips": {
+    "items": "Items",
+    "enemies": "Enemies",
+    "bosses": "Bosses",
+    "fog": "Fog"
+  }
+}

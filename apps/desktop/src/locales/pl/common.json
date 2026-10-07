@@ -1,0 +1,24 @@
+{
+  "language": {
+    "label": "Język",
+    "auto": "Automatycznie",
+    "english": "English",
+    "polish": "Polski"
+  },
+  "plannedExtension": "Planowane rozszerzenie",
+  "cancel": "Anuluj",
+  "close": "Zamknij",
+  "launchGame": "Uruchom grę",
+  "copySeed": "Kopiuj seed",
+  "copied": "Skopiowano",
+  "moreActions": "Więcej akcji",
+  "loadSeed": "Wczytaj seed",
+  "apply": "Zastosuj",
+  "retry": "Ponów",
+  "chips": {
+    "items": "Przedmioty",
+    "enemies": "Wrogowie",
+    "bosses": "Bossowie",
+    "fog": "Mgły"
+  }
+}

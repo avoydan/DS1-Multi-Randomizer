@@ -1,0 +1,20 @@
+{
+  "title": "Historia losowań",
+  "empty": "Tu pojawią się Twoje zrandomizowane światy.",
+  "status": {
+    "generated": "Wygenerowano",
+    "applied": "Zastosowano",
+    "restored": "Przywrócono"
+  },
+  "regenerate": "Wygeneruj pliki ponownie",
+  "regenerateHint": "Wygenerowane pliki zostały wyczyszczone. To tworzy ten sam świat jeszcze raz.",
+  "applyPlay": "Zastosuj / Graj",
+  "restoreFirst": "Najpierw przywróć oryginalne pliki gry.",
+  "viewSettings": "Pokaż ustawienia",
+  "viewSpoiler": "Pokaż log spoilerów",
+  "delete": "Usuń z historii",
+  "detailsTitle": {
+    "settings": "Ustawienia tego świata",
+    "spoiler": "Log spoilerów"
+  }
+}

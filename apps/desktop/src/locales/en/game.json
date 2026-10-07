@@ -1,0 +1,34 @@
+{
+  "status": {
+    "ready": "Dark Souls Remastered found",
+    "searching": "Looking for Dark Souls Remastered...",
+    "checking": "Checking Dark Souls Remastered...",
+    "choose": "We found more than one copy of Dark Souls Remastered",
+    "missing": "We couldn't find Dark Souls Remastered automatically.",
+    "problem": "Dark Souls Remastered needs attention"
+  },
+  "problem": {
+    "notComplete": "This folder does not look like a complete Dark Souls Remastered installation. Verify the game files in Steam, or choose another folder.",
+    "notVerified": "Dark Souls Remastered could not be verified. If you used other randomizers on it, verify the game files in Steam and try again.",
+    "cannotCheck": "Dark Souls Remastered could not be checked. Restart the app and try again.",
+    "invalid": "This folder does not look like Dark Souls Remastered.",
+    "no-snapshot": "Dark Souls Remastered is being checked.",
+    "version-changed": "Dark Souls Remastered was updated. Restore the original game files, then try again.",
+    "interrupted": "A previous change to the game was interrupted. Use \"Restore original game\" to repair it.",
+    "modified": "Some game files were changed by another tool. Verify the game files in Steam, then try again."
+  },
+  "useCopy": "Use the copy in {{path}}",
+  "selectFolder": "Select game folder",
+  "changeFolder": "Change game folder",
+  "folderPlaceholder": "Type the Dark Souls Remastered folder, or use Browse",
+  "folderLabel": "Dark Souls Remastered folder",
+  "browse": "Browse",
+  "useFolder": "Use this folder",
+  "world": {
+    "label": "Fog randomizer",
+    "preparing": "Preparing fog randomizer...",
+    "ready": "Fog randomizer ready",
+    "attention": "Fog randomizer needs attention",
+    "retry": "Retry"
+  }
+}

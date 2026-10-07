@@ -159,3 +159,5 @@ input:focus, select:focus { border-color: #8e7043; box-shadow: 0 0 0 3px #8e7043
 .plan-behaviors li { display: flex; gap: 12px; align-items: baseline; }
 .plan-behaviors strong { min-width: 150px; color: #c9d1dc; font-size: 13px; }
 .plan-behaviors span { color: #9aa5b3; font-size: 13px; }
+.language-select { display: flex; align-items: center; gap: 8px; color: #a4adba; font-size: 12px; }
+.language-select select { width: auto; padding: 6px 10px; font-size: 12px; }

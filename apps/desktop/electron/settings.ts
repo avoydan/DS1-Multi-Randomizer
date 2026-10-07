@@ -1,7 +1,11 @@
+import { normalizeLanguageSetting, type LanguageSetting } from './language.js';
+
 /** Application settings kept in userData/settings.json. */
 export interface StoredSettings {
   /** The Dark Souls Remastered folder the person chose by hand and that passed the installation check; it wins over detection. */
   gamePath?: string;
+  /** The language the person chose (Auto follows the operating system). Absent means Auto. Never part of a world. */
+  language?: LanguageSetting;
 }
 
 /**
@@ -25,6 +29,8 @@ export function migrateSettings(raw: unknown): { settings: StoredSettings; chang
   const source = typeof raw === 'object' && raw !== null && !Array.isArray(raw) ? raw as Record<string, unknown> : {};
   const settings: StoredSettings = {};
   if (typeof source.gamePath === 'string' && source.gamePath.trim() !== '') settings.gamePath = source.gamePath;
+  const language = normalizeLanguageSetting(source.language);
+  if (language && language !== 'auto') settings.language = language;
   const keptKeys = Object.keys(settings);
   const changed = Object.keys(source).length !== keptKeys.length || Object.keys(source).some((key) => !keptKeys.includes(key));
   return { settings, changed };

@@ -1,6 +1,6 @@
 {
   "name": "@ds1tr/backend",
-  "version": "0.41.0",
+  "version": "0.42.0",
   "license": "GPL-3.0-only",
   "private": true,
   "type": "module",
@@ -13,7 +13,7 @@
     "start": "node dist/server.js"
   },
   "dependencies": {
-    "@ds1tr/contracts": "0.3.0"
+    "@ds1tr/contracts": "*"
   },
   "devDependencies": {
     "@types/node": "^22.10.5",

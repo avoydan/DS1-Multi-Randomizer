@@ -1,0 +1,118 @@
+{
+  "header": {
+    "eyebrow": "DARK SOULS REMASTERED",
+    "title": "Triple Randomizer",
+    "tagline": "Losuj przedmioty, wrogów i bramy mgły w Dark Souls Remastered."
+  },
+  "status": { "starting": "Uruchamianie...", "ready": "Gotowe", "offline": "Nie działa" },
+  "startupError": {
+    "text": "DS1 Triple Randomizer nie mógł uruchomić swojego silnika. Zamknij aplikację i otwórz ją ponownie; jeśli problem się powtarza, pobierz aplikację jeszcze raz.",
+    "details": "Szczegóły"
+  },
+  "sections": { "game": "Twoja gra" },
+  "options": {
+    "includeDlc": { "label": "Uwzględnij DLC", "hint": "Wyłączenie DLC nie jest zaimplementowane; DLC jest zawsze uwzględniane." },
+    "spoilerLog": "Generuj log spoilerów"
+  },
+  "preset": {
+    "summary": "Preset ustawień (import / eksport)",
+    "aria": "Preset ustawień",
+    "placeholder": "Wklej tutaj preset DS1TR albo wyeksportuj bieżące ustawienia.",
+    "export": "Eksportuj bieżące ustawienia",
+    "apply": "Zastosuj preset",
+    "reset": "Przywróć ustawienia domyślne",
+    "exported": "Preset wyeksportowany. Skopiuj tekst, aby udostępnić te ustawienia.",
+    "applied": "Preset zastosowany. Sprawdź ustawienia, a potem kliknij Losuj świat.",
+    "resetDone": "Przywrócono ustawienia domyślne."
+  },
+  "state": {
+    "vanilla": "Twoja gra jest oryginalna i gotowa do zrandomizowania.",
+    "active": "Zastosowano zrandomizowaną grę. Przywróć oryginalne pliki, zanim stworzysz nową.",
+    "interrupted": "Poprzednia zmiana została przerwana. Kliknij „Przywróć oryginalne pliki”, aby ją naprawić.",
+    "version-changed": "Dark Souls Remastered zostało zaktualizowane. Przywróć oryginalne pliki gry, a potem spróbuj ponownie.",
+    "modified": "Niektóre pliki gry zostały zmienione przez inne narzędzie. Najpierw zweryfikuj pliki gry w Steam.",
+    "invalid": "Ten folder nie jest instalacją Dark Souls Remastered.",
+    "no-snapshot": "Sprawdzanie Twojej gry...",
+    "looking": "Szukanie Twojej gry..."
+  },
+  "phase": {
+    "generated": "Gotowe do zastosowania",
+    "applied": "Zrandomizowana gra",
+    "repair": "Potrzebna naprawa",
+    "blocked": "Twoja gra",
+    "working": "Trwa praca",
+    "ready": "Losowanie"
+  },
+  "progress": {
+    "checking": "Sprawdzanie Twojej gry",
+    "combined": "Losowanie przedmiotów i wrogów",
+    "fog": "Losowanie bram mgły i teleportów",
+    "working": "Trwa praca"
+  },
+  "work": {
+    "working": "Trwa praca",
+    "applying": "Stosowanie zrandomizowanej gry",
+    "restoring": "Przywracanie oryginalnej gry",
+    "preparingFog": "Przygotowywanie randomizera mgieł"
+  },
+  "progressAria": "Postęp",
+  "run": {
+    "randomize": "Losuj świat",
+    "chooseSettings": "Wybierz ustawienia, a potem kliknij Losuj świat.",
+    "readyTitle": "Twoja zrandomizowana gra jest gotowa",
+    "seedAria": "Kod seeda",
+    "stale": "Zmieniono ustawienia po utworzeniu tego świata. Zastosuj instaluje świat pokazany powyżej; Losuj świat tworzy nowy.",
+    "apply": "Zastosuj do gry",
+    "randomizeAgain": "Losuj ponownie",
+    "restore": "Przywróć oryginalne pliki",
+    "restoreShared": "Przywróć i utwórz nowy świat",
+    "copySeedShort": "Kopiuj seed {{seed}}",
+    "pendingRestore": "Aby utworzyć udostępniony świat, najpierw przywróć oryginalne pliki gry. Zostanie on utworzony automatycznie.",
+    "pendingRepair": "Aby utworzyć udostępniony świat, najpierw napraw grę. Zostanie on utworzony automatycznie.",
+    "pendingBlocked": "Udostępniony świat zostanie utworzony, gdy tylko Twoja gra będzie gotowa."
+  },
+  "message": {
+    "gameChecked": "Dark Souls Remastered sprawdzone.",
+    "worldReady": "Twoja zrandomizowana gra jest gotowa.",
+    "seedCopied": "Skopiowano kod seeda.",
+    "seedCopyFailed": "Zaznacz kod seeda i skopiuj go skrótem Ctrl+C.",
+    "planDone": "Wygenerowano plan przebiegu. Planowane rozszerzenia pozostają wyłączone do czasu implementacji.",
+    "failed": "Coś poszło nie tak."
+  },
+  "outcome": {
+    "applied": { "text": "Zrandomizowana gra została zastosowana.", "sub": "Możesz teraz uruchomić Dark Souls Remastered." },
+    "restored": { "text": "Oryginalna gra została przywrócona.", "sub": "Dark Souls Remastered wróciło do swoich oryginalnych plików." }
+  },
+  "launch": {
+    "steam": "Uruchamianie Dark Souls Remastered przez Steam...",
+    "executable": "Uruchamianie Dark Souls Remastered...",
+    "failed": "Nie udało się uruchomić Dark Souls Remastered. Uruchom grę ze Steam.",
+    "noBridge": "Uruchom Dark Souls Remastered ze Steam."
+  },
+  "spoiler": {
+    "SPOILER_NONE": "Ten świat nie ma logu spoilerów.",
+    "SPOILER_UNAVAILABLE": "Log spoilerów nie jest już dostępny. Użyj opcji Wygeneruj pliki ponownie, aby go odtworzyć.",
+    "unreadable": "Nie udało się odczytać logu spoilerów."
+  },
+  "advanced": {
+    "title": "Zaawansowane",
+    "preview": "Podgląd planu losowania",
+    "checkAgain": "Sprawdź pliki gry ponownie",
+    "internalSeed": "Wewnętrzny master seed: {{seed}} - profil generowania: {{profile}}",
+    "files": "Pliki: {{path}} ({{count}} plików)",
+    "detailsAria": "Szczegóły",
+    "nothing": "Na razie nie ma nic do pokazania."
+  },
+  "plan": {
+    "title": "Podgląd przebiegu",
+    "behaviorsAria": "Co robią wybrane ustawienia",
+    "disabled": "wyłączone"
+  },
+  "legal": {
+    "eyebrow": "O PROGRAMIE I LICENCJA",
+    "title": "Wolne oprogramowanie na licencji GPL-3.0-only",
+    "copyright": "Copyright © 2026 współtwórcy DS1 Triple Randomizer. Program jest udostępniany bez jakiejkolwiek gwarancji. Możesz go rozpowszechniać i modyfikować na warunkach GNU GPL w wersji 3. Odpowiadający kod źródłowy i pełny tekst licencji towarzyszą każdemu wydaniu.",
+    "disclaimer": "Ten nieoficjalny projekt nie jest powiązany z FromSoftware ani Bandai Namco Entertainment. Używaj go wyłącznie z własną instalacją gry i graj na zmodyfikowanych danych gry offline.",
+    "readLicense": "Przeczytaj licencję GNU GPL v3"
+  }
+}

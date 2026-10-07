@@ -53,7 +53,7 @@ async function findSpoiler(workspacePath: string, packagePath: string): Promise<
   return null;
 }
 
-const APP_VERSION = '0.41.0';
+const APP_VERSION = '0.42.0';
 const runDependencies = { ...generationDependencies, appVersion: APP_VERSION };
 
 function send(res: http.ServerResponse, status: number, body: unknown): void {
@@ -184,11 +184,11 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'POST' && url.pathname === '/api/history/spoiler') {
       const body = await readJson<{ id?: string }>(req);
       const entry = typeof body.id === 'string' ? await history.get(body.id) : null;
-      if (!entry?.spoilerPath) return send(res, 200, { ok: false, message: 'This world has no spoiler log.' });
+      if (!entry?.spoilerPath) return send(res, 200, { ok: false, code: 'SPOILER_NONE', message: 'This world has no spoiler log.' });
       try {
         return send(res, 200, { ok: true, text: await readFile(entry.spoilerPath, 'utf8') });
       } catch {
-        return send(res, 200, { ok: false, message: 'The spoiler log is no longer available. Use Regenerate files to create it again.' });
+        return send(res, 200, { ok: false, code: 'SPOILER_UNAVAILABLE', message: 'The spoiler log is no longer available. Use Regenerate files to create it again.' });
       }
     }
 

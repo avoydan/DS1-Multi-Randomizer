@@ -1,0 +1,34 @@
+{
+  "status": {
+    "ready": "Znaleziono Dark Souls Remastered",
+    "searching": "Szukanie Dark Souls Remastered...",
+    "checking": "Sprawdzanie Dark Souls Remastered...",
+    "choose": "Znaleziono więcej niż jedną kopię Dark Souls Remastered",
+    "missing": "Nie udało się automatycznie znaleźć Dark Souls Remastered.",
+    "problem": "Dark Souls Remastered wymaga uwagi"
+  },
+  "problem": {
+    "notComplete": "Ten folder nie wygląda na kompletną instalację Dark Souls Remastered. Zweryfikuj pliki gry w Steam albo wybierz inny folder.",
+    "notVerified": "Nie udało się zweryfikować Dark Souls Remastered. Jeśli używano na nim innych randomizerów, zweryfikuj pliki gry w Steam i spróbuj ponownie.",
+    "cannotCheck": "Nie udało się sprawdzić Dark Souls Remastered. Uruchom aplikację ponownie i spróbuj jeszcze raz.",
+    "invalid": "Ten folder nie wygląda na Dark Souls Remastered.",
+    "no-snapshot": "Dark Souls Remastered jest sprawdzane.",
+    "version-changed": "Dark Souls Remastered zostało zaktualizowane. Przywróć oryginalne pliki gry, a potem spróbuj ponownie.",
+    "interrupted": "Poprzednia zmiana w grze została przerwana. Użyj „Przywróć oryginalne pliki”, aby ją naprawić.",
+    "modified": "Niektóre pliki gry zostały zmienione przez inne narzędzie. Zweryfikuj pliki gry w Steam, a potem spróbuj ponownie."
+  },
+  "useCopy": "Użyj kopii w {{path}}",
+  "selectFolder": "Wybierz folder gry",
+  "changeFolder": "Zmień folder gry",
+  "folderPlaceholder": "Wpisz folder Dark Souls Remastered albo użyj przycisku Przeglądaj",
+  "folderLabel": "Folder Dark Souls Remastered",
+  "browse": "Przeglądaj",
+  "useFolder": "Użyj tego folderu",
+  "world": {
+    "label": "Randomizer mgieł",
+    "preparing": "Przygotowywanie randomizera mgieł...",
+    "ready": "Randomizer mgieł gotowy",
+    "attention": "Randomizer mgieł wymaga uwagi",
+    "retry": "Ponów"
+  }
+}

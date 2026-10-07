@@ -6,6 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { migrateSettings, normalizeGamePath, type StoredSettings } from './settings.js';
 import { launchGame } from './launchGame.js';
+import { mainMessage, normalizeLanguageSetting, resolveLanguage, type AppLanguage, type LanguageSetting, type MainMessageKey } from './language.js';
 
 const currentDirectory = path.dirname(fileURLToPath(import.meta.url));
 const runtimeRoot = path.join(process.resourcesPath, 'runtime');
@@ -16,6 +17,12 @@ let backendError: string | null = null;
 let sessionToken = '';
 let settings: StoredSettings = {};
 let quitting = false;
+
+/** The language the person chose, or the operating system's when it is Auto (docs/I18N.md). Resolved before the window exists. */
+const systemLocales = (): string[] => [...app.getPreferredSystemLanguages(), app.getLocale()];
+const languageSetting = (): LanguageSetting => settings.language ?? 'auto';
+const currentLanguage = (): AppLanguage => resolveLanguage(settings.language, systemLocales());
+const say = (key: MainMessageKey, params?: Record<string, string | number>): string => mainMessage(currentLanguage(), key, params);
 
 async function saveSettings(): Promise<void> {
   try {
@@ -79,7 +86,7 @@ async function startBackend(): Promise<void> {
   let output = '';
   let errors = '';
   await new Promise<void>((resolve) => {
-    const timeout = setTimeout(() => finish('Backend startup timed out. Check the packaged runtime files.'), 15000);
+    const timeout = setTimeout(() => finish(say('backendTimeout')), 15000);
     let finished = false;
     function finish(error?: string): void {
       if (finished) return;
@@ -94,11 +101,11 @@ async function startBackend(): Promise<void> {
       if (match) { backendUrl = `http://127.0.0.1:${match[1]}/api`; finish(); }
     });
     child.stderr?.on('data', (chunk: Buffer) => { errors += chunk.toString(); });
-    child.on('error', (error) => finish(`Cannot start backend: ${error.message}`));
+    child.on('error', (error) => finish(say('backendCannotStart', { reason: error.message })));
     child.on('exit', (code) => {
       backendUrl = null;
-      finish(`Backend exited with code ${code}.`);
-      if (finished && !backendError) backendError = `Backend exited with code ${code}.${errors ? ` ${errors.slice(-500)}` : ''}`;
+      finish(say('backendExited', { code: String(code) }));
+      if (finished && !backendError) backendError = `${say('backendExited', { code: String(code) })}${errors ? ` ${errors.slice(-500)}` : ''}`;
     });
   });
 }
@@ -130,10 +137,19 @@ async function createWindow(): Promise<void> {
 }
 
 ipcMain.handle('dialog:select-game-directory', async () => {
-  const result = await dialog.showOpenDialog({ title: 'Select the Dark Souls Remastered folder', properties: ['openDirectory'] });
+  const result = await dialog.showOpenDialog({ title: say('selectGameFolder'), properties: ['openDirectory'] });
   if (result.canceled) return null;
   // Only the choice is returned: the folder is remembered once the installation check accepted it (game:remember-path).
   return result.filePaths[0];
+});
+ipcMain.handle('language:get', () => ({ setting: languageSetting(), resolved: currentLanguage() }));
+ipcMain.handle('language:set', async (_event, value: unknown) => {
+  const next = normalizeLanguageSetting(value);
+  if (!next) return { setting: languageSetting(), resolved: currentLanguage() };
+  const { language: _previous, ...rest } = settings;
+  settings = next === 'auto' ? rest : { ...rest, language: next };
+  await saveSettings();
+  return { setting: languageSetting(), resolved: currentLanguage() };
 });
 ipcMain.handle('game:remember-path', async (_event, gamePath: unknown) => {
   const normalized = normalizeGamePath(gamePath);
@@ -161,7 +177,7 @@ app.whenReady().then(async () => {
   await loadSettings();
   await startBackend();
   await createWindow();
-}).catch((error) => { dialog.showErrorBox('Desktop startup failed', String(error)); app.quit(); });
+}).catch((error) => { dialog.showErrorBox(say('startupFailedTitle'), String(error)); app.quit(); });
 app.on('before-quit', (event) => {
   if (quitting) return;
   event.preventDefault();
