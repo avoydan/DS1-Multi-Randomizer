@@ -8,7 +8,7 @@ import {
   type CatalogSourceVerificationResult,
 } from './combinedRandomizerCatalog.js';
 import { mapCombinedRandomizerConfig } from './combinedRandomizerConfig.js';
-import { formatPlacementDiagnostics, summarizePlacementDiagnostics, type PlacementDiagnosticsSummary } from '../core/placementDiagnostics.js';
+import { formatPlacementDiagnostics, summarizePlacementDiagnostics, summarizePlacementValidation, type PlacementDiagnosticsSummary } from '../core/placementDiagnostics.js';
 import {
   loadCombinedRandomizerCore,
   type CombinedRandomizerCoreLoadResult,
@@ -114,6 +114,8 @@ export interface CombinedGenerationSuccess {
   placementHash: string;
   /** Placement algorithm identity and, for sampling-v1, its summary (never the per-slot detail). */
   placementDiagnostics: PlacementDiagnosticsSummary;
+  /** The engine's placement validation summary: counts of what was placed, wake-ups, own rows, retries and fallbacks (null if the core predates it). */
+  placementValidation: Record<string, unknown> | null;
   /** The seed actually handed to upstream, after `normalizeConfig`. */
   seed: string;
   /** Whether this run had to `scan` the game directory to build a catalog. */
@@ -516,6 +518,7 @@ export async function executeCombinedGeneration(
     randomizerVersion: result.randomizerVersion,
     placementHash: result.placementHash,
     placementDiagnostics,
+    placementValidation: summarizePlacementValidation(result.validation?.enemyPlacement),
     seed: result.seed,
     catalogScanned: !catalogPresent,
   };

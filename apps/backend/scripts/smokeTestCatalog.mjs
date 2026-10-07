@@ -127,10 +127,16 @@ try {
       const run = spawnSync(exe, [path.join(first.packagePath, 'mod'), paramdef, expectationsFile, game], { encoding: 'utf8' });
       let results = [];
       try { results = JSON.parse(run.stdout.trim().split('\n').pop()); } catch { /* reported below */ }
+      // Event owner audit: every placement of the world that needs a custom event has one in the event file of its owner map.
+      const algorithm = scenario.settings?.enemies?.placement?.algorithm === 'sampling-v1' ? 'sampling' : 'classic';
+      const auditRun = spawnSync(exe, ['audit', path.join(first.packagePath, 'mod'), path.join(first.packagePath, 'randomizer.json'), source, algorithm], { encoding: 'utf8' });
+      let audit = { checkedCount: 0, missing: ['the audit did not run'], duplicateOwners: [] };
+      try { audit = JSON.parse(auditRun.stdout.trim().split(/\r?\n/u).pop()); } catch { /* reported below */ }
+      results.push({ id: `${scenario.id}/event-owners`, ok: audit.missing.length === 0 && audit.duplicateOwners.length === 0, checks: [{ name: `event owners (${audit.checkedCount} placements checked)`, ok: audit.missing.length === 0 && audit.duplicateOwners.length === 0, detail: [...audit.missing.slice(0, 3), ...audit.duplicateOwners].join(' | ') || 'every placement that needs an event has one' }] });
       const bad = results.flatMap((result) => result.checks.filter((check) => !check.ok).map((check) => `${result.id}: ${check.name}: ${check.detail}`));
-      const ok = run.status === 0 && results.length === expectations.length && bad.length === 0 && deterministic;
+      const ok = run.status === 0 && results.length === expectations.length + 1 && bad.length === 0 && deterministic;
       if (!ok) failed += 1;
-      console.log(`${ok ? 'PASS' : 'FAIL'} ${scenario.id} (${first.seedCode.slice(0, 20)}...): ${results.length}/${expectations.length} expectations read from the package, ${results.reduce((n, r) => n + r.checks.length, 0)} checks, package ${deterministic ? 'identical on a second run' : 'DIFFERENT on a second run'} (${digest.slice(0, 12)})${run.status !== 0 && results.length === 0 ? ` - verifier: ${String(run.stderr).slice(0, 400)}` : ''}`);
+      console.log(`${ok ? 'PASS' : 'FAIL'} ${scenario.id} (${first.seedCode.slice(0, 20)}...): ${results.length - 1}/${expectations.length} expectations read from the package plus the event owner audit, ${results.reduce((n, r) => n + r.checks.length, 0)} checks, package ${deterministic ? 'identical on a second run' : 'DIFFERENT on a second run'} (${digest.slice(0, 12)})${run.status !== 0 && results.length === 0 ? ` - verifier: ${String(run.stderr).slice(0, 400)}` : ''}`);
       for (const line of bad) console.log(`   ${line}`);
       await rm(first.workspacePath, { recursive: true, force: true });
       if (second.workspacePath) await rm(second.workspacePath, { recursive: true, force: true });
@@ -151,7 +157,7 @@ try {
       '## Quick smoke tests', '',
       '| Test | What it shows | Where | Time to the target |', '|---|---|---|---|',
     ];
-    const gameplayLine = (scenario) => (scenario.gameplay ? `**Gameplay result:** passed in the real game on ${scenario.gameplay.date} (played by hand). ${scenario.gameplay.note}` : '**Gameplay result:** not played in the real game yet; only the static check exists.');
+    const gameplayLine = (scenario) => (scenario.gameplay ? `**Gameplay result:** ${scenario.gameplay.result === 'passed' ? 'passed' : 'partly passed'} in the real game on ${scenario.gameplay.date} (played by hand). ${scenario.gameplay.note}` : '**Gameplay result:** not played in the real game yet; only the static check exists.');
     const quick = SMOKE_SCENARIOS.filter((entry) => entry.category === 'quick');
     const extended = SMOKE_SCENARIOS.filter((entry) => entry.category === 'extended');
     for (const scenario of quick) lines.push(`| \`${scenario.id}\` | ${scenario.title} | ${scenario.expectations.map((e) => `${e.slot} (${e.meters} m)`).join(', ')} | ~${scenario.estimateSeconds} s |`);

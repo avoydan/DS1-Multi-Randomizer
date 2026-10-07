@@ -1,0 +1,63 @@
+diff --git a/engines/combined/vendor/src/core/generator.js b/engines/combined/vendor/src/core/generator.js
+index ab3d602..1bb42a4 100644
+--- a/engines/combined/vendor/src/core/generator.js
++++ b/engines/combined/vendor/src/core/generator.js
+@@ -3179,6 +3179,51 @@ export function describeRegularEnemyPool(inputConfig, gameCatalog) {
+   };
+ }
+ 
++/**
++ * The one validation summary of a generated enemy placement (Part G): what was decided, what stayed vanilla, what the data tool will have to
++ * write. Read-only and deterministic, derived from the placements and the planner's counters; it is not part of `placementHash`, not part of
++ * any package digest, and never read back by the generator. The normal user does not see it: it goes to the manifest, the logs and the spoiler
++ * metadata. `events` counts the custom events the placements ask the data tool for (the event window itself is measured when the tool writes the
++ * files: `DS1TR_AUDIT_EVENTS`).
++ */
++export function summarizeEnemyPlacement(placements, diagnostics) {
++  const enemies = placements.enemies ?? [];
++  const bosses = placements.bosses ?? [];
++  const all = [...enemies, ...bosses];
++  const changed = all.filter((placement) => placement.changed);
++  const maps = new Set(all.map((placement) => placement.map));
++  const summary = diagnostics?.summary ?? null;
++  const perMap = Object.values(summary?.maps ?? {});
++  const wakeUps = all.filter((placement) => placement.forceCombatActivation === true).length;
++  return {
++    algorithm: diagnostics?.algorithm ?? "permutation-v1",
++    maps: maps.size,
++    placements: { regularSlotsPlaced: enemies.length, bossSlotsPlaced: bosses.length, changed: changed.length, keptVanilla: all.length - changed.length },
++    models: { maxFinalModelsPerMap: perMap.length > 0 ? Math.max(...perMap.map((map) => map.finalModels ?? 0)) : null, mapsAboveTheLimit: summary?.counters?.mapsAboveCap ?? 0 },
++    events: {
++      wakeUp: wakeUps,
++      passiveUntilAttacked: all.filter((placement) => placement.passiveUntilAttacked === true).length,
++      disabledEntities: all.filter((placement) => placement.disableEntity === true).length,
++      deferredOrContained: all.filter((placement) => placement.activationRegionId !== undefined || placement.combatRegionId !== undefined).length,
++    },
++    ownRows: {
++      npcParam: all.filter((placement) => Number.isInteger(placement.scaledNpcParamId)).length,
++      npcThinkParam: all.filter((placement) => Number.isInteger(placement.targetThinkParamId) && placement.targetThinkParamId >= 9_600_000).length,
++    },
++    roamingBosses: enemies.filter((placement) => placement.compatibility === "sampled-roaming-boss").length,
++    hostileNpcs: enemies.filter((placement) => placement.hostileNpc === true).length,
++    bossBodies: bosses.filter((placement) => placement.encounterBody === true).length,
++    retries: summary?.retries?.length ?? 0,
++    difficultyLapses: summary?.counters?.difficultyLapses ?? 0,
++    classFallbacks: summary?.counters?.classFallbacks ?? 0,
++    safetyExclusions: {
++      bossSlotsKeptUnsupported: summary?.counters?.bossSlotsKeptUnsupported ?? 0,
++      slotsKeptByChance: summary?.counters?.keptByChance ?? 0,
++      slotsKeptByPool: summary?.counters?.keptByPool ?? 0,
++    },
++  };
++}
++
+ export function generate(inputConfig, { gameCatalog = null } = {}) {
+   const config = normalizeConfig(inputConfig);
+   const errors = validateConfig(config);
+@@ -3319,5 +3364,6 @@ export function generate(inputConfig, { gameCatalog = null } = {}) {
+     .digest("hex");
+   // Identity (and, for sampling-v1, the summary) of the planner; not part of placementHash.
+   result.placementDiagnostics = placementDiagnostics ? placementDiagnostics.toJSON() : permutationDiagnostics();
++  result.validation.enemyPlacement = summarizeEnemyPlacement(result.placements, result.placementDiagnostics);
+   return result;
+ }

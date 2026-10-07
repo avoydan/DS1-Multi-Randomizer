@@ -97,3 +97,16 @@ The spoiler log of a world randomizer run is the one of its item/enemy stage (re
 person changes them and loaded on start. The game path is machine state and is managed separately. A missing file is normal; a
 damaged, invalid or newer-than-this-app file is replaced by the defaults with the plain note "Your saved settings could not be
 read (...) and were reset to the defaults.". A later schema adds its migration in `settingsStore.ts` before validation.
+
+## Defaults and old records (Part G, desktop 0.26.0)
+
+The **default** of a new configuration changed: a first start, "Restore defaults" and the base of a new preset now use legacy-style sampling (`enemies.placement.algorithm = sampling-v1` with the legacy defaults). **Nothing that already exists was reinterpreted:**
+
+* **A Seed Code states its algorithm.** The placement options are extension keys, stored only when they differ from the neutral value; the neutral value of the algorithm is the classic permutation (`permutation-v1`) and it never changes. A code made before sampling existed has no algorithm key and decodes to the classic permutation; a sampling code has the key and decodes to sampling. Re-encoding either gives the identical text.
+* **Presets** always write the algorithm; a preset from before the placement section (version 4 and older) imports as the classic permutation.
+* **Saved settings** keep the algorithm they were saved with; only a missing settings file starts from the new default. A saved classic setting stays classic until the person changes it.
+* **Run history** keeps the Seed Code of each run; Load seed and Regenerate files use the code alone.
+* **Test worlds** (`docs/SMOKE_TESTS.md`) are built from their own frozen base (`SMOKE_TEST_BASE_SETTINGS`), not from the product default, so their codes do not move.
+* The UI names are "Sampling (recommended)" and "Classic permutation"; the serialized values (`sampling-v1`, `permutation-v1`) are unchanged. The sampling-only controls are shown only with sampling.
+
+No generation profile changed (`ds1tr-gen-v1`): a default is not part of a code. `apps/backend/src/core/placementDefault.test.mjs` pins all of the above.

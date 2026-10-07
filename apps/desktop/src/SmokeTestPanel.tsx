@@ -53,7 +53,7 @@ export function SmokeTestPanel({ busy, onCreate }: Props) {
             <div className="smoke-details">
               <strong className={`smoke-category ${world.category}`}>{world.category === 'quick' ? 'Quick smoke test' : 'Extended gameplay test'}</strong>
               <p>{world.purpose}</p>
-              <p className={`smoke-result ${world.gameplay ? 'passed' : 'unplayed'}`}>{world.gameplay ? `Played in the real game (${world.gameplay.date}): passed. ${world.gameplay.note}` : 'Not played in the real game yet.'}</p>
+              <p className={`smoke-result ${world.gameplay ? 'passed' : 'unplayed'}`}>{world.gameplay ? `Played in the real game (${world.gameplay.date}): ${world.gameplay.result === 'passed' ? 'passed' : 'partly passed'}. ${world.gameplay.note}` : 'Not played in the real game yet.'}</p>
               {world.category === 'quick' ? (
                 <>
                   <strong>Target</strong>

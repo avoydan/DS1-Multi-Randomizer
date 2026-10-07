@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
+import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
@@ -11,7 +12,12 @@ const backendRoot = fileURLToPath(new URL('..', import.meta.url));
 
 test('desktop API exposes typed state and generation failure without touching a game', async (t) => {
   const stateRoot = await mkdtemp(path.join(os.tmpdir(), 'ds1tr-api-'));
-  const port = 45000 + Math.floor(Math.random() * 10000);
+  // A port the operating system hands out: a random number can fall into a range Windows reserves (Hyper-V / WinNAT) and the server cannot bind it.
+  const port = await new Promise((resolve, reject) => {
+    const probe = net.createServer();
+    probe.once('error', reject);
+    probe.listen(0, '127.0.0.1', () => { const { port: free } = probe.address(); probe.close(() => resolve(free)); });
+  });
   const child = spawn(process.execPath, ['dist/server.js'], {
     cwd: backendRoot,
     env: { ...process.env, DS1TR_PORT: String(port), DS1TR_STATE_DIR: stateRoot },

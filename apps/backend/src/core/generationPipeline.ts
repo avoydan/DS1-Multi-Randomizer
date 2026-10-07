@@ -55,6 +55,8 @@ export interface GenerationManifest {
     classTableHash: string | null;
     /** Planner counters of the last combined attempt (sampling-v1 only). */
     summary: PlacementSummary | null;
+    /** The placement validation summary of the last combined attempt: what was placed, wake-up events, own rows, retries, fallbacks and safety exclusions. */
+    validation: Record<string, unknown> | null;
   };
   attempts: Array<{ combinedAttempt: number; fogAttempt: number; combinedSeed: string; fogSeed: number; result: string }>;
   engines: { combined?: string; fog?: string };
@@ -138,7 +140,7 @@ export async function generateRun(
     enemyPlacement: {
       algorithm: config.enemies.placement.algorithm,
       rngVersion: config.enemies.placement.algorithm === 'sampling-v1' ? 'enemy-placement-v1' : null,
-      classTableHash: null, summary: null,
+      classTableHash: null, summary: null, validation: null,
     },
     attempts: [], engines: {}, validation: [], files: [],
   };
@@ -237,6 +239,7 @@ export async function generateRun(
       if (combinedDrift) return fail('validation', 'GENERATION_PROFILE_MISMATCH', combinedDrift);
       manifest.enemyPlacement.classTableHash = combined.placementDiagnostics?.classTableHash ?? null;
       manifest.enemyPlacement.summary = combined.placementDiagnostics?.summary ?? null;
+      manifest.enemyPlacement.validation = combined.placementValidation ?? null;
     }
     const packagePath = combined?.ok ? combined.seedDirectory : path.join(attemptWorkspace, 'fog-only');
     if (combined?.ok) {

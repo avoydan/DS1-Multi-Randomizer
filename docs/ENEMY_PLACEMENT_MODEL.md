@@ -594,7 +594,7 @@ risk: data first, selection-only options next, event-touching options last.
 | **D** (built, see 10.6) | Boss class (bosses only) | boss sampler over the portable single-body pool, per-candidate Gwyn nerf, Unique bosses, unit participation | `bossReplacement` {none, bosses}, `uniqueBosses`, `bossChanceInBossSlots` | activation | boss repetition, unit swaps, hash lock | **40 seeds** Bosses + Fog (overlay set must remain the 15 events), `verify-skips` | medium |
 | **E** (E1 built 2026-10-06, section 10.7; E2 built as a three-encounter subset 2026-10-07, section 10.8) | Cross-class and roaming boss options | boss to normal slot, normal to boss slot, "both" modes, `getSoul` on the scaled row, respawn handling | modes `normals`/`both`, `bossChanceInNormalSlots`, `roamingBossSouls`, `respawningRoamingBosses` | activation | reward ownership, scaled row always present, boss bar rules | **40 seeds**, measure edited events against the overlay and FogMod; stop on any new overlap | **high** |
 | **F** (F1 built 2026-10-07, section 10.9; NPC replacement not built by decision) | NPC class and hostile NPCs | NPC classification, hostile sources, slot-owned rows, wake-up events | `hostileNpcs` (an extension key); `npcReplacement` is not built | activation | slot-owned drops, talk preservation (no talk file touched) | event-set diff vs FogMod, then 100 Fog seeds | **high** |
-| **G** | Default flip (product decision) | none | default `sampling`, docs, migration notes | default values | n/a | full 40-seed default sweep | low once A-F passed |
+| **G** (built 2026-10-07, section 10.10) | Default flip for NEW configurations (product decision), ordering lock, validation summary | none (summary only) | default `sampling-v1` with the legacy defaults; old Seed Codes, presets and settings keep their algorithm | "Sampling (recommended)" / "Classic permutation", no dead controls | ordering, default, migration tests | 500 engine + 300 real-tool default seeds, 810 event-owner seeds, feature matrix 384 x 30 | low |
 
 ### 10.1 Part 0 as built (2026-10-05)
 
@@ -1643,6 +1643,58 @@ All on the real extracted catalog and a clean copy of Dark Souls Remastered; zer
 
 **Not verified by playing:** whether a hostile NPC wakes up, attacks, navigates, dies and gives only the slot's rewards; whether the NPC models show no T-pose in a regular slot; whether Gough would have worked (not tested). The quick world "Hostile NPC - Andre as an enemy" and five extended worlds (`docs/SMOKE_TESTS.md`) are made for that.
 
+### 10.10 Part G as built (2026-10-07): legacy-style sampling is the default of new configurations
+
+**Decision.** `sampling-v1` with the legacy defaults is what a **new** configuration starts with (a first start, "Restore defaults", the base of a new preset). It is a product decision made after A-F were complete: the legacy defaults are fit = only where they fit, difficulty = random + Easy Asylum, normal enemy replacement = normals, boss replacement = classic shuffle, chance 100, boss chance 10 / 90, no hostile NPCs, no Type replacement, no custom pool (`DEFAULT_GENERATION_SETTINGS` in `@ds1tr/contracts`).
+
+**What the default does not touch.** Nothing that already says what it is.
+
+| Where an algorithm is stored | What it does now |
+|---|---|
+| Seed Code | the algorithm is part of the canonical settings of the code: a sampling code is a sampling code, a classic code stays a classic code (the extension keys exist only when non-neutral; neutral = the classic permutation, so an old code decodes exactly as before) |
+| Preset (version 13) | an export always states the algorithm; a preset from before the placement section (version 4 and older) has none and imports as the **classic permutation**, never as the new default |
+| Persisted settings and the saved settings file | an existing choice stays (`permutation-v1` stays classic); only "nothing saved yet" starts from the default |
+| Run history | a record keeps the Seed Code it was made with; "Load seed" restores the settings of the code |
+| The value a record without the key means | `NEUTRAL_ENEMY_PLACEMENT_OPTIONS` (classic permutation): unchanged, and tested (`placementDefault.test.mjs`) |
+| The test worlds (`docs/SMOKE_TESTS.md`) | built from their own frozen base `SMOKE_TEST_BASE_SETTINGS` (classic unless the world names sampling); the product default does not move them, so every recorded Seed Code of a test world is unchanged |
+
+**UI.** The algorithm select reads **Sampling (recommended)** and **Classic permutation** (the serialized values `sampling-v1` / `permutation-v1` are unchanged). With the classic permutation the sampling-only controls are **not shown** (no dead controls: a control that cannot do anything on the chosen algorithm is not offered); with sampling each control is shown and is greyed (never hidden, with the reason in its tooltip) only when another switch turns the feature off (no regular enemies, no bosses, mode not selected). The "Legacy parity - planned" placeholder is gone; "Allow T-pose behavior" is not built and is not advertised. Wording is the plain-language form of the legacy options ("Normal enemy replacement", "Placement", "Difficulty mode").
+
+**Deterministic ordering (documented and locked by `enemyPlacementOrdering.test.mjs`).** One place says in which order the planners decide, so that a feature cannot silently depend on a later one:
+
+| Step | Decides | Reads | Draws from |
+|---|---|---|---|
+| 1. Items | item placements | the item options only | its own streams; **no enemy option changes an item placement** (test: every enemy toggle leaves the item placements byte for byte alone) |
+| 2. Boss plan (Part D, E2 bodies) | boss slot assignments, boss bodies | boss options, Gwyn nerf, Second Gargoyle | its own streams (boss class draws, `category:slot:<id>`, `body:slot:<id>`); **decided before the regular sampler**: no regular, roaming or hostile option changes a boss placement |
+| 3. Class tables | the derived classes, the table hash | the catalog | none |
+| 4. Hostile NPC types | appended to the candidate table **after** the classes are derived | the option | none (appended, so every class, the hash and the HP ranks are what they are without them) |
+| 5. Regular sampler (Part A-C) | regular slots and Type groups | the model budget (bosses only through the budget they leave) | `slot:<id>` and the Type group streams (`map:<map>:model:<model>`) |
+| 6. Roaming pass (E1) | overrides slots with bosses | the plan of step 5 | `roaming:type:*` / `roaming:slot:*`; **it only overrides**: every slot it did not take keeps the placement it had without the pass (test, hostile NPCs on and off) |
+| 7. Own rows, wake-ups, events | scaled NpcParam rows, wake-up events, event ids | the final placements | none |
+
+**No RNG cascade.** A **neutral option draws nothing**: its off value, its absence and its default are the same world for every extension key (test), because every draw comes from a named stream of the slot or group it belongs to, never from a shared sequence. Boss bodies (E2) take no draw from the regular sampler or the roaming pass. The replacement chance is the one shared first draw of a slot, boss slots included (so chance 100 and "not asked" agree).
+
+**Placement validation summary.** Every run now reports `result.validation.enemyPlacement` (engine) and `manifest.enemyPlacement.validation` (run manifest; plain counters, no per-slot detail, **not part of the placement hash**): algorithm, maps, placements (regular and boss slots placed, changed, kept vanilla), the final models of the fullest map and maps above the limit, events (wake-ups, passive-until-attacked, disabled entities, deferred or contained), own rows (NpcParam, NpcThinkParam), roaming bosses, hostile NPCs, boss bodies, map retries, difficulty lapses, class fallbacks and the safety exclusions (boss slots kept because unsupported, slots kept by chance, slots kept by the pool). The run manifest already carried the planner counters (`enemyPlacement.summary`); the validation block is the placement-level view next to it.
+
+**Event owners.** Part G contains the Darkroot Basin fix (Part A of the same work): `m12_00_00_01` has no event file of its own and writes its events in the Garden's (`docs/EVENT_ALLOCATION.md`, "Event owners"). The hostile NPC restriction for the Basin is gone. Recorded exception 2 in `docs/GENERATION_COMPATIBILITY.md`.
+
+**Classic stays frozen, with its quirks.** The permutation core and its hash lock are untouched, and every classic golden fixture verifies byte for byte. Quirks that are kept on purpose because fixing them would change old Seed Codes: (1) Basin placements of the classic permutation have no events (the event owner is resolved for sampling only); (2) with Vanilla scaling a changed placement keeps the replacement's drops (13.11). A new profile is the only way to change either.
+
+**Sweeps** (all on the real extracted catalog and a clean copy of the game; zero failures; no retry budget was raised, nothing was relaxed):
+
+| What | Result |
+|---|---|
+| Engine, the exact product default (`defaultSweep.mjs`, `prepareRun` + the application's config mapping) | **500/500** worlds: deterministic, 0 maps over the model limit (max 30), every changed placement slot-owned; mean per world: 1,753.8 changed, 138.1 kept, 159 wake-ups (max 201), 20 passive, 32 disabled entities, 0 retries, 0 difficulty lapses, 0 class fallbacks. The same sweep with `--classic` (the frozen permutation): 500/500 |
+| Real data tool, default configuration (`placementMatrix.mjs product-default`) | Items + Enemies + Bosses **100/100**; Enemies + Bosses **100/100**; the full Triple with the real FogHost (Items + Enemies + Bosses + Fog) **100/100**: 0 retries, 0 window overruns, 0 event owner failures, 0 non-deterministic reruns, max 30 models |
+| Real data tool, event owners (`placementMatrix.mjs event-owners`, Part A) | **810/810**: E1 (roaming, both + stay dead), hostile NPCs, Type replacement (enabled, except roaming), general sampling, Part D boss sampling, E2 bodies, Second Gargoyle: 0 event owner failures over about 230,000 checked events; the classic cases keep the quirk (1,145 frozen events, no failure) |
+| Feature matrix (`featureMatrix.mjs`): Type replacement x custom pool x normal replacement x boss replacement x hostile NPCs x fit x difficulty = 384 combinations x 30 seeds | 7,680 worlds generated, 3,840 refused by the typed options errors (hostile NPCs with a custom pool or without normal enemies; every one refused as designed), 0 failures: at most 12 hostile NPCs and 10 roaming bosses per map, boss bodies only in the audited slots, no map above max(30, its models without the roaming pass) (+1 for the custom pool grace), the validation summary consistent with the placements, deterministic; 956 worlds had roaming bosses and hostile NPCs together, 606 boss bodies and hostile NPCs together |
+| Fog real format (`fogHostE2e.mjs`, `verify-skips` on every package) | see the status document (4 configurations x 25 seeds with the event-owner data tool: default, E1 both + stay dead, hostile NPCs + Type, E2 boss bodies) |
+| Golden fixtures | all 27 verify from their Seed Codes (classic and unaffected cases byte-identical; the 12 + 5 sampling / hostile fixtures re-recorded as recorded exception 2) |
+
+**Gameplay status (honest).** Runtime-verified by playing: the main E1 quick tests, boss sampling (first boss), sampling first enemies, E2 Asylum Demon and E2 Taurus. **Not verified by playing:** Part F (hostile NPCs), E2 Capra, the extended Fog / Gargoyle / Parish worlds and the Darkroot Basin test worlds. Everything above for them is static (verifier, sweeps, fixtures).
+
+**Enemy Placement A-G status: Enemy Placement core complete with documented safe-subset deviations.** The deviations are the safe subsets chosen by decision (E2: three boss encounters; F: hostile NPCs only, no friendly NPC replacement; E1 roaming bosses limited to supported single-body bosses) and the frozen classic quirks above. Nothing is "complete" in the sense of full legacy parity: `docs/FEATURE_PARITY.md` lists what remains.
+
 ---
 
 ## 11. Prototype evidence
@@ -1703,9 +1755,7 @@ To reproduce (needs a game-derived catalog from `DsrDataTool scan`, never commit
 
 ## 13. Unresolved questions
 
-1. **Product default.** Keep `permutation` as the default until the group is complete, then flip? (The
-   legacy defaults are fit = only where they fit, difficulty = random + Easy Asylum, boss chance 10/90; a flip
-   changes every new preset's enemy layout.)
+1. **Product default.** Decided (Part G, 10.10): new configurations start with `sampling-v1` and the legacy defaults; old Seed Codes, presets and settings keep their explicit algorithm.
 2. **Model budget definition.** DS1TR counts all models in the map (cap 30, measured safe). The legacy tool
    counts only new types (30, Blighttown 50 on Remastered) and keeps unused originals in the list. Can a map
    exceed 30 total? Blighttown may justify a higher cap; this cannot be answered without running the game.

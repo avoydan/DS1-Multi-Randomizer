@@ -49,6 +49,12 @@ export function summarizePlacementDiagnostics(value: unknown): PlacementDiagnost
   };
 }
 
+/** The engine's placement validation summary (`validation.enemyPlacement`): plain counters, copied as it is; null when the core does not report one. */
+export function summarizePlacementValidation(value: unknown): Record<string, unknown> | null {
+  const input = record(value);
+  return input ? structuredClone(input) as Record<string, unknown> : null;
+}
+
 /** One log line for a run; contains only counters and ids, never a path. */
 export function formatPlacementDiagnostics(diagnostics: PlacementDiagnosticsSummary): string | null {
   const summary = diagnostics.summary;

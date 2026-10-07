@@ -129,7 +129,7 @@ test('writes a validated combined package, manifest and progress', async () => f
   assert.equal(result.ok, true);
   assert.equal(result.manifest.engines.combined, 'test-engine');
   assert.equal(result.manifest.pristineSnapshotId, 'snapshot-1');
-  assert.deepEqual(result.manifest.enemyPlacement, { algorithm: 'permutation-v1', rngVersion: null, classTableHash: null, summary: null });
+  assert.deepEqual(result.manifest.enemyPlacement, { algorithm: 'permutation-v1', rngVersion: null, classTableHash: null, summary: null, validation: null });
   assert.equal(result.manifest.gameTreeRoot, 'mod');
   assert.equal(result.manifest.attempts[0].result, 'success');
   assert.equal(result.manifest.files.some((file) => file.path === 'mod/items.bin'), true);

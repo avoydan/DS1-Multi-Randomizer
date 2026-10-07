@@ -74,6 +74,8 @@ export interface UpstreamGenerationResult extends Record<string, unknown> {
   placementHash: string;
   /** Which planner produced the enemies (and, for sampling-v1, its summary). Not part of `placementHash`. */
   placementDiagnostics?: unknown;
+  /** What the validation of the run found; `enemyPlacement` is the placement summary (counts of what was decided, no per-slot detail). Not part of `placementHash`. */
+  validation?: { enemyPlacement?: unknown } & Record<string, unknown>;
 }
 
 /** Typed view of the vendored core's callable surface. */

@@ -4,7 +4,7 @@ import { api } from './api';
 
 interface Props {
   gamePath: string;
-  /** The editor is usable: Legacy-style sampling with regular enemies on. */
+  /** The editor is usable: Sampling with regular enemies on. */
   active: boolean;
   fit: PlacementFitMode;
   customPool: string[] | null;
@@ -78,7 +78,7 @@ export function EnemyPoolEditor({ gamePath, active, fit, customPool, onChange }:
 
   return (
     <div className="pool-editor">
-      <label className="toggle-row" title="Legacy-style sampling only. Restricts which enemies may be placed; enemies you leave out stay where they are in the game.">
+      <label className="toggle-row" title="Restricts which enemies may be placed; enemies you leave out stay where they are in the game.">
         <span>Custom enemy pool</span>
         <input type="checkbox" checked={enabled} disabled={!active || loading} onChange={(event) => { void toggleUse(event.target.checked); }} />
       </label>

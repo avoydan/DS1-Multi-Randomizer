@@ -74,18 +74,20 @@ test('every quick smoke test states an exact target, an expected replacement and
 
 test('only worlds that a person played in the real game carry a gameplay result; static checks never set one', () => {
   const played = SMOKE_SCENARIOS.filter((scenario) => scenario.gameplay).map((scenario) => scenario.id);
-  assert.deepEqual(played, ['quick-roaming-basic', 'quick-roaming-souls', 'quick-roaming-repeated', 'quick-sampling-asylum', 'quick-boss-asylum-demon']);
+  assert.deepEqual(played.slice().sort(), ['body-burg-fights', 'quick-boss-asylum-demon', 'quick-encounter-body', 'quick-roaming-basic', 'quick-roaming-repeated', 'quick-roaming-souls', 'quick-sampling-asylum']);
   for (const scenario of SMOKE_SCENARIOS.filter((entry) => entry.gameplay)) {
-    assert.equal(scenario.gameplay.result, 'passed');
+    // Only the Burg fights world is partly played (Taurus Demon yes, Capra Demon not yet); every other played world passed entirely.
+    assert.equal(scenario.gameplay.result, scenario.id === 'body-burg-fights' ? 'partly-passed' : 'passed', scenario.id);
     assert.match(scenario.gameplay.date, /^\d{4}-\d{2}-\d{2}$/u);
   }
   // The respawn test, every extended world (Fog, Gargoyle, Parish ...) and anything new have not been played.
   assert.equal(SMOKE_SCENARIOS.find((scenario) => scenario.id === 'quick-roaming-respawn').gameplay, undefined);
-  for (const scenario of SMOKE_SCENARIOS.filter((entry) => entry.category === 'extended')) assert.equal(scenario.gameplay, undefined, scenario.id);
+  for (const scenario of SMOKE_SCENARIOS.filter((entry) => entry.category === 'extended' && entry.id !== 'body-burg-fights')) assert.equal(scenario.gameplay, undefined, scenario.id);
+  assert.match(SMOKE_SCENARIOS.find((scenario) => scenario.id === 'body-burg-fights').gameplay.note, /Capra Demon fight was not played/u, 'the unplayed part is named');
   // Two played worlds changed one cell after they were played (the respawn bit); the record says so.
   for (const id of ['quick-roaming-basic', 'quick-roaming-repeated']) assert.match(SMOKE_SCENARIOS.find((scenario) => scenario.id === id).gameplay.note, /disableRespawn = 0/u, id);
   const { worlds } = smokeTestWorlds();
-  assert.deepEqual(worlds.filter((world) => world.gameplay).map((world) => world.id), played);
+  assert.deepEqual(worlds.filter((world) => world.gameplay).map((world) => world.id).sort(), played.slice().sort());
 });
 
 test('quick worlds are ordinary worlds: no override, no forced placement, nothing a Seed Code does not already say', () => {
@@ -165,7 +167,7 @@ test('the scenarios exercise what they claim: boss sampling options, chance, uni
   assert.match(describeSmokeExpected(hostile.expectations[0]), /no dialogue, no shop/u);
   const encounter = SMOKE_SCENARIOS.find((scenario) => scenario.id === 'quick-encounter-body');
   assert.equal(encounter.expectations[0].kind, 'encounter-body');
-  assert.equal(encounter.gameplay, undefined, 'nobody has played the encounter-body world yet');
+  assert.equal(encounter.gameplay.result, 'passed', 'the Asylum Demon body was played in the real game');
   assert.match(describeSmokeExpected(encounter.expectations[0]), /the health bar and the name on it stay Asylum Demon's/u);
 });
 

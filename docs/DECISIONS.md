@@ -1133,3 +1133,14 @@ Date: 2026-10-06.
    disk that is temporarily offline wins again when it returns) but not used.
 3. The choice is not part of any Seed Code, preset or configuration.
 
+
+## Legacy-style sampling is the default of new configurations (Part G, desktop 0.26.0)
+
+Date: 2026-10-07.
+
+1. **Decision.** A new configuration (first start, "Restore defaults", the base of a new preset) uses `sampling-v1` with the legacy defaults. Reason: Parts A-F made the sampler complete for the safe subsets, the legacy defaults are what people expect from the original tool, and the classic permutation stays one click away ("Classic permutation").
+2. **Nothing existing is reinterpreted.** What a record without the key means is the classic permutation, forever. Seed Codes, presets, saved settings and history keep the algorithm they state; only "nothing saved" starts from the default. The test worlds have their own frozen base. No generation profile change (`docs/SEED_FORMAT.md`, "Defaults and old records").
+3. **No dead controls.** A control that cannot do anything on the chosen algorithm is not shown (the classic permutation hides the sampling options); the "planned" placeholder is removed.
+4. **Order of the planners is a contract**, locked by tests (`docs/ENEMY_PLACEMENT_MODEL.md` 10.10): items, boss plan, class tables, hostile NPC types, regular sampler, roaming pass, own rows and events; every draw comes from a named stream, a neutral option draws nothing.
+5. **The placement validation summary is recorded** in the run manifest (`enemyPlacement.validation`), outside the placement hash.
+6. **Status wording.** "Enemy Placement core complete with documented safe-subset deviations": E2 (three boss encounters), F (hostile NPCs only), E1 (supported single-body bosses) and the frozen classic quirks. Part F, E2 Capra and the extended worlds remain not verified by playing.

@@ -10,7 +10,8 @@
 //     node apps/backend/scripts/placementMatrix.mjs <set> [--seeds N] [--cases a,b] [--reruns K]
 //   node apps/backend/scripts/placementMatrix.mjs --list
 
-import { cp, mkdtemp, mkdir, readdir, rm } from 'node:fs/promises';
+import { cp, mkdtemp, mkdir, readdir, readFile, rm } from 'node:fs/promises';
+import { spawnSync } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -18,6 +19,7 @@ import { fileURLToPath } from 'node:url';
 import { GameStateAuthority, executableName, managedRoots } from '../dist/core/gameState.js';
 import { generateRun } from '../dist/core/generationPipeline.js';
 import { prepareRun } from '../dist/core/seededRun.js';
+import { DEFAULT_GENERATION_SETTINGS } from '@ds1tr/contracts';
 import { buildSettings, packageDigest } from './goldenCompatibility.mjs';
 
 const sampling = (placement, enemies = {}) => ({ enemies: { ...enemies, placement: { algorithm: 'sampling-v1', ...placement } } });
@@ -71,6 +73,25 @@ export const sets = {
     { name: 'roaming-vanilla-scaling', patch: merge2(noItems, noFog, sampling({ normalReplacement: 'bosses', replacementChance: 50, fit: 'anywhere' }, { scaling: 'vanilla' })) },
     { name: 'roaming-both-fog', patch: merge2(noItems, sampling({ normalReplacement: 'both', bossChanceInNormalSlots: 25, fit: 'fits' })), seeds: 20 },
     { name: 'roaming-bosses-fog', patch: merge2(noItems, sampling({ normalReplacement: 'bosses', replacementChance: 40, fit: 'anywhere', typeReplacement: 'enabled-except-roaming-bosses' })), seeds: 20 },
+  ],
+  /** Part G: the EXACT product default (what a fresh installation starts with), with the engines switched the way a person would switch them. */
+  'product-default': [
+    { name: 'default-items-enemies-bosses', patch: merge2(structuredClone(DEFAULT_GENERATION_SETTINGS), noFog), seeds: 100 },
+    { name: 'default-enemies-bosses-only', patch: merge2(structuredClone(DEFAULT_GENERATION_SETTINGS), noItems, noFog), seeds: 100 },
+    { name: 'default-triple-with-fog', patch: structuredClone(DEFAULT_GENERATION_SETTINGS), seeds: 100 },
+  ],
+  /** Event owners (docs/EVENT_ALLOCATION.md): worlds with many placements in the Darkroot Basin, which shares the Darkroot Garden's event file. Every case is also audited. */
+  'event-owners': [
+    { name: 'owner-e1-roaming', patch: merge2(noItems, noFog, sampling({ normalReplacement: 'bosses', fit: 'anywhere', replacementChance: 100 })), seeds: 100 },
+    { name: 'owner-e1-both-stay-dead', patch: merge2(noItems, noFog, sampling({ normalReplacement: 'both', bossChanceInNormalSlots: 30, fit: 'anywhere', roamingBossSouls: 100, roamingBossesStayDead: true })), seeds: 100 },
+    { name: 'owner-hostile-npcs', patch: merge2(noItems, noFog, sampling({ hostileNpcs: true, fit: 'anywhere' })), seeds: 100 },
+    { name: 'owner-type-enabled', patch: merge2(noItems, noFog, sampling({ typeReplacement: 'enabled', fit: 'anywhere' })), seeds: 100 },
+    { name: 'owner-type-except-roaming', patch: merge2(noItems, noFog, sampling({ typeReplacement: 'enabled-except-roaming-bosses', normalReplacement: 'both', bossChanceInNormalSlots: 25, fit: 'anywhere' })), seeds: 100 },
+    { name: 'owner-general-sampling', patch: merge2(noItems, noFog, sampling({ fit: 'fits', difficultyMode: 'curve', difficultyStrictness: 'loose' })), seeds: 100 },
+    { name: 'owner-part-d-boss-sampling', patch: merge2(noItems, noFog, sampling({ bossReplacement: 'bosses', fit: 'anywhere' })), seeds: 60 },
+    { name: 'owner-e2-bodies', patch: merge2(noItems, noFog, sampling({ bossReplacement: 'both', bossChanceInBossSlots: 40, fit: 'anywhere' })), seeds: 60 },
+    { name: 'owner-second-gargoyle', patch: merge2(noItems, noFog, sampling({ bossReplacement: 'bosses', fit: 'anywhere' }, { secondGargoyle: 'replace', gwynNerf: 'strong' })), seeds: 60 },
+    { name: 'owner-classic-frozen', patch: merge2(noItems, noFog, { enemies: { placement: { algorithm: 'permutation-v1' } } }), seeds: 30 },
   ],
   /** Part F1: hostile NPCs through the real data tool (Fog is covered by the fogHostE2e sweeps): events, rows and AI bundles of every placed NPC. */
   'hostile-npc-f1': [
@@ -138,6 +159,22 @@ async function main() {
     const authority = new GameStateAuthority({ stateRoot: path.join(temp, 'state'), isGameRunning: async () => false });
     if (!(await authority.importPristine(game)).ok) throw new Error('pristine import failed');
 
+    // Event owner audit (docs/EVENT_ALLOCATION.md, "Event owners"): every placement that needs a custom event has a NEW event naming its entity in
+    // the event file of its owner map; the exe is the static verifier. A package without randomizer.json (a Fog package) is audited through its combined run.
+    const verifier = process.env.DS1TR_SMOKE_VERIFY_EXE ?? fileURLToPath(new URL('../../../tools/smoke-verify/bin/Release/net8.0/SmokeVerify.exe', import.meta.url));
+    const auditOwners = async (run) => {
+      let dir = run.result.packagePath;
+      const has = async (candidate) => readFile(path.join(candidate, 'randomizer.json')).then(() => true, () => false);
+      if (!(await has(dir))) {
+        const attempts = (await readdir(run.workspacePath)).filter((name) => /^combined-\d+$/u.test(name)).sort((a, b) => Number(b.slice(9)) - Number(a.slice(9)));
+        const seedDirectory = (await readdir(path.join(run.workspacePath, attempts[0]))).find((name) => name.startsWith('seed_'));
+        dir = path.join(run.workspacePath, attempts[0], seedDirectory);
+      }
+      const algorithm = run.prepared.config.enemies.placement.algorithm === 'sampling-v1' ? 'sampling' : 'classic';
+      const out = spawnSync(verifier, ['audit', path.join(dir, 'mod'), path.join(dir, 'randomizer.json'), source, algorithm], { encoding: 'utf8' });
+      try { return JSON.parse(out.stdout.trim().split(/\r?\n/u).pop()); } catch { return { checkedCount: 0, missing: [`the audit did not run: ${String(out.stderr).slice(0, 200)}`], duplicateOwners: [] }; }
+    };
+
     const generate = async (spec, seed, label) => {
       const prepared = prepareRun({ gamePath: game, masterSeed: seed, ...buildSettings(spec.patch) });
       if (!prepared.ok) throw new Error(`${label}: ${prepared.code}: ${prepared.technical}`);
@@ -157,7 +194,7 @@ async function main() {
 
     for (const spec of caseList.filter((entry) => !args.cases || args.cases.includes(entry.name))) {
       const seeds = args.seeds ?? spec.seeds ?? 12;
-      const stats = { case: spec.name, seeds, ok: 0, failed: [], retries: 0, windowOverruns: 0, windowInexact: 0, floorReserved: 0, windowMoved: 0, movedSeeds: [], maxEvents: 0, maxEventsMap: '', nonDeterministic: 0, maxModels: 0, started: Date.now() };
+      const stats = { case: spec.name, seeds, ok: 0, failed: [], retries: 0, windowOverruns: 0, windowInexact: 0, eventOwnerChecked: 0, eventOwnerFrozen: 0, eventOwnerFailures: [], floorReserved: 0, windowMoved: 0, movedSeeds: [], maxEvents: 0, maxEventsMap: '', nonDeterministic: 0, maxModels: 0, started: Date.now() };
       const indices = args.only ?? Array.from({ length: seeds }, (_, offset) => offset + 1);
       stats.seeds = indices.length;
       for (const index of indices) {
@@ -168,6 +205,10 @@ async function main() {
         } else {
           stats.ok += 1;
           stats.retries += run.result.manifest.attempts.length - 1;
+          const owners = await auditOwners(run);
+          stats.eventOwnerChecked += owners.checkedCount;
+          stats.eventOwnerFrozen += owners.frozenWithoutEvents ?? 0;
+          if (owners.missing.length > 0 || owners.duplicateOwners.length > 0) stats.eventOwnerFailures.push(`#${index}: ${[...owners.missing.slice(0, 2), ...owners.duplicateOwners.slice(0, 1)].join(' | ')}`);
           const maps = Object.values(run.result.manifest.enemyPlacement.summary?.maps ?? {});
           stats.maxModels = Math.max(stats.maxModels, ...maps.map((map) => map.finalModels ?? 0), 0);
           for (const line of run.audit) {
@@ -197,8 +238,8 @@ async function main() {
       console.log(JSON.stringify(stats));
     }
     const failed = summary.reduce((total, entry) => total + entry.failed.length, 0);
-    const bad = summary.reduce((total, entry) => total + entry.windowOverruns + entry.nonDeterministic, 0);
-    console.log(`MATRIX ${args.set}: ${summary.reduce((total, entry) => total + entry.ok, 0)} ok, ${failed} failed, ${bad} invariant violations (window overruns / non-deterministic reruns)`);
+    const bad = summary.reduce((total, entry) => total + entry.windowOverruns + entry.nonDeterministic + entry.eventOwnerFailures.length, 0);
+    console.log(`MATRIX ${args.set}: ${summary.reduce((total, entry) => total + entry.ok, 0)} ok, ${failed} failed, ${bad} invariant violations (window overruns / non-deterministic reruns / event owner audit)`);
     if (failed > 0 || bad > 0) process.exitCode = 1;
   } finally {
     await rm(temp, { recursive: true, force: true });

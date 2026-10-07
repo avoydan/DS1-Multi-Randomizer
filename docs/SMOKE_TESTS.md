@@ -119,7 +119,7 @@ A normal enemy takes the place of the first boss: the fight must still start, sh
 
 **Needs a reset or reload:** no
 
-**Gameplay result:** not played in the real game yet; only the static check exists.
+**Gameplay result:** passed in the real game on 2026-10-07 (played by hand). Reported by the person who played it: the Asylum Demon encounter with a normal enemy as its body worked in the real game.
 
 **Check**
 
@@ -765,7 +765,7 @@ Different enemy models in the Undead Parish: 30 (the limit is 30; a map that bos
 
 The second and third early boss fights with a normal enemy as the body: the Taurus Demon bridge and the Capra Demon room in the Undead Burg.
 
-**Gameplay result:** not played in the real game yet; only the static check exists.
+**Gameplay result:** partly passed in the real game on 2026-10-07 (played by hand). The Taurus Demon fight with a normal enemy as its body was played and worked. The Capra Demon fight was not played yet.
 
 ```
 DS1TR1-06NJDCP6-577CVKTE-TQ6XEKEA-9YMX8K9A-5N5DED94-B3TT15XG-MDTWZ85F-FF81TDQ8-58FQ06C0-MQN035RA-F3N1VS0J-C245AEMG-B82BQ8XG-AN4D0G0V-NP8TGM13-0401ABBP-KM
@@ -881,7 +881,7 @@ DS1TR1-06NJDCP6-577CVKTE-TQ6GE1CK-DRWTG3PH-6MJ5HXD0-JYRA6XEF-A2PQQM0B-H4GNNY90-2
 - The real Undead Merchant, Andre of Astora and the other friendly characters are where they always are and still talk and sell.
 - No more than twelve hostile NPCs stand in one map.
 
-Hostile NPCs in this world: 49 (Undead Merchant x27, Vamos x17, Andre of Astora x5). The first 14 by map order:
+Hostile NPCs in this world: 55 (Undead Merchant x32, Vamos x18, Andre of Astora x5). The first 14 by map order:
 
 - Undead Burg / Parish: c2500 (slot c2500_0036) -> Undead Merchant
 - Undead Burg / Parish: c2500 (slot c2500_0058) -> Undead Merchant
@@ -1001,10 +1001,11 @@ DS1TR1-06NJDCP6-577CVKTE-TQ6GE1CK-5RMCQT0T-2AP7KM0B-V38TMSX8-ARYYGSE4-22PQQ42B-0
 - Where a whole kind of enemy became one hostile NPC, each of them wakes up and fights; none is passive or stuck.
 - Every one of them gives the drops of its own slot: a kind that was one NPC does not drop one NPC reward per body.
 
-Hostile NPCs in this world: 6 (Andre of Astora x1, Vamos x5). The first 6 by map order:
+Hostile NPCs in this world: 7 (Andre of Astora x1, Vamos x5, Undead Merchant x1). The first 7 by map order:
 
 - The Depths: c1202 (slot c1202_0000) -> Andre of Astora
 - Undead Burg / Parish: c3460 (slot c3460_0000) -> Vamos
+- Darkroot Basin: c2795 (slot c2795_0000) -> Undead Merchant
 - Tomb of the Giants: c3491 (slot c3491_0000) -> Vamos
 - Tomb of the Giants: c3491 (slot c3491_0001) -> Vamos
 - Tomb of the Giants: c3491 (slot c3491_0002) -> Vamos
@@ -1026,7 +1027,7 @@ DS1TR1-06NJDCP6-577CVKTE-TQ6GE18K-TG5VN1G4-XCFF88KP-PKS1KBBW-52P7S835-06BCM1TW-5
 
 - The boss fights work as in the boss tests; the hostile NPCs around them are ordinary enemies and do not take part in any boss fight.
 
-Hostile NPCs in this world: 74 (Andre of Astora x40, Undead Merchant x12, Vamos x22). The first 14 by map order:
+Hostile NPCs in this world: 80 (Andre of Astora x40, Undead Merchant x12, Vamos x28). The first 14 by map order:
 
 - The Depths: c1201 (slot c1201_0019) -> Andre of Astora
 - The Depths: c3200 (slot c3200_0004) -> Andre of Astora

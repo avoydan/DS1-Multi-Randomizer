@@ -77,7 +77,7 @@ test('the user-facing wording says Fog, and the LUDOS artwork is a small decorat
 test('Boss replacement and Unique bosses are real controls (not planned placeholders) and are reset with the algorithm', async () => {
   const app = await read('App.tsx');
   assert.match(app, /<label className="field-label">Boss replacement<\/label>/u);
-  assert.match(app, /Random bosses \(legacy-style\)/u);
+  assert.match(app, /<option value="bosses">Random bosses<\/option>/u);
   assert.match(app, /label="Unique bosses"/u);
   assert.doesNotMatch(app, /\['Boss replacement', 'NPC replacement'\]/u);
   assert.doesNotMatch(app, /'Allow T-pose behavior', 'Unique bosses'/u);
@@ -115,4 +115,17 @@ test('the test worlds panel separates quick smoke tests from extended gameplay t
   const advanced = app.slice(app.indexOf('<summary>Advanced</summary>'));
   assert.ok(advanced.includes('<SmokeTestPanel'), 'the panel lives in Advanced');
   assert.equal(app.slice(0, app.indexOf('<summary>Advanced</summary>')).includes('<SmokeTestPanel'), false);
+});
+
+test('Part G: Sampling is the recommended default, the classic permutation stays selectable, and the sampling controls exist only where they apply', async () => {
+  const app = await read('App.tsx');
+  assert.match(app, /<option value="sampling-v1">Sampling \(recommended\)<\/option><option value="permutation-v1">Classic permutation<\/option>/u);
+  assert.doesNotMatch(app, /[Ll]egacy-style/u, 'no implementation history in the visible text');
+  // Everything between the replacement chance and the custom pool editor is inside one sampling-only block: no disabled twin is shown for the classic permutation.
+  assert.match(app, /\{config\.enemies\.placement\.algorithm === 'sampling-v1' && \(\s*<>\s*<RangeOption label="Replacement chance"/u);
+  assert.match(app, /<EnemyPoolEditor[\s\S]*?<\/>\s*\)\}/u);
+  // No planned placeholder is left in the enemy section (the T-pose and NPC replacement controls did nothing).
+  assert.doesNotMatch(app, /Allow T-pose behavior|NPC replacement/u);
+  // A fresh screen starts from the contracts default (sampling); Restore default settings returns to it, a loaded Seed Code keeps its own algorithm.
+  assert.match(app, /const resetSettings = \(\) => \{\s*setConfig\(\(current\) => \(\{ \.\.\.initialConfig, gamePath: current\.gamePath \}\)\);/u);
 });

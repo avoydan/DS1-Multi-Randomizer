@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { pathToFileURL } from 'node:url';
 import { loadCombinedRandomizerCore, resolveCombinedRandomizerCoreModulePath } from '../../dist/adapters/combinedRandomizerCore.js';
-import { formatPlacementDiagnostics, summarizePlacementDiagnostics } from '../../dist/core/placementDiagnostics.js';
+import { formatPlacementDiagnostics, summarizePlacementDiagnostics, summarizePlacementValidation } from '../../dist/core/placementDiagnostics.js';
 
 // sampling-v1 for regular enemy slots (Part A), on synthetic catalogs (extracted game data is never committed).
 
@@ -649,4 +649,13 @@ test('the backend summary keeps counters and the class table hash, drops per-slo
   // permutation-v1 and anything unreadable reduce to the frozen algorithm's identity.
   assert.deepEqual(summarizePlacementDiagnostics(undefined), { algorithm: 'permutation-v1', rngVersion: null, classTableHash: null, summary: null });
   assert.equal(formatPlacementDiagnostics(summarizePlacementDiagnostics(placement.permutationDiagnostics())), null);
+});
+
+test('the placement validation summary is copied as plain counters and is null when the core reports none', () => {
+  assert.equal(summarizePlacementValidation(undefined), null);
+  assert.equal(summarizePlacementValidation([1]), null);
+  const source = { algorithm: 'sampling-v1', placements: { changed: 2 } };
+  const copy = summarizePlacementValidation(source);
+  assert.deepEqual(copy, source);
+  assert.notEqual(copy, source, 'a copy, not the engine object');
 });

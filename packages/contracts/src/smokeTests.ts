@@ -11,8 +11,11 @@ export const SMOKE_TEST_PROFILE = GENERATION_PROFILE_V1;
  * shared between testers and re-created later. The list lives in Advanced and in docs/SMOKE_TESTS.md, never in the normal flow.
  */
 
-/** The settings of a fresh installation (the controls of the main screen before anything is changed). */
-export const DEFAULT_GENERATION_SETTINGS: GenerationSettings = {
+/**
+ * The base of every test world (docs/SMOKE_TESTS.md): the settings a fresh installation had until Part G, with the classic permutation. The Seed Codes
+ * of the test worlds are pinned to this base and never change, so it is frozen here and no longer follows the product default below.
+ */
+export const SMOKE_TEST_BASE_SETTINGS: GenerationSettings = {
   items: {
     enabled: true, randomizeWorldItems: true, randomizeProtectedItems: false, progressionLogic: true, guaranteeEarlyWeapon: true,
     balancedEarlyLoot: true, randomizeStartingClass: false, randomizeStartingEquipment: false, randomizeGifts: false,
@@ -34,6 +37,24 @@ export const DEFAULT_GENERATION_SETTINGS: GenerationSettings = {
     requireLordSouls: true, pacifistMode: false, language: 'ENGLISH',
   },
   output: { includeDlc: true },
+};
+
+/**
+ * The settings of a fresh installation (the controls of the main screen before anything is changed, and "Restore default settings"): legacy-style
+ * sampling (Part G; its options are the legacy defaults), everything else as before. Only NEW configurations start here: a saved setting, a preset, a
+ * Seed Code and a run in the history all carry their algorithm explicitly and keep it (`NEUTRAL_ENEMY_PLACEMENT_OPTIONS`, the value an older record
+ * is read with, stays the classic permutation and never changes).
+ */
+export const DEFAULT_GENERATION_SETTINGS: GenerationSettings = {
+  ...SMOKE_TEST_BASE_SETTINGS,
+  enemies: {
+    ...SMOKE_TEST_BASE_SETTINGS.enemies,
+    placement: {
+      algorithm: 'sampling-v1', replacementChance: 100, normalReplacement: 'normals', fit: 'fits', difficultyMode: 'random-easy-asylum',
+      difficultyStrictness: 'loose', typeReplacement: 'disabled', customPool: null, bossReplacement: 'classic', uniqueBosses: false,
+      bossChanceInBossSlots: 90, hostileNpcs: false, bossChanceInNormalSlots: 10, roamingBossSouls: 50, roamingBossesStayDead: false,
+    },
+  },
 };
 
 type DeepPartial<T> = { [K in keyof T]?: T[K] extends readonly unknown[] | null ? T[K] : T[K] extends object ? DeepPartial<T[K]> : T[K] };
@@ -71,7 +92,8 @@ export interface SmokeExpectation {
 
 /** What a person who played a world in the real game reported. Only a manual result belongs here; static checks never set it. */
 export interface SmokeGameplayResult {
-  result: 'passed';
+  /** `passed`: the whole world was played; `partly-passed`: only the parts the note names were played. */
+  result: 'passed' | 'partly-passed';
   date: string;
   note: string;
 }
@@ -84,7 +106,7 @@ export interface SmokeScenario {
   purpose: string;
   /** Fixed internal master seed (the Seed Code carries it; nobody has to type it). */
   masterSeed: string;
-  /** Changes to DEFAULT_GENERATION_SETTINGS. */
+  /** Changes to SMOKE_TEST_BASE_SETTINGS. */
   settings: DeepPartial<GenerationSettings>;
   /** Extended: where to go and what to look at. Quick: the specific checks of this world, in order. */
   observe: string[];
@@ -247,6 +269,7 @@ export const SMOKE_SCENARIOS: readonly SmokeScenario[] = [
     purpose: 'A normal enemy takes the place of the first boss: the fight must still start, show its health bar, end when it dies and open the way on.',
     settings: QUICK_SMOKE_RECIPES['quick-encounter-body'].settings,
     expectations: [{ kind: 'encounter-body', map: 'm18_01_00_00', mapName: 'Undead Asylum', slot: 'c2232_0000', replacedModel: 'c2232', replacedName: 'Asylum Demon', model: 'c2560', name: 'Balder Knight', meters: 22.5, up: 13.3 }],
+    gameplay: { result: 'passed', date: '2026-10-07', note: 'Reported by the person who played it: the Asylum Demon encounter with a normal enemy as its body worked in the real game.' },
     estimateSeconds: 90,
     observe: [
       'A Balder Knight stands in the arena where the Asylum Demon normally appears; the Asylum Demon is not there.',
@@ -452,6 +475,7 @@ export const SMOKE_SCENARIOS: readonly SmokeScenario[] = [
       items: { enabled: false }, fog: { enabled: false },
       enemies: { randomizeRegularEnemies: false, gwynNerf: 'none', secondGargoyle: 'keep', placement: { algorithm: 'sampling-v1', fit: 'anywhere', difficultyMode: 'random', replacementChance: 100, bossReplacement: 'normals' } },
     },
+    gameplay: { result: 'partly-passed', date: '2026-10-07', note: 'The Taurus Demon fight with a normal enemy as its body was played and worked. The Capra Demon fight was not played yet.' },
     observe: ['Fight the Taurus Demon on the bridge of the Undead Burg and the Capra Demon below: the bodies of this world are listed in docs/SMOKE_TESTS.md, the health bars keep the boss names, each fight ends when its body dies and its fog gate opens.', 'Both fights must not start again after a reload.'],
   },
   {
@@ -540,7 +564,7 @@ export const SMOKE_SCENARIOS: readonly SmokeScenario[] = [
   },
 ];
 
-/** DEFAULT_GENERATION_SETTINGS with the scenario's changes applied (objects merge, everything else replaces). */
+/** SMOKE_TEST_BASE_SETTINGS with the scenario's changes applied (objects merge, everything else replaces). */
 export function resolveScenarioSettings(scenario: SmokeScenario): GenerationSettings {
   const merge = (base: unknown, patch: unknown): unknown => {
     if (patch === undefined) return structuredClone(base);
@@ -549,5 +573,5 @@ export function resolveScenarioSettings(scenario: SmokeScenario): GenerationSett
     for (const [key, value] of Object.entries(patch as Record<string, unknown>)) result[key] = merge((base as Record<string, unknown>)[key], value);
     return result;
   };
-  return merge(DEFAULT_GENERATION_SETTINGS, scenario.settings) as GenerationSettings;
+  return merge(SMOKE_TEST_BASE_SETTINGS, scenario.settings) as GenerationSettings;
 }
