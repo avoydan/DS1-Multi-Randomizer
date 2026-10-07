@@ -967,3 +967,12 @@ verification are unchanged. 19 files (18 `.msb`, `GameParam.parambnd.dcx`) are c
 the other 40 are fetched once from the pinned FogMod commit and hash-checked. The per-file inventory, the comparison with a
 clean installation and the redistribution decision are in `docs/FOG_DATA_PROVENANCE.md`. `DS1TR_FOG_DATA_ROOT` is a
 developer override. FogHost and DsrDataTool are shipped as self-contained single-file executables (`docs/DESKTOP_PACKAGING.md`).
+
+## Progression commands (FogHost project 0.6.0; Part H)
+
+Two read-only commands next to `generate`, used by key placement (`docs/ITEM_PROGRESSION_MODEL.md`). They write no game data, take no request file and change nothing about `generate`; **`HostVersion` stays `0.5.0`**, so every generation profile still matches and only the project version (the file version of the executable) moves to 0.6.0.
+
+* `FogHost progression-model --data-root <world data> --out <file>`: FogMod's graph built with every randomization option off (the vanilla world), written as `ds1tr-progression-model-1` JSON with deterministic bytes: areas, edges with FogMod's own condition tree, the key items with their vanilla area and tags, `LotLocations` (item lot row -> area), the optional areas and the prison rule. It names the FogMod commit and the SHA-256 of the annotation it was built from; the backend refuses a model of another annotation.
+* `FogHost progression-check --data-root <world data> (--game <game tree> | --assign <key:area json> | --assign-many <json list>) --out <file>`: asks FogMod's own `GraphChecker` whether the world is completable and the prison can be left. `--game` reads the item lots **of a written package** with FogMod's own `ItemReader` (the same reader `generate` uses), so the answer is about the real lots; `--assign` and `--assign-many` take explicit key areas (used by `apps/backend/scripts/progressionDifferential.mjs` to compare the engine's evaluation with FogMod's on thousands of assignments).
+
+Exit codes: 0 success, 2 usage, 4 a typed host error (`CODE: message` on stderr; the data root is verified against the pinned world data first, so another annotation is refused), 5 any other failure. The output file is written atomically.

@@ -17,6 +17,8 @@ namespace FogHost
 
         public static int Main(string[] args)
         {
+            // The progression commands (docs/ITEM_PROGRESSION_MODEL.md) are separate from `generate`: they write no game data and change nothing about it.
+            if (ProgressionCommands.Handles(args)) return ProgressionCommands.Run(args);
             if (args.Length != 5 || args[0] != "generate" || args[1] != "--request" || args[3] != "--response")
             {
                 Console.Error.WriteLine("Usage: FogHost generate --request <request.json> --response <response.json>");
