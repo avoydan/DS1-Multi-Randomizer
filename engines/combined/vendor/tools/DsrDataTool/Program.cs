@@ -208,6 +208,10 @@ static GameCatalog ScanGame(string gameDirectory)
     if (File.Exists(paramdefPath))
         sourceFiles.Add(DescribeSource(paramdefPath, gameDirectory));
     sourceFiles.Add(DescribeSource(itemMessagePath, gameDirectory));
+    // Part H (patches/0021): the boss rewards are awarded by an event of the shared common event file.
+    var commonEventPath = Path.Combine(gameDirectory, "event", "common.emevd.dcx");
+    if (File.Exists(commonEventPath))
+        sourceFiles.Add(DescribeSource(commonEventPath, gameDirectory));
 
     var maps = new List<MapRecord>();
     var slots = new List<EnemySlotRecord>();
@@ -342,6 +346,8 @@ static GameCatalog ScanGame(string gameDirectory)
     var enemyDropLots = new List<ItemLotRecord>();
     var worldItemLots = new List<WorldItemLotRecord>();
     var shopEntries = new List<ShopEntryRecord>();
+    var bossRewards = new List<BossRewardRecord>();
+    var transpositionRecipes = new List<TranspositionRecipeRecord>();
     var startingEquipmentPools = new StartingEquipmentPools(
         new(), new(), new(), new(), new());
     var itemNames = ReadEnglishItemNames(itemMessagePath);
@@ -370,7 +376,11 @@ static GameCatalog ScanGame(string gameDirectory)
                             slot.ModelName.StartsWith('c'))
                         .Select(slot => slot.NpcParamId)
                         .ToHashSet(),
-                    eventAwardItemLotIds);
+                    eventAwardItemLotIds,
+                    Path.Combine(gameDirectory, "event"));
+                bossRewards = randomizerData.BossRewards;
+                transpositionRecipes = randomizerData.TranspositionRecipes;
+                errors.AddRange(randomizerData.Errors);
                 gifts = randomizerData.Gifts;
                 enemyDropLots = randomizerData.EnemyDropLots;
                 worldItemLots = randomizerData.WorldItemLots;
@@ -411,7 +421,9 @@ static GameCatalog ScanGame(string gameDirectory)
         aiGoalIds,
         errors,
         ignoredFiles,
-        EventOwners.Shared ? "shared" : null);
+        EventOwners.Shared ? "shared" : null,
+        bossRewards,
+        transpositionRecipes);
 }
 
 static RandomizerParamData ReadRandomizerParamData(
@@ -419,7 +431,8 @@ static RandomizerParamData ReadRandomizerParamData(
     string paramdefPath,
     ItemNameLookup itemNames,
     HashSet<int> safeNpcParamIds,
-    HashSet<int> eventAwardItemLotIds)
+    HashSet<int> eventAwardItemLotIds,
+    string eventDirectory)
 {
     var paramdefs = BND3.Read(paramdefPath).Files
         .Select(file => PARAMDEF.Read(file.Bytes))
@@ -608,6 +621,11 @@ static RandomizerParamData ReadRandomizerParamData(
         .ToList();
 
     var weaponParam = ReadParam("EquipParamWeapon.param");
+    var scanErrors = new List<ScanError>();
+    var bossRewards = ReadBossRewards(
+        eventDirectory, itemLotParam, npcParam, DescribeItemLot, ItemLotEntries, scanErrors);
+    var transpositionRecipes = ReadTranspositionRecipes(
+        ReadParam("EquipMtrlSetParam.param"), weaponParam, itemNames, scanErrors);
     var weapons = weaponParam.Rows
         // Use every named base weapon rather than only equipment that happens
         // to appear in a shop, loot table, or vanilla class. Explicitly named
@@ -667,7 +685,175 @@ static RandomizerParamData ReadRandomizerParamData(
         enemyDropLots,
         worldItemLots,
         shopEntries,
-        startingEquipmentPools);
+        startingEquipmentPools,
+        bossRewards,
+        transpositionRecipes,
+        scanErrors);
+}
+
+// Part H (patches/0021): the boss rewards. The shared common event 970 waits for a trigger flag (a boss defeat) and then awards up
+// to three item lots; every boss of the game is one initialisation of it (common.emevd.dcx, event 0). The reward therefore belongs to
+// the encounter's flag, never to the body that stands in the arena (boss sampling, roaming bosses and encounter bodies never touch it).
+// A lot is awarded together with the rows that follow it consecutively (the same chain rule FogMod's ItemReader uses), so the catalog
+// records the chain of every awarded lot. The shape of the event is asserted: anything else is a scan error, never a guess.
+static List<BossRewardRecord> ReadBossRewards(
+    string eventDirectory,
+    PARAM itemLotParam,
+    PARAM npcParam,
+    Func<PARAM.Row, string> describeLot,
+    Func<PARAM.Row, List<ItemLotEntryRecord>> lotEntries,
+    List<ScanError> errors)
+{
+    const int rewardEventId = 970;
+    var result = new List<BossRewardRecord>();
+    const string commonPath = "event/common.emevd.dcx";
+    var commonFile = Path.Combine(eventDirectory, "common.emevd.dcx");
+    if (!File.Exists(commonFile))
+    {
+        errors.Add(new ScanError(commonPath, "boss-rewards", "The shared common event file is missing."));
+        return result;
+    }
+    var common = EMEVD.Read(commonFile);
+    var rewardEvent = common.Events.SingleOrDefault(entry => entry.ID == rewardEventId);
+    if (rewardEvent == null)
+    {
+        errors.Add(new ScanError(commonPath, "boss-rewards", $"Event {rewardEventId} (the boss reward event) was not found."));
+        return result;
+    }
+    var awardParameters = new List<int>();
+    for (var index = 0; index < rewardEvent.Instructions.Count; index++)
+    {
+        var instruction = rewardEvent.Instructions[index];
+        if (instruction.Bank != 2003 || instruction.ID != 36) continue;
+        var parameter = rewardEvent.Parameters.SingleOrDefault(entry =>
+            entry.InstructionIndex == index && entry.TargetStartByte == 0 && entry.ByteCount == 4);
+        if (parameter == null)
+        {
+            errors.Add(new ScanError(commonPath, "boss-rewards", $"Event {rewardEventId} awards a fixed item lot; its shape changed."));
+            return result;
+        }
+        awardParameters.Add((int)parameter.SourceStartByte);
+    }
+    var first = rewardEvent.Instructions.Count > 1 ? rewardEvent.Instructions[0] : null;
+    var triggerParameter = rewardEvent.Parameters.SingleOrDefault(entry =>
+        entry.InstructionIndex == 0 && entry.TargetStartByte == 4 && entry.ByteCount == 4);
+    if (awardParameters.Count != 3 || first == null || first.Bank != 1003 || first.ID != 2 || triggerParameter == null ||
+        rewardEvent.Instructions[1].Bank != 3 || rewardEvent.Instructions[1].ID != 0)
+    {
+        errors.Add(new ScanError(commonPath, "boss-rewards",
+            $"Event {rewardEventId} no longer has the shape the scan understands (a flag wait and three parameterised awards)."));
+        return result;
+    }
+    var triggerSource = (int)triggerParameter.SourceStartByte;
+    var lotRows = itemLotParam.Rows.GroupBy(row => row.ID).ToDictionary(group => group.Key, group => group.First());
+    var npcReferences = npcParam.Rows
+        .SelectMany(row => row.Cells
+            .Where(cell => cell.Def.InternalName.StartsWith("itemLotId_", StringComparison.OrdinalIgnoreCase))
+            .Select(cell => Convert.ToInt32(cell.Value)))
+        .Where(id => id > 0)
+        .ToHashSet();
+    // Maps whose events set a (small, global) trigger flag: the map of the encounter.
+    var triggers = new List<(int Slot, int Flag, List<int> Lots)>();
+    foreach (var instruction in common.Events.SelectMany(entry => entry.Instructions))
+    {
+        if (instruction.Bank != 2000 || (instruction.ID != 0 && instruction.ID != 6)) continue;
+        var data = instruction.ArgData;
+        var width = 8 + Math.Max(triggerSource, awardParameters.Max()) + 4;
+        if (data.Length < width || BitConverter.ToUInt32(data, 4) != rewardEventId) continue;
+        var lots = awardParameters
+            .Select(source => BitConverter.ToInt32(data, 8 + source))
+            .ToList();
+        triggers.Add((BitConverter.ToInt32(data, 0), BitConverter.ToInt32(data, 8 + triggerSource), lots));
+    }
+    var flagMaps = new Dictionary<int, string>();
+    var smallFlags = triggers.Select(entry => entry.Flag).Where(flag => flag > 0 && flag < 10_000_000).ToHashSet();
+    foreach (var mapEvent in Directory.EnumerateFiles(eventDirectory, "m??_??_00_00.emevd.dcx").OrderBy(path => path, StringComparer.Ordinal))
+    {
+        var mapId = Path.GetFileName(mapEvent).Replace(".emevd.dcx", "", StringComparison.Ordinal);
+        foreach (var instruction in EMEVD.Read(mapEvent).Events.SelectMany(entry => entry.Instructions))
+        {
+            if (instruction.Bank != 2003 || instruction.ID != 2 || instruction.ArgData.Length < 8) continue;
+            var flag = BitConverter.ToInt32(instruction.ArgData, 0);
+            if (smallFlags.Contains(flag) && !flagMaps.ContainsKey(flag))
+                flagMaps[flag] = mapId;
+        }
+    }
+    foreach (var trigger in triggers.OrderBy(entry => entry.Slot))
+    {
+        string? mapId = null;
+        if (trigger.Flag >= 10_000_000)
+            mapId = $"m{trigger.Flag / 100_000 % 100:00}_{trigger.Flag / 10_000 % 10:00}_00_00";
+        else if (flagMaps.TryGetValue(trigger.Flag, out var found))
+            mapId = found;
+        var lots = new List<BossRewardLotRecord>();
+        for (var order = 0; order < trigger.Lots.Count; order++)
+        {
+            var lotId = trigger.Lots[order];
+            if (lotId <= 0 || !lotRows.ContainsKey(lotId)) continue;
+            var chain = new List<ItemLotRecord>();
+            for (var id = lotId; lotRows.TryGetValue(id, out var row); id++)
+            {
+                chain.Add(new ItemLotRecord(row.ID, describeLot(row), lotEntries(row)));
+                if (npcReferences.Contains(id))
+                    errors.Add(new ScanError(commonPath, "boss-rewards",
+                        $"Item lot {id} of boss reward {trigger.Slot} is also an NPC drop; reward ownership would be ambiguous."));
+            }
+            lots.Add(new BossRewardLotRecord(lotId, order == 0 ? "primary" : "bonus", chain));
+        }
+        result.Add(new BossRewardRecord(
+            $"boss-reward-{trigger.Slot}", trigger.Slot, trigger.Flag, mapId, mapId == "m12_01_00_00", lots));
+    }
+    return result;
+}
+
+// Part H (patches/0021): which boss weapons a boss soul can be transposed into. It is game data: a weapon whose material set asks for
+// the soul (EquipParamWeapon.materialSetId -> EquipMtrlSetParam.materialId01-05, goods 700-711). A family is a run of consecutive
+// weapon ids in steps of 100 (one weapon at its reinforcement levels).
+static List<TranspositionRecipeRecord> ReadTranspositionRecipes(
+    PARAM mtrlSetParam,
+    PARAM weaponParam,
+    ItemNameLookup itemNames,
+    List<ScanError> errors)
+{
+    var result = new List<TranspositionRecipeRecord>();
+    var setsBySoul = new SortedDictionary<int, HashSet<int>>();
+    foreach (var row in mtrlSetParam.Rows)
+    {
+        for (var index = 1; index <= 5; index++)
+        {
+            var material = GetCellInt(row, $"materialId0{index}", -1);
+            if (material < 700 || material > 711) continue;
+            if (!setsBySoul.ContainsKey(material)) setsBySoul[material] = new HashSet<int>();
+            setsBySoul[material].Add(row.ID);
+        }
+    }
+    foreach (var (soul, sets) in setsBySoul)
+    {
+        var ids = weaponParam.Rows
+            .Where(row => sets.Contains(GetCellInt(row, "materialSetId", -1)))
+            .Select(row => row.ID)
+            .OrderBy(id => id)
+            .ToList();
+        if (ids.Count == 0) continue;
+        var families = new List<List<TranspositionItemRecord>>();
+        foreach (var id in ids)
+        {
+            if (!itemNames.Weapons.TryGetValue(id, out var name))
+            {
+                errors.Add(new ScanError("param/GameParam/GameParam.parambnd.dcx", "transposition",
+                    $"Weapon {id} (a transposition of goods {soul}) has no English name."));
+                name = $"Weapon {id}";
+            }
+            var item = new TranspositionItemRecord(id, 0, 0, name);
+            if (families.Count > 0 && families[^1][^1].ItemId + 100 == id)
+                families[^1].Add(item);
+            else
+                families.Add(new List<TranspositionItemRecord> { item });
+        }
+        result.Add(new TranspositionRecipeRecord(
+            soul, itemNames.GetName(0x40000000, soul), families));
+    }
+    return result;
 }
 
 static ItemNameLookup ReadEnglishItemNames(string itemMessagePath)
@@ -1262,7 +1448,7 @@ static PatchReport PatchEnemies(
     var enemyDropPlacements = ReadRowPlacements("enemyDrops");
     var worldItemPlacements = ReadRowPlacements("items");
     var shopPlacements = ReadRowPlacements("shops");
-    var itemAssignments = new[] { "items", "gifts", "enemyDrops", "shops" }
+    var itemAssignments = new[] { "items", "gifts", "enemyDrops", "shops", "bossRewards" }
         .Where(propertyName => placementsRoot.TryGetProperty(propertyName, out _))
         .SelectMany(propertyName => placementsRoot.GetProperty(propertyName).EnumerateArray())
         .Where(row => row.TryGetProperty("targetKind", out _))
@@ -5263,7 +5449,9 @@ record GameCatalog(
     List<int> AiGoalIds,
     List<ScanError> Errors,
     List<string> IgnoredFiles,
-    string? EventOwners = null);
+    string? EventOwners = null,
+    List<BossRewardRecord>? BossRewards = null,
+    List<TranspositionRecipeRecord>? TranspositionRecipes = null);
 
 // Which map's event file serves a map: see EventOwnerMap. One mode per run.
 static class EventOwners
@@ -5471,7 +5659,25 @@ record RandomizerParamData(
     List<ItemLotRecord> EnemyDropLots,
     List<WorldItemLotRecord> WorldItemLots,
     List<ShopEntryRecord> ShopEntries,
-    StartingEquipmentPools StartingEquipmentPools);
+    StartingEquipmentPools StartingEquipmentPools,
+    List<BossRewardRecord> BossRewards,
+    List<TranspositionRecipeRecord> TranspositionRecipes,
+    List<ScanError> Errors);
+// Part H (patches/0021). One boss reward = one initialisation of the common boss reward event: the flag it waits for (TriggerFlag), the
+// map that sets that flag (MapId; null when the data does not say) and the lots it awards, each with the chain of rows awarded with it.
+record BossRewardRecord(
+    string Id,
+    int Slot,
+    int TriggerFlag,
+    string? MapId,
+    bool Dlc,
+    List<BossRewardLotRecord> Lots);
+record BossRewardLotRecord(int RowId, string Role, List<ItemLotRecord> Chain);
+record TranspositionRecipeRecord(
+    int SoulItemId,
+    string SoulName,
+    List<List<TranspositionItemRecord>> Families);
+record TranspositionItemRecord(int ItemId, int Category, int EquipType, string Name);
 record ScanError(string Path, string Stage, string Message);
 record PatchPlacement(
     string SlotId,

@@ -128,7 +128,7 @@ export function normalizeConfig(input = {}) {
     : defaultConfig.enemyScaling;
 
   for (const [key, allowed] of [
-    ["soulItems", ["shuffled", "replaced"]],
+    ["soulItems", ["shuffled", "replaced", "transposed"]],
     ["startingItems", ["shield-1h", "shield-2h", "mixed-pool"]],
     ["gwynNerf", ["none", "medium", "strong"]],
     ["secondGargoyle", ["single-boss", "replace", "keep"]],

@@ -43,6 +43,7 @@ function itemLocationsText(result) {
     ...(result.placements.gifts || []),
     ...(result.placements.enemyDrops || []),
     ...(result.placements.shops || []),
+    ...(result.placements.bossRewards || []),
   ].sort(
     (left, right) =>
       (left.itemName || left.to).localeCompare(right.itemName || right.to) ||
@@ -96,6 +97,7 @@ function spoilerText(result) {
     ...(result.placements.gifts || []),
     ...(result.placements.enemyDrops || []),
     ...(result.placements.shops || []),
+    ...(result.placements.bossRewards || []),
   ].sort(
     (left, right) =>
       (left.itemName || left.to).localeCompare(right.itemName || right.to) ||
@@ -152,6 +154,13 @@ function spoilerText(result) {
   lines.push("", "=== SHOPS ===");
   for (const placement of result.placements.shops || []) {
     lines.push(`[${placement.rowId}] ${placement.from} -> ${placement.to}`);
+  }
+  // Only with Soul items Transposed (Part H): the other spoilers keep their text exactly.
+  if ((result.placements.bossRewards || []).length > 0) {
+    lines.push("", "=== BOSS REWARDS ===");
+    for (const placement of result.placements.bossRewards) {
+      lines.push(`[${placement.rowId}] ${placement.from} -> ${placement.to}`);
+    }
   }
   lines.push("", "=== VALIDATION ===", `Valid seed: ${result.validation.valid ? "YES" : "NO"}`);
   return `${lines.join("\n")}\n`;

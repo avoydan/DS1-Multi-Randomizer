@@ -2124,6 +2124,14 @@ function randomizeExtractedItemLots(config, catalog) {
       lotTargets,
     );
   }
+  // Legacy "Soul items" = Transposed (Part H, patches/0022): the boss souls join the pool and each becomes a boss weapon of its boss
+  // with a 75% chance.
+  if (config.soulItems === "transposed") {
+    lotTargets.push(...transposedBossSouls(
+      createStream(config.seed, "soul-items-transposed", config.version),
+      catalog,
+    ));
+  }
   // Legacy "Fashion Souls" off: world armor sets move as whole sets.
   const armorSetHomes = config.fashionSouls ? [] : findArmorSetHomes(lotTargets);
   const armorSetTargets = new Set(armorSetHomes.flat());
@@ -2132,6 +2140,7 @@ function randomizeExtractedItemLots(config, catalog) {
     ...shopTargets.filter((entry) => !isBulkShopConsumable(entry)),
   ];
   const result = { items: [], gifts: [], enemyDrops: [], shops: [] };
+  if (config.soulItems === "transposed") result.bossRewards = [];
   if (globalTargets.length + shopOnlyTargets.length < 2 && armorSetHomes.length === 0) {
     return result;
   }
@@ -2152,6 +2161,12 @@ function randomizeExtractedItemLots(config, catalog) {
             map: "ItemLotParam",
             itemLot: entry.rowId,
           }
+        : entry.pool === "boss"
+          ? {
+              area: `Boss reward: ${entry.originalName ?? entry.name}`,
+              map: entry.mapId ?? "ItemLotParam",
+              itemLot: entry.rowId,
+            }
         : entry.pool === "shop"
           ? {
               area: `Shop inventory: ${entry.name}`,
@@ -2190,6 +2205,8 @@ function randomizeExtractedItemLots(config, catalog) {
       originalLocation: describeLocation(source),
       randomizedLocation: describeLocation(target),
       progression: source.progression,
+      // Only a transposed boss soul says what it was (hint metadata); every other placement keeps its exact shape.
+      ...(source.pool === "boss" && source.transmuted ? { transposedFrom: source.originalName } : {}),
       preserved:
         target.kind === source.kind &&
         target.rowId === source.rowId &&
@@ -2200,6 +2217,9 @@ function randomizeExtractedItemLots(config, catalog) {
       placement.location = `itemlot:${target.rowId}`;
       placement.map = target.mapId;
       result.items.push(placement);
+    } else if (target.pool === "boss") {
+      placement.bossReward = target.bossReward;
+      result.bossRewards.push(placement);
     } else if (target.pool === "gift") {
       result.gifts.push(placement);
     } else if (target.pool === "enemy") {
@@ -2231,6 +2251,64 @@ function randomizeExtractedItemLots(config, catalog) {
     }
   }
   return result;
+}
+
+// Legacy "Soul items" Transposed (Part H, patches/0022; docs/ITEM_PROGRESSION_MODEL.md). The boss souls (goods 700-711) are the item lot rows of
+// the boss rewards (catalog.bossRewards; rewards belong to the encounter's trigger flag, never to a boss body). In the legacy every boss soul
+// is a pool item in every mode and "Transposed" additionally gives each one a 75% chance to become a boss weapon of that boss: a family of
+// the soul's recipe is drawn, then one of its reinforcement levels. Here the souls join the pool only for Transposed (the other two modes
+// keep them at their bosses, as before), so the option changes the whole item layout of a seed, as it does in the legacy.
+// The recipes are game data (EquipMtrlSetParam x EquipParamWeapon.materialSetId); the soul of the Sanctuary Guardian has none and stays.
+const isBossSoul = (entry) => entry.equipType === 3 && entry.itemId >= 700 && entry.itemId <= 711;
+
+function transposedBossSouls(rng, catalog) {
+  const rewards = catalog?.bossRewards ?? [];
+  const recipes = new Map((catalog?.transpositionRecipes ?? []).map((recipe) => [recipe.soulItemId, recipe]));
+  if (rewards.length === 0 || recipes.size === 0) {
+    throw new Error(
+      "SOUL_ITEMS_TRANSPOSED_UNAVAILABLE: the catalog has no boss rewards. Import the clean game data again.",
+    );
+  }
+  const targets = [];
+  for (const reward of [...rewards].sort((left, right) => left.slot - right.slot)) {
+    for (const lot of reward.lots) {
+      for (const row of lot.chain) {
+        for (const entry of row.entries) {
+          if (!isBossSoul(entry)) continue;
+          const draw = rng.next();
+          const recipe = recipes.get(entry.itemId);
+          let source = {
+            ...entry,
+            rowId: row.rowId,
+            mapId: reward.mapId ?? null,
+            pool: "boss",
+            kind: "lot",
+            progression: false,
+            bossReward: reward.id,
+            name: entry.name,
+          };
+          if (draw < 0.75 && recipe && recipe.families.length > 0) {
+            const family = recipe.families[rng.int(recipe.families.length)];
+            const item = family[rng.int(family.length)];
+            source = {
+              ...source,
+              itemId: item.itemId,
+              category: item.category,
+              equipType: item.equipType,
+              quantity: 1,
+              name: item.name,
+              originalName: entry.name,
+              transmuted: true,
+            };
+          }
+          // A DLC boss keeps the DLC rule of the world lots (no progression or restricted item in the DLC).
+          if (reward.dlc) source.mapId = "m12_01_00_00";
+          targets.push(source);
+        }
+      }
+    }
+  }
+  return targets;
 }
 
 // Legacy "Soul items" Replaced: the lesser souls (goods 400-409, the Soul of
@@ -3287,6 +3365,8 @@ export function generate(inputConfig, { gameCatalog = null } = {}) {
         ? itemLotPlan.enemyDrops
         : [],
       shops: extractedData ? itemLotPlan.shops : [],
+      // Only with Soul items Transposed: every other world keeps its placement (and so its placement hash) exactly.
+      ...(extractedData && itemLotPlan.bossRewards ? { bossRewards: itemLotPlan.bossRewards } : {}),
     },
     validation: {
       valid: true,
@@ -3330,6 +3410,9 @@ export function generate(inputConfig, { gameCatalog = null } = {}) {
               : ["The six respawning Blighttown mosquitoes were left in place and kept out of the enemy pool."]),
             ...(config.soulItems === "replaced"
               ? ["Soul items replaced: lesser souls (goods 400-409) were swapped for other consumables before shuffling."]
+              : []),
+            ...(config.soulItems === "transposed"
+              ? ["Soul items transposed: the boss souls joined the item pool and each had a 75% chance to become a boss weapon of its boss."]
               : []),
             ...(config.randomizeStartingEquipment && config.startingItems !== "mixed-pool"
               ? [`Starting items (${config.startingItems}): left-hand pickups are shields${config.startingItems === "shield-1h" ? " and right-hand weapons are one-handed usable" : ""}.`]
