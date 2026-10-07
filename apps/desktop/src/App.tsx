@@ -179,8 +179,8 @@ export function App() {
       enemies: {
         ...current.enemies,
         placement: algorithm === 'sampling-v1'
-          ? { algorithm, replacementChance: 100, normalReplacement: 'normals', fit: 'fits', difficultyMode: 'random-easy-asylum', difficultyStrictness: 'loose', typeReplacement: 'disabled', customPool: null, bossReplacement: 'classic', uniqueBosses: false, bossChanceInBossSlots: 90, bossChanceInNormalSlots: 10, roamingBossSouls: 50, roamingBossesStayDead: false }
-          : { algorithm, replacementChance: 100, normalReplacement: 'normals', fit: 'anywhere', difficultyMode: 'random', difficultyStrictness: 'loose', typeReplacement: 'disabled', customPool: null, bossReplacement: 'classic', uniqueBosses: false, bossChanceInBossSlots: 90, bossChanceInNormalSlots: 10, roamingBossSouls: 50, roamingBossesStayDead: false },
+          ? { algorithm, replacementChance: 100, normalReplacement: 'normals', fit: 'fits', difficultyMode: 'random-easy-asylum', difficultyStrictness: 'loose', typeReplacement: 'disabled', customPool: null, bossReplacement: 'classic', uniqueBosses: false, bossChanceInBossSlots: 90, hostileNpcs: false, bossChanceInNormalSlots: 10, roamingBossSouls: 50, roamingBossesStayDead: false }
+          : { algorithm, replacementChance: 100, normalReplacement: 'normals', fit: 'anywhere', difficultyMode: 'random', difficultyStrictness: 'loose', typeReplacement: 'disabled', customPool: null, bossReplacement: 'classic', uniqueBosses: false, bossChanceInBossSlots: 90, hostileNpcs: false, bossChanceInNormalSlots: 10, roamingBossSouls: 50, roamingBossesStayDead: false },
       },
     }));
   const setPlacement = <K extends keyof RandomizerConfig['enemies']['placement']>(key: K, value: RandomizerConfig['enemies']['placement'][K]) =>
@@ -192,6 +192,8 @@ export function App() {
       const placement = { ...current.enemies.placement, normalReplacement: mode };
       if (mode !== 'both') placement.bossChanceInNormalSlots = 10;
       if (!roaming) { placement.roamingBossSouls = 50; placement.roamingBossesStayDead = false; }
+      // Hostile NPCs join the pool of replaced normal enemies, so the setting goes back to off wherever none are replaced.
+      if (mode !== 'normals' && mode !== 'both') placement.hostileNpcs = false;
       return { ...current, enemies: { ...current.enemies, placement } };
     });
   /** Leaving "Bosses or normal enemies" puts its chance back to the default, and Unique bosses is off wherever no boss is drawn. */
@@ -518,10 +520,13 @@ export function App() {
                 <RangeOption label="Boss chance in boss slots" hint="Of the boss slots that take part and can take a normal enemy, the share that get a boss; the rest get a normal enemy." value={config.enemies.placement.bossChanceInBossSlots} inactive={!config.enemies.randomizeBosses} onChange={(value) => setPlacement('bossChanceInBossSlots', value)} />
               )}
               <Toggle inactive={!config.enemies.randomizeBosses || config.enemies.placement.algorithm !== 'sampling-v1' || (config.enemies.placement.bossReplacement !== 'bosses' && config.enemies.placement.bossReplacement !== 'both')} label="Unique bosses" hint="Needs Random bosses or Bosses or normal enemies. Every boss of the pool is used once before any boss appears a second time." checked={config.enemies.placement.uniqueBosses} onChange={(value) => setPlacement('uniqueBosses', value)} />
-              <EnemyPoolEditor gamePath={config.gamePath} active={config.enemies.randomizeRegularEnemies && config.enemies.placement.algorithm === 'sampling-v1'} fit={config.enemies.placement.fit} customPool={config.enemies.placement.customPool} onChange={(pool) => setPlacement('customPool', pool)} />
+              <EnemyPoolEditor gamePath={config.gamePath} active={config.enemies.randomizeRegularEnemies && config.enemies.placement.algorithm === 'sampling-v1'} fit={config.enemies.placement.fit} customPool={config.enemies.placement.customPool} onChange={(pool) => setConfig((current) => ({ ...current, enemies: { ...current.enemies, placement: { ...current.enemies.placement, customPool: pool, ...(pool !== null ? { hostileNpcs: false } : {}) } } }))} />
             </div>
             <div className="option-group"><h3>Legacy options</h3>
               <Toggle inactive={!config.enemies.randomizeRegularEnemies} label="Replace mimics" hint="Off: Mimics stay in place and are kept out of the enemy pool." checked={config.enemies.replaceMimics} onChange={(value) => setEnemy('replaceMimics', value)} />
+              {config.enemies.placement.algorithm === 'sampling-v1' && (config.enemies.placement.normalReplacement === 'normals' || config.enemies.placement.normalReplacement === 'both') && config.enemies.placement.customPool === null && (
+                <Toggle inactive={!config.enemies.randomizeRegularEnemies} label="Hostile NPCs" hint="Randomizes hostile NPC combatants: the Undead Merchant, Andre of Astora and Vamos can appear as enemies in place of regular enemies. Quest and service NPCs are kept safe: the real ones are never touched and nothing they sell or teach changes. Not used together with a custom enemy pool." checked={config.enemies.placement.hostileNpcs} onChange={(value) => setPlacement('hostileNpcs', value)} />
+              )}
               <Toggle inactive={!config.enemies.randomizeRegularEnemies} label="Replace respawning mosquitoes" hint="Off: the six respawning Blighttown swamp mosquitoes stay in place." checked={config.enemies.replaceRespawningMosquitoes} onChange={(value) => setEnemy('replaceRespawningMosquitoes', value)} />
               <Toggle inactive={!config.enemies.randomizeRegularEnemies} label="Prevent same enemy" hint="On: no regular enemy is replaced by an enemy of its own kind (a Hollow never becomes a Hollow). Bosses are never replaced by the same boss." checked={config.enemies.preventSameEnemy} onChange={(value) => setEnemy('preventSameEnemy', value)} />
               <Toggle inactive={!config.enemies.randomizeRegularEnemies} label="Pinwheel Chaos" hint="On: the main Pinwheel is not replaced; its clones are replaced by regular enemies with their own stats." checked={config.enemies.pinwheelChaos} onChange={(value) => setEnemy('pinwheelChaos', value)} />
@@ -531,8 +536,7 @@ export function App() {
               <select value={config.enemies.gwynNerf} disabled={!config.enemies.randomizeBosses} title="Chance that Lord Gwyn is rejected as a boss replacement: strong 85%, medium 60%." onChange={(event) => setEnemy('gwynNerf', event.target.value as GwynNerfMode)}><option value="strong">Strong</option><option value="medium">Medium</option><option value="none">None</option></select>
             </div>
             <div className="option-group planned-group"><h3>Legacy parity <span>planned</span></h3>
-              {['NPC replacement'].map((label) => <div key={label}><label className="field-label">{label}</label><select defaultValue="disabled" disabled><option value="disabled">Disabled</option><option value="bosses">Only bosses</option><option value="enemies">Only normal enemies</option><option value="all">Bosses or normal enemies</option></select></div>)}
-              {['Allow T-pose behavior', 'Hostile NPCs'].map((label) => <Toggle key={label} disabled label={label} checked={false} onChange={() => undefined} />)}
+              {['Allow T-pose behavior'].map((label) => <Toggle key={label} disabled label={label} checked={false} onChange={() => undefined} />)}
             </div>
           </section>
 
