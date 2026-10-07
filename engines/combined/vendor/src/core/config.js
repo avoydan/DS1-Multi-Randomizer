@@ -62,6 +62,10 @@ export const defaultConfig = Object.freeze({
   // Part E2 (patches/0016): a regular enemy in a boss encounter slot. enemyBossReplacement may then also be "normals" or "both"; the
   // chance only applies with "both" (legacy "Boss chance: boss slots", default 90) and is refused otherwise (never ignored).
   enemyBossChanceBossSlots: 90,
+  // Part F1 (patches/0017): legacy "Hostile NPCs". The Undead Merchant, Andre of Astora and Vamos (the authored hostile sources) join the
+  // normal enemy pool as hostile combatants; the friendly NPCs themselves are never touched. Needs sampling-v1 with normal enemies replaced and
+  // no custom pool; refused otherwise (never ignored).
+  enemyHostileNpcs: false,
   // Part E1 (patches/0014): bosses in regular enemy slots ("roaming bosses"). enemyNormalReplacement may then be "bosses" or "both";
   // the three options below only apply with those values and are refused otherwise (never ignored). 10 / 50 / false are the legacy
   // defaults ("Boss chance: normal slots", "Roaming boss souls", "Respawning roaming bosses": respawn).

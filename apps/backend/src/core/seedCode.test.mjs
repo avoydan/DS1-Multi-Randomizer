@@ -295,3 +295,28 @@ test('Part E2 (a normal enemy in a boss slot) extends the format without changin
     assert.equal(invalid.code, 'INVALID_SETTINGS');
   }
 });
+
+test('Part F1 (hostile NPCs) extends the format without changing any earlier code', () => {
+  const part = { algorithm: 'sampling-v1', fit: 'fits', normalReplacement: 'both', bossChanceInNormalSlots: 25, bossReplacement: 'both', bossChanceInBossSlots: 60 };
+  const before = fullSettings({ enemies: { placement: part } });
+  // Every earlier world is stored exactly as before: the new key is neutral (off) and therefore absent, and it comes after every earlier key.
+  assert.doesNotMatch(canonicalSettingsJson(before), /hostileNpcs/u);
+  const on = fullSettings({ enemies: { placement: { ...part, hostileNpcs: true } } });
+  assert.equal(canonicalSettingsJson(on).replace(',"hostileNpcs":true', ''), canonicalSettingsJson(before), 'the only difference is the appended key');
+  assert.match(canonicalSettingsJson(on), /"bossChanceInBossSlots":60,"hostileNpcs":true\}/u);
+  const decoded = decodeSeedCode(encodeSeedCode(envelopeOf(on)));
+  assert.equal(decoded.ok, true);
+  assert.equal(decoded.envelope.settings.enemies.placement.hostileNpcs, true);
+  assert.equal(decoded.seedCode, encodeSeedCode(envelopeOf(on)));
+  const plain = decodeSeedCode(encodeSeedCode(envelopeOf(before)));
+  assert.equal(plain.envelope.settings.enemies.placement.hostileNpcs, false, 'the neutral value is filled in');
+  for (const placement of [
+    { normalReplacement: 'none', hostileNpcs: true },
+    { normalReplacement: 'bosses', hostileNpcs: true },
+    { hostileNpcs: true, customPool: ['c2500'] },
+  ]) {
+    const invalid = decodeSeedCode(encodeSeedCode(envelopeOf(fullSettings({ enemies: { placement: { algorithm: 'sampling-v1', ...placement } } }))));
+    assert.equal(invalid.ok, false, JSON.stringify(placement));
+    assert.equal(invalid.code, 'INVALID_SETTINGS');
+  }
+});

@@ -12,14 +12,15 @@ import { canonicalizeSettings } from '../../dist/core/canonicalSettings.js';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.join(here, '..', '..', '..', '..');
 
-test('the smoke-test worlds are seven quick smoke tests and seventeen extended gameplay tests with unique ids and seeds', () => {
+test('the smoke-test worlds are eight quick smoke tests and twenty-two extended gameplay tests with unique ids and seeds', () => {
   const quick = SMOKE_SCENARIOS.filter((scenario) => scenario.category === 'quick').map((scenario) => scenario.id);
   const extended = SMOKE_SCENARIOS.filter((scenario) => scenario.category === 'extended').map((scenario) => scenario.id);
-  assert.deepEqual(quick, ['quick-roaming-basic', 'quick-roaming-souls', 'quick-encounter-body', 'quick-roaming-respawn', 'quick-roaming-repeated', 'quick-sampling-asylum', 'quick-boss-asylum-demon']);
+  assert.deepEqual(quick, ['quick-roaming-basic', 'quick-roaming-souls', 'quick-encounter-body', 'quick-roaming-respawn', 'quick-roaming-repeated', 'quick-sampling-asylum', 'quick-hostile-npc', 'quick-boss-asylum-demon']);
   assert.deepEqual(extended, [
     'classic-triple', 'sampling-regular', 'second-gargoyle', 'parish-models', 'boss-sampling', 'boss-repeat', 'boss-unique', 'boss-partial',
     'roaming-repeat', 'roaming-gargoyle', 'roaming-fog', 'roaming-parish',
     'body-burg-fights', 'body-fog', 'body-roaming', 'body-both', 'body-gargoyle',
+    'npc-world', 'npc-fog', 'npc-roaming', 'npc-type', 'npc-bosses',
   ]);
   assert.deepEqual(SMOKE_SCENARIOS.map((scenario) => scenario.category), [...quick.map(() => 'quick'), ...extended.map(() => 'extended')], 'quick tests come first');
   assert.equal(new Set(SMOKE_SCENARIOS.map((scenario) => scenario.masterSeed)).size, SMOKE_SCENARIOS.length);
@@ -148,6 +149,20 @@ test('the scenarios exercise what they claim: boss sampling options, chance, uni
   assert.equal(by('body-fog').fog.enabled, true);
   assert.equal(by('body-gargoyle').enemies.secondGargoyle, 'replace');
   assert.equal(by('body-roaming').enemies.placement.normalReplacement, 'both');
+  // Part F1: hostile NPCs.
+  for (const id of ['quick-hostile-npc', 'npc-world', 'npc-fog', 'npc-roaming', 'npc-type', 'npc-bosses']) {
+    assert.equal(by(id).enemies.placement.hostileNpcs, true, id);
+    assert.ok(['normals', 'both'].includes(by(id).enemies.placement.normalReplacement), `${id} replaces normal enemies`);
+    assert.equal(by(id).enemies.placement.customPool, null, `${id} has no custom pool`);
+  }
+  assert.equal(by('npc-fog').fog.enabled, true);
+  assert.equal(by('npc-type').enemies.placement.typeReplacement, 'enabled');
+  assert.equal(by('npc-roaming').enemies.placement.normalReplacement, 'both');
+  assert.equal(by('npc-bosses').enemies.placement.bossReplacement, 'both');
+  const hostile = SMOKE_SCENARIOS.find((scenario) => scenario.id === 'quick-hostile-npc');
+  assert.equal(hostile.expectations[0].kind, 'hostile-npc');
+  assert.equal(hostile.gameplay, undefined, 'nobody has played the hostile NPC world yet');
+  assert.match(describeSmokeExpected(hostile.expectations[0]), /no dialogue, no shop/u);
   const encounter = SMOKE_SCENARIOS.find((scenario) => scenario.id === 'quick-encounter-body');
   assert.equal(encounter.expectations[0].kind, 'encounter-body');
   assert.equal(encounter.gameplay, undefined, 'nobody has played the encounter-body world yet');

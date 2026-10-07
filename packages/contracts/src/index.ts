@@ -136,6 +136,8 @@ export interface EnemyPlacementOptions {
   uniqueBosses: boolean;
   /** Part E2. Chance (percent, 0-100) that a boss slot that takes part gets a boss rather than a normal enemy. Needs `bossReplacement: 'both'`. */
   bossChanceInBossSlots: number;
+  /** Part F1. Legacy "Hostile NPCs": the Undead Merchant, Andre and Vamos join the normal enemy pool as hostile combatants. Needs `normalReplacement` `normals` or `both` and no custom pool. */
+  hostileNpcs: boolean;
   /** Part E1. Chance (percent, 0-100) that a regular enemy slot that takes part gets a boss rather than a normal enemy. Needs `normalReplacement: 'both'`. */
   bossChanceInNormalSlots: number;
   /** Part E1. Share (percent, 0-100) of a boss's fight souls that the boss drops when it stands in a regular slot. Needs roaming bosses. */
@@ -176,6 +178,7 @@ export const NEUTRAL_ENEMY_PLACEMENT_OPTIONS: Omit<EnemyPlacementOptions, 'algor
   bossReplacement: 'classic',
   uniqueBosses: false,
   bossChanceInBossSlots: 90,
+  hostileNpcs: false,
   bossChanceInNormalSlots: 10,
   roamingBossSouls: 50,
   roamingBossesStayDead: false,
@@ -193,6 +196,7 @@ export const LEGACY_ENEMY_PLACEMENT_OPTIONS: Omit<EnemyPlacementOptions, 'algori
   bossReplacement: 'classic',
   uniqueBosses: false,
   bossChanceInBossSlots: 90,
+  hostileNpcs: false,
   bossChanceInNormalSlots: 10,
   roamingBossSouls: 50,
   roamingBossesStayDead: false,
@@ -320,7 +324,7 @@ export type GenerationResult =
   | { ok: false; code: string; message: string; stage: string };
 
 export const PRESET_FORMAT = 'ds1tr-preset';
-export const PRESET_VERSION = 12;
+export const PRESET_VERSION = 13;
 
 /** Shareable settings: everything in RandomizerConfig except the machine-specific game path. */
 export interface PresetDocument {

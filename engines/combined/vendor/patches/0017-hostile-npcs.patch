@@ -1,0 +1,466 @@
+diff --git a/engines/combined/vendor/src/core/config.js b/engines/combined/vendor/src/core/config.js
+index 3dbc9c2..d0ceda2 100644
+--- a/engines/combined/vendor/src/core/config.js
++++ b/engines/combined/vendor/src/core/config.js
+@@ -62,6 +62,10 @@ export const defaultConfig = Object.freeze({
+   // Part E2 (patches/0016): a regular enemy in a boss encounter slot. enemyBossReplacement may then also be "normals" or "both"; the
+   // chance only applies with "both" (legacy "Boss chance: boss slots", default 90) and is refused otherwise (never ignored).
+   enemyBossChanceBossSlots: 90,
++  // Part F1 (patches/0017): legacy "Hostile NPCs". The Undead Merchant, Andre of Astora and Vamos (the authored hostile sources) join the
++  // normal enemy pool as hostile combatants; the friendly NPCs themselves are never touched. Needs sampling-v1 with normal enemies replaced and
++  // no custom pool; refused otherwise (never ignored).
++  enemyHostileNpcs: false,
+   // Part E1 (patches/0014): bosses in regular enemy slots ("roaming bosses"). enemyNormalReplacement may then be "bosses" or "both";
+   // the three options below only apply with those values and are refused otherwise (never ignored). 10 / 50 / false are the legacy
+   // defaults ("Boss chance: normal slots", "Roaming boss souls", "Respawning roaming bosses": respawn).
+diff --git a/engines/combined/vendor/src/core/generator.js b/engines/combined/vendor/src/core/generator.js
+index 3262929..9c15734 100644
+--- a/engines/combined/vendor/src/core/generator.js
++++ b/engines/combined/vendor/src/core/generator.js
+@@ -380,6 +380,67 @@ function encounterBodySetup(config, catalog, dragonPlan, bossOptions) {
+   };
+ }
+ 
++// ---- hostile NPCs (Part F1, patches/0017) ---------------------------------------------------------------------------------------
++// Legacy "Hostile NPCs": four NPC models join the normal enemy pool (the legacy tool also sets their allegiance with an event). DS1TR
++// reconstructs that as a source pool only: the friendly NPCs themselves (their slots, talk, shops, quests, services) are never touched,
++// a hostile NPC is a body that stands in a regular enemy slot and is owned by that slot (team, drops, respawn, reward).
++
++/**
++ * The NPC slots of the real catalog by role. The classification is semantic (talk script, team, model family), never by model id alone, and
++ * anything not recognized is UNKNOWN_UNSAFE. Only SAFE_HOSTILE_SOURCE slots are ever used, and only as a source of a body.
++ */
++export const NPC_ROLES = Object.freeze({
++  SAFE_HOSTILE_SOURCE: "SAFE_HOSTILE_SOURCE",
++  MERCHANT_UNSAFE: "MERCHANT_UNSAFE",
++  BLACKSMITH_UNSAFE: "BLACKSMITH_UNSAFE",
++  FIREKEEPER_OR_BONFIRE: "FIREKEEPER_OR_BONFIRE",
++  QUEST_NPC: "QUEST_NPC",
++  PLAYER_MODEL_NPC: "PLAYER_MODEL_NPC",
++  BOSS_COMPANION: "BOSS_COMPANION",
++  DUMMY_OR_PASSIVE: "DUMMY_OR_PASSIVE",
++  UNKNOWN_UNSAFE: "UNKNOWN_UNSAFE",
++});
++
++/** The authored hostile sources (legacy: the Merchant, Andre and Vamos; Gough and the second Merchant are left out, see docs/ENEMY_PLACEMENT_MODEL.md 10.9). */
++const hostileNpcSourceSlots = new Set([
++  // The Undead Merchant of the Lower Undead Burg (m10_02, NPC 251000 / think 251001) is left out: its think row names a logic script (251000_logic.lua)
++  // that the data tool does not carry to another map (it copies battle goals), so a placed copy would name a missing logic goal.
++  "m10_01_00_00:c2510_0000", // Undead Merchant (Undead Burg), NPC 251001 / think 251000, common logic
++  "m10_01_00_00:c2640_0000", // Andre of Astora (Undead Parish), NPC 264000 / think 264000
++  "m13_00_00_00:c2920_0000", // Vamos (Catacombs), NPC 292000 / think 292000
++]);
++
++/** Role of a catalog slot that is not a regular enemy (team 0): why it may or may not be used. Unknown is unsafe. */
++export function classifyNpcSlot(slot) {
++  if (hostileNpcSourceSlots.has(slot.id)) return NPC_ROLES.SAFE_HOSTILE_SOURCE;
++  if (slot.dummy) return NPC_ROLES.DUMMY_OR_PASSIVE;
++  if (slot.modelName === "c1000") return NPC_ROLES.FIREKEEPER_OR_BONFIRE;
++  if (slot.modelName === "c5330" || slot.modelName === "c5340") return NPC_ROLES.FIREKEEPER_OR_BONFIRE;
++  if (slot.modelName === "c0000") return NPC_ROLES.PLAYER_MODEL_NPC;
++  if (slot.modelName === "c2510") return NPC_ROLES.MERCHANT_UNSAFE;
++  if (["c2640", "c2920", "c4110"].includes(slot.modelName)) return NPC_ROLES.BLACKSMITH_UNSAFE;
++  if (slot.teamType === 1) return NPC_ROLES.BOSS_COMPANION;
++  if (slot.talkId > 0 && slot.teamType === 2) return NPC_ROLES.QUEST_NPC;
++  return NPC_ROLES.UNKNOWN_UNSAFE;
++}
++
++/** model -> catalog source slots of the hostile NPC candidates (empty when the catalog lacks them). */
++function hostileNpcSources(catalog) {
++  const sources = new Map();
++  for (const slot of catalog.enemySlots) {
++    if (!hostileNpcSourceSlots.has(slot.id) || slot.dummy || slot.npcParamId <= 0 || slot.thinkParamId <= 0 || !(slot.baseHp > 0)) continue;
++    if (classifyNpcSlot(slot) !== NPC_ROLES.SAFE_HOSTILE_SOURCE) continue;
++    if (!sources.has(slot.modelName)) sources.set(slot.modelName, []);
++    sources.get(slot.modelName).push(slot);
++  }
++  return sources.size === 0 ? null : sources;
++}
++
++/** The Darkroot Basin has no event file of its own (the data tool writes no event for a part there), so a hostile NPC, which needs its wake-up event, never stands there. */
++const hostileNpcForbiddenMaps = new Set(["m12_00_00_01"]);
++
++const hostileNpcSourceIds = (catalog) => new Set([...(hostileNpcSources(catalog)?.values() ?? [])].flat().map((slot) => slot.id));
++
+ /** Regular slots that keep their own enemy even when bosses may roam (they have special handling that a boss would break). */
+ function roamingProtectedSlotIds(slots) {
+   return new Set(slots.filter((slot) =>
+@@ -1314,7 +1375,7 @@ function regularEnemyContext(config, catalog, dragonPlan, bossPlan) {
+ // activation), think-param clones and the placement record itself. Behavior for permutation-v1 is unchanged;
+ // sampling-v1 only differs in the compatibility label and in always forcing a scaled NpcParam row, so the
+ // destination slot's drops and team follow the slot (model document 6.9).
+-function decorateEnemyPlacements(config, catalog, allSlots, assignment, pinwheelCloneIds, algorithm, roamingSlotIds = new Set(), roamingOptions = null) {
++function decorateEnemyPlacements(config, catalog, allSlots, assignment, pinwheelCloneIds, algorithm, roamingSlotIds = new Set(), roamingOptions = null, hostileNpcIds = new Set()) {
+   const sampling = algorithm === "sampling-v1";
+   const newLondoGroundAnchors = catalog.enemySlots
+     .filter((slot) =>
+@@ -1370,7 +1431,10 @@ function decorateEnemyPlacements(config, catalog, allSlots, assignment, pinwheel
+       replacement.modelName !== slot.modelName ||
+       replacement.npcParamId !== slot.npcParamId ||
+       replacementThinkParamId !== slot.thinkParamId;
+-    const makeTangible = tangibleGhostModels.has(replacement.modelName);
++    // Part F1: a hostile NPC is a body in a regular slot. Its NPC row's ghost transition is switched off (like every tangible replacement) and
++    // the slot owns its team, respawn, reward and drops (the data tool takes those cells from the slot's row).
++    const isHostileNpc = hostileNpcIds.has(replacement.id);
++    const makeTangible = tangibleGhostModels.has(replacement.modelName) || isHostileNpc;
+     const replacesWallPhasingGhost =
+       slot.mapId === "m16_00_00_00" &&
+       tangibleGhostModels.has(slot.modelName) &&
+@@ -1387,7 +1451,9 @@ function decorateEnemyPlacements(config, catalog, allSlots, assignment, pinwheel
+     const requiresCombatEvent =
+       forceCombatActivationModels.has(replacement.modelName) ||
+       darkrootButterflyPath ||
+-      isRoamingBoss;
++      isRoamingBoss ||
++      // A dummy part is not spawned in the game: it gets the row and the mark, never a wake-up event.
++      (isHostileNpc && !slot.dummy);
+     const assignedEntityId =
+       (passiveUntilAttacked || requiresCombatEvent) && slot.entityId < 0
+         ? 16_099_000 + index
+@@ -1405,6 +1471,7 @@ function decorateEnemyPlacements(config, catalog, allSlots, assignment, pinwheel
+             targetThinkParamId: replacementThinkParamId,
+           }),
+       ...(makeTangible ? { makeTangible: true } : {}),
++      ...(isHostileNpc ? { hostileNpc: true } : {}),
+       // Replaced clones keep their own combat stats (normal HP) instead of
+       // inheriting the clone's 1 HP; drops and team still follow the slot.
+       ...(isChaosPinwheelClone ? { scaling: "vanilla" } : {}),
+@@ -1441,6 +1508,8 @@ function decorateEnemyPlacements(config, catalog, allSlots, assignment, pinwheel
+       compatibility: sampling
+         ? isRoamingBoss
+           ? "sampled-roaming-boss"
++          : isHostileNpc && !passiveUntilAttacked && !isChaosPinwheelClone
++          ? "sampled-hostile-npc"
+           : isChaosPinwheelClone
+           ? "pinwheel-chaos-clone"
+           : passiveUntilAttacked
+@@ -1535,6 +1604,8 @@ function sampleExtractedEnemies(config, catalog, dragonPlan, bossPlan, diagnosti
+     extraSlots: pinwheelClones,
+     fixedModelsByMap,
+     diagnostics,
++    hostileNpcSources: options.hostileNpcs ? hostileNpcSources(catalog) : null,
++    hostileNpcForbiddenMaps,
+   });
+   const allSlots = [...slots, ...pinwheelClones];
+   let assignment = regularAssignment;
+@@ -1564,8 +1635,14 @@ function sampleExtractedEnemies(config, catalog, dragonPlan, bossPlan, diagnosti
+   }
+   // Decoration (and its index-based ids) is computed over every slot so ids stay stable, but only slots the
+   // sampler assigned get a placement: the others stay exactly vanilla (model document 5, decision 2).
+-  const randomized = decorateEnemyPlacements(config, catalog, allSlots, assignment, pinwheelCloneIds, "sampling-v1", new Set(roaming.keys()), options)
++  const randomized = decorateEnemyPlacements(config, catalog, allSlots, assignment, pinwheelCloneIds, "sampling-v1", new Set(roaming.keys()), options,
++    options.hostileNpcs ? hostileNpcSourceIds(catalog) : new Set())
+     .filter((placement) => assignment.has(placement.slot));
++  if (options.hostileNpcs) {
++    const placed = randomized.filter((placement) => placement.hostileNpc === true);
++    diagnostics.count("hostileNpcPlacements", placed.length);
++    for (const model of new Set(placed.map((placement) => placement.targetModelName))) diagnostics.count(`hostileNpc:${model}`, placed.filter((placement) => placement.targetModelName === model).length);
++  }
+   assertSlotOwnedDrops(randomized);
+   return randomized
+     .concat(massOfSoulsPlan.placements)
+diff --git a/engines/combined/vendor/src/core/placement.js b/engines/combined/vendor/src/core/placement.js
+index 8a0a876..6df5bf0 100644
+--- a/engines/combined/vendor/src/core/placement.js
++++ b/engines/combined/vendor/src/core/placement.js
+@@ -93,6 +93,7 @@ export const BOSS_SAMPLING_MODES = Object.freeze(["bosses", "normals", "both"]);
+ 
+ /** Values under which permutation-v1 behaves exactly as it always did; anything else is refused there. */
+ export const SAMPLING_NEUTRAL_OPTIONS = Object.freeze({
++  enemyHostileNpcs: false,
+   enemyBossChanceBossSlots: 90,
+   enemyBossChanceNormalSlots: 10,
+   enemyRoamingBossSouls: 50,
+@@ -197,6 +198,16 @@ export function resolveEnemyPlacementOptions(config, algorithm = config.enemyPla
+   } else if (config.enemyBossChanceBossSlots !== SAMPLING_NEUTRAL_OPTIONS.enemyBossChanceBossSlots && config.enemyBossReplacement !== "both") {
+     problems.push("enemyBossChanceBossSlots only applies with enemyBossReplacement \"both\" (a boss or a normal enemy per boss slot).");
+   }
++  if (typeof config.enemyHostileNpcs !== "boolean") {
++    problems.push(`enemyHostileNpcs must be true or false (got ${String(config.enemyHostileNpcs)}).`);
++  } else if (config.enemyHostileNpcs) {
++    if (!["normals", "both"].includes(config.enemyNormalReplacement)) {
++      problems.push("enemyHostileNpcs only applies when normal enemies are replaced (enemyNormalReplacement \"normals\" or \"both\").");
++    }
++    if (config.enemyCustomPool !== null && config.enemyCustomPool !== undefined) {
++      problems.push("enemyHostileNpcs does not apply with a custom enemy pool (the pool lists enemy models; the hostile NPCs are not part of it).");
++    }
++  }
+   const roamingMode = ROAMING_BOSS_MODES.includes(config.enemyNormalReplacement);
+   if (!Number.isInteger(config.enemyBossChanceNormalSlots) || config.enemyBossChanceNormalSlots < 0 || config.enemyBossChanceNormalSlots > 100) {
+     problems.push(`enemyBossChanceNormalSlots must be an integer from 0 to 100 (got ${String(config.enemyBossChanceNormalSlots)}).`);
+@@ -238,6 +249,7 @@ export function resolveEnemyPlacementOptions(config, algorithm = config.enemyPla
+     bossChanceInNormalSlots: config.enemyBossChanceNormalSlots,
+     roamingBossSouls: config.enemyRoamingBossSouls,
+     roamingBossesStayDead: config.enemyRoamingBossesStayDead,
++    hostileNpcs: config.enemyHostileNpcs,
+   };
+ }
+ 
+diff --git a/engines/combined/vendor/src/core/sampling.js b/engines/combined/vendor/src/core/sampling.js
+index 57d5ad1..24aa4a9 100644
+--- a/engines/combined/vendor/src/core/sampling.js
++++ b/engines/combined/vendor/src/core/sampling.js
+@@ -669,13 +669,13 @@ export const MAP_ATTEMPTS = 3;
+  */
+ export function planSampledRegularEnemies({
+   seed, options, preventSame, slots, extraSlots = [], fixedModelsByMap, diagnostics, cap = MODEL_BUDGET_CAP,
+-  mapAttempts = MAP_ATTEMPTS, candidateFilter = undefined,
++  mapAttempts = MAP_ATTEMPTS, candidateFilter = undefined, hostileNpcSources = null, hostileNpcForbiddenMaps = new Set(),
+ }) {
+   // The boss options belong to planSampledBosses; they never reach the regular-slot settings (and so not their diagnostics).
+   // The roaming-boss options (Part E1) belong to planRoamingBosses in the same way.
+   const {
+     bossReplacement: _bossReplacement, uniqueBosses: _uniqueBosses, bossChanceInNormalSlots: _bossChance, roamingBossSouls: _roamingSouls,
+-    roamingBossesStayDead: _roamingStayDead, bossChanceInBossSlots: _bossChanceBossSlots, ...regularOptions
++    roamingBossesStayDead: _roamingStayDead, bossChanceInBossSlots: _bossChanceBossSlots, hostileNpcs: _hostileNpcs, ...regularOptions
+   } = options;
+   const settings = {
+     ...regularOptions,
+@@ -684,15 +684,27 @@ export function planSampledRegularEnemies({
+     typeReplacement: options.typeReplacement ?? "disabled",
+   };
+   const table = deriveRegularClassTable(slots);
++  // Part F1: the hostile NPC types join the candidates after the regular table is derived, so the classes of the regular models (their HP
++  // ranks, the table hash) are exactly what they are without them. Only the generator passes any, and only with the option on.
++  const hostileNpcTypes = hostileNpcSources === null ? [] : deriveHostileNpcTypes(hostileNpcSources, table);
++  for (const type of hostileNpcTypes) {
++    table.types.push(type);
++    table.byModel.set(type.model, type);
++  }
+   const customModels = resolveCustomPool({ models: settings.customPool ?? null, table, slots: [...slots, ...extraSlots], settings, preventSame });
+   const customSet = customModels === null ? null : new Set(customModels);
+   const pool = createCandidatePool(table, (type) => (customSet === null || customSet.has(type.model)) && (candidateFilter === undefined || candidateFilter(type)));
+   diagnostics.classTableHash = table.hash;
++  if (hostileNpcTypes.length > 0) diagnostics.hostileNpcTypes = hostileNpcTypes.map((type) => ({ model: type.model, size: type.size, difficulty: type.difficulty, variants: type.variants.length }));
+   diagnostics.options = { ...settings, customPool: undefined, preventSame };
+   diagnostics.customPool = {
+     enabled: customModels !== null, hash: customPoolHash(customModels),
+     ...analyzePoolCoverage({ table, pool, slots: [...slots, ...extraSlots], fit: settings.fit, preventSame }),
+   };
++  // A map that cannot hold a hostile NPC (no event file for its wake-up) plans with the pool minus the hostile NPC types.
++  const poolWithoutHostileNpcs = hostileNpcTypes.length > 0
++    ? createCandidatePool(table, (type) => !type.hostileNpc && (customSet === null || customSet.has(type.model)) && (candidateFilter === undefined || candidateFilter(type)))
++    : pool;
+   const assignment = new Map();
+   const all = [...slots, ...extraSlots];
+   const mapIds = [...new Set(all.map((slot) => slot.mapId))].sort(compare);
+@@ -726,7 +738,10 @@ export function planSampledRegularEnemies({
+     for (let attempt = 0; attempt < mapAttempts; attempt += 1) {
+       const scratch = createPlacementDiagnostics({ algorithm: "sampling-v1", level: diagnostics.level });
+       try {
+-        planned = planMap({ seed, settings, preventSame, table, pool, mapId, mapSlots, attempt, fixedModelsByMap, cap, diagnostics: scratch });
++        planned = planMap({
++          seed, settings, preventSame, table, pool: hostileNpcForbiddenMaps.has(mapId) ? poolWithoutHostileNpcs : pool, mapId, mapSlots, attempt, fixedModelsByMap, cap, diagnostics: scratch,
++          hostile: hostileNpcTypes.length === 0 ? null : { limit: hostileNpcForbiddenMaps.has(mapId) ? 0 : HOSTILE_NPC_MAP_CAP, without: poolWithoutHostileNpcs },
++        });
+       } catch (error) {
+         if (!(error instanceof EnemyPlacementInfeasibleError)) throw error;
+         lastError = error;
+@@ -932,6 +947,39 @@ export function deriveBodyTypes(sources, table) {
+   return types.sort((left, right) => compare(left.key, right.key));
+ }
+ 
++/** Safety limit (DS1TR, not a legacy value): hostile NPCs per map. Every one has a wake-up event, so this bounds the events of a map like ROAMING_BOSS_MAP_CAP does. */
++export const HOSTILE_NPC_MAP_CAP = 12;
++
++/**
++ * The hostile NPC candidates (Part F1) typed like the regular models: size class from the capsule of the authored source slots, difficulty
++ * class with the formula of the regular classes (map tier of where the NPC lives, HP rank among the regular models); one variant per
++ * source slot (the two Undead Merchants differ in their NPC and think rows). `sources` is model -> catalog slots.
++ */
++export function deriveHostileNpcTypes(sources, table) {
++  const types = [];
++  for (const [model, slots] of [...sources].sort(([a], [b]) => compare(a, b))) {
++    const members = [...slots].sort((left, right) => compare(left.id, right.id));
++    const footprints = members.map(slotFootprint).filter((value) => value !== null);
++    const hp = members.map((member) => member.baseHp).filter((value) => Number.isFinite(value) && value > 0).sort((a, b) => a - b);
++    if (footprints.length === 0 || hp.length === 0) continue;
++    const tiers = members.map((member) => tierOfMap(member.mapId, model)).sort((a, b) => a - b);
++    const variants = new Map();
++    for (const member of members) {
++      const key = `${member.npcParamId}:${member.thinkParamId}:${member.battleGoalId}`;
++      if (!variants.has(key)) variants.set(key, { key, npcParamId: member.npcParamId, thinkParamId: member.thinkParamId, source: member });
++    }
++    types.push({
++      model,
++      size: sizeClassOfFootprint(Math.max(...footprints)),
++      footprint: Math.max(...footprints),
++      difficulty: difficultyOfScore(upperMedian(tiers), hpRank(table.sortedLogHp, Math.log(lowerMedian(hp)))),
++      variants: [...variants.values()].sort((left, right) => compare(left.key, right.key)),
++      hostileNpc: true,
++    });
++  }
++  return types;
++}
++
+ /** Size and difficulty class of a boss slot as a destination: its capsule, and its map tier and HP with the formula of the regular classes. */
+ export function bossDestinationClass(table, slot) {
+   const footprint = slotFootprint(slot);
+@@ -1116,7 +1164,7 @@ function finalizeMap({ mapId, fixedModelsByMap, mapSlots, modelOfSlot, mapCap, a
+ }
+ 
+ /** One attempt at one map, slot by slot (Type replacement disabled). Throws EnemyPlacementInfeasibleError (with baseline/cap). */
+-function planMapAttempt({ seed, settings, preventSame, table, pool, mapId, mapSlots, attempt, fixedModelsByMap, cap, diagnostics }) {
++function planMapAttempt({ seed, settings, preventSame, table, pool, mapId, mapSlots, attempt, fixedModelsByMap, cap, diagnostics, hostile = null }) {
+   const sizeOf = (slot) => slotSizeClass(table, slot);
+   const fitSize = (slot) => (settings.fit === "fits" ? sizeOf(slot) : UNKNOWN_SLOT_SIZE);
+   const streams = new Map(mapSlots.map((slot) => [slot.id, createSlotStream(seed, slot.id, attempt)]));
+@@ -1149,6 +1197,7 @@ function planMapAttempt({ seed, settings, preventSame, table, pool, mapId, mapSl
+   const assignment = new Map();
+   const modelOfSlot = new Map();
+   const noExclusions = new Set();
++  let hostileUsed = 0;
+ 
+   for (const slot of mapSlots) {
+     if (!active.has(slot.id)) {
+@@ -1158,8 +1207,10 @@ function planMapAttempt({ seed, settings, preventSame, table, pool, mapId, mapSl
+     }
+     const rng = streams.get(slot.id);
+     const maxSize = fitSize(slot);
++    // Part F1: once a map holds its limit of hostile NPCs they are no longer candidates (the limit bounds the wake-up events of the map).
++    const usable = hostile !== null && hostileUsed + 1 > hostile.limit ? hostile.without : pool;
+     const sampled = sampleCandidate({
+-      rng, subject: slot, mapId, maxSize, destinationOf: () => slotDifficultyClass(table, slot), settings, pool, budget, preventSame,
++      rng, subject: slot, mapId, maxSize, destinationOf: () => slotDifficultyClass(table, slot), settings, pool: usable, budget, preventSame,
+       excluded: noExclusions, diagnostics,
+     });
+     const rejected = sampled.rejected;
+@@ -1168,7 +1219,7 @@ function planMapAttempt({ seed, settings, preventSame, table, pool, mapId, mapSl
+     let stage = "sampled";
+ 
+     if (!chosen) {
+-      const fallback = fallbackLadder({ slot, budget, table, pool, maxSize, preventSame });
++      const fallback = fallbackLadder({ slot, budget, table, pool: usable, maxSize, preventSame });
+       stage = fallback.stage;
+       chosen = fallback.chosen;
+       if (stage === "infeasible") {
+@@ -1183,6 +1234,7 @@ function planMapAttempt({ seed, settings, preventSame, table, pool, mapId, mapSl
+ 
+     if (chosen) {
+       const variant = chosen.variants[rng.int(chosen.variants.length)];
++      if (chosen.hostileNpc) hostileUsed += 1;
+       budget.admit(chosen.model);
+       assignment.set(slot.id, variant.source);
+       modelOfSlot.set(slot.id, chosen.model);
+@@ -1209,7 +1261,7 @@ function planMapAttempt({ seed, settings, preventSame, table, pool, mapId, mapSl
+  * and then, as the last rung, a model another group already has (sharedFallback); a group with none fails the attempt. There is no coverage reserve: every group keeps its original model as the
+  * fallback until it is decided.
+  */
+-function planMapByType({ seed, settings, preventSame, table, pool, mapId, mapSlots, attempt, fixedModelsByMap, cap, diagnostics }) {
++function planMapByType({ seed, settings, preventSame, table, pool, mapId, mapSlots, attempt, fixedModelsByMap, cap, diagnostics, hostile = null }) {
+   const sizeOf = (slot) => slotSizeClass(table, slot);
+   const fitSize = (slot) => (settings.fit === "fits" ? sizeOf(slot) : UNKNOWN_SLOT_SIZE);
+   const byModel = new Map();
+@@ -1282,6 +1334,7 @@ function planMapByType({ seed, settings, preventSame, table, pool, mapId, mapSlo
+   const assignment = new Map();
+   const modelOfSlot = new Map();
+   const used = new Set();
++  let hostileUsed = 0;
+ 
+   for (const group of groups) {
+     const subject = { id: group.id, modelName: group.modelName, mapId };
+@@ -1296,8 +1349,10 @@ function planMapByType({ seed, settings, preventSame, table, pool, mapId, mapSlo
+     const rng = typeStreams.get(group.id);
+     const maxSize = groupFit(group);
+     budget.release(group.modelName, { pending: true }); // tentatively free the original model; a group that stays vanilla takes it back
++    // Part F1: a group counts every one of its slots against the hostile NPC limit of the map.
++    const usable = hostile !== null && hostileUsed + group.members.length > hostile.limit ? hostile.without : pool;
+     const sampled = sampleCandidate({
+-      rng, subject, mapId, maxSize, destinationOf: () => slotDifficultyClass(table, group.members[0]), settings, pool, budget, preventSame,
++      rng, subject, mapId, maxSize, destinationOf: () => slotDifficultyClass(table, group.members[0]), settings, pool: usable, budget, preventSame,
+       excluded: used, diagnostics,
+     });
+     const rejected = sampled.rejected;
+@@ -1312,11 +1367,11 @@ function planMapByType({ seed, settings, preventSame, table, pool, mapId, mapSlo
+     if (sampled.sizeRejections > 0) diagnostics.count("typeFitRejections", sampled.sizeRejections);
+ 
+     if (!chosen) {
+-      const fallback = fallbackLadder({ slot: subject, budget, table, pool, maxSize, preventSame, excluded: used });
++      const fallback = fallbackLadder({ slot: subject, budget, table, pool: usable, maxSize, preventSame, excluded: used });
+       stage = fallback.stage;
+       chosen = fallback.chosen;
+       if (stage === "infeasible") {
+-        const shared = sharedFallback({ group, budget, pool, table, maxSize, preventSame, destination: slotDifficultyClass(table, group.members[0]), rng });
++        const shared = sharedFallback({ group, budget, pool: usable, table, maxSize, preventSame, destination: slotDifficultyClass(table, group.members[0]), rng });
+         if (shared) {
+           chosen = shared;
+           stage = "shared-fit";
+@@ -1340,6 +1395,7 @@ function planMapByType({ seed, settings, preventSame, table, pool, mapId, mapSlo
+     }
+ 
+     if (chosen) {
++      if (chosen.hostileNpc) hostileUsed += group.members.length;
+       budget.hold(chosen.model);
+       used.add(chosen.model);
+       diagnostics.count("typeGroupsReplaced");
+diff --git a/engines/combined/vendor/tools/DsrDataTool/Program.cs b/engines/combined/vendor/tools/DsrDataTool/Program.cs
+index be74cd1..d5e3969 100644
+--- a/engines/combined/vendor/tools/DsrDataTool/Program.cs
++++ b/engines/combined/vendor/tools/DsrDataTool/Program.cs
+@@ -1105,7 +1105,9 @@ static PatchReport PatchEnemies(
+                 element.TryGetProperty("disableRespawn", out var noRespawn) &&
+                     noRespawn.ValueKind == JsonValueKind.True,
+                 element.TryGetProperty("encounterBody", out var encounterBody) &&
+-                    encounterBody.ValueKind == JsonValueKind.True))
++                    encounterBody.ValueKind == JsonValueKind.True,
++                element.TryGetProperty("hostileNpc", out var hostileNpc) &&
++                    hostileNpc.ValueKind == JsonValueKind.True))
+             .Where(placement =>
+                 placement.TargetNpcParamId >= 0 && placement.TargetThinkParamId >= 0);
+     }
+@@ -4290,6 +4292,12 @@ static PatchedFile? PatchGameParam(
+ // initialized by the engine (the boss events own it). They come from the boss row of the encounter, never from the body.
+ static string[] EncounterOwnedCells() => new[] { "dropType", "getSoul", "disableInitializeDead" };
+ 
++// Hostile NPC (Part F1): the body, animations and AI of an NPC stand in a regular enemy slot. Everything that says what kind of actor it is
++// belongs to the slot: its allegiance class (npcType, teamType below), whether it comes back (disableRespawn), what its death gives
++// (dropType, getSoul in every scaling mode, humanityLotId, the item lots copied above) and its covenant mark (vowType). An NPC row has
++// disableRespawn 1, a blacksmith dropType, humanity and soul rewards that are not those of a Hollow's slot.
++static string[] HostileNpcOwnedCells() => new[] { "npcType", "disableRespawn", "dropType", "getSoul", "humanityLotId", "vowType" };
++
+ static void AddScaledNpcRows(PARAM npcParam, List<PatchPlacement> placements)
+ {
+     if (placements.Count == 0)
+@@ -4362,6 +4370,11 @@ static void AddScaledNpcRows(PARAM npcParam, List<PatchPlacement> placements)
+                 SetCell(scaled, cellName, GetCellInt(source, cellName));
+             SetCell(scaled, "disableRespawn", 1);
+         }
++        if (placement.HostileNpc)
++        {
++            foreach (var cellName in HostileNpcOwnedCells())
++                SetCell(scaled, cellName, GetCellInt(source, cellName));
++        }
+         // Roaming boss (Part E1): the reward and the respawn bit are decisions of the placement, not of the boss row.
+         if (placement.RoamingBossSouls.HasValue)
+             SetCell(scaled, "getSoul", placement.RoamingBossSouls.Value);
+@@ -4385,6 +4398,7 @@ static void AddScaledNpcRows(PARAM npcParam, List<PatchPlacement> placements)
+                 !IsNpcItemLotField(name) &&
+                 !(placement.RoamingBossSouls.HasValue && name == "disableRespawn") &&
+                 !(placement.EncounterBody && (name == "disableRespawn" || EncounterOwnedCells().Contains(name))) &&
++                !(placement.HostileNpc && HostileNpcOwnedCells().Contains(name)) &&
+                 !(placement.MakeTangible &&
+                   name is "isGhost" or "isChangeWanderGhost" or "ghostModelId"));
+         if (placement.RoamingBossSouls.HasValue)
+@@ -4397,6 +4411,11 @@ static void AddScaledNpcRows(PARAM npcParam, List<PatchPlacement> placements)
+                 AssertCell(scaled, cellName, GetCellInt(source, cellName));
+             AssertCell(scaled, "disableRespawn", 1);
+         }
++        if (placement.HostileNpc)
++        {
++            foreach (var cellName in HostileNpcOwnedCells())
++                AssertCell(scaled, cellName, GetCellInt(source, cellName));
++        }
+         AssertCell(
+             scaled,
+             "teamType",
+@@ -5458,7 +5477,9 @@ record PatchPlacement(
+     int? RoamingBossSouls = null,
+     bool DisableRespawn = false,
+     // Part E2 (patches/0016): the body of a boss encounter is a normal enemy; its row is owned by the encounter (see AddScaledNpcRows).
+-    bool EncounterBody = false)
++    bool EncounterBody = false,
++    // Part F1 (patches/0017): a hostile NPC body in a regular enemy slot; the slot owns what makes it an actor of its kind (see AddScaledNpcRows).
++    bool HostileNpc = false)
+ {
+     public int EffectiveNpcParamId => ScaledNpcParamId ?? TargetNpcParamId;
+ }

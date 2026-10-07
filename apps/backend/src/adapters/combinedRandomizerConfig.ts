@@ -42,6 +42,7 @@ export interface UpstreamCombinedRandomizerConfig {
   enemyBossReplacement: BossReplacementMode;
   enemyUniqueBosses: boolean;
   enemyBossChanceBossSlots: number;
+  enemyHostileNpcs: boolean;
   enemyBossChanceNormalSlots: number;
   enemyRoamingBossSouls: number;
   enemyRoamingBossesStayDead: boolean;
@@ -116,6 +117,8 @@ export function mapCombinedRandomizerConfig(
     enemyUniqueBosses: request.enemies.placement.uniqueBosses ?? false,
     // Part E2 option: optional on input too (the legacy default, which does nothing without Boss replacement "both").
     enemyBossChanceBossSlots: request.enemies.placement.bossChanceInBossSlots ?? 90,
+    // Part F1 option: optional on input too (off is the world before the option existed).
+    enemyHostileNpcs: request.enemies.placement.hostileNpcs ?? false,
     // Part E1 options are optional on input too (the legacy defaults, which do nothing without roaming bosses).
     enemyBossChanceNormalSlots: request.enemies.placement.bossChanceInNormalSlots ?? 10,
     enemyRoamingBossSouls: request.enemies.placement.roamingBossSouls ?? 50,

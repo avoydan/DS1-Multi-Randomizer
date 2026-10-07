@@ -669,13 +669,13 @@ export const MAP_ATTEMPTS = 3;
  */
 export function planSampledRegularEnemies({
   seed, options, preventSame, slots, extraSlots = [], fixedModelsByMap, diagnostics, cap = MODEL_BUDGET_CAP,
-  mapAttempts = MAP_ATTEMPTS, candidateFilter = undefined,
+  mapAttempts = MAP_ATTEMPTS, candidateFilter = undefined, hostileNpcSources = null, hostileNpcForbiddenMaps = new Set(),
 }) {
   // The boss options belong to planSampledBosses; they never reach the regular-slot settings (and so not their diagnostics).
   // The roaming-boss options (Part E1) belong to planRoamingBosses in the same way.
   const {
     bossReplacement: _bossReplacement, uniqueBosses: _uniqueBosses, bossChanceInNormalSlots: _bossChance, roamingBossSouls: _roamingSouls,
-    roamingBossesStayDead: _roamingStayDead, bossChanceInBossSlots: _bossChanceBossSlots, ...regularOptions
+    roamingBossesStayDead: _roamingStayDead, bossChanceInBossSlots: _bossChanceBossSlots, hostileNpcs: _hostileNpcs, ...regularOptions
   } = options;
   const settings = {
     ...regularOptions,
@@ -684,15 +684,27 @@ export function planSampledRegularEnemies({
     typeReplacement: options.typeReplacement ?? "disabled",
   };
   const table = deriveRegularClassTable(slots);
+  // Part F1: the hostile NPC types join the candidates after the regular table is derived, so the classes of the regular models (their HP
+  // ranks, the table hash) are exactly what they are without them. Only the generator passes any, and only with the option on.
+  const hostileNpcTypes = hostileNpcSources === null ? [] : deriveHostileNpcTypes(hostileNpcSources, table);
+  for (const type of hostileNpcTypes) {
+    table.types.push(type);
+    table.byModel.set(type.model, type);
+  }
   const customModels = resolveCustomPool({ models: settings.customPool ?? null, table, slots: [...slots, ...extraSlots], settings, preventSame });
   const customSet = customModels === null ? null : new Set(customModels);
   const pool = createCandidatePool(table, (type) => (customSet === null || customSet.has(type.model)) && (candidateFilter === undefined || candidateFilter(type)));
   diagnostics.classTableHash = table.hash;
+  if (hostileNpcTypes.length > 0) diagnostics.hostileNpcTypes = hostileNpcTypes.map((type) => ({ model: type.model, size: type.size, difficulty: type.difficulty, variants: type.variants.length }));
   diagnostics.options = { ...settings, customPool: undefined, preventSame };
   diagnostics.customPool = {
     enabled: customModels !== null, hash: customPoolHash(customModels),
     ...analyzePoolCoverage({ table, pool, slots: [...slots, ...extraSlots], fit: settings.fit, preventSame }),
   };
+  // A map that cannot hold a hostile NPC (no event file for its wake-up) plans with the pool minus the hostile NPC types.
+  const poolWithoutHostileNpcs = hostileNpcTypes.length > 0
+    ? createCandidatePool(table, (type) => !type.hostileNpc && (customSet === null || customSet.has(type.model)) && (candidateFilter === undefined || candidateFilter(type)))
+    : pool;
   const assignment = new Map();
   const all = [...slots, ...extraSlots];
   const mapIds = [...new Set(all.map((slot) => slot.mapId))].sort(compare);
@@ -726,7 +738,10 @@ export function planSampledRegularEnemies({
     for (let attempt = 0; attempt < mapAttempts; attempt += 1) {
       const scratch = createPlacementDiagnostics({ algorithm: "sampling-v1", level: diagnostics.level });
       try {
-        planned = planMap({ seed, settings, preventSame, table, pool, mapId, mapSlots, attempt, fixedModelsByMap, cap, diagnostics: scratch });
+        planned = planMap({
+          seed, settings, preventSame, table, pool: hostileNpcForbiddenMaps.has(mapId) ? poolWithoutHostileNpcs : pool, mapId, mapSlots, attempt, fixedModelsByMap, cap, diagnostics: scratch,
+          hostile: hostileNpcTypes.length === 0 ? null : { limit: hostileNpcForbiddenMaps.has(mapId) ? 0 : HOSTILE_NPC_MAP_CAP, without: poolWithoutHostileNpcs },
+        });
       } catch (error) {
         if (!(error instanceof EnemyPlacementInfeasibleError)) throw error;
         lastError = error;
@@ -932,6 +947,39 @@ export function deriveBodyTypes(sources, table) {
   return types.sort((left, right) => compare(left.key, right.key));
 }
 
+/** Safety limit (DS1TR, not a legacy value): hostile NPCs per map. Every one has a wake-up event, so this bounds the events of a map like ROAMING_BOSS_MAP_CAP does. */
+export const HOSTILE_NPC_MAP_CAP = 12;
+
+/**
+ * The hostile NPC candidates (Part F1) typed like the regular models: size class from the capsule of the authored source slots, difficulty
+ * class with the formula of the regular classes (map tier of where the NPC lives, HP rank among the regular models); one variant per
+ * source slot (the two Undead Merchants differ in their NPC and think rows). `sources` is model -> catalog slots.
+ */
+export function deriveHostileNpcTypes(sources, table) {
+  const types = [];
+  for (const [model, slots] of [...sources].sort(([a], [b]) => compare(a, b))) {
+    const members = [...slots].sort((left, right) => compare(left.id, right.id));
+    const footprints = members.map(slotFootprint).filter((value) => value !== null);
+    const hp = members.map((member) => member.baseHp).filter((value) => Number.isFinite(value) && value > 0).sort((a, b) => a - b);
+    if (footprints.length === 0 || hp.length === 0) continue;
+    const tiers = members.map((member) => tierOfMap(member.mapId, model)).sort((a, b) => a - b);
+    const variants = new Map();
+    for (const member of members) {
+      const key = `${member.npcParamId}:${member.thinkParamId}:${member.battleGoalId}`;
+      if (!variants.has(key)) variants.set(key, { key, npcParamId: member.npcParamId, thinkParamId: member.thinkParamId, source: member });
+    }
+    types.push({
+      model,
+      size: sizeClassOfFootprint(Math.max(...footprints)),
+      footprint: Math.max(...footprints),
+      difficulty: difficultyOfScore(upperMedian(tiers), hpRank(table.sortedLogHp, Math.log(lowerMedian(hp)))),
+      variants: [...variants.values()].sort((left, right) => compare(left.key, right.key)),
+      hostileNpc: true,
+    });
+  }
+  return types;
+}
+
 /** Size and difficulty class of a boss slot as a destination: its capsule, and its map tier and HP with the formula of the regular classes. */
 export function bossDestinationClass(table, slot) {
   const footprint = slotFootprint(slot);
@@ -1116,7 +1164,7 @@ function finalizeMap({ mapId, fixedModelsByMap, mapSlots, modelOfSlot, mapCap, a
 }
 
 /** One attempt at one map, slot by slot (Type replacement disabled). Throws EnemyPlacementInfeasibleError (with baseline/cap). */
-function planMapAttempt({ seed, settings, preventSame, table, pool, mapId, mapSlots, attempt, fixedModelsByMap, cap, diagnostics }) {
+function planMapAttempt({ seed, settings, preventSame, table, pool, mapId, mapSlots, attempt, fixedModelsByMap, cap, diagnostics, hostile = null }) {
   const sizeOf = (slot) => slotSizeClass(table, slot);
   const fitSize = (slot) => (settings.fit === "fits" ? sizeOf(slot) : UNKNOWN_SLOT_SIZE);
   const streams = new Map(mapSlots.map((slot) => [slot.id, createSlotStream(seed, slot.id, attempt)]));
@@ -1149,6 +1197,7 @@ function planMapAttempt({ seed, settings, preventSame, table, pool, mapId, mapSl
   const assignment = new Map();
   const modelOfSlot = new Map();
   const noExclusions = new Set();
+  let hostileUsed = 0;
 
   for (const slot of mapSlots) {
     if (!active.has(slot.id)) {
@@ -1158,8 +1207,10 @@ function planMapAttempt({ seed, settings, preventSame, table, pool, mapId, mapSl
     }
     const rng = streams.get(slot.id);
     const maxSize = fitSize(slot);
+    // Part F1: once a map holds its limit of hostile NPCs they are no longer candidates (the limit bounds the wake-up events of the map).
+    const usable = hostile !== null && hostileUsed + 1 > hostile.limit ? hostile.without : pool;
     const sampled = sampleCandidate({
-      rng, subject: slot, mapId, maxSize, destinationOf: () => slotDifficultyClass(table, slot), settings, pool, budget, preventSame,
+      rng, subject: slot, mapId, maxSize, destinationOf: () => slotDifficultyClass(table, slot), settings, pool: usable, budget, preventSame,
       excluded: noExclusions, diagnostics,
     });
     const rejected = sampled.rejected;
@@ -1168,7 +1219,7 @@ function planMapAttempt({ seed, settings, preventSame, table, pool, mapId, mapSl
     let stage = "sampled";
 
     if (!chosen) {
-      const fallback = fallbackLadder({ slot, budget, table, pool, maxSize, preventSame });
+      const fallback = fallbackLadder({ slot, budget, table, pool: usable, maxSize, preventSame });
       stage = fallback.stage;
       chosen = fallback.chosen;
       if (stage === "infeasible") {
@@ -1183,6 +1234,7 @@ function planMapAttempt({ seed, settings, preventSame, table, pool, mapId, mapSl
 
     if (chosen) {
       const variant = chosen.variants[rng.int(chosen.variants.length)];
+      if (chosen.hostileNpc) hostileUsed += 1;
       budget.admit(chosen.model);
       assignment.set(slot.id, variant.source);
       modelOfSlot.set(slot.id, chosen.model);
@@ -1209,7 +1261,7 @@ function planMapAttempt({ seed, settings, preventSame, table, pool, mapId, mapSl
  * and then, as the last rung, a model another group already has (sharedFallback); a group with none fails the attempt. There is no coverage reserve: every group keeps its original model as the
  * fallback until it is decided.
  */
-function planMapByType({ seed, settings, preventSame, table, pool, mapId, mapSlots, attempt, fixedModelsByMap, cap, diagnostics }) {
+function planMapByType({ seed, settings, preventSame, table, pool, mapId, mapSlots, attempt, fixedModelsByMap, cap, diagnostics, hostile = null }) {
   const sizeOf = (slot) => slotSizeClass(table, slot);
   const fitSize = (slot) => (settings.fit === "fits" ? sizeOf(slot) : UNKNOWN_SLOT_SIZE);
   const byModel = new Map();
@@ -1282,6 +1334,7 @@ function planMapByType({ seed, settings, preventSame, table, pool, mapId, mapSlo
   const assignment = new Map();
   const modelOfSlot = new Map();
   const used = new Set();
+  let hostileUsed = 0;
 
   for (const group of groups) {
     const subject = { id: group.id, modelName: group.modelName, mapId };
@@ -1296,8 +1349,10 @@ function planMapByType({ seed, settings, preventSame, table, pool, mapId, mapSlo
     const rng = typeStreams.get(group.id);
     const maxSize = groupFit(group);
     budget.release(group.modelName, { pending: true }); // tentatively free the original model; a group that stays vanilla takes it back
+    // Part F1: a group counts every one of its slots against the hostile NPC limit of the map.
+    const usable = hostile !== null && hostileUsed + group.members.length > hostile.limit ? hostile.without : pool;
     const sampled = sampleCandidate({
-      rng, subject, mapId, maxSize, destinationOf: () => slotDifficultyClass(table, group.members[0]), settings, pool, budget, preventSame,
+      rng, subject, mapId, maxSize, destinationOf: () => slotDifficultyClass(table, group.members[0]), settings, pool: usable, budget, preventSame,
       excluded: used, diagnostics,
     });
     const rejected = sampled.rejected;
@@ -1312,11 +1367,11 @@ function planMapByType({ seed, settings, preventSame, table, pool, mapId, mapSlo
     if (sampled.sizeRejections > 0) diagnostics.count("typeFitRejections", sampled.sizeRejections);
 
     if (!chosen) {
-      const fallback = fallbackLadder({ slot: subject, budget, table, pool, maxSize, preventSame, excluded: used });
+      const fallback = fallbackLadder({ slot: subject, budget, table, pool: usable, maxSize, preventSame, excluded: used });
       stage = fallback.stage;
       chosen = fallback.chosen;
       if (stage === "infeasible") {
-        const shared = sharedFallback({ group, budget, pool, table, maxSize, preventSame, destination: slotDifficultyClass(table, group.members[0]), rng });
+        const shared = sharedFallback({ group, budget, pool: usable, table, maxSize, preventSame, destination: slotDifficultyClass(table, group.members[0]), rng });
         if (shared) {
           chosen = shared;
           stage = "shared-fit";
@@ -1340,6 +1395,7 @@ function planMapByType({ seed, settings, preventSame, table, pool, mapId, mapSlo
     }
 
     if (chosen) {
+      if (chosen.hostileNpc) hostileUsed += group.members.length;
       budget.hold(chosen.model);
       used.add(chosen.model);
       diagnostics.count("typeGroupsReplaced");

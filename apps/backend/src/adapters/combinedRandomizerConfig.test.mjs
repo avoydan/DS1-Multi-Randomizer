@@ -119,6 +119,7 @@ test('maps both enabled capabilities deterministically', () => {
       enemyBossReplacement: 'classic',
       enemyUniqueBosses: false,
       enemyBossChanceBossSlots: 90,
+      enemyHostileNpcs: false,
       enemyBossChanceNormalSlots: 10,
       enemyRoamingBossSouls: 50,
       enemyRoamingBossesStayDead: false,

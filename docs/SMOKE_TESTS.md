@@ -22,6 +22,7 @@ There are two kinds of world.
 | `quick-roaming-respawn` | Roaming boss - respawns | c2500_0007 (11.4 m) | ~30 s |
 | `quick-roaming-repeated` | Roaming boss - three at once | c2500_0006 (8.7 m), c2500_0007 (11.4 m), c2500_0005 (33.2 m) | ~35 s |
 | `quick-sampling-asylum` | Regular enemies - first three change | c2500_0006 (8.7 m), c2500_0007 (11.4 m), c2500_0005 (33.2 m) | ~35 s |
+| `quick-hostile-npc` | Hostile NPC - Andre as an enemy | c2500_0006 (8.7 m) | ~30 s |
 | `quick-boss-asylum-demon` | Boss sampling - the first boss | c2232_0000 (22.5 m) | ~90 s |
 
 ### How the targets were chosen
@@ -239,6 +240,43 @@ Legacy-style sampling at runtime: the first Hollows are different enemies and be
 
 ```
 DS1TR1-06NJDCP6-577CVKTE-TMPK9MC5-0YJK3GDA-0YYR87DD-FE36NQC3-BS40SMEA-0YWHH85C-WR0SE89R-DCES8MM2-YRTH0D4M-8TNJ0AJM-840CRE6W-HR
+```
+
+### Hostile NPC - Andre as an enemy
+
+**Quick smoke test** - ID `quick-hostile-npc`
+
+A hostile NPC combatant stands where a regular enemy stood: the real NPCs are untouched, this one only borrows the body and the fighting.
+
+**Target**
+
+- Undead Asylum: the Hollow at slot c2500_0006, 8.7 m from where you wake up, on the same floor as the start
+
+**Expected**
+
+- Andre of Astora (c2640) stands in place of the Hollow at slot c2500_0006 as a hostile fighter: no dialogue, no shop, the drops and rewards of that slot
+
+**Estimated time to the target:** ~30 seconds after you gain control.
+
+**Needs a reset or reload:** no
+
+**Gameplay result:** not played in the real game yet; only the static check exists.
+
+**Check**
+
+- [ ] Andre of Astora (the blacksmith model with his hammer) stands where the first Hollow of the cell block stands; he is not at a forge and he does not talk.
+- [ ] He attacks you as soon as you come near (he is a hostile fighter; there is no talk prompt and no shop) and fights with his own moves: no T-pose, no frozen idle.
+- [ ] His health is that of a Hollow of this area, not that of the real Andre; he dies like a regular enemy.
+- [ ] He gives what a Hollow of that slot gives (a few souls, perhaps a drop); no blacksmith items or unique rewards appear.
+- [ ] Die once or rest and come back: he is there again like every regular enemy (he is not a stay-dead NPC).
+
+**Afterwards**
+
+- [ ] The real Andre of Astora in the Undead Parish is not part of this test and is untouched: he still sells and upgrades there.
+- [ ] The other first-visit Hollows are ordinary enemies of this world.
+
+```
+DS1TR1-06NJDCP6-577CVKTE-TMPV8045-JEQAK68H-R5X0FFBR-3PPQH1KA-RP1NWGGC-T6D0FE8C-31HDB3ME-A937WWA9-CS7AMQR1-5JJB3NA4-T001QBCA-N181A080-MY41T68
 ```
 
 ### Boss sampling - the first boss
@@ -824,4 +862,184 @@ DS1TR1-06NJDCP6-577CVKTE-TQ6XEKEA-9YMX8KC7-CSWNTGW2-TM7QMA9V-BBZGSYQT-0ZEP30XE-0
 - The Asylum Demon, Taurus Demon and Capra Demon fights have normal enemies as bodies (listed in docs/SMOKE_TESTS.md).
 
 Expected: the second Bell Gargoyle of the Undead Parish fight becomes **c5271 (c5271)**; the first Gargoyle body becomes Centipede Demon. It is released when the first body drops to about 60% health, on the rooftop.
+
+### Hostile NPCs across the world
+
+**Extended gameplay test** - ID `npc-world`
+
+Hostile Merchants, Andre and Vamos among the regular enemies of the whole game (at most twelve per map), with the real NPCs left alone.
+
+**Gameplay result:** not played in the real game yet; only the static check exists.
+
+```
+DS1TR1-06NJDCP6-577CVKTE-TQ6GE1CK-DRWTG3PH-6MJ5HXD0-JYRA6XEF-A2PQQM0B-H4GNNY90-2W1S9N9W-W0S08SXD-GD94MM5Q-0V953JP8-5WQCKK29-YMNR119R-PS50J6KG-METH45BA-4M01WGSG-PG
+```
+
+**In this world**
+
+- Walk the Undead Burg and Parish and the Depths: the hostile NPCs listed in docs/SMOKE_TESTS.md are enemies; they wake up, fight and die like regular enemies.
+- The real Undead Merchant, Andre of Astora and the other friendly characters are where they always are and still talk and sell.
+- No more than twelve hostile NPCs stand in one map.
+
+Hostile NPCs in this world: 49 (Undead Merchant x27, Vamos x17, Andre of Astora x5). The first 14 by map order:
+
+- Undead Burg / Parish: c2500 (slot c2500_0036) -> Undead Merchant
+- Undead Burg / Parish: c2500 (slot c2500_0058) -> Undead Merchant
+- Undead Burg / Parish: c2540 (slot c2540_0007) -> Undead Merchant
+- Undead Burg / Parish: c2550 (slot c2550_0003) -> Undead Merchant
+- Undead Burg / Parish: c2550 (slot c2550_0042) -> Undead Merchant
+- Undead Burg / Parish: c3491 (slot c3491_0006) -> Undead Merchant
+- Undead Burg / Parish: c3491 (slot c3491_0008) -> Undead Merchant
+- Lower Undead Burg: c2900 (slot c2900_0004) -> Vamos
+- Lower Undead Burg: c2910 (slot c2910_0001) -> Andre of Astora
+- Painted World: c1203 (slot c1203_0001) -> Vamos
+- Painted World: c1203 (slot c1203_0003) -> Undead Merchant
+- Painted World: c1203 (slot c1203_0005) -> Vamos
+- Painted World: c2500 (slot c2500_0010) -> Vamos
+- Painted World: c2500 (slot c2500_0011) -> Vamos
+
+### Hostile NPCs with the fog randomizer
+
+**Extended gameplay test** - ID `npc-fog`
+
+Hostile NPCs together with the fog randomizer: the friendly NPCs, their dialogue and the fog gates must all keep working.
+
+**Gameplay result:** not played in the real game yet; only the static check exists.
+
+```
+DS1TR1-06NJDCP6-577CVKTE-TQ6GE1CK-DSD7XENE-470RM1XX-FGETTYC6-DB6R6QJ4-1K8TM1XS-2305NVWR-1QB6MHT7-54HVZE14-6CKXBBR0-2V8A6D8H-9NNJ403K-T1KBR
+```
+
+**In this world**
+
+- Play the first area: hostile NPCs are enemies, the fog gates and warps work as in any fog world.
+- Talk to the real Andre and the real Undead Merchant if the fog randomizer lets you reach them: dialogue and shops are unchanged.
+
+Hostile NPCs in this world: 37 (Undead Merchant x16, Andre of Astora x6, Vamos x15). The first 14 by map order:
+
+- Undead Burg / Parish: c2500 (slot c2500_0023) -> Undead Merchant
+- Undead Burg / Parish: c2500 (slot c2500_0041) -> Undead Merchant
+- Undead Burg / Parish: c2500 (slot c2500_0044) -> Undead Merchant
+- Undead Burg / Parish: c2500 (slot c2500_0053) -> Undead Merchant
+- Undead Burg / Parish: c2500 (slot c2500_0056) -> Undead Merchant
+- Undead Burg / Parish: c2520 (slot c2520_0004) -> Undead Merchant
+- Undead Burg / Parish: c2540 (slot c2540_0023) -> Undead Merchant
+- Undead Burg / Parish: c2550 (slot c2550_0031) -> Undead Merchant
+- Undead Burg / Parish: c3490 (slot c3490_0000) -> Andre of Astora
+- Lower Undead Burg: c2540 (slot c2540_0001) -> Andre of Astora
+- Painted World: c1203 (slot c1203_0000) -> Vamos
+- Painted World: c2500 (slot c2500_0024) -> Vamos
+- Painted World: c2840 (slot c2840_0008) -> Vamos
+- Painted World: c2930 (slot c2930_0011) -> Vamos
+
+### Hostile NPCs and roaming bosses together
+
+**Extended gameplay test** - ID `npc-roaming`
+
+Both kinds of crossing in one world: bosses in regular slots and hostile NPCs in regular slots.
+
+**Gameplay result:** not played in the real game yet; only the static check exists.
+
+```
+DS1TR1-06NJDCP6-577CVKTE-TQ6GE18K-VGNRC11B-3ZT34XNM-YRCTND8F-F8RK2H5B-3ZJ8403B-VNHR58ZA-9752ZJC0-TWXY04M4-BSTRX3JJ-8SZ72JB6-9TN5Y09C-GJRNAGYG-G0DAV1X8-A07G203R-JRRSA
+```
+
+**In this world**
+
+- Some regular slots hold a roaming boss, others a hostile NPC; neither interferes with the other and both wake up and fight.
+
+Hostile NPCs in this world: 14 (Vamos x7, Undead Merchant x5, Andre of Astora x2). The first 14 by map order:
+
+- The Depths: c2500 (slot c2500_0006) -> Vamos
+- The Depths: c3491 (slot c3491_0001) -> Vamos
+- Undead Burg / Parish: c2540 (slot c2540_0014) -> Undead Merchant
+- Undead Burg / Parish: c3491 (slot c3491_0000) -> Undead Merchant
+- Undead Burg / Parish: c3491 (slot c3491_0001) -> Undead Merchant
+- Catacombs: c2900 (slot c2900_0020) -> Vamos
+- Catacombs: c2900 (slot c2900_0034) -> Undead Merchant
+- Catacombs: c2900 (slot c2900_0047) -> Vamos
+- Catacombs: c2900 (slot c2900_0056) -> Vamos
+- New Londo Ruins: c2390 (slot c2390_0006) -> Vamos
+- New Londo Ruins: c3491 (slot c3491_0004) -> Vamos
+- Duke's Archives: c2710 (slot c2710_0001) -> Andre of Astora
+- Duke's Archives: c2710 (slot c2710_0005) -> Andre of Astora
+- The Kiln: c3491 (slot c3491_0000) -> Undead Merchant
+
+Bosses in regular enemy slots in this world: 16 (Moonlight Butterfly x2, Manus x1, Artorias x1, Pinwheel x11, Smough x1). The first 14 by map order:
+
+- Darkroot Garden: a boss replaces enemy c2710 (slot c2710_0001): Moonlight Butterfly, souls 5000
+- Darkroot Basin: a boss replaces enemy c5360 (slot c5360_0001): Manus, souls 30000
+- Oolacile: a boss replaces enemy c4120 (slot c4120_0002): Artorias, souls 25000
+- Oolacile: a boss replaces enemy c4120 (slot c4120_0012): Moonlight Butterfly, souls 5000
+- Catacombs: a boss replaces enemy c2650 (slot c2650_0001): Pinwheel, souls 7500
+- Tomb of the Giants: a boss replaces enemy c2795 (slot c2795_0000): Pinwheel, souls 7500
+- Tomb of the Giants: a boss replaces enemy c2910 (slot c2910_0010): Pinwheel, souls 7500
+- Tomb of the Giants: a boss replaces enemy c2910 (slot c2910_0013): Pinwheel, souls 7500
+- Ash Lake: a boss replaces enemy c3250 (slot c3250_0000): Pinwheel, souls 7500
+- Blighttown: a boss replaces enemy c2810 (slot c2810_0000): Pinwheel, souls 7500
+- Blighttown: a boss replaces enemy c2811 (slot c2811_0004): Pinwheel, souls 7500
+- Sen's Fortress: a boss replaces enemy c2700 (slot c2700_0000): Pinwheel, souls 7500
+- Sen's Fortress: a boss replaces enemy c2700 (slot c2700_0003): Pinwheel, souls 7500
+- Anor Londo: a boss replaces enemy c2260 (slot c2260_0010): Smough, souls 12500
+
+Different enemy models in the Undead Parish: 30 (the limit is 30; a map that bosses and dragons already push above it never gets more).
+
+### Hostile NPCs with Type replacement
+
+**Extended gameplay test** - ID `npc-type`
+
+Type replacement turns every enemy of one kind in a map into one replacement: a hostile NPC may take a whole group (at most twelve per map).
+
+**Gameplay result:** not played in the real game yet; only the static check exists.
+
+```
+DS1TR1-06NJDCP6-577CVKTE-TQ6GE1CK-5RMCQT0T-2AP7KM0B-V38TMSX8-ARYYGSE4-22PQQ42B-0752M7KG-261B7MJ1-54JCHA40-C2RRAPFZ-X0M6BS0Q-JXJED97T-2Q00472V-JM20VDYH-7A4GMX8J-01VEFE41
+```
+
+**In this world**
+
+- Where a whole kind of enemy became one hostile NPC, each of them wakes up and fights; none is passive or stuck.
+- Every one of them gives the drops of its own slot: a kind that was one NPC does not drop one NPC reward per body.
+
+Hostile NPCs in this world: 6 (Andre of Astora x1, Vamos x5). The first 6 by map order:
+
+- The Depths: c1202 (slot c1202_0000) -> Andre of Astora
+- Undead Burg / Parish: c3460 (slot c3460_0000) -> Vamos
+- Tomb of the Giants: c3491 (slot c3491_0000) -> Vamos
+- Tomb of the Giants: c3491 (slot c3491_0001) -> Vamos
+- Tomb of the Giants: c3491 (slot c3491_0002) -> Vamos
+- Tomb of the Giants: c3491 (slot c3491_0003) -> Vamos
+
+### Hostile NPCs with boss bodies and boss sampling
+
+**Extended gameplay test** - ID `npc-bosses`
+
+Hostile NPCs next to boss sampling and normal enemies as bodies of the early boss fights.
+
+**Gameplay result:** not played in the real game yet; only the static check exists.
+
+```
+DS1TR1-06NJDCP6-577CVKTE-TQ6GE18K-TG5VN1G4-XCFF88KP-PKS1KBBW-52P7S835-06BCM1TW-5VGAJYCG-SE022NQD-83N12N75-97WJA6AA-204RG1SW-YD0925CW-JC7MN636-0RX4M6FS-RMJSJED9-FR2V1A61-ASXM2GVR-PKXA4GQN-0M0DZBY8-9W
+```
+
+**In this world**
+
+- The boss fights work as in the boss tests; the hostile NPCs around them are ordinary enemies and do not take part in any boss fight.
+
+Hostile NPCs in this world: 74 (Andre of Astora x40, Undead Merchant x12, Vamos x22). The first 14 by map order:
+
+- The Depths: c1201 (slot c1201_0019) -> Andre of Astora
+- The Depths: c3200 (slot c3200_0004) -> Andre of Astora
+- The Depths: c3491 (slot c3491_0000) -> Andre of Astora
+- Undead Burg / Parish: c2500 (slot c2500_0022) -> Undead Merchant
+- Undead Burg / Parish: c2500 (slot c2500_0027) -> Andre of Astora
+- Undead Burg / Parish: c2500 (slot c2500_0038) -> Undead Merchant
+- Undead Burg / Parish: c2500 (slot c2500_0041) -> Andre of Astora
+- Undead Burg / Parish: c2500 (slot c2500_0054) -> Andre of Astora
+- Undead Burg / Parish: c2520 (slot c2520_0013) -> Andre of Astora
+- Undead Burg / Parish: c2540 (slot c2540_0001) -> Andre of Astora
+- Undead Burg / Parish: c2540 (slot c2540_0015) -> Undead Merchant
+- Undead Burg / Parish: c2540 (slot c2540_0023) -> Andre of Astora
+- Painted World: c2310 (slot c2310_0004) -> Vamos
+- Painted World: c2500 (slot c2500_0026) -> Vamos
 

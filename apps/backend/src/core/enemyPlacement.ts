@@ -76,6 +76,13 @@ function validateSamplingOnlyValues(value: Record<string, unknown>, path: string
     if (typeof chance !== 'number' || !Number.isInteger(chance) || chance < 0 || chance > 100) problems.push(`${path}.bossChanceInBossSlots must be an integer from 0 to 100.`);
     else if (chance !== NEUTRAL_ENEMY_PLACEMENT_OPTIONS.bossChanceInBossSlots && value.bossReplacement !== 'both') problems.push(`${path}.bossChanceInBossSlots needs ${path}.bossReplacement "both".`);
   }
+  if (Object.hasOwn(value, 'hostileNpcs')) {
+    if (typeof value.hostileNpcs !== 'boolean') problems.push(`${path}.hostileNpcs must be true or false.`);
+    else if (value.hostileNpcs) {
+      if (value.normalReplacement !== 'normals' && value.normalReplacement !== 'both') problems.push(`${path}.hostileNpcs needs ${path}.normalReplacement "normals" or "both".`);
+      if (value.customPool !== null && value.customPool !== undefined) problems.push(`${path}.hostileNpcs does not apply with a custom enemy pool.`);
+    }
+  }
   const roaming = (ROAMING_BOSS_REPLACEMENT_MODES as readonly unknown[]).includes(value.normalReplacement);
   if (Object.hasOwn(value, 'bossChanceInNormalSlots')) {
     const chance = value.bossChanceInNormalSlots;

@@ -13,7 +13,7 @@ export function fullSettings(overrides = {}) {
       replaceRespawningMosquitoes: true, preventSameEnemy: false, pinwheelChaos: false, gwynNerf: 'medium', secondGargoyle: 'replace',
       placement: {
         algorithm: 'permutation-v1', replacementChance: 100, normalReplacement: 'normals', fit: 'anywhere', difficultyMode: 'random',
-        difficultyStrictness: 'loose', typeReplacement: 'disabled', customPool: null, bossReplacement: 'classic', uniqueBosses: false, bossChanceInNormalSlots: 10, roamingBossSouls: 50, roamingBossesStayDead: false, bossChanceInBossSlots: 90,
+        difficultyStrictness: 'loose', typeReplacement: 'disabled', customPool: null, bossReplacement: 'classic', uniqueBosses: false, bossChanceInNormalSlots: 10, roamingBossSouls: 50, roamingBossesStayDead: false, bossChanceInBossSlots: 90, hostileNpcs: false,
       },
     },
     fog: {

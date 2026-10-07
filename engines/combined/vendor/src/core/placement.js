@@ -93,6 +93,7 @@ export const BOSS_SAMPLING_MODES = Object.freeze(["bosses", "normals", "both"]);
 
 /** Values under which permutation-v1 behaves exactly as it always did; anything else is refused there. */
 export const SAMPLING_NEUTRAL_OPTIONS = Object.freeze({
+  enemyHostileNpcs: false,
   enemyBossChanceBossSlots: 90,
   enemyBossChanceNormalSlots: 10,
   enemyRoamingBossSouls: 50,
@@ -197,6 +198,16 @@ export function resolveEnemyPlacementOptions(config, algorithm = config.enemyPla
   } else if (config.enemyBossChanceBossSlots !== SAMPLING_NEUTRAL_OPTIONS.enemyBossChanceBossSlots && config.enemyBossReplacement !== "both") {
     problems.push("enemyBossChanceBossSlots only applies with enemyBossReplacement \"both\" (a boss or a normal enemy per boss slot).");
   }
+  if (typeof config.enemyHostileNpcs !== "boolean") {
+    problems.push(`enemyHostileNpcs must be true or false (got ${String(config.enemyHostileNpcs)}).`);
+  } else if (config.enemyHostileNpcs) {
+    if (!["normals", "both"].includes(config.enemyNormalReplacement)) {
+      problems.push("enemyHostileNpcs only applies when normal enemies are replaced (enemyNormalReplacement \"normals\" or \"both\").");
+    }
+    if (config.enemyCustomPool !== null && config.enemyCustomPool !== undefined) {
+      problems.push("enemyHostileNpcs does not apply with a custom enemy pool (the pool lists enemy models; the hostile NPCs are not part of it).");
+    }
+  }
   const roamingMode = ROAMING_BOSS_MODES.includes(config.enemyNormalReplacement);
   if (!Number.isInteger(config.enemyBossChanceNormalSlots) || config.enemyBossChanceNormalSlots < 0 || config.enemyBossChanceNormalSlots > 100) {
     problems.push(`enemyBossChanceNormalSlots must be an integer from 0 to 100 (got ${String(config.enemyBossChanceNormalSlots)}).`);
@@ -238,6 +249,7 @@ export function resolveEnemyPlacementOptions(config, algorithm = config.enemyPla
     bossChanceInNormalSlots: config.enemyBossChanceNormalSlots,
     roamingBossSouls: config.enemyRoamingBossSouls,
     roamingBossesStayDead: config.enemyRoamingBossesStayDead,
+    hostileNpcs: config.enemyHostileNpcs,
   };
 }
 

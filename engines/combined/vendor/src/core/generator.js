@@ -380,6 +380,67 @@ function encounterBodySetup(config, catalog, dragonPlan, bossOptions) {
   };
 }
 
+// ---- hostile NPCs (Part F1, patches/0017) ---------------------------------------------------------------------------------------
+// Legacy "Hostile NPCs": four NPC models join the normal enemy pool (the legacy tool also sets their allegiance with an event). DS1TR
+// reconstructs that as a source pool only: the friendly NPCs themselves (their slots, talk, shops, quests, services) are never touched,
+// a hostile NPC is a body that stands in a regular enemy slot and is owned by that slot (team, drops, respawn, reward).
+
+/**
+ * The NPC slots of the real catalog by role. The classification is semantic (talk script, team, model family), never by model id alone, and
+ * anything not recognized is UNKNOWN_UNSAFE. Only SAFE_HOSTILE_SOURCE slots are ever used, and only as a source of a body.
+ */
+export const NPC_ROLES = Object.freeze({
+  SAFE_HOSTILE_SOURCE: "SAFE_HOSTILE_SOURCE",
+  MERCHANT_UNSAFE: "MERCHANT_UNSAFE",
+  BLACKSMITH_UNSAFE: "BLACKSMITH_UNSAFE",
+  FIREKEEPER_OR_BONFIRE: "FIREKEEPER_OR_BONFIRE",
+  QUEST_NPC: "QUEST_NPC",
+  PLAYER_MODEL_NPC: "PLAYER_MODEL_NPC",
+  BOSS_COMPANION: "BOSS_COMPANION",
+  DUMMY_OR_PASSIVE: "DUMMY_OR_PASSIVE",
+  UNKNOWN_UNSAFE: "UNKNOWN_UNSAFE",
+});
+
+/** The authored hostile sources (legacy: the Merchant, Andre and Vamos; Gough and the second Merchant are left out, see docs/ENEMY_PLACEMENT_MODEL.md 10.9). */
+const hostileNpcSourceSlots = new Set([
+  // The Undead Merchant of the Lower Undead Burg (m10_02, NPC 251000 / think 251001) is left out: its think row names a logic script (251000_logic.lua)
+  // that the data tool does not carry to another map (it copies battle goals), so a placed copy would name a missing logic goal.
+  "m10_01_00_00:c2510_0000", // Undead Merchant (Undead Burg), NPC 251001 / think 251000, common logic
+  "m10_01_00_00:c2640_0000", // Andre of Astora (Undead Parish), NPC 264000 / think 264000
+  "m13_00_00_00:c2920_0000", // Vamos (Catacombs), NPC 292000 / think 292000
+]);
+
+/** Role of a catalog slot that is not a regular enemy (team 0): why it may or may not be used. Unknown is unsafe. */
+export function classifyNpcSlot(slot) {
+  if (hostileNpcSourceSlots.has(slot.id)) return NPC_ROLES.SAFE_HOSTILE_SOURCE;
+  if (slot.dummy) return NPC_ROLES.DUMMY_OR_PASSIVE;
+  if (slot.modelName === "c1000") return NPC_ROLES.FIREKEEPER_OR_BONFIRE;
+  if (slot.modelName === "c5330" || slot.modelName === "c5340") return NPC_ROLES.FIREKEEPER_OR_BONFIRE;
+  if (slot.modelName === "c0000") return NPC_ROLES.PLAYER_MODEL_NPC;
+  if (slot.modelName === "c2510") return NPC_ROLES.MERCHANT_UNSAFE;
+  if (["c2640", "c2920", "c4110"].includes(slot.modelName)) return NPC_ROLES.BLACKSMITH_UNSAFE;
+  if (slot.teamType === 1) return NPC_ROLES.BOSS_COMPANION;
+  if (slot.talkId > 0 && slot.teamType === 2) return NPC_ROLES.QUEST_NPC;
+  return NPC_ROLES.UNKNOWN_UNSAFE;
+}
+
+/** model -> catalog source slots of the hostile NPC candidates (empty when the catalog lacks them). */
+function hostileNpcSources(catalog) {
+  const sources = new Map();
+  for (const slot of catalog.enemySlots) {
+    if (!hostileNpcSourceSlots.has(slot.id) || slot.dummy || slot.npcParamId <= 0 || slot.thinkParamId <= 0 || !(slot.baseHp > 0)) continue;
+    if (classifyNpcSlot(slot) !== NPC_ROLES.SAFE_HOSTILE_SOURCE) continue;
+    if (!sources.has(slot.modelName)) sources.set(slot.modelName, []);
+    sources.get(slot.modelName).push(slot);
+  }
+  return sources.size === 0 ? null : sources;
+}
+
+/** The Darkroot Basin has no event file of its own (the data tool writes no event for a part there), so a hostile NPC, which needs its wake-up event, never stands there. */
+const hostileNpcForbiddenMaps = new Set(["m12_00_00_01"]);
+
+const hostileNpcSourceIds = (catalog) => new Set([...(hostileNpcSources(catalog)?.values() ?? [])].flat().map((slot) => slot.id));
+
 /** Regular slots that keep their own enemy even when bosses may roam (they have special handling that a boss would break). */
 function roamingProtectedSlotIds(slots) {
   return new Set(slots.filter((slot) =>
@@ -1314,7 +1375,7 @@ function regularEnemyContext(config, catalog, dragonPlan, bossPlan) {
 // activation), think-param clones and the placement record itself. Behavior for permutation-v1 is unchanged;
 // sampling-v1 only differs in the compatibility label and in always forcing a scaled NpcParam row, so the
 // destination slot's drops and team follow the slot (model document 6.9).
-function decorateEnemyPlacements(config, catalog, allSlots, assignment, pinwheelCloneIds, algorithm, roamingSlotIds = new Set(), roamingOptions = null) {
+function decorateEnemyPlacements(config, catalog, allSlots, assignment, pinwheelCloneIds, algorithm, roamingSlotIds = new Set(), roamingOptions = null, hostileNpcIds = new Set()) {
   const sampling = algorithm === "sampling-v1";
   const newLondoGroundAnchors = catalog.enemySlots
     .filter((slot) =>
@@ -1370,7 +1431,10 @@ function decorateEnemyPlacements(config, catalog, allSlots, assignment, pinwheel
       replacement.modelName !== slot.modelName ||
       replacement.npcParamId !== slot.npcParamId ||
       replacementThinkParamId !== slot.thinkParamId;
-    const makeTangible = tangibleGhostModels.has(replacement.modelName);
+    // Part F1: a hostile NPC is a body in a regular slot. Its NPC row's ghost transition is switched off (like every tangible replacement) and
+    // the slot owns its team, respawn, reward and drops (the data tool takes those cells from the slot's row).
+    const isHostileNpc = hostileNpcIds.has(replacement.id);
+    const makeTangible = tangibleGhostModels.has(replacement.modelName) || isHostileNpc;
     const replacesWallPhasingGhost =
       slot.mapId === "m16_00_00_00" &&
       tangibleGhostModels.has(slot.modelName) &&
@@ -1387,7 +1451,9 @@ function decorateEnemyPlacements(config, catalog, allSlots, assignment, pinwheel
     const requiresCombatEvent =
       forceCombatActivationModels.has(replacement.modelName) ||
       darkrootButterflyPath ||
-      isRoamingBoss;
+      isRoamingBoss ||
+      // A dummy part is not spawned in the game: it gets the row and the mark, never a wake-up event.
+      (isHostileNpc && !slot.dummy);
     const assignedEntityId =
       (passiveUntilAttacked || requiresCombatEvent) && slot.entityId < 0
         ? 16_099_000 + index
@@ -1405,6 +1471,7 @@ function decorateEnemyPlacements(config, catalog, allSlots, assignment, pinwheel
             targetThinkParamId: replacementThinkParamId,
           }),
       ...(makeTangible ? { makeTangible: true } : {}),
+      ...(isHostileNpc ? { hostileNpc: true } : {}),
       // Replaced clones keep their own combat stats (normal HP) instead of
       // inheriting the clone's 1 HP; drops and team still follow the slot.
       ...(isChaosPinwheelClone ? { scaling: "vanilla" } : {}),
@@ -1441,6 +1508,8 @@ function decorateEnemyPlacements(config, catalog, allSlots, assignment, pinwheel
       compatibility: sampling
         ? isRoamingBoss
           ? "sampled-roaming-boss"
+          : isHostileNpc && !passiveUntilAttacked && !isChaosPinwheelClone
+          ? "sampled-hostile-npc"
           : isChaosPinwheelClone
           ? "pinwheel-chaos-clone"
           : passiveUntilAttacked
@@ -1535,6 +1604,8 @@ function sampleExtractedEnemies(config, catalog, dragonPlan, bossPlan, diagnosti
     extraSlots: pinwheelClones,
     fixedModelsByMap,
     diagnostics,
+    hostileNpcSources: options.hostileNpcs ? hostileNpcSources(catalog) : null,
+    hostileNpcForbiddenMaps,
   });
   const allSlots = [...slots, ...pinwheelClones];
   let assignment = regularAssignment;
@@ -1564,8 +1635,14 @@ function sampleExtractedEnemies(config, catalog, dragonPlan, bossPlan, diagnosti
   }
   // Decoration (and its index-based ids) is computed over every slot so ids stay stable, but only slots the
   // sampler assigned get a placement: the others stay exactly vanilla (model document 5, decision 2).
-  const randomized = decorateEnemyPlacements(config, catalog, allSlots, assignment, pinwheelCloneIds, "sampling-v1", new Set(roaming.keys()), options)
+  const randomized = decorateEnemyPlacements(config, catalog, allSlots, assignment, pinwheelCloneIds, "sampling-v1", new Set(roaming.keys()), options,
+    options.hostileNpcs ? hostileNpcSourceIds(catalog) : new Set())
     .filter((placement) => assignment.has(placement.slot));
+  if (options.hostileNpcs) {
+    const placed = randomized.filter((placement) => placement.hostileNpc === true);
+    diagnostics.count("hostileNpcPlacements", placed.length);
+    for (const model of new Set(placed.map((placement) => placement.targetModelName))) diagnostics.count(`hostileNpc:${model}`, placed.filter((placement) => placement.targetModelName === model).length);
+  }
   assertSlotOwnedDrops(randomized);
   return randomized
     .concat(massOfSoulsPlan.placements)

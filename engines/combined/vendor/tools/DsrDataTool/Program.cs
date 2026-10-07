@@ -1105,7 +1105,9 @@ static PatchReport PatchEnemies(
                 element.TryGetProperty("disableRespawn", out var noRespawn) &&
                     noRespawn.ValueKind == JsonValueKind.True,
                 element.TryGetProperty("encounterBody", out var encounterBody) &&
-                    encounterBody.ValueKind == JsonValueKind.True))
+                    encounterBody.ValueKind == JsonValueKind.True,
+                element.TryGetProperty("hostileNpc", out var hostileNpc) &&
+                    hostileNpc.ValueKind == JsonValueKind.True))
             .Where(placement =>
                 placement.TargetNpcParamId >= 0 && placement.TargetThinkParamId >= 0);
     }
@@ -4290,6 +4292,12 @@ static PatchedFile? PatchGameParam(
 // initialized by the engine (the boss events own it). They come from the boss row of the encounter, never from the body.
 static string[] EncounterOwnedCells() => new[] { "dropType", "getSoul", "disableInitializeDead" };
 
+// Hostile NPC (Part F1): the body, animations and AI of an NPC stand in a regular enemy slot. Everything that says what kind of actor it is
+// belongs to the slot: its allegiance class (npcType, teamType below), whether it comes back (disableRespawn), what its death gives
+// (dropType, getSoul in every scaling mode, humanityLotId, the item lots copied above) and its covenant mark (vowType). An NPC row has
+// disableRespawn 1, a blacksmith dropType, humanity and soul rewards that are not those of a Hollow's slot.
+static string[] HostileNpcOwnedCells() => new[] { "npcType", "disableRespawn", "dropType", "getSoul", "humanityLotId", "vowType" };
+
 static void AddScaledNpcRows(PARAM npcParam, List<PatchPlacement> placements)
 {
     if (placements.Count == 0)
@@ -4362,6 +4370,11 @@ static void AddScaledNpcRows(PARAM npcParam, List<PatchPlacement> placements)
                 SetCell(scaled, cellName, GetCellInt(source, cellName));
             SetCell(scaled, "disableRespawn", 1);
         }
+        if (placement.HostileNpc)
+        {
+            foreach (var cellName in HostileNpcOwnedCells())
+                SetCell(scaled, cellName, GetCellInt(source, cellName));
+        }
         // Roaming boss (Part E1): the reward and the respawn bit are decisions of the placement, not of the boss row.
         if (placement.RoamingBossSouls.HasValue)
             SetCell(scaled, "getSoul", placement.RoamingBossSouls.Value);
@@ -4385,6 +4398,7 @@ static void AddScaledNpcRows(PARAM npcParam, List<PatchPlacement> placements)
                 !IsNpcItemLotField(name) &&
                 !(placement.RoamingBossSouls.HasValue && name == "disableRespawn") &&
                 !(placement.EncounterBody && (name == "disableRespawn" || EncounterOwnedCells().Contains(name))) &&
+                !(placement.HostileNpc && HostileNpcOwnedCells().Contains(name)) &&
                 !(placement.MakeTangible &&
                   name is "isGhost" or "isChangeWanderGhost" or "ghostModelId"));
         if (placement.RoamingBossSouls.HasValue)
@@ -4396,6 +4410,11 @@ static void AddScaledNpcRows(PARAM npcParam, List<PatchPlacement> placements)
             foreach (var cellName in EncounterOwnedCells())
                 AssertCell(scaled, cellName, GetCellInt(source, cellName));
             AssertCell(scaled, "disableRespawn", 1);
+        }
+        if (placement.HostileNpc)
+        {
+            foreach (var cellName in HostileNpcOwnedCells())
+                AssertCell(scaled, cellName, GetCellInt(source, cellName));
         }
         AssertCell(
             scaled,
@@ -5458,7 +5477,9 @@ record PatchPlacement(
     int? RoamingBossSouls = null,
     bool DisableRespawn = false,
     // Part E2 (patches/0016): the body of a boss encounter is a normal enemy; its row is owned by the encounter (see AddScaledNpcRows).
-    bool EncounterBody = false)
+    bool EncounterBody = false,
+    // Part F1 (patches/0017): a hostile NPC body in a regular enemy slot; the slot owns what makes it an actor of its kind (see AddScaledNpcRows).
+    bool HostileNpc = false)
 {
     public int EffectiveNpcParamId => ScaledNpcParamId ?? TargetNpcParamId;
 }

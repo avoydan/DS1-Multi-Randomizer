@@ -25,7 +25,7 @@ export const DEFAULT_GENERATION_SETTINGS: GenerationSettings = {
     placement: {
       algorithm: 'permutation-v1', replacementChance: 100, normalReplacement: 'normals', fit: 'anywhere', difficultyMode: 'random',
       difficultyStrictness: 'loose', typeReplacement: 'disabled', customPool: null, bossReplacement: 'classic', uniqueBosses: false,
-      bossChanceInBossSlots: 90, bossChanceInNormalSlots: 10, roamingBossSouls: 50, roamingBossesStayDead: false,
+      bossChanceInBossSlots: 90, hostileNpcs: false, bossChanceInNormalSlots: 10, roamingBossSouls: 50, roamingBossesStayDead: false,
     },
   },
   fog: {
@@ -49,7 +49,7 @@ export const SMOKE_START = { map: 'm18_01_00_00', mapName: 'Undead Asylum', x: -
 
 /** One thing a quick world promises, in the words the tester reads and in the terms a static check of the generated files uses. */
 export interface SmokeExpectation {
-  kind: 'roaming-boss' | 'regular-enemy' | 'boss' | 'encounter-body';
+  kind: 'roaming-boss' | 'regular-enemy' | 'boss' | 'encounter-body' | 'hostile-npc';
   map: string;
   mapName: string;
   /** The part name in the map's MSB (`c2500_0006`), the same as the slot id after the colon. */
@@ -108,6 +108,7 @@ export function describeSmokeTarget(expectation: SmokeExpectation): string {
 /** "Capra Demon (c2240) replaces the Hollow at slot c2500_0006". */
 export function describeSmokeExpected(expectation: SmokeExpectation): string {
   if (expectation.kind === 'encounter-body') return `${expectation.name} (${expectation.model}) takes the place of ${expectation.replacedName} as the body of the boss encounter; the health bar and the name on it stay ${expectation.replacedName}'s, and the fight completes when ${expectation.name} dies`;
+  if (expectation.kind === 'hostile-npc') return `${expectation.name} (${expectation.model}) stands in place of the ${expectation.replacedName} at slot ${expectation.slot} as a hostile fighter: no dialogue, no shop, the drops and rewards of that slot`;
   if (expectation.kind === 'boss') return `${expectation.name} (${expectation.model}) takes the place of ${expectation.replacedName}, the first boss`;
   const extra = expectation.souls === undefined ? '' : `; it carries ${expectation.souls} souls${expectation.disableRespawn ? ' and stays dead' : ''}`;
   return `${expectation.name} (${expectation.model}) replaces the ${expectation.replacedName} at slot ${expectation.slot}${extra}`;
@@ -162,6 +163,13 @@ export const QUICK_SMOKE_RECIPES: Readonly<Record<string, { seedPrefix: string; 
     settings: {
       items: { enabled: false }, fog: { enabled: false },
       enemies: { randomizeRegularEnemies: false, gwynNerf: 'none', secondGargoyle: 'keep', placement: { algorithm: 'sampling-v1', fit: 'anywhere', difficultyMode: 'random', replacementChance: 100, bossReplacement: 'normals' } },
+    },
+  },
+  'quick-hostile-npc': {
+    seedPrefix: 'smoke-q8-npc',
+    settings: {
+      items: { enabled: false }, fog: { enabled: false },
+      enemies: { randomizeBosses: false, placement: { algorithm: 'sampling-v1', fit: 'anywhere', difficultyMode: 'random', replacementChance: 100, normalReplacement: 'normals', hostileNpcs: true } },
     },
   },
   'quick-roaming-respawn': {
@@ -301,6 +309,24 @@ export const SMOKE_SCENARIOS: readonly SmokeScenario[] = [
       'Where the first three Hollows stood there are a Balder Knight, an Undead Soldier and an Undead Assassin.',
       'None is in a T-pose or invisible; each wakes up, moves and attacks; none floats or sinks into the floor.',
       'Their size looks right for the cell block (the setting only allows enemies that fit).',
+    ],
+  },
+  {
+    id: 'quick-hostile-npc', category: 'quick', title: 'Hostile NPC - Andre as an enemy', masterSeed: 'smoke-q8-npc-562',
+    purpose: 'A hostile NPC combatant stands where a regular enemy stood: the real NPCs are untouched, this one only borrows the body and the fighting.',
+    settings: QUICK_SMOKE_RECIPES['quick-hostile-npc'].settings,
+    expectations: [{ kind: 'hostile-npc', map: 'm18_01_00_00', mapName: 'Undead Asylum', slot: 'c2500_0006', replacedModel: 'c2500', replacedName: 'Hollow', model: 'c2640', name: 'Andre of Astora', meters: 8.7, up: 0 }],
+    estimateSeconds: 30,
+    observe: [
+      'Andre of Astora (the blacksmith model with his hammer) stands where the first Hollow of the cell block stands; he is not at a forge and he does not talk.',
+      'He attacks you as soon as you come near (he is a hostile fighter; there is no talk prompt and no shop) and fights with his own moves: no T-pose, no frozen idle.',
+      'His health is that of a Hollow of this area, not that of the real Andre; he dies like a regular enemy.',
+      'He gives what a Hollow of that slot gives (a few souls, perhaps a drop); no blacksmith items or unique rewards appear.',
+      'Die once or rest and come back: he is there again like every regular enemy (he is not a stay-dead NPC).',
+    ],
+    afterwards: [
+      'The real Andre of Astora in the Undead Parish is not part of this test and is untouched: he still sells and upgrades there.',
+      'The other first-visit Hollows are ordinary enemies of this world.',
     ],
   },
   {
@@ -466,6 +492,51 @@ export const SMOKE_SCENARIOS: readonly SmokeScenario[] = [
       enemies: { randomizeRegularEnemies: false, gwynNerf: 'none', secondGargoyle: 'replace', placement: { algorithm: 'sampling-v1', fit: 'anywhere', difficultyMode: 'random', replacementChance: 100, bossReplacement: 'normals' } },
     },
     observe: ['Go up to the rooftop of the Undead Parish church: the Bell Gargoyles fight is the one listed in docs/SMOKE_TESTS.md (the classic shuffle still moves the multi-body bosses around), with its second body replaced by a boss as in the Second Bell Gargoyle test. The Gargoyles never get a normal enemy.', 'The Asylum Demon, Taurus Demon and Capra Demon fights have normal enemies as bodies (listed in docs/SMOKE_TESTS.md).'],
+  },
+  {
+    id: 'npc-world', category: 'extended', title: 'Hostile NPCs across the world', masterSeed: 'smoke-o-npc-world-1',
+    purpose: 'Hostile Merchants, Andre and Vamos among the regular enemies of the whole game (at most twelve per map), with the real NPCs left alone.',
+    settings: {
+      items: { enabled: false }, fog: { enabled: false },
+      enemies: { randomizeBosses: false, placement: { algorithm: 'sampling-v1', fit: 'fits', difficultyMode: 'random-easy-asylum', replacementChance: 100, normalReplacement: 'normals', hostileNpcs: true } },
+    },
+    observe: ['Walk the Undead Burg and Parish and the Depths: the hostile NPCs listed in docs/SMOKE_TESTS.md are enemies; they wake up, fight and die like regular enemies.', 'The real Undead Merchant, Andre of Astora and the other friendly characters are where they always are and still talk and sell.', 'No more than twelve hostile NPCs stand in one map.'],
+  },
+  {
+    id: 'npc-fog', category: 'extended', title: 'Hostile NPCs with the fog randomizer', masterSeed: 'smoke-o-npc-fog-1',
+    purpose: 'Hostile NPCs together with the fog randomizer: the friendly NPCs, their dialogue and the fog gates must all keep working.',
+    settings: {
+      items: { enabled: false },
+      enemies: { randomizeBosses: false, placement: { algorithm: 'sampling-v1', fit: 'anywhere', difficultyMode: 'random', replacementChance: 60, normalReplacement: 'normals', hostileNpcs: true } },
+    },
+    observe: ['Play the first area: hostile NPCs are enemies, the fog gates and warps work as in any fog world.', 'Talk to the real Andre and the real Undead Merchant if the fog randomizer lets you reach them: dialogue and shops are unchanged.'],
+  },
+  {
+    id: 'npc-roaming', category: 'extended', title: 'Hostile NPCs and roaming bosses together', masterSeed: 'smoke-o-npc-roaming-1',
+    purpose: 'Both kinds of crossing in one world: bosses in regular slots and hostile NPCs in regular slots.',
+    settings: {
+      items: { enabled: false }, fog: { enabled: false },
+      enemies: { randomizeBosses: false, placement: { algorithm: 'sampling-v1', fit: 'fits', difficultyMode: 'random', replacementChance: 40, normalReplacement: 'both', bossChanceInNormalSlots: 10, hostileNpcs: true } },
+    },
+    observe: ['Some regular slots hold a roaming boss, others a hostile NPC; neither interferes with the other and both wake up and fight.'],
+  },
+  {
+    id: 'npc-type', category: 'extended', title: 'Hostile NPCs with Type replacement', masterSeed: 'smoke-o-npc-type-1',
+    purpose: 'Type replacement turns every enemy of one kind in a map into one replacement: a hostile NPC may take a whole group (at most twelve per map).',
+    settings: {
+      items: { enabled: false }, fog: { enabled: false },
+      enemies: { randomizeBosses: false, placement: { algorithm: 'sampling-v1', fit: 'fits', difficultyMode: 'random-easy-asylum', replacementChance: 100, normalReplacement: 'normals', typeReplacement: 'enabled', hostileNpcs: true } },
+    },
+    observe: ['Where a whole kind of enemy became one hostile NPC, each of them wakes up and fights; none is passive or stuck.', 'Every one of them gives the drops of its own slot: a kind that was one NPC does not drop one NPC reward per body.'],
+  },
+  {
+    id: 'npc-bosses', category: 'extended', title: 'Hostile NPCs with boss bodies and boss sampling', masterSeed: 'smoke-o-npc-bosses-1',
+    purpose: 'Hostile NPCs next to boss sampling and normal enemies as bodies of the early boss fights.',
+    settings: {
+      items: { enabled: false }, fog: { enabled: false },
+      enemies: { randomizeRegularEnemies: true, gwynNerf: 'strong', secondGargoyle: 'keep', placement: { algorithm: 'sampling-v1', fit: 'anywhere', difficultyMode: 'random', replacementChance: 100, normalReplacement: 'normals', bossReplacement: 'both', bossChanceInBossSlots: 60, hostileNpcs: true } },
+    },
+    observe: ['The boss fights work as in the boss tests; the hostile NPCs around them are ordinary enemies and do not take part in any boss fight.'],
   },
 ];
 
