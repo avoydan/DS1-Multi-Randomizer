@@ -63,6 +63,15 @@ export const CANONICAL_ITEM_KEYS = [
   'randomizeStartingClass', 'randomizeStartingEquipment', 'randomizeGifts', 'randomizeEnemyDrops', 'guaranteedEnemyDrops',
   'randomizeShops', 'fashionSouls', 'soulItems', 'startingItems',
 ] as const;
+/**
+ * Item options added after format 1 (Part H): complete in memory, stored in a Seed Code only when they differ from their neutral value, so every earlier
+ * code keeps its exact text (the same rule as the placement extension keys below). Keys are appended in this order and a neutral value never changes.
+ */
+export const CANONICAL_ITEM_EXTENSION_KEYS = [
+  { key: 'keyPlacement', neutral: 'vanilla' },
+  { key: 'randomizeLordvessel', neutral: false },
+  { key: 'randomizeLordSouls', neutral: false },
+] as const;
 export const CANONICAL_ENEMY_KEYS = [
   'enabled', 'randomizeRegularEnemies', 'randomizeBosses', 'scaling', 'replaceMimics', 'replaceRespawningMosquitoes',
   'preventSameEnemy', 'pinwheelChaos', 'gwynNerf', 'secondGargoyle', 'placement',
@@ -109,6 +118,7 @@ export const GENERATION_FIELD_POLICY: Readonly<Record<string, GenerationFieldPol
   gamePath: { excluded: 'machine-specific installation path; the world does not depend on where the game is installed' },
   masterSeed: 'envelope',
   ...Object.fromEntries(CANONICAL_ITEM_KEYS.map((key) => [`items.${key}`, 'seed' as const])),
+  ...Object.fromEntries(CANONICAL_ITEM_EXTENSION_KEYS.map(({ key }) => [`items.${key}`, 'seed' as const])),
   ...Object.fromEntries(CANONICAL_ENEMY_KEYS.filter((key) => key !== 'placement').map((key) => [`enemies.${key}`, 'seed' as const])),
   ...Object.fromEntries(CANONICAL_PLACEMENT_KEYS.map((key) => [`enemies.placement.${key}`, 'seed' as const])),
   ...Object.fromEntries(CANONICAL_PLACEMENT_EXTENSION_KEYS.map(({ key }) => [`enemies.placement.${key}`, 'seed' as const])),

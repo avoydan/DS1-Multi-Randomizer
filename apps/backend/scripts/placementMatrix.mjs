@@ -105,6 +105,22 @@ export const sets = {
     { name: 'souls-triple-fog', patch: merge2(structuredClone(DEFAULT_GENERATION_SETTINGS), { items: { soulItems: 'transposed' } }), seeds: 100 },
     { name: 'souls-replaced-fog', patch: merge2(structuredClone(DEFAULT_GENERATION_SETTINGS), { items: { soulItems: 'replaced' } }), seeds: 20 },
   ],
+  /**
+   * Part H: key placement (docs/ITEM_PROGRESSION_MODEL.md) through the real data tool and the real FogHost. Every run is checked by the lots verifier and, for the
+   * progression, by FogMod's own GraphChecker over the lots of the FINAL package (`FogHost progression-check --game`): completable, prison escapable, every key located.
+   */
+  'keys-h': [
+    { name: 'keys-nofog', patch: merge2({ enemies: { enabled: false } }, noFog, { items: { keyPlacement: 'shuffled' } }), seeds: 150 },
+    { name: 'keys-nofog-enemies', patch: merge2(noFog, { items: { keyPlacement: 'shuffled' } }), seeds: 60 },
+    { name: 'keys-nofog-all-pools', patch: merge2({ enemies: { enabled: false } }, noFog, { items: { keyPlacement: 'shuffled', randomizeGifts: true, randomizeEnemyDrops: true, randomizeShops: true, soulItems: 'transposed' } }), seeds: 60 },
+    { name: 'keys-nofog-lordvessel', patch: merge2({ enemies: { enabled: false } }, noFog, { items: { keyPlacement: 'shuffled', randomizeLordvessel: true } }), seeds: 80 },
+    { name: 'keys-nofog-lordsouls', patch: merge2({ enemies: { enabled: false } }, noFog, { items: { keyPlacement: 'shuffled', randomizeLordSouls: true } }), seeds: 80 },
+    { name: 'keys-nofog-lordvessel-lordsouls', patch: merge2({ enemies: { enabled: false } }, noFog, { items: { keyPlacement: 'shuffled', randomizeLordvessel: true, randomizeLordSouls: true } }), seeds: 80 },
+    { name: 'keys-fog', patch: merge2({ enemies: { enabled: false } }, { items: { keyPlacement: 'shuffled' } }), seeds: 150 },
+    { name: 'keys-fog-lordvessel-lordsouls', patch: merge2({ enemies: { enabled: false } }, { items: { keyPlacement: 'shuffled', randomizeLordvessel: true, randomizeLordSouls: true } }), seeds: 100 },
+    { name: 'keys-triple', patch: merge2(structuredClone(DEFAULT_GENERATION_SETTINGS), { items: { keyPlacement: 'shuffled', randomizeLordvessel: true, randomizeLordSouls: true, soulItems: 'transposed' } }), seeds: 120 },
+    { name: 'keys-triple-vanilla-fog-options', patch: merge2(structuredClone(DEFAULT_GENERATION_SETTINGS), { items: { keyPlacement: 'shuffled' } }), seeds: 100 },
+  ],
   /** Part F1: hostile NPCs through the real data tool (Fog is covered by the fogHostE2e sweeps): events, rows and AI bundles of every placed NPC. */
   'hostile-npc-f1': [
     { name: 'npc-anywhere', patch: merge2(noItems, noFog, sampling({ hostileNpcs: true, fit: 'anywhere', difficultyMode: 'random' })) },
@@ -202,6 +218,46 @@ async function main() {
       try { return JSON.parse(out.stdout.trim().split(/\r?\n/u).pop()); } catch { return { checkedTargets: 0, bossRewardTargets: 0, problems: [`the lots verifier did not run: ${String(out.stderr).slice(0, 200)}`] }; }
     };
 
+    // FogMod's GraphChecker over the lots of the FINAL package (a Fog merge included): the one model of the world, asked about the written game data.
+    const fogHost = process.env.DS1TR_FOG_HOST;
+    const worldRoot = path.join(process.env.DS1TR_STATE_DIR ?? '', 'world-data');
+    const model = await (async () => {
+      try { return JSON.parse(await readFile(path.join(worldRoot, (await readdir(worldRoot)).find((name) => name.endsWith('.progression-model.json'))), 'utf8')); } catch { return { keys: [] }; }
+    })();
+    const auditProgression = async (run) => {
+      const tree = await readdir(path.join(run.result.packagePath, 'param')).then(() => run.result.packagePath, () => path.join(run.result.packagePath, 'mod'));
+      const dataRoot = path.join(worldRoot, (await readdir(worldRoot))[0]);
+      const out = path.join(temp, `progression-${path.basename(run.workspacePath)}.json`);
+      const proc = spawnSync(fogHost, ['progression-check', '--data-root', dataRoot, '--game', tree, '--out', out], { encoding: 'utf8' });
+      try { return JSON.parse(await readFile(out, 'utf8')); } catch { return { worldCompletable: false, prisonEscapable: false, unvisited: [`the progression check did not run: ${String(proc.stderr).slice(0, 200)}`], keyAreas: {} }; }
+    };
+
+    // The placements of the combined run as a whole (randomizer.json): every pickup written once, every item taken once, nothing created or lost, every key placed once.
+    const auditPlacements = async (run) => {
+      let dir = run.result.packagePath;
+      if (!(await readFile(path.join(dir, 'randomizer.json')).then(() => true, () => false))) {
+        const attempts = (await readdir(run.workspacePath)).filter((name) => /^combined-\d+$/u.test(name)).sort((a, b) => Number(b.slice(9)) - Number(a.slice(9)));
+        dir = path.join(run.workspacePath, attempts[0], (await readdir(path.join(run.workspacePath, attempts[0]))).find((name) => name.startsWith('seed_')));
+      }
+      const document = JSON.parse(await readFile(path.join(dir, 'randomizer.json'), 'utf8'));
+      const placements = document.placements ?? document;
+      const all = ['items', 'gifts', 'enemyDrops', 'shops', 'bossRewards'].flatMap((list) => placements[list] ?? []);
+      const problems = [];
+      const targets = new Set(); const sources = new Set(); const itemCount = new Map();
+      for (const entry of all) {
+        const target = `${entry.targetKind}:${entry.rowId}:${entry.targetSlot}`;
+        const source = `${entry.sourceRowId}:${entry.sourceSlot}`;
+        if (targets.has(target)) problems.push(`pickup written twice: ${target}`);
+        if (sources.has(source)) problems.push(`item taken twice: ${source}`);
+        targets.add(target); sources.add(source);
+        const item = `${entry.equipType}:${entry.itemId}`;
+        itemCount.set(item, (itemCount.get(item) ?? 0) + (entry.itemQuantity ?? 1));
+      }
+      const keyNames = all.filter((entry) => entry.keyName).map((entry) => entry.keyName);
+      if (new Set(keyNames).size !== keyNames.length) problems.push('a key was placed twice');
+      return { count: all.length, keys: keyNames.length, problems: problems.slice(0, 3) };
+    };
+
     const generate = async (spec, seed, label) => {
       const prepared = prepareRun({ gamePath: game, masterSeed: seed, ...buildSettings(spec.patch) });
       if (!prepared.ok) throw new Error(`${label}: ${prepared.code}: ${prepared.technical}`);
@@ -221,7 +277,7 @@ async function main() {
 
     for (const spec of caseList.filter((entry) => !args.cases || args.cases.includes(entry.name))) {
       const seeds = args.seeds ?? spec.seeds ?? 12;
-      const stats = { case: spec.name, seeds, ok: 0, failed: [], retries: 0, windowOverruns: 0, windowInexact: 0, eventOwnerChecked: 0, eventOwnerFrozen: 0, eventOwnerFailures: [], lotsChecked: 0, bossRewardsChecked: 0, lotFailures: [], floorReserved: 0, windowMoved: 0, movedSeeds: [], maxEvents: 0, maxEventsMap: '', nonDeterministic: 0, maxModels: 0, started: Date.now() };
+      const stats = { case: spec.name, seeds, ok: 0, failed: [], retries: 0, windowOverruns: 0, windowInexact: 0, eventOwnerChecked: 0, eventOwnerFrozen: 0, eventOwnerFailures: [], lotsChecked: 0, progressionChecked: 0, placementsChecked: 0, keysPlaced: 0, placementFailures: [], progressionFailures: [], keyAttempts: 0, keysMoved: 0, bossRewardsChecked: 0, lotFailures: [], floorReserved: 0, windowMoved: 0, movedSeeds: [], maxEvents: 0, maxEventsMap: '', nonDeterministic: 0, maxModels: 0, started: Date.now() };
       const indices = args.only ?? Array.from({ length: seeds }, (_, offset) => offset + 1);
       stats.seeds = indices.length;
       for (const index of indices) {
@@ -240,6 +296,26 @@ async function main() {
           stats.lotsChecked += lots.checkedTargets;
           stats.bossRewardsChecked += lots.bossRewardTargets;
           if (lots.problems.length > 0) stats.lotFailures.push(`#${index}: ${lots.problems.slice(0, 2).join(' | ')}`);
+          if (run.prepared.config.items.keyPlacement === 'shuffled') {
+            const progression = await auditProgression(run);
+            stats.progressionChecked += 1;
+            const written = await auditPlacements(run);
+            stats.placementsChecked += written.count; stats.keysPlaced += written.keys;
+            if (written.problems.length > 0) stats.placementFailures.push(`#${index}: ${written.problems.join(' | ')}`);
+            if (!progression.worldCompletable || !progression.prisonEscapable) stats.progressionFailures.push(`#${index}: completable=${progression.worldCompletable} prison=${progression.prisonEscapable} unvisited=${(progression.unvisited ?? []).slice(0, 4).join(',')}`);
+            const keyReport = run.result.manifest.keyPlacement?.summary;
+            if (keyReport) {
+              stats.keyAttempts = Math.max(stats.keyAttempts, Number(keyReport.attempts ?? 1));
+              stats.keysMoved += Number(keyReport.keysMoved ?? 0);
+              // The engine's area of every key against FogMod's own reading of the written lots: two independent derivations of one fact.
+              const theirs = progression.keyAreas ?? {};
+              // A `randomonly` key (Cast Light, Purple Coward's Crystal) is an ordinary pool item that key placement never moves: the engine keeps it at its vanilla area, FogMod follows it wherever the item shuffle put it.
+              const randomOnly = new Set((model.keys ?? []).filter((entry) => (entry.tags ?? []).includes('randomonly')).map((entry) => entry.name));
+              const differ = Object.entries(keyReport.keyAreas ?? {}).filter(([key, area]) => !randomOnly.has(key) && theirs[key] !== area).map(([key, area]) => `${key}: engine ${area}, FogMod ${theirs[key]}`);
+              if (differ.length > 0 || Object.keys(keyReport.keyAreas ?? {}).length === 0) stats.progressionFailures.push(`#${index}: key areas differ: ${differ.slice(0, 3).join('; ') || 'no key areas reported'}`);
+              if (Object.entries(keyReport.keyAreas ?? {}).every(([key, area]) => (model.keys.find((entry) => entry.name === key)?.area) === area)) stats.progressionFailures.push(`#${index}: no key moved`);
+            }
+          }
           const maps = Object.values(run.result.manifest.enemyPlacement.summary?.maps ?? {});
           stats.maxModels = Math.max(stats.maxModels, ...maps.map((map) => map.finalModels ?? 0), 0);
           for (const line of run.audit) {
@@ -269,7 +345,7 @@ async function main() {
       console.log(JSON.stringify(stats));
     }
     const failed = summary.reduce((total, entry) => total + entry.failed.length, 0);
-    const bad = summary.reduce((total, entry) => total + entry.windowOverruns + entry.nonDeterministic + entry.eventOwnerFailures.length + entry.lotFailures.length, 0);
+    const bad = summary.reduce((total, entry) => total + entry.windowOverruns + entry.nonDeterministic + entry.eventOwnerFailures.length + entry.lotFailures.length + entry.progressionFailures.length + entry.placementFailures.length, 0);
     console.log(`MATRIX ${args.set}: ${summary.reduce((total, entry) => total + entry.ok, 0)} ok, ${failed} failed, ${bad} invariant violations (window overruns / non-deterministic reruns / event owner audit)`);
     if (failed > 0 || bad > 0) process.exitCode = 1;
   } finally {

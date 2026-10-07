@@ -48,9 +48,16 @@ export function describePlanBehaviors(config: RandomizerConfig): PlanBehavior[] 
       } as const)[items.soulItems]
       : 'no effect (turn on world items, NPC gifts or enemy drops)';
     lines.push({ label: 'Soul items', value: souls });
-    lines.push({ label: 'Key items', value: 'stay where the game puts them (progression items are protected)' });
-    lines.push({ label: 'Lordvessel', value: 'stays where the game puts it (given by Gwynevere)' });
-    lines.push({ label: 'Lord Souls', value: 'stay where the game puts them (the rewards of the four Lords)' });
+    // A configuration with key placement but no world items is refused by the validation before a plan exists.
+    if ((items.keyPlacement ?? 'vanilla') === 'shuffled') {
+      lines.push({ label: 'Key items', value: 'Shuffled (placed by a safety-checked fill over the world graph: every area stays reachable and Firelink Altar can be reached; gifts, shops and drops never hold a key)' });
+      lines.push({ label: 'Lordvessel', value: items.randomizeLordvessel ? 'shuffled with the keys (Gwynevere then hands over another item of the pool)' : 'stays where the game puts it (given by Gwynevere)' });
+      lines.push({ label: 'Lord Souls', value: items.randomizeLordSouls ? 'shuffled with the keys (the four rewards go to other pickups, and the Lords drop other items)' : 'stay where the game puts them (the rewards of the four Lords)' });
+    } else {
+      lines.push({ label: 'Key items', value: 'stay where the game puts them (progression items are protected)' });
+      lines.push({ label: 'Lordvessel', value: 'stays where the game puts it (given by Gwynevere)' });
+      lines.push({ label: 'Lord Souls', value: 'stay where the game puts them (the rewards of the four Lords)' });
+    }
   }
   if (config.enemies.enabled) {
     lines.push({

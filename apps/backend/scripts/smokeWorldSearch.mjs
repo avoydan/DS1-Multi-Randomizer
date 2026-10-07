@@ -78,6 +78,23 @@ const ACCEPT = {
     if (!['c2500_0006', 'c2500_0007'].includes(short(entry.slot)) || entry.targetModelName !== 'c2640' || entry.passiveUntilAttacked || !firstVisit(slot) || entry.forceCombatActivation !== true) return null;
     return { slot: short(entry.slot), model: entry.targetModelName, meters: Number(metersFromSpawn(slot).toFixed(1)), entityId: entry.entityId, source: entry.sourceSlot, scaledNpcParamId: entry.scaledNpcParamId, think: entry.targetThinkParamId };
   },
+  // Key placement: a key (not the Peculiar Doll) lies in the pickup of the first cell, where the clean game has the Doll (needs --model <progression model json>).
+  'quick-key-placement': ({ plan }) => {
+    const cell = plan.placements.items.find((entry) => entry.rowId === 1810080);
+    if (!cell || !cell.keyName || cell.keyName === 'peculiar_doll') return null;
+    return { keyName: cell.keyName, item: cell.itemName, itemId: cell.itemId, itemCategory: cell.itemCategory, equipType: cell.equipType, replacedItem: cell.from, doll: plan.placements.items.find((entry) => entry.keyName === 'peculiar_doll')?.randomizedLocation ?? null };
+  },
+  // Lordvessel / Lord Soul placement: that item lies in the first cell (the same pickup as above; the switch under test is on).
+  'quick-lordvessel': ({ plan }) => {
+    const cell = plan.placements.items.find((entry) => entry.rowId === 1810080);
+    if (!cell || cell.keyName !== 'lordvessel') return null;
+    return { keyName: cell.keyName, item: cell.itemName, itemId: cell.itemId, itemCategory: cell.itemCategory, replacedItem: cell.from };
+  },
+  'quick-lord-soul': ({ plan }) => {
+    const cell = plan.placements.items.find((entry) => entry.rowId === 1810080);
+    if (!cell || !String(cell.keyName).startsWith('lord_soul')) return null;
+    return { keyName: cell.keyName, item: cell.itemName, itemId: cell.itemId, itemCategory: cell.itemCategory, replacedItem: cell.from };
+  },
   'quick-boss-asylum-demon': ({ plan }) => {
     const placement = plan.placements.bosses.find((entry) => entry.slot === `${ASYLUM}:c2232_0000`);
     if (!placement || !['c2250', 'c2240'].includes(placement.targetModelName)) return null;
@@ -100,6 +117,7 @@ const from = Number(option('--from', 1));
 const to = Number(option('--to', 2000));
 const prefix = option('--prefix', recipe.seedPrefix);
 const settings = resolveScenarioSettings({ settings: recipe.settings });
+const progressionModel = option('--model', null) ? JSON.parse(readFileSync(option('--model', null), 'utf8')) : null;
 
 let failures = 0;
 for (let index = from; index <= to; index += 1) {
@@ -109,7 +127,7 @@ for (let index = from; index <= to; index += 1) {
   const { items, enemies } = prepared.config;
   const mapped = mapCombinedRandomizerConfig({
     gamePath: 'X:/search', workspacePath: 'X:/search/work', masterSeed, combinedSeed: deriveAttemptSeeds(masterSeed, 0, 0, profile.seedDerivation).combined,
-    items, enemies, generateSpoilerLog: false, placementDiagnosticsLevel: 'summary', fogTrackedItems: null,
+    items, enemies, generateSpoilerLog: false, placementDiagnosticsLevel: 'summary', fogTrackedItems: null, progressionModel,
   });
   if (!mapped.ok) throw new Error(mapped.message);
   let plan;

@@ -48,6 +48,12 @@ world cannot be forgotten in the Seed Code.
    value is "what the world did before the option existed" and is frozen forever. So every code made before the option keeps its exact
    text, decoding fills the neutral value back in, and re-encoding gives the identical code. A code that uses a non-neutral extension
    value is refused by an application that does not know the option ("settings cannot be used"), never silently reinterpreted.
+   **Item extension keys (Part H).** `items.keyPlacement` (neutral `"vanilla"`; the other value is `"shuffled"`), `items.randomizeLordvessel` (neutral `false`)
+   and `items.randomizeLordSouls` (neutral `false`) follow the same rule (`CANONICAL_ITEM_EXTENSION_KEYS`): complete in memory, in history, presets and the settings file, but in a Seed
+   Code only when they differ from the neutral value, appended after `startingItems` in that order. So every code made before key placement existed keeps its exact text and
+   decodes to the neutral values (the code of a world that does not use the option is byte for byte what it was), and stating the neutral values or leaving them out is the
+   same code (`seedCode.test.mjs`). Soul items gained its third value `transposed` in the same way (an extension of an existing enumeration, no new key). Presets are version 14;
+   versions 1 to 13 import with the neutral values and a document below 14 that states them is refused.
 2. `deflate-raw` (level 9) with a fixed preset dictionary (`SEED_DICTIONARY`, part of the format; it only makes codes short).
 3. Bytes = `[0x01 format][deflated envelope][first 4 bytes of SHA-256 of the preceding bytes]`.
 4. Crockford base32 (`0123456789ABCDEFGHJKMNPQRSTVWXYZ`) in groups of 8, prefix `DS1TR1-`.

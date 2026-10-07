@@ -7,6 +7,19 @@ export type EngineName = 'combined' | 'fog';
  */
 export type SoulItemsMode = 'shuffled' | 'replaced' | 'transposed';
 
+/**
+ * Legacy "Key placement" (Part H, docs/ITEM_PROGRESSION_MODEL.md). `vanilla`: every key stays where the game puts it (the behavior before the option existed).
+ * `shuffled`: the keys of FogMod's annotation are placed by a progression-safe fill over the world graph. The legacy's Race Mode and Race Mode + are not built.
+ */
+export type KeyPlacementMode = 'vanilla' | 'shuffled';
+
+/** The values under which key placement does nothing: what an older Seed Code, preset or settings file means. They never change. */
+export const NEUTRAL_KEY_OPTIONS: { keyPlacement: KeyPlacementMode; randomizeLordvessel: boolean; randomizeLordSouls: boolean } = {
+  keyPlacement: 'vanilla',
+  randomizeLordvessel: false,
+  randomizeLordSouls: false,
+};
+
 /** Legacy "Starting items": right-hand weapon rule and left-hand pool. 'shield-2h' is the legacy default. */
 export type StartingItemsMode = 'shield-1h' | 'shield-2h' | 'mixed-pool';
 
@@ -35,6 +48,12 @@ export interface ItemOptions {
   soulItems: SoulItemsMode;
   /** Legacy default: shield-2h. Acts only with starting equipment on. */
   startingItems: StartingItemsMode;
+  /** Part H: key placement. Needs world items. Neutral: vanilla. */
+  keyPlacement: KeyPlacementMode;
+  /** Legacy "Senile Gwynevere": the Lordvessel joins the key shuffle (needs key placement "shuffled"). Neutral: off. */
+  randomizeLordvessel: boolean;
+  /** Legacy "Senile Primordial Serpents": the four Lord Soul items join the key shuffle (needs key placement "shuffled"). Neutral: off. */
+  randomizeLordSouls: boolean;
 }
 
 export type EnemyScaling = 'vanilla' | 'area' | 'progressive';
@@ -335,7 +354,7 @@ export type GenerationResult =
   | { ok: false; code: string; message: string; stage: string };
 
 export const PRESET_FORMAT = 'ds1tr-preset';
-export const PRESET_VERSION = 13;
+export const PRESET_VERSION = 14;
 
 /** Shareable settings: everything in RandomizerConfig except the machine-specific game path. */
 export interface PresetDocument {

@@ -163,6 +163,17 @@ export const v1ExtraCaseSets = {
     { name: 'souls-transposed-triple', masterSeed: 'golden-v1-souls-triple', patch: { items: { soulItems: 'transposed' },
       enemies: { gwynNerf: 'medium', secondGargoyle: 'replace', placement: { algorithm: 'sampling-v1', replacementChance: 100, fit: 'fits', bossReplacement: 'bosses', normalReplacement: 'both', bossChanceInNormalSlots: 15 } } } },
   ],
+  /** Key placement (Part H): worlds that use the non-neutral values of the extension fields, frozen from the day they exist. */
+  'key-placement': [
+    { name: 'keys-items', masterSeed: 'golden-v1-keys-items', patch: { fog: { enabled: false }, enemies: { enabled: false }, items: { keyPlacement: 'shuffled' } } },
+    { name: 'keys-lordvessel-lord-souls', masterSeed: 'golden-v1-keys-lords', patch: { fog: { enabled: false }, enemies: { enabled: false },
+      items: { keyPlacement: 'shuffled', randomizeLordvessel: true, randomizeLordSouls: true, soulItems: 'transposed' } } },
+    { name: 'keys-all-pools', masterSeed: 'golden-v1-keys-pools', patch: { fog: { enabled: false }, enemies: { enabled: false },
+      items: { keyPlacement: 'shuffled', randomizeGifts: true, randomizeEnemyDrops: true, randomizeShops: true } } },
+    { name: 'keys-fog', masterSeed: 'golden-v1-keys-fog', patch: { enemies: { enabled: false }, items: { keyPlacement: 'shuffled', randomizeLordvessel: true } } },
+    { name: 'keys-triple', masterSeed: 'golden-v1-keys-triple', patch: { items: { keyPlacement: 'shuffled', randomizeLordSouls: true },
+      enemies: { gwynNerf: 'medium', secondGargoyle: 'replace', placement: { algorithm: 'sampling-v1', replacementChance: 100, fit: 'fits', bossReplacement: 'bosses', normalReplacement: 'both', bossChanceInNormalSlots: 15 } } } },
+  ],
   'boss-baseline': [
     { name: 'sampling-bosses-fog', masterSeed: 'golden-v1-boss-fog', patch: { enemies: { gwynNerf: 'strong', secondGargoyle: 'replace',
       placement: { algorithm: 'sampling-v1', replacementChance: 70, fit: 'fits', difficultyMode: 'curve', difficultyStrictness: 'strict' } } } },

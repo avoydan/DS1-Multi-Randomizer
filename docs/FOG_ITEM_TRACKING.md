@@ -88,6 +88,14 @@ already honors the rule, so a repeat means the data or configuration cannot work
 (`decideFogRetry`: `fail`, one attempt). `FOG_SEED_UNSOLVABLE` (another Fog seed may solve the graph) stays retryable. The
 FogHost field `retryable` for this code is informational and unchanged.
 
+## Key placement (Part H)
+
+Key placement moves the **key items themselves** (Basement Key, Lordvessel, Lord Souls ...) to other item lots. FogMod finds them by reading the lots, so a moved key is just a key item in a different lot of its `LotLocations`; `fogItemRules` and the repair step apply unchanged. What changes:
+
+* The world data is prepared (and `FogHost progression-model` run once, cached beside it) also when the fog randomizer is **off**: key placement evaluates the same graph (`docs/ITEM_PROGRESSION_MODEL.md` section 5).
+* The destinations of a key are limited to lots that are in `LotLocations` (the model covers exactly those), so FogMod can always follow the key. The two rules do not overlap: the movable keys leave the pool before the shuffle (they are placed by the fill and their displaced items are paired with the freed pickups from a separate stream), so the tracked-item repair works only on the items that remain in the pool; the keys that stay (Orange Charred Ring, Crest of Artorias ...) are tracked as before.
+* A fog layout that cannot be found around the shuffled keys is retried (bounded, deterministic seeds) and reported as `FOG_KEY_CONFLICT`.
+
 ## What the player sees
 
 The old text ("try another seed") was wrong for this case. `FOG_UPSTREAM_INCOMPATIBLE` now reads "These item and world settings

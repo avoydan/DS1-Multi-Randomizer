@@ -18,6 +18,8 @@ export interface CombinedRandomizerRequest {
   placementDiagnosticsLevel?: 'summary' | 'detail';
   /** Set when the world randomizer runs: items it follows may only be placed in lots it can follow (see fogItemRules.ts). */
   fogTrackedItems?: FogTrackedItems | null;
+  /** Needed (and used) only with Key placement "shuffled": the exported progression model of the world data (adapters/progressionModel.ts). */
+  progressionModel?: unknown | null;
 }
 
 export type CombinedRandomizerEvent =

@@ -7,6 +7,7 @@ import { buildFogCompatibility, decideFogRetry, defaultFogRetryBounds, planFogSt
 import { FogHostProcess, type FogHostResponse } from '../adapters/fogHostProcess.js';
 import { userMessageFor } from './userMessages.js';
 import { readFogItemRules, type FogTrackedItems } from '../adapters/fogItemRules.js';
+import { loadProgressionModel, type ProgressionModel, type ProgressionModelResult } from '../adapters/progressionModel.js';
 import { resolveFogPrerequisites, type FogPreparationContext, type FogPrerequisiteFailure, type FogPrerequisites } from '../adapters/fogPrerequisites.js';
 import { effectiveCombinedEnabled, validateRandomizerConfig } from './configValidation.js';
 import { validateInstallation } from './installation.js';
@@ -58,6 +59,8 @@ export interface GenerationManifest {
     /** The placement validation summary of the last combined attempt: what was placed, wake-up events, own rows, retries, fallbacks and safety exclusions. */
     validation: Record<string, unknown> | null;
   };
+  /** Key placement (Part H): null unless it ran. Counters and the model identity only; the locations are in the placements file and the spoiler. */
+  keyPlacement: { mode: 'shuffled'; lordvessel: boolean; lordSouls: boolean; modelAnnotationSha256: string | null; summary: Record<string, unknown> | null } | null;
   attempts: Array<{ combinedAttempt: number; fogAttempt: number; combinedSeed: string; fogSeed: number; result: string }>;
   engines: { combined?: string; fog?: string };
   validation: string[];
@@ -78,6 +81,8 @@ export interface GenerationDependencies {
   getFogPrerequisites: (language: FogLanguage, context?: FogPreparationContext) => Promise<FogPrerequisites | FogPrerequisiteFailure | null>;
   combined: typeof executeCombinedGeneration;
   fog: FogHostProcess;
+  /** The progression model of the prepared world data (key placement only). */
+  progressionModel: (prerequisites: FogPrerequisites) => Promise<ProgressionModelResult>;
   /** Recorded in the manifest only; it never influences the output (a Seed Code does not depend on the app version). */
   appVersion: string;
 }
@@ -90,7 +95,8 @@ const defaults: GenerationDependencies = {
   getFogPrerequisites: (language, context) => resolveFogPrerequisites(language, process.env, context),
   combined: executeCombinedGeneration,
   fog: new FogHostProcess(),
-  appVersion: '0.39.0',
+  progressionModel: (prerequisites) => loadProgressionModel(prerequisites),
+  appVersion: '0.40.0',
 };
 
 async function fingerprint(file: string): Promise<{ size: number; sha256: string }> {
@@ -142,6 +148,7 @@ export async function generateRun(
       rngVersion: config.enemies.placement.algorithm === 'sampling-v1' ? 'enemy-placement-v1' : null,
       classTableHash: null, summary: null, validation: null,
     },
+    keyPlacement: null,
     attempts: [], engines: {}, validation: [], files: [],
   };
   // The primary message is plain language; the exact reason stays in the log and the manifest.
@@ -176,19 +183,25 @@ export async function generateRun(
   manifest.pristineSnapshotId = pristine.snapshotId ?? null;
   progress('import', 0.1, 'Verified pristine source available.');
 
+  // Key placement evaluates FogMod's own world graph, so it needs the prepared world data even when the fog randomizer itself is off.
+  const keysShuffled = effectiveCombinedEnabled(config) && config.items.enabled && config.items.randomizeWorldItems && (config.items.keyPlacement ?? 'vanilla') === 'shuffled';
   let fogReady: FogPrerequisites | null = null;
-  if (config.fog.enabled) {
-    progress('fog', 0.12, 'Preparing fog randomizer...');
+  if (config.fog.enabled || keysShuffled) {
+    progress('fog', 0.12, config.fog.enabled ? 'Preparing fog randomizer...' : 'Preparing world data for key placement...');
     const prerequisites = await services.getFogPrerequisites(config.fog.language, {
       pristineDirectory: pristine.directory,
       onProgress: (event) => progress('fog', 0.12 + 0.03 * event.fraction, event.message),
     });
-    if (!prerequisites) return fail('fog', 'FOG_PREREQUISITES_MISSING',
-      'The fog randomizer is not available in this installation. Turn it off, or download DS1 Triple Randomizer again.');
+    if (!prerequisites) {
+      return config.fog.enabled
+        ? fail('fog', 'FOG_PREREQUISITES_MISSING', 'The fog randomizer is not available in this installation. Turn it off, or download DS1 Triple Randomizer again.')
+        : fail('combined', 'KEY_PLACEMENT_MODEL_UNAVAILABLE', 'World data for key placement is not available in this installation.');
+    }
     if ('failure' in prerequisites) {
       const { code, userMessage, technical } = prerequisites.failure;
       manifest.validation.push(`fog randomizer: ${code}: ${technical}`);
       onEvent({ type: 'log', stage: 'fog', level: 'info', message: `Details: ${code}: ${technical}` });
+      if (!config.fog.enabled) return fail('combined', 'KEY_PLACEMENT_MODEL_UNAVAILABLE', `${code}: ${technical}`);
       return fail('fog', code === 'FOG_HOST_MISSING' ? 'FOG_PREREQUISITES_MISSING' : code, userMessage);
     }
     fogReady = prerequisites;
@@ -204,6 +217,21 @@ export async function generateRun(
     try { fogTrackedItems = await readFogItemRules(fogReady.dataRoot); } catch (error) {
       return fail('fog', 'FOG_ITEM_RULES_UNREADABLE', error instanceof Error ? error.message : String(error));
     }
+  }
+
+  let progressionModel: ProgressionModel | null = null;
+  if (keysShuffled && fogReady) {
+    const loaded = await services.progressionModel(fogReady);
+    if (!loaded.ok) {
+      manifest.validation.push(`key placement: ${loaded.code}: ${loaded.technical}`);
+      onEvent({ type: 'log', stage: 'combined', level: 'info', message: `Details: ${loaded.code}: ${loaded.technical}` });
+      return fail('combined', loaded.code, loaded.technical);
+    }
+    progressionModel = loaded.model;
+    manifest.keyPlacement = {
+      mode: 'shuffled', lordvessel: config.items.randomizeLordvessel ?? false, lordSouls: config.items.randomizeLordSouls ?? false,
+      modelAnnotationSha256: loaded.model.annotationSha256, summary: null,
+    };
   }
 
   const combinedEnabled = effectiveCombinedEnabled(config);
@@ -222,6 +250,7 @@ export async function generateRun(
         generateSpoilerLog: config.output.generateSpoilerLog,
         placementDiagnosticsLevel: process.env[placementDiagnosticsVariable] === 'detail' ? 'detail' : 'summary',
         fogTrackedItems,
+        progressionModel,
       }, (event) => {
         if (event.type === 'log') onEvent({ ...event, stage: 'combined' });
         else progress('combined', 0.15 + event.progress * 0.4, event.message ?? 'Combined generation.');
@@ -240,6 +269,7 @@ export async function generateRun(
       manifest.enemyPlacement.classTableHash = combined.placementDiagnostics?.classTableHash ?? null;
       manifest.enemyPlacement.summary = combined.placementDiagnostics?.summary ?? null;
       manifest.enemyPlacement.validation = combined.placementValidation ?? null;
+      if (manifest.keyPlacement) manifest.keyPlacement.summary = combined.keyPlacement ?? null;
     }
     const packagePath = combined?.ok ? combined.seedDirectory : path.join(attemptWorkspace, 'fog-only');
     if (combined?.ok) {
@@ -270,6 +300,8 @@ export async function generateRun(
       return finish(packagePath, manifest, progress, fail);
     }
     let retryCombined = false;
+    // With shuffled keys a fog layout that cannot be found is a conflict between the key placement and the fog options (typed FOG_KEY_CONFLICT).
+    const fogFailureCode = (code: string): string => (manifest.keyPlacement ? 'FOG_KEY_CONFLICT' : code);
     for (fogAttempt = 0; fogAttempt < bounds.maxFogAttempts; fogAttempt++) {
       const attemptSeeds = deriveAttemptSeeds(config.masterSeed, combinedAttempt, fogAttempt, profile.seedDerivation);
       const attemptDirectory = path.join(workspace, `fog-${combinedAttempt}-${fogAttempt}`);
@@ -322,7 +354,7 @@ export async function generateRun(
         const decision = decideFogRetry(response.error, { combinedAttempt, fogAttempt }, bounds);
         if (decision.action === 'retry-fog') continue;
         if (decision.action === 'retry-combined') { retryCombined = true; break; }
-        return fail('fog', response.error.code, decision.reason);
+        return fail('fog', /retries exhausted/u.test(decision.reason) ? fogFailureCode(response.error.code) : response.error.code, decision.reason);
       }
       manifest.engines.fog = `${response.hostVersion} / ${response.fogModCommit}`;
       const fogDrift = drift({ fogHostVersion: response.hostVersion, fogModCommit: response.fogModCommit });
@@ -341,10 +373,11 @@ export async function generateRun(
         return finish(staging.value.stagingDirectory, manifest, progress, fail);
       } catch (error) { return fail('validation', 'FOG_OUTPUT_INVALID', String(error)); }
     }
-    if (!retryCombined) return fail('fog', 'FOG_RETRIES_EXHAUSTED', 'Fog retries exhausted.');
+    if (!retryCombined) return fail('fog', fogFailureCode('FOG_RETRIES_EXHAUSTED'), 'Fog retries exhausted.');
     combinedAttempt++;
   }
-  return fail('combined', 'COMBINED_RETRIES_EXHAUSTED', 'Combined retries exhausted.');
+  const fogRejected = manifest.keyPlacement !== null && config.fog.enabled && manifest.attempts.some((attempt) => attempt.result.startsWith('FOG_'));
+  return fail('combined', fogRejected ? 'FOG_KEY_CONFLICT' : 'COMBINED_RETRIES_EXHAUSTED', 'Combined retries exhausted.');
 }
 
 async function finish(

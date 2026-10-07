@@ -136,6 +136,18 @@ placements (it embeds the run folder path). Verified stable across workspaces.
 * **Packaged app:** a fresh profile of the packaged 0.17.0 build, Randomize, restart, Load seed, Apply, Restore through its own UI:
   the Seed Code made by Randomize and the one loaded after the restart produce byte-identical packages.
 
+## Part H: key placement and Soul items Transposed (backend 0.40.0, contracts 0.26.0, desktop 0.28.0)
+
+**No new generation profile.** Every new option is an extension field whose neutral value is "what the world did before the option existed" (`soulItems: transposed` is a new value of an existing enumeration;
+`keyPlacement`, `randomizeLordvessel`, `randomizeLordSouls` are new extension keys). A world that does not use them is byte for byte what it was:
+
+* the engine reads the new config keys only when they are non-neutral (`combinedKeyPlacement.test.mjs`: a progression model with `keyPlacement: vanilla` changes nothing; `combinedSoulsTransposed.test.mjs`: the other soul modes are identical to a catalog without boss data);
+* the neutral placements carry no new key (`placements.bossRewards` exists only with Transposed, `validation.keyPlacement` only with key placement), so the `placementHash` is unchanged;
+* the pinned `HostVersion` of FogHost stays `0.5.0` (the `generate` behavior); the progression commands are separate and bump only the project version to 0.6.0;
+* the DsrDataTool additions (boss reward scan, boss reward rows in the item assignments) change no output unless the engine asks for them.
+
+Golden fixtures: all earlier fixtures regenerate from their Seed Codes with the Part H engine and helpers, and two new sets were recorded the day the options appeared and are never touched again: `soul-items` (4 worlds, Transposed) and `key-placement` (5 worlds: items only, Lordvessel + Lord Souls + Transposed, all pools, with Fog, full Triple). Results: section 9 of `docs/ITEM_PROGRESSION_MODEL.md` and `docs/IMPLEMENTATION_STATUS.md`.
+
 ## Part G: the default changed, no generation did (desktop 0.26.0)
 
 New configurations start with `sampling-v1`. **This is a default, not a generation change:** a Seed Code carries its algorithm, a record without the key still decodes to the classic permutation, and no package of an existing Seed Code differs because of it. Verified: all 27 golden fixtures regenerate from their Seed Codes (classic and unaffected cases byte-identical; the recorded exception 2 above is the only difference, and it predates this part), `placementDefault.test.mjs`, `seedUx.test.mjs`. The classic quirks that stay frozen (a Basin placement of the classic permutation has no events; Vanilla scaling keeps the replacement's drops) are listed in `docs/ENEMY_PLACEMENT_MODEL.md` 10.10.

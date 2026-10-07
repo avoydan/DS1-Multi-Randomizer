@@ -20,7 +20,7 @@ export const SMOKE_TEST_BASE_SETTINGS: GenerationSettings = {
     enabled: true, randomizeWorldItems: true, randomizeProtectedItems: false, progressionLogic: true, guaranteeEarlyWeapon: true,
     balancedEarlyLoot: true, randomizeStartingClass: false, randomizeStartingEquipment: false, randomizeGifts: false,
     randomizeEnemyDrops: false, guaranteedEnemyDrops: false, randomizeShops: false, fashionSouls: true, soulItems: 'shuffled',
-    startingItems: 'shield-2h',
+    startingItems: 'shield-2h', keyPlacement: 'vanilla', randomizeLordvessel: false, randomizeLordSouls: false,
   },
   enemies: {
     enabled: true, randomizeRegularEnemies: true, randomizeBosses: true, scaling: 'area', replaceMimics: true,
@@ -96,6 +96,8 @@ export interface SmokeExpectation {
   itemId?: number;
   itemCategory?: number;
   fromSoul?: string;
+  /** `item-lot` of a key (Part H key placement): the key that was moved here from the place where the clean game has it (a text for the tester). */
+  movedKeyFrom?: string;
 }
 
 /** What a person who played a world in the real game reported. Only a manual result belongs here; static checks never set it. */
@@ -138,7 +140,7 @@ export function describeSmokeTarget(expectation: SmokeExpectation): string {
 
 /** "Capra Demon (c2240) replaces the Hollow at slot c2500_0006". */
 export function describeSmokeExpected(expectation: SmokeExpectation): string {
-  if (expectation.kind === 'item-lot') return `${expectation.name} (weapon id ${expectation.itemId}) lies where the ${expectation.replacedName} lay${expectation.fromSoul ? `: a weapon made from the ${expectation.fromSoul}, which no longer exists as a soul anywhere in this world` : ''}`;
+  if (expectation.kind === 'item-lot') return `${expectation.name} (${expectation.itemCategory === 0 ? 'weapon' : 'item'} id ${expectation.itemId}) lies where the ${expectation.replacedName} lay${expectation.fromSoul ? `: a weapon made from the ${expectation.fromSoul}, which no longer exists as a soul anywhere in this world` : ''}${expectation.movedKeyFrom ? `: a key that the clean game puts ${expectation.movedKeyFrom}` : ''}`;
   if (expectation.kind === 'encounter-body') return `${expectation.name} (${expectation.model}) takes the place of ${expectation.replacedName} as the body of the boss encounter; the health bar and the name on it stay ${expectation.replacedName}'s, and the fight completes when ${expectation.name} dies`;
   if (expectation.kind === 'hostile-npc') return `${expectation.name} (${expectation.model}) stands in place of the ${expectation.replacedName} at slot ${expectation.slot} as a hostile fighter: no dialogue, no shop, the drops and rewards of that slot`;
   if (expectation.kind === 'boss') return `${expectation.name} (${expectation.model}) takes the place of ${expectation.replacedName}, the first boss`;
@@ -208,6 +210,24 @@ export const QUICK_SMOKE_RECIPES: Readonly<Record<string, { seedPrefix: string; 
     seedPrefix: 'smoke-q9-soul',
     settings: {
       items: { soulItems: 'transposed' }, enemies: { enabled: false }, fog: { enabled: false },
+    },
+  },
+  'quick-key-placement': {
+    seedPrefix: 'smoke-q10-keys',
+    settings: {
+      items: { keyPlacement: 'shuffled' }, enemies: { enabled: false }, fog: { enabled: false },
+    },
+  },
+  'quick-lordvessel': {
+    seedPrefix: 'smoke-q11-vessel',
+    settings: {
+      items: { keyPlacement: 'shuffled', randomizeLordvessel: true }, enemies: { enabled: false }, fog: { enabled: false },
+    },
+  },
+  'quick-lord-soul': {
+    seedPrefix: 'smoke-q12-lordsoul',
+    settings: {
+      items: { keyPlacement: 'shuffled', randomizeLordSouls: true }, enemies: { enabled: false }, fog: { enabled: false },
     },
   },
   'quick-roaming-respawn': {
@@ -385,6 +405,63 @@ export const SMOKE_SCENARIOS: readonly SmokeScenario[] = [
     afterwards: [
       'Nothing else is to be checked in this world. Where the Soul of Smough itself would lie, a weapon (or another pool item) lies now: the soul of this seed no longer exists.',
       'To see the whole picture turn on the spoiler log: the section BOSS REWARDS names every boss soul and what lies in its place.',
+    ],
+  },
+  {
+    id: 'quick-key-placement', category: 'quick', title: 'Key placement - a key in your cell', masterSeed: 'smoke-q10-keys-93',
+    purpose: 'Key placement "Shuffled": the keys of the world move to other pickups, with a check that every area stays reachable; here the Cage Key lies in the first cell, where the clean game has the Peculiar Doll.',
+    settings: QUICK_SMOKE_RECIPES['quick-key-placement'].settings,
+    expectations: [{
+      kind: 'item-lot', map: 'm18_01_00_00', mapName: 'Undead Asylum', slot: 'lot 1810080', replacedModel: 'item', replacedName: 'Peculiar Doll', model: '2003', name: 'Cage Key',
+      meters: 2.8, up: 0.2, lotRow: 1810080, itemId: 2003, itemCategory: 1073741824, movedKeyFrom: "in the upper part of Sen's Fortress",
+    }],
+    estimateSeconds: 30,
+    observe: [
+      'You wake up in the cell. In the clean game the Peculiar Doll lies on the floor of this cell; here the same pickup holds the Cage Key.',
+      "Pick it up: it is a normal key item named Cage Key (it opens the cage in Sen's Fortress; you will not need it in the Asylum).",
+      'The Peculiar Doll is not in the cell any more: it lies in another place of this world, reachable before anything that needs it.',
+    ],
+    afterwards: [
+      'Nothing else is to be checked in this world. The other keys moved too, and the placement guarantees that every area can be reached; to see where every key lies turn on the spoiler log: the section KEY PLACEMENT names each key and the pickup it lies in.',
+      'The full check is a run through the game with the keys where the spoiler says: this world only shows that a moved key can be picked up and used.',
+    ],
+  },
+  {
+    id: 'quick-lordvessel', category: 'quick', title: 'Lordvessel placement - the Lordvessel in your cell', masterSeed: 'smoke-q11-vessel-354',
+    purpose: 'Key placement "Shuffled" with Lordvessel placement on: the Lordvessel joins the key shuffle; here it lies in the first cell, where the clean game has the Peculiar Doll.',
+    settings: QUICK_SMOKE_RECIPES['quick-lordvessel'].settings,
+    expectations: [{
+      kind: 'item-lot', map: 'm18_01_00_00', mapName: 'Undead Asylum', slot: 'lot 1810080', replacedModel: 'item', replacedName: 'Peculiar Doll', model: '2510', name: 'Lordvessel',
+      meters: 2.8, up: 0.2, lotRow: 1810080, itemId: 2510, itemCategory: 1073741824, movedKeyFrom: "as the gift of Gwynevere in Anor Londo",
+    }],
+    estimateSeconds: 30,
+    observe: [
+      'You wake up in the cell. In the clean game the Peculiar Doll lies on the floor of this cell; here the same pickup holds the Lordvessel.',
+      'Pick it up: it is a normal key item named Lordvessel. (It is used at the Firelink Altar; you cannot do that here, and this test does not need it.)',
+      'The Peculiar Doll is not in the cell any more: it lies in another place of this world.',
+    ],
+    afterwards: [
+      "Nothing else is to be checked in this world. In Anor Londo, Gwynevere hands over another item of the pool instead of the Lordvessel; that part of the world is far from the start and is not part of this test.",
+      'To see every key turn on the spoiler log: the section KEY PLACEMENT names each key and the pickup it lies in.',
+    ],
+  },
+  {
+    id: 'quick-lord-soul', category: 'quick', title: 'Lord Soul placement - a Lord Soul in your cell', masterSeed: 'smoke-q12-lordsoul-29',
+    purpose: 'Key placement "Shuffled" with Lord Soul placement on: the four Lord Souls join the key shuffle; here the Lord Soul that Gravelord Nito carries lies in the first cell, where the clean game has the Peculiar Doll.',
+    settings: QUICK_SMOKE_RECIPES['quick-lord-soul'].settings,
+    expectations: [{
+      kind: 'item-lot', map: 'm18_01_00_00', mapName: 'Undead Asylum', slot: 'lot 1810080', replacedModel: 'item', replacedName: 'Peculiar Doll', model: '2500', name: 'Lord Soul',
+      meters: 2.8, up: 0.2, lotRow: 1810080, itemId: 2500, itemCategory: 1073741824, movedKeyFrom: "as the reward of Gravelord Nito in the Tomb of the Giants",
+    }],
+    estimateSeconds: 30,
+    observe: [
+      'You wake up in the cell. In the clean game the Peculiar Doll lies on the floor of this cell; here the same pickup holds a Lord Soul.',
+      'Pick it up: it is a normal item named Lord Soul. (Do not use it before you need it at the Kiln.)',
+      'The Peculiar Doll is not in the cell any more: it lies in another place of this world.',
+    ],
+    afterwards: [
+      'Nothing else is to be checked in this world. Gravelord Nito, when you reach him, drops another item of the pool instead of the Lord Soul: the Lord Soul itself exists once in this world, in your cell.',
+      'To see every key turn on the spoiler log: the section KEY PLACEMENT names each key and the pickup it lies in.',
     ],
   },
   {

@@ -1,4 +1,4 @@
-import { DEFAULT_ENEMY_PLACEMENT_ALGORITHM, NEUTRAL_ENEMY_PLACEMENT_OPTIONS, PRESET_FORMAT, PRESET_VERSION } from '@ds1tr/contracts';
+import { DEFAULT_ENEMY_PLACEMENT_ALGORITHM, NEUTRAL_ENEMY_PLACEMENT_OPTIONS, NEUTRAL_KEY_OPTIONS, PRESET_FORMAT, PRESET_VERSION } from '@ds1tr/contracts';
 import type { PresetDocument, PresetImportResult, RandomizerConfig } from '@ds1tr/contracts';
 import { InvalidConfigurationError, validateRandomizerConfig } from './configValidation.js';
 
@@ -13,6 +13,10 @@ const batch1Defaults: SectionDefaults = {
 const batch2Defaults: SectionDefaults = {
   items: { soulItems: 'shuffled', startingItems: 'mixed-pool' },
   enemies: { pinwheelChaos: false, gwynNerf: 'none' },
+};
+/** Version 14: key placement (Part H); every older preset keeps the keys where the game puts them. */
+const batch14Defaults: SectionDefaults = {
+  items: { keyPlacement: NEUTRAL_KEY_OPTIONS.keyPlacement, randomizeLordvessel: NEUTRAL_KEY_OPTIONS.randomizeLordvessel, randomizeLordSouls: NEUTRAL_KEY_OPTIONS.randomizeLordSouls },
 };
 /** Batch 3: the earlier DS1TR Bell Gargoyle behavior (extra bodies disabled), not the new legacy default. */
 const batch3Defaults: SectionDefaults = {
@@ -71,18 +75,19 @@ const placementKeysAddedIn: Array<{ version: number; defaults: Record<string, un
 ];
 /** What each older preset version lacks, newest additions last (the nested v6 placement keys are handled apart). */
 const missingByVersion: Record<number, SectionDefaults[]> = {
-  1: [batch1Defaults, batch2Defaults, batch3Defaults, batch4Defaults],
-  2: [batch2Defaults, batch3Defaults, batch4Defaults],
-  3: [batch3Defaults, batch4Defaults],
-  4: [batch4Defaults],
-  5: [],
-  6: [],
-  7: [],
-  8: [],
-  9: [],
-  10: [],
-  11: [],
-  12: [],
+  1: [batch1Defaults, batch2Defaults, batch3Defaults, batch4Defaults, batch14Defaults],
+  2: [batch2Defaults, batch3Defaults, batch4Defaults, batch14Defaults],
+  3: [batch3Defaults, batch4Defaults, batch14Defaults],
+  4: [batch4Defaults, batch14Defaults],
+  5: [batch14Defaults],
+  6: [batch14Defaults],
+  7: [batch14Defaults],
+  8: [batch14Defaults],
+  9: [batch14Defaults],
+  10: [batch14Defaults],
+  11: [batch14Defaults],
+  12: [batch14Defaults],
+  13: [batch14Defaults],
 };
 
 const presetKeys = ['format', 'presetVersion', 'masterSeed', 'items', 'enemies', 'fog', 'output'];
@@ -109,7 +114,14 @@ export function exportPreset(config: RandomizerConfig): PresetDocument {
   validateRandomizerConfig(config);
   return {
     format: PRESET_FORMAT, presetVersion: PRESET_VERSION, masterSeed: config.masterSeed.trim(),
-    items: config.items, enemies: canonicalEnemies(config.enemies), fog: config.fog, output: config.output,
+    // The key options are always stated in an exported preset (an older configuration means their neutral value).
+    items: {
+      ...config.items,
+      keyPlacement: config.items.keyPlacement ?? NEUTRAL_KEY_OPTIONS.keyPlacement,
+      randomizeLordvessel: config.items.randomizeLordvessel ?? NEUTRAL_KEY_OPTIONS.randomizeLordvessel,
+      randomizeLordSouls: config.items.randomizeLordSouls ?? NEUTRAL_KEY_OPTIONS.randomizeLordSouls,
+    },
+    enemies: canonicalEnemies(config.enemies), fog: config.fog, output: config.output,
   };
 }
 
@@ -127,7 +139,7 @@ export function importPreset(text: string): PresetImportResult {
   const problems: string[] = [];
   if (record.format !== PRESET_FORMAT) problems.push(`Preset format must be "${PRESET_FORMAT}".`);
   if (record.presetVersion !== PRESET_VERSION && !(typeof record.presetVersion === 'number' && missingByVersion[record.presetVersion])) {
-    problems.push(`Preset version must be ${PRESET_VERSION} (versions 1 to 12 are migrated).`);
+    problems.push(`Preset version must be ${PRESET_VERSION} (versions 1 to 13 are migrated).`);
   }
   for (const key of Object.keys(record)) {
     if (!presetKeys.includes(key)) problems.push(`preset.${key} is not supported.`);

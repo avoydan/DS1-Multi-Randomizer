@@ -8,6 +8,9 @@ const itemKeys = [
   'randomizeStartingEquipment', 'randomizeGifts', 'randomizeEnemyDrops',
   'guaranteedEnemyDrops', 'randomizeShops', 'fashionSouls', 'soulItems', 'startingItems',
 ] as const;
+/** Item options added after format 1 (Part H): optional on input (an older configuration means their neutral value), validated when present. */
+const itemExtensionKeys = ['keyPlacement', 'randomizeLordvessel', 'randomizeLordSouls'] as const;
+const keyPlacementModes = new Set(['vanilla', 'shuffled']);
 const enemyKeys = [
   'enabled', 'randomizeRegularEnemies', 'randomizeBosses', 'scaling',
   'replaceMimics', 'replaceRespawningMosquitoes', 'preventSameEnemy', 'pinwheelChaos', 'gwynNerf', 'secondGargoyle', 'placement',
@@ -100,13 +103,24 @@ export function validateRandomizerConfig(input: unknown): asserts input is Rando
       problems.push(`config.${key} must be an object.`);
       continue;
     }
-    validateKeys(section, expected, `config.${key}`, problems);
+    validateKeys(section, key === 'items' ? [...expected, ...itemExtensionKeys.filter((optional) => Object.hasOwn(section, optional))] : expected, `config.${key}`, problems);
   }
 
   if (isObject(input.items)) {
     validateBooleans(input.items, itemKeys.filter((key) => key !== 'soulItems' && key !== 'startingItems'), 'config.items', problems);
     if (!soulItemModes.has(String(input.items.soulItems))) problems.push('Soul items mode is invalid.');
     if (!startingItemModes.has(String(input.items.startingItems))) problems.push('Starting items mode is invalid.');
+    const keyMode = input.items.keyPlacement ?? 'vanilla';
+    if (!keyPlacementModes.has(String(keyMode))) problems.push('Key placement mode is invalid.');
+    for (const optional of ['randomizeLordvessel', 'randomizeLordSouls'] as const) {
+      if (Object.hasOwn(input.items, optional) && typeof input.items[optional] !== 'boolean') problems.push(`config.items.${optional} must be a boolean.`);
+    }
+    if (keyMode === 'shuffled') {
+      if (!input.items.enabled || !input.items.randomizeWorldItems) problems.push('Key placement needs the world items: turn on Items and World items.');
+      if (input.items.randomizeProtectedItems) problems.push('Key placement and protected-item randomization cannot be combined.');
+    } else if (input.items.randomizeLordvessel === true || input.items.randomizeLordSouls === true) {
+      problems.push('The Lordvessel and Lord Souls switches need key placement "shuffled".');
+    }
   }
   if (isObject(input.enemies)) {
     validateBooleans(input.enemies, enemyKeys.filter((key) => key !== 'scaling' && key !== 'gwynNerf' && key !== 'secondGargoyle' && key !== 'placement'), 'config.enemies', problems);

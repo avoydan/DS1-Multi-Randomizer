@@ -125,6 +125,10 @@ test('maps both enabled capabilities deterministically', () => {
       enemyRoamingBossesStayDead: false,
       placementDiagnosticsLevel: 'summary',
       fogTrackedItems: null,
+      keyPlacement: 'vanilla',
+      keyRandomizeLordvessel: false,
+      keyRandomizeLordSouls: false,
+      progressionModel: null,
       generateSpoilerLog: true,
     },
   });
@@ -309,4 +313,16 @@ test('the mapper passes both algorithms and the sampling settings, and refuses a
   assert.equal(refused.ok, false);
   assert.equal(refused.code, 'ENEMY_PLACEMENT_ALGORITHM_UNAVAILABLE');
   assert.match(refused.message, /not implemented yet/);
+});
+
+test('key placement options map only when world items and key placement are on, and carry the model', () => {
+  const model = { format: 'ds1tr-progression-model-1' };
+  const shuffled = { ...itemOptions, keyPlacement: 'shuffled', randomizeLordvessel: true, randomizeLordSouls: true };
+  const on = mapCombinedRandomizerConfig(createRequest({ items: shuffled, progressionModel: model }));
+  assert.equal(on.ok, true);
+  assert.deepEqual([on.config.keyPlacement, on.config.keyRandomizeLordvessel, on.config.keyRandomizeLordSouls, on.config.progressionModel], ['shuffled', true, true, model]);
+  const noWorld = mapCombinedRandomizerConfig(createRequest({ items: { ...shuffled, randomizeWorldItems: false }, progressionModel: model }));
+  assert.deepEqual([noWorld.config.keyPlacement, noWorld.config.keyRandomizeLordvessel, noWorld.config.progressionModel], ['vanilla', false, null]);
+  const vanilla = mapCombinedRandomizerConfig(createRequest({ items: { ...shuffled, keyPlacement: 'vanilla' }, progressionModel: model }));
+  assert.deepEqual([vanilla.config.keyPlacement, vanilla.config.keyRandomizeLordSouls, vanilla.config.progressionModel], ['vanilla', false, null]);
 });

@@ -1,5 +1,5 @@
 import {
-  CANONICAL_ENEMY_KEYS, CANONICAL_FOG_KEYS, CANONICAL_ITEM_KEYS, CANONICAL_OUTPUT_KEYS, CANONICAL_PLACEMENT_EXTENSION_KEYS,
+  CANONICAL_ENEMY_KEYS, CANONICAL_FOG_KEYS, CANONICAL_ITEM_EXTENSION_KEYS, CANONICAL_ITEM_KEYS, CANONICAL_OUTPUT_KEYS, CANONICAL_PLACEMENT_EXTENSION_KEYS,
   CANONICAL_PLACEMENT_KEYS,
 } from '@ds1tr/contracts';
 import type { GenerationSettings } from '@ds1tr/contracts';
@@ -41,8 +41,14 @@ export function canonicalizeSettings(input: unknown): GenerationSettings {
     customPool: (pool) => (Array.isArray(pool) ? [...(pool as string[])].sort() : pool),
   });
   const enemies = pick(enemiesSource, CANONICAL_ENEMY_KEYS, 'settings.enemies', { placement: () => placement });
+  const itemKeys = [...CANONICAL_ITEM_KEYS, ...CANONICAL_ITEM_EXTENSION_KEYS.map((entry) => entry.key)];
+  const canonicalItems = (value: unknown): Json => {
+    const itemsSource = { ...object(value, 'settings.items') };
+    for (const { key, neutral } of CANONICAL_ITEM_EXTENSION_KEYS) if (!Object.hasOwn(itemsSource, key)) itemsSource[key] = neutral;
+    return pick(itemsSource, itemKeys, 'settings.items');
+  };
   const top = pick(source, ['items', 'enemies', 'fog', 'output'], 'settings', {
-    items: (value) => pick(object(value, 'settings.items'), CANONICAL_ITEM_KEYS, 'settings.items'),
+    items: canonicalItems,
     enemies: () => enemies,
     fog: (value) => pick(object(value, 'settings.fog'), CANONICAL_FOG_KEYS, 'settings.fog'),
     output: (value) => pick(object(value, 'settings.output'), CANONICAL_OUTPUT_KEYS, 'settings.output'),
@@ -55,10 +61,12 @@ export function canonicalizeSettings(input: unknown): GenerationSettings {
  * neutral value. A code made before such an option existed therefore keeps its exact text.
  */
 export function sparseCanonicalSettings(settings: GenerationSettings): Record<string, unknown> {
-  const complete = canonicalizeSettings(settings) as unknown as { enemies: { placement: Record<string, unknown> } };
+  const complete = canonicalizeSettings(settings) as unknown as { items: Record<string, unknown>; enemies: { placement: Record<string, unknown> } };
   const placement = { ...complete.enemies.placement };
   for (const { key, neutral } of CANONICAL_PLACEMENT_EXTENSION_KEYS) if (placement[key] === neutral) delete placement[key];
-  return { ...complete, enemies: { ...complete.enemies, placement } } as Record<string, unknown>;
+  const items = { ...complete.items };
+  for (const { key, neutral } of CANONICAL_ITEM_EXTENSION_KEYS) if (items[key] === neutral) delete items[key];
+  return { ...complete, items, enemies: { ...complete.enemies, placement } } as Record<string, unknown>;
 }
 
 /** Compact, order-stable JSON of the settings in their Seed Code form (see {@link sparseCanonicalSettings}). */

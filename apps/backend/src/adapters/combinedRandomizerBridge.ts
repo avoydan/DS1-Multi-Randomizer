@@ -83,6 +83,12 @@ export type CombinedGenerationFailureCode =
   | 'ENEMY_PLACEMENT_CLASS_UNDERIVABLE'
   | 'ENEMY_PLACEMENT_INFEASIBLE'
   | 'ENEMY_PLACEMENT_CUSTOM_POOL_INVALID'
+  | 'KEY_PLACEMENT_UNSATISFIABLE'
+  | 'KEY_PLACEMENT_FILL_IMPOSSIBLE'
+  | 'KEY_PLACEMENT_INVALID'
+  | 'KEY_PLACEMENT_MODEL_INVALID'
+  | 'KEY_PLACEMENT_MODEL_MISSING'
+  | 'KEY_PLACEMENT_NOTHING_TO_PLACE'
   | 'JS_CORE_MISSING'
   | 'JS_CORE_INCOMPLETE'
   | 'INVALID_CONFIG'
@@ -114,6 +120,8 @@ export interface CombinedGenerationSuccess {
   placementHash: string;
   /** Placement algorithm identity and, for sampling-v1, its summary (never the per-slot detail). */
   placementDiagnostics: PlacementDiagnosticsSummary;
+  /** Key placement (Part H): the planner's counters (attempts, keys moved and kept, destinations); null unless key placement ran. Never a location. */
+  keyPlacement: Record<string, unknown> | null;
   /** The engine's placement validation summary: counts of what was placed, wake-ups, own rows, retries and fallbacks (null if the core predates it). */
   placementValidation: Record<string, unknown> | null;
   /** The seed actually handed to upstream, after `normalizeConfig`. */
@@ -441,6 +449,14 @@ export async function executeCombinedGeneration(
     }
     // A slot that has no placement within the map's budget depends on the participation draws, so another
     // attempt (a new combined seed) can solve it. It keeps its own code so the attempt log shows why it retried.
+    // Key placement (Part H): an assumed fill that finds no place depends on the draws (another combined seed can solve it); every other
+    // failure is structural and the same for any seed.
+    if (errorCode === 'KEY_PLACEMENT_UNSATISFIABLE' || errorCode === 'KEY_PLACEMENT_FILL_IMPOSSIBLE') {
+      return { ok: false, code: errorCode, message: messageOf(error), retryable: true };
+    }
+    if (errorCode === 'KEY_PLACEMENT_INVALID' || errorCode === 'KEY_PLACEMENT_MODEL_INVALID' || errorCode === 'KEY_PLACEMENT_MODEL_MISSING' || errorCode === 'KEY_PLACEMENT_NOTHING_TO_PLACE') {
+      return { ok: false, code: errorCode, message: messageOf(error), retryable: false };
+    }
     if (errorCode === 'ENEMY_PLACEMENT_INFEASIBLE') {
       return { ok: false, code: 'ENEMY_PLACEMENT_INFEASIBLE', message: messageOf(error), retryable: true };
     }
@@ -519,6 +535,7 @@ export async function executeCombinedGeneration(
     placementHash: result.placementHash,
     placementDiagnostics,
     placementValidation: summarizePlacementValidation(result.validation?.enemyPlacement),
+    keyPlacement: summarizePlacementValidation(result.validation?.keyPlacement),
     seed: result.seed,
     catalogScanned: !catalogPresent,
   };

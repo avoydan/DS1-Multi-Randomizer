@@ -24,6 +24,9 @@ There are two kinds of world.
 | `quick-sampling-asylum` | Regular enemies - first three change | c2500_0006 (8.7 m), c2500_0007 (11.4 m), c2500_0005 (33.2 m) | ~35 s |
 | `quick-hostile-npc` | Hostile NPC - Andre as an enemy | c2500_0006 (8.7 m) | ~30 s |
 | `quick-transposed-soul` | Soul items Transposed - a boss weapon in your cell | lot 1810080 (2.8 m) | ~30 s |
+| `quick-key-placement` | Key placement - a key in your cell | lot 1810080 (2.8 m) | ~30 s |
+| `quick-lordvessel` | Lordvessel placement - the Lordvessel in your cell | lot 1810080 (2.8 m) | ~30 s |
+| `quick-lord-soul` | Lord Soul placement - a Lord Soul in your cell | lot 1810080 (2.8 m) | ~30 s |
 | `quick-boss-asylum-demon` | Boss sampling - the first boss | c2232_0000 (22.5 m) | ~90 s |
 
 ### How the targets were chosen
@@ -313,6 +316,111 @@ Soul items "Transposed": the boss souls join the item pool and some become the w
 
 ```
 DS1TR1-06NJDCP6-577CVKTE-TMPV9N05-2P1BNHP6-MFTWXG6M-7CJMB2BS-RM2ZKHF4-TMYEGXMF-ARYM7EQA-G43D0T6X-8E2VM1R0-J025KYR
+```
+
+### Key placement - a key in your cell
+
+**Quick smoke test** - ID `quick-key-placement`
+
+Key placement "Shuffled": the keys of the world move to other pickups, with a check that every area stays reachable; here the Cage Key lies in the first cell, where the clean game has the Peculiar Doll.
+
+**Target**
+
+- Undead Asylum: the pickup where the Peculiar Doll lies in the clean game (item lot 1810080), 2.8 m from where you wake up, on the same floor as the start
+
+**Expected**
+
+- Cage Key (item id 2003) lies where the Peculiar Doll lay: a key that the clean game puts in the upper part of Sen's Fortress
+
+**Estimated time to the target:** ~30 seconds after you gain control.
+
+**Needs a reset or reload:** no
+
+**Gameplay result:** not played in the real game yet; only the static check exists.
+
+**Check**
+
+- [ ] You wake up in the cell. In the clean game the Peculiar Doll lies on the floor of this cell; here the same pickup holds the Cage Key.
+- [ ] Pick it up: it is a normal key item named Cage Key (it opens the cage in Sen's Fortress; you will not need it in the Asylum).
+- [ ] The Peculiar Doll is not in the cell any more: it lies in another place of this world, reachable before anything that needs it.
+
+**Afterwards**
+
+- [ ] Nothing else is to be checked in this world. The other keys moved too, and the placement guarantees that every area can be reached; to see where every key lies turn on the spoiler log: the section KEY PLACEMENT names each key and the pickup it lies in.
+- [ ] The full check is a run through the game with the keys where the spoiler says: this world only shows that a moved key can be picked up and used.
+
+```
+DS1TR1-06NJDCP6-577CVKTE-TMPK8D6G-SN7ATB6P-PMT1XBBR-0SRWB8X3-JJENM6C0-AJKC2XF1-N29D1Q9M-B8KGVT9T-14D418WN-28AJM980-ESQ2T30
+```
+
+### Lordvessel placement - the Lordvessel in your cell
+
+**Quick smoke test** - ID `quick-lordvessel`
+
+Key placement "Shuffled" with Lordvessel placement on: the Lordvessel joins the key shuffle; here it lies in the first cell, where the clean game has the Peculiar Doll.
+
+**Target**
+
+- Undead Asylum: the pickup where the Peculiar Doll lies in the clean game (item lot 1810080), 2.8 m from where you wake up, on the same floor as the start
+
+**Expected**
+
+- Lordvessel (item id 2510) lies where the Peculiar Doll lay: a key that the clean game puts as the gift of Gwynevere in Anor Londo
+
+**Estimated time to the target:** ~30 seconds after you gain control.
+
+**Needs a reset or reload:** no
+
+**Gameplay result:** not played in the real game yet; only the static check exists.
+
+**Check**
+
+- [ ] You wake up in the cell. In the clean game the Peculiar Doll lies on the floor of this cell; here the same pickup holds the Lordvessel.
+- [ ] Pick it up: it is a normal key item named Lordvessel. (It is used at the Firelink Altar; you cannot do that here, and this test does not need it.)
+- [ ] The Peculiar Doll is not in the cell any more: it lies in another place of this world.
+
+**Afterwards**
+
+- [ ] Nothing else is to be checked in this world. In Anor Londo, Gwynevere hands over another item of the pool instead of the Lordvessel; that part of the world is far from the start and is not part of this test.
+- [ ] To see every key turn on the spoiler log: the section KEY PLACEMENT names each key and the pickup it lies in.
+
+```
+DS1TR1-06NJDCP6-577CVKTE-TMPK8D6M-GPJ42QB3-AE9X3EK7-23BKTEJA-V6MSA0A8-RMD94BNR-QMZF0CG5-K83V2NTR-X371VBDH-GST8T18D-M38JN2RA-AMB00NJJ-T38G
+```
+
+### Lord Soul placement - a Lord Soul in your cell
+
+**Quick smoke test** - ID `quick-lord-soul`
+
+Key placement "Shuffled" with Lord Soul placement on: the four Lord Souls join the key shuffle; here the Lord Soul that Gravelord Nito carries lies in the first cell, where the clean game has the Peculiar Doll.
+
+**Target**
+
+- Undead Asylum: the pickup where the Peculiar Doll lies in the clean game (item lot 1810080), 2.8 m from where you wake up, on the same floor as the start
+
+**Expected**
+
+- Lord Soul (item id 2500) lies where the Peculiar Doll lay: a key that the clean game puts as the reward of Gravelord Nito in the Tomb of the Giants
+
+**Estimated time to the target:** ~30 seconds after you gain control.
+
+**Needs a reset or reload:** no
+
+**Gameplay result:** not played in the real game yet; only the static check exists.
+
+**Check**
+
+- [ ] You wake up in the cell. In the clean game the Peculiar Doll lies on the floor of this cell; here the same pickup holds a Lord Soul.
+- [ ] Pick it up: it is a normal item named Lord Soul. (Do not use it before you need it at the Kiln.)
+- [ ] The Peculiar Doll is not in the cell any more: it lies in another place of this world.
+
+**Afterwards**
+
+- [ ] Nothing else is to be checked in this world. Gravelord Nito, when you reach him, drops another item of the pool instead of the Lord Soul: the Lord Soul itself exists once in this world, in your cell.
+- [ ] To see every key turn on the spoiler log: the section KEY PLACEMENT names each key and the pickup it lies in.
+
+```
+DS1TR1-06NJDCP6-577CVKTE-TMPK8D6J-0PJM6M29-N1NP8EAT-Z46E5JJ7-8WMKQD9J-02MNRGYJ-0PVHEB9B-WEMB1M2X-7DD663F9-385HMG53-AMB1BAHC-019QYDSY
 ```
 
 ### Boss sampling - the first boss

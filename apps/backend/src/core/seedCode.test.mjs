@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
-  CANONICAL_ENEMY_KEYS, CANONICAL_FOG_KEYS, CANONICAL_ITEM_KEYS, CANONICAL_OUTPUT_KEYS, CANONICAL_PLACEMENT_EXTENSION_KEYS, CANONICAL_PLACEMENT_KEYS, GENERATION_FIELD_POLICY,
+  CANONICAL_ENEMY_KEYS, CANONICAL_FOG_KEYS, CANONICAL_ITEM_EXTENSION_KEYS, CANONICAL_ITEM_KEYS, CANONICAL_OUTPUT_KEYS, CANONICAL_PLACEMENT_EXTENSION_KEYS, CANONICAL_PLACEMENT_KEYS, GENERATION_FIELD_POLICY,
   isLoadedSeedModified, joinConfig, splitConfig,
 } from '@ds1tr/contracts';
 import { canonicalSettingsJson, canonicalizeSettings, sparseCanonicalSettings } from '../../dist/core/canonicalSettings.js';
@@ -123,7 +123,7 @@ test('every generation-affecting field is in the Seed Code or explicitly documen
     if (typeof policy === 'object') assert.ok(policy.excluded.length > 10, `${key} documents why it is excluded`);
   }
   // The canonical key lists are the validator's keys.
-  assert.deepEqual([...CANONICAL_ITEM_KEYS].sort(), Object.keys(config.items).sort());
+  assert.deepEqual([...CANONICAL_ITEM_KEYS, ...CANONICAL_ITEM_EXTENSION_KEYS.map((entry) => entry.key)].sort(), Object.keys(config.items).sort());
   assert.deepEqual([...CANONICAL_ENEMY_KEYS].sort(), Object.keys(config.enemies).sort());
   assert.deepEqual([...CANONICAL_PLACEMENT_KEYS, ...CANONICAL_PLACEMENT_EXTENSION_KEYS.map((entry) => entry.key)].sort(), Object.keys(config.enemies.placement).sort());
   assert.deepEqual([...CANONICAL_FOG_KEYS].sort(), Object.keys(config.fog).sort());
@@ -319,4 +319,20 @@ test('Part F1 (hostile NPCs) extends the format without changing any earlier cod
     assert.equal(invalid.ok, false, JSON.stringify(placement));
     assert.equal(invalid.code, 'INVALID_SETTINGS');
   }
+});
+
+test('key placement keys are extension keys: neutral values never enter a Seed Code, so every earlier code keeps its exact text', () => {
+  const plain = broad();
+  const withoutOptions = JSON.parse(JSON.stringify(plain));
+  for (const { key } of CANONICAL_ITEM_EXTENSION_KEYS) delete withoutOptions.items[key];
+  assert.equal(encodeSeedCode(envelopeOf(plain)), encodeSeedCode(envelopeOf(withoutOptions)), 'stating the neutral values or omitting them is the same code');
+  assert.doesNotMatch(serializeEnvelope(envelopeOf(plain)), /keyPlacement|randomizeLordvessel|randomizeLordSouls/u);
+  const keyed = JSON.parse(JSON.stringify(plain));
+  keyed.items.keyPlacement = 'shuffled';
+  keyed.items.randomizeLordvessel = true;
+  const code = encodeSeedCode(envelopeOf(keyed));
+  assert.notEqual(code, encodeSeedCode(envelopeOf(plain)));
+  assert.match(serializeEnvelope(envelopeOf(keyed)), /"keyPlacement":"shuffled"/u);
+  assert.doesNotMatch(serializeEnvelope(envelopeOf(keyed)), /randomizeLordSouls/u, 'a neutral companion option stays out');
+  assert.deepEqual(decodeSeedCode(code).envelope.settings, canonicalizeSettings(keyed));
 });

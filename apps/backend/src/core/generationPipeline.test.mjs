@@ -284,3 +284,146 @@ test('a key item outside the fog randomizer lots is structural: one attempt, no 
   assert.ok(events.some((event) => event.type === 'log' && /darkmoon_seance_ring/u.test(event.message)), 'the exact reason is in the log');
   assert.ok(result.manifest.validation.some((line) => /darkmoon_seance_ring/u.test(line)), 'and in the manifest');
 }));
+
+// ---- key placement (Part H) -------------------------------------------------------------------------------------------------------------
+
+const keysConfig = (game, fog = false, items = {}) => {
+  const base = config(game, fog);
+  return { ...base, items: { ...base.items, keyPlacement: 'shuffled', randomizeLordvessel: false, randomizeLordSouls: false, ...items } };
+};
+const fakeModel = { format: 'ds1tr-progression-model-1', annotationSha256: 'pinned' };
+
+test('key placement without the fog randomizer still needs the prepared world data, and hands the combined engine the progression model', async () => fixture(async ({ root, game, pristine, workspace }) => {
+  const executablePath = path.join(root, 'FogHost.exe');
+  await writeFile(executablePath, 'host');
+  const dataRoot = await fogData(root);
+  const requests = [];
+  const stub = combinedStub();
+  let prepared = 0;
+  const result = await generateRun({ config: keysConfig(game), workspacePath: workspace }, () => {}, {
+    getPristineSource: async () => ({ directory: pristine }),
+    getFogPrerequisites: async () => { prepared += 1; return { executablePath, dataRoot, readSet: [] }; },
+    progressionModel: async () => ({ ok: true, model: fakeModel, fromCache: true }),
+    combined: async (request, onEvent) => { requests.push(request); return stub(request, onEvent); },
+  });
+  assert.equal(result.ok, true, result.message);
+  assert.equal(prepared, 1, 'world data is prepared although the fog randomizer is off');
+  assert.equal(requests[0].progressionModel, fakeModel);
+  assert.equal(result.manifest.keyPlacement.mode, 'shuffled');
+  assert.equal(result.manifest.attempts.length, 1);
+}));
+
+test('a neutral run never prepares world data or a model for key placement, and its manifest says so', async () => fixture(async ({ game, pristine, workspace }) => {
+  const stub = combinedStub();
+  const requests = [];
+  const result = await generateRun({ config: config(game), workspacePath: workspace }, () => {}, {
+    getPristineSource: async () => ({ directory: pristine }),
+    getFogPrerequisites: async () => { throw new Error('unexpected'); },
+    progressionModel: async () => { throw new Error('unexpected'); },
+    combined: async (request, onEvent) => { requests.push(request); return stub(request, onEvent); },
+  });
+  assert.equal(result.ok, true, result.message);
+  assert.equal(result.manifest.keyPlacement, null);
+  assert.equal(requests[0].progressionModel ?? null, null);
+}));
+
+test('key placement needs the world data: when it cannot be prepared the run stops with a typed code and a plain message', async () => fixture(async ({ game, pristine, workspace }) => {
+  let combined = 0;
+  const missing = await generateRun({ config: keysConfig(game), workspacePath: workspace }, () => {}, {
+    getPristineSource: async () => ({ directory: pristine }),
+    getFogPrerequisites: async () => null,
+    combined: async () => { combined += 1; throw new Error('unexpected'); },
+  });
+  assert.equal(missing.ok, false);
+  assert.equal(missing.code, 'KEY_PLACEMENT_MODEL_UNAVAILABLE');
+  assert.doesNotMatch(missing.message, /FogHost|json|annotation/iu);
+  const failed = await generateRun({ config: keysConfig(game), workspacePath: `${workspace}-b` }, () => {}, {
+    getPristineSource: async () => ({ directory: pristine }),
+    getFogPrerequisites: async () => ({ failure: { code: 'FOG_DATA_UNAVAILABLE', userMessage: 'x', technical: 'download failed' } }),
+    combined: async () => { combined += 1; throw new Error('unexpected'); },
+  });
+  assert.equal(failed.code, 'KEY_PLACEMENT_MODEL_UNAVAILABLE');
+  assert.equal(combined, 0);
+}));
+
+test('an unusable progression model is a typed stop before the combined engine is called', async () => fixture(async ({ root, game, pristine, workspace }) => {
+  const executablePath = path.join(root, 'FogHost.exe');
+  await writeFile(executablePath, 'host');
+  const dataRoot = await fogData(root);
+  let combined = 0;
+  const result = await generateRun({ config: keysConfig(game), workspacePath: workspace }, () => {}, {
+    getPristineSource: async () => ({ directory: pristine }),
+    getFogPrerequisites: async () => ({ executablePath, dataRoot, readSet: [] }),
+    progressionModel: async () => ({ ok: false, code: 'KEY_PLACEMENT_MODEL_UNAVAILABLE', message: 'm', technical: 'exit 3' }),
+    combined: async () => { combined += 1; throw new Error('unexpected'); },
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.code, 'KEY_PLACEMENT_MODEL_UNAVAILABLE');
+  assert.equal(combined, 0);
+  assert.ok(result.manifest.validation.some((line) => line.includes('exit 3')), 'the exact reason stays in the manifest');
+}));
+
+test('an unsatisfiable key placement is retried with a new combined seed, within the bound, and recorded', async () => fixture(async ({ root, game, pristine, workspace }) => {
+  const executablePath = path.join(root, 'FogHost.exe');
+  await writeFile(executablePath, 'host');
+  const dataRoot = await fogData(root);
+  const stub = combinedStub();
+  const seeds = [];
+  const result = await generateRun({ config: keysConfig(game), workspacePath: workspace }, () => {}, {
+    getPristineSource: async () => ({ directory: pristine }),
+    getFogPrerequisites: async () => ({ executablePath, dataRoot, readSet: [] }),
+    progressionModel: async () => ({ ok: true, model: fakeModel, fromCache: true }),
+    combined: async (request, onEvent) => {
+      seeds.push(request.combinedSeed);
+      if (seeds.length < 3) return { ok: false, code: 'KEY_PLACEMENT_UNSATISFIABLE', message: 'No safe place', retryable: true };
+      return stub(request, onEvent);
+    },
+  });
+  assert.equal(result.ok, true, result.message);
+  assert.equal(new Set(seeds).size, 3, 'every attempt has its own derived seed');
+  assert.deepEqual(result.manifest.attempts.map((attempt) => attempt.result), ['KEY_PLACEMENT_UNSATISFIABLE', 'KEY_PLACEMENT_UNSATISFIABLE', 'success']);
+}));
+
+test('a fog layout that cannot be found around the shuffled keys is the typed FOG_KEY_CONFLICT, with the fog retries bounded', async () => fixture(async ({ root, game, pristine, workspace }) => {
+  const executablePath = path.join(root, 'FogHost.exe');
+  await writeFile(executablePath, 'host');
+  const dataRoot = await fogData(root);
+  let fogCalls = 0;
+  const unsolvable = { execute: async () => { fogCalls += 1; return { schemaVersion: 2, ok: false, error: { code: 'FOG_SEED_UNSOLVABLE', retryable: true, retryScope: 'fog', message: 'bad graph' } }; } };
+  const result = await generateRun({ config: keysConfig(game, true), workspacePath: workspace }, () => {}, {
+    getPristineSource: async () => ({ directory: pristine }),
+    getFogPrerequisites: async () => ({ executablePath, dataRoot, readSet: [] }),
+    progressionModel: async () => ({ ok: true, model: fakeModel, fromCache: true }),
+    combined: combinedStub(),
+    fog: unsolvable,
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.code, 'FOG_KEY_CONFLICT');
+  assert.ok(fogCalls >= 2 && fogCalls <= 40, `bounded (${fogCalls} calls)`);
+  assert.doesNotMatch(result.message, /FOG_SEED_UNSOLVABLE|graph/u);
+  // The same failure without key placement keeps its own code.
+  const plain = await generateRun({ config: config(game, true), workspacePath: `${workspace}-plain` }, () => {}, {
+    getPristineSource: async () => ({ directory: pristine }),
+    getFogPrerequisites: async () => ({ executablePath, dataRoot, readSet: [] }),
+    combined: combinedStub(),
+    fog: unsolvable,
+  });
+  assert.notEqual(plain.code, 'FOG_KEY_CONFLICT');
+}));
+
+test('with the fog randomizer off, exhausted key placement retries report the key placement itself, never a fog conflict', async () => fixture(async ({ root, game, pristine, workspace }) => {
+  const executablePath = path.join(root, 'FogHost.exe');
+  await writeFile(executablePath, 'host');
+  const dataRoot = await fogData(root);
+  let calls = 0;
+  const result = await generateRun({ config: keysConfig(game), workspacePath: workspace }, () => {}, {
+    getPristineSource: async () => ({ directory: pristine }),
+    getFogPrerequisites: async () => ({ executablePath, dataRoot, readSet: [] }),
+    progressionModel: async () => ({ ok: true, model: fakeModel, fromCache: true }),
+    combined: async () => { calls += 1; return { ok: false, code: 'KEY_PLACEMENT_UNSATISFIABLE', message: 'No safe place', retryable: true }; },
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.code, 'KEY_PLACEMENT_UNSATISFIABLE');
+  assert.ok(calls >= 2 && calls <= 20, `bounded (${calls} attempts)`);
+  assert.equal(result.manifest.attempts.length, calls, 'every attempt is recorded');
+}));

@@ -5,7 +5,7 @@ import { SeedPanel, SummaryChips, shortSeedCode, type LoadedSeed } from './SeedP
 import { RunHistoryPanel } from './RunHistoryPanel';
 import { SmokeTestPanel } from './SmokeTestPanel';
 import { DEFAULT_GENERATION_SETTINGS, OUTCOME_MESSAGES, deriveRunPhase, isLoadedSeedModified, joinConfig, splitConfig } from '@ds1tr/contracts';
-import type { RunPhase, RunHistoryEntry, EnemyPlacementAlgorithm, FogLanguage, GameStateReport, GwynNerfMode, SecondGargoyleMode, SoulItemsMode, StartingItemsMode, GenerationResult, PipelinePlan, RandomizerConfig } from '@ds1tr/contracts';
+import type { RunPhase, RunHistoryEntry, EnemyPlacementAlgorithm, FogLanguage, GameStateReport, GwynNerfMode, SecondGargoyleMode, KeyPlacementMode, SoulItemsMode, StartingItemsMode, GenerationResult, PipelinePlan, RandomizerConfig } from '@ds1tr/contracts';
 import { api } from './api';
 import ludos from './assets/branding/ludos.png';
 
@@ -170,6 +170,9 @@ export function App() {
 
   const setItem = <K extends keyof RandomizerConfig['items']>(key: K, value: RandomizerConfig['items'][K]) =>
     setConfig((current) => ({ ...current, items: { ...current.items, [key]: value } }));
+  /** Leaving Key placement "Shuffled" puts the two switches that belong to it back to off, so a hidden switch never stays in the world. */
+  const setKeyPlacement = (mode: KeyPlacementMode) =>
+    setConfig((current) => ({ ...current, items: { ...current.items, keyPlacement: mode, ...(mode === 'shuffled' ? {} : { randomizeLordvessel: false, randomizeLordSouls: false }) } }));
   const setEnemy = <K extends keyof RandomizerConfig['enemies']>(key: K, value: RandomizerConfig['enemies'][K]) =>
     setConfig((current) => ({ ...current, enemies: { ...current.enemies, [key]: value } }));
   /** Switching the algorithm moves the sampling-only settings to their legacy defaults (sampling) or neutral values (classic). */
@@ -474,10 +477,21 @@ export function App() {
               <label className="field-label">Starting items</label>
               <select value={config.items.startingItems} disabled={!config.items.randomizeStartingEquipment} title="Needs Starting equipment. Shield modes give the left hand a shield; mixed pool also allows weapons." onChange={(event) => setItem('startingItems', event.target.value as StartingItemsMode)}><option value="shield-1h">Shield + 1H weapon</option><option value="shield-2h">Shield + 1H/2H weapon</option><option value="mixed-pool">Shield/weapon + weapon</option></select>
             </div>
+            <div className="option-group"><h3>Key items</h3>
+              <label className="field-label">Key placement</label>
+              <select value={config.items.keyPlacement ?? 'vanilla'} title="Vanilla: every key stays where the game puts it. Shuffled: the keys of the world graph (Basement Key, Master Key, Crest of Artorias, the bell keys and the like) move to other world pickups, and the placement is checked so every area stays reachable and Firelink Altar can be reached. Needs World items." onChange={(event) => setKeyPlacement(event.target.value as KeyPlacementMode)}><option value="vanilla">Vanilla</option><option value="shuffled">Shuffled</option></select>
+              <small className="field-note">{(config.items.keyPlacement ?? 'vanilla') !== 'shuffled'
+                ? 'Every key stays where the game puts it.'
+                : config.items.randomizeWorldItems
+                  ? 'Keys are placed by a safety-checked fill over the world graph. Race Mode is not available.'
+                  : 'Key placement needs World items: turn on World items, or set Key placement to Vanilla.'}</small>
+              <Toggle inactive={(config.items.keyPlacement ?? 'vanilla') !== 'shuffled'} label="Lordvessel placement" hint="The Lordvessel joins the key shuffle: it lies at another world pickup, and Gwynevere hands over another item of the pool instead. The Firelink Altar still needs the Lordvessel in your inventory. Needs Key placement Shuffled. (The fog option Lordvessel gates is separate.)" checked={config.items.randomizeLordvessel ?? false} onChange={(value) => setItem('randomizeLordvessel', value)} />
+              <Toggle inactive={(config.items.keyPlacement ?? 'vanilla') !== 'shuffled'} label="Lord Soul placement" hint="The four Lord Souls join the key shuffle (the Bed of Chaos, Nito, Quelaag and Seath pickups). Needs Key placement Shuffled. (The fog option Require Lord Souls is separate.)" checked={config.items.randomizeLordSouls ?? false} onChange={(value) => setItem('randomizeLordSouls', value)} />
+            </div>
             <div className="option-group planned-group"><h3>Legacy parity <span>planned</span></h3>
               <label className="field-label">Difficulty</label><select defaultValue="fair" disabled><option value="fair">Fair</option><option value="unfair">Unfair</option><option value="very-unfair">Very Unfair</option></select>
-              <label className="field-label">Key placement</label><select defaultValue="shuffled" disabled><option value="vanilla">Not Shuffled</option><option value="shuffled">Shuffled</option><option value="race">Race Mode</option><option value="race-plus">Race Mode+</option></select>
-              {['Laundromat Mixup', 'Randomize Lordvessel', 'Randomize Lord Souls'].map((label) => <Toggle key={label} disabled label={label} checked={false} onChange={() => undefined} />)}
+              <label className="field-label">Race modes</label><select defaultValue="none" disabled><option value="none">Not built</option></select>
+              {['Laundromat Mixup'].map((label) => <Toggle key={label} disabled label={label} checked={false} onChange={() => undefined} />)}
             </div>
           </section>
 

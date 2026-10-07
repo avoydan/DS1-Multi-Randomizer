@@ -7,6 +7,7 @@ export function fullSettings(overrides = {}) {
       balancedEarlyLoot: true, randomizeStartingClass: false, randomizeStartingEquipment: false, randomizeGifts: false,
       randomizeEnemyDrops: false, guaranteedEnemyDrops: false, randomizeShops: false, fashionSouls: true, soulItems: 'shuffled',
       startingItems: 'shield-2h',
+      keyPlacement: 'vanilla', randomizeLordvessel: false, randomizeLordSouls: false,
     },
     enemies: {
       enabled: true, randomizeRegularEnemies: true, randomizeBosses: true, scaling: 'area', replaceMimics: true,
