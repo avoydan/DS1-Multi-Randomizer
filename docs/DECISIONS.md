@@ -993,6 +993,21 @@ Date: 2026-10-06.
 8. **Launch game** is a desktop (Electron) concern: Steam `steam://rungameid/570940` first, the game executable as a fallback,
    and the method used is reported. The renderer never starts processes.
 
+## Hostile NPCs: a body in a regular slot, owned by the slot; NPC replacement not built (Part F1; backend 0.37.0, desktop 0.25.0, contracts 0.23.0)
+
+Date: 2026-10-07.
+
+1. **Scope: F1 only.** The legacy has two NPC options (reconstruction in `ENEMY_PLACEMENT_MODEL.md` 10.9). **Hostile NPCs** is built. **NPC replacement** is **not built, by decision**: its six slots (two Merchants, Andre, Vamos, Gough, the Fair Lady) are services and the legacy
+   removes them; friendly NPC support would need talk-script, quest-event and service work that cannot be proven without playing (the hard stop of the task). No control is shown for it and the planned placeholder was removed. The legacy has no hostile NPC destination slots, no NPC-to-NPC rule,
+   no invaders or summons (`c0000` is in no table): there is nothing to build for them.
+2. **Three of four sources.** The Undead Merchant (Undead Burg), Andre and Vamos. Gough (his part has think 0, his AI is event driven, a giant capsule, 20,000 souls) and the Lower Burg Merchant (a logic script the data tool does not copy) are left out, each for a documented reason; an unknown NPC defaults to unsafe (`classifyNpcSlot`).
+3. **The slot owns the actor.** The row of a hostile NPC takes its team, `npcType`, covenant mark, respawn bit, drop type, humanity lot, item lots and `getSoul` (in every scaling mode) from the slot; the body, animations and AI are the NPC's. Rejected: letting the NPC carry its row as in the legacy (a hostile Andre would drop Andre's loot and
+   never respawn).
+4. **Pool membership, not a second pass.** The legacy adds the models to the normal pool, so they are appended to the candidate table after the regular classes are derived and drawn from the existing streams. No new stream, no new constant; the option off adds nothing and the earlier worlds are byte-identical.
+5. **Wake-up events with a limit.** Every live hostile NPC gets the existing wake-up event (it also sets team 6, the legacy allegiance event); the limit of 12 per map bounds the events (the uncapped numbers are in the event allocation document). Hostile NPCs are refused with a custom pool (the pool lists enemies) and with `normalReplacement` `none` / `bosses`.
+6. **Seed Codes and presets.** `hostileNpcs` is an extension key (neutral false), presets version 13; no existing code changes (22 golden fixtures byte-identical).
+7. **No talk file.** No ESD is read or written by Part F; the package file list has none.
+
 ## A regular enemy as the body of a boss encounter: a safe subset of three (Part E2; backend 0.36.0, desktop 0.24.0, contracts 0.22.0)
 
 Date: 2026-10-07.

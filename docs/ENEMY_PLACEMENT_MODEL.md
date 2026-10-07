@@ -593,7 +593,7 @@ risk: data first, selection-only options next, event-touching options last.
 | **C** (C1 Type replacement built, see 10.4; C2 custom pool built, see 10.5) | Type replacement and custom pool | type map with type-level participation and injectivity; pool filter | `typeReplacement`, `customPool` (named list of enabled types) | select, pool editor (largest UI piece) | injectivity, sentinel cases, pool filter | 10 seeds | none |
 | **D** (built, see 10.6) | Boss class (bosses only) | boss sampler over the portable single-body pool, per-candidate Gwyn nerf, Unique bosses, unit participation | `bossReplacement` {none, bosses}, `uniqueBosses`, `bossChanceInBossSlots` | activation | boss repetition, unit swaps, hash lock | **40 seeds** Bosses + Fog (overlay set must remain the 15 events), `verify-skips` | medium |
 | **E** (E1 built 2026-10-06, section 10.7; E2 built as a three-encounter subset 2026-10-07, section 10.8) | Cross-class and roaming boss options | boss to normal slot, normal to boss slot, "both" modes, `getSoul` on the scaled row, respawn handling | modes `normals`/`both`, `bossChanceInNormalSlots`, `roamingBossSouls`, `respawningRoamingBosses` | activation | reward ownership, scaled row always present, boss bar rules | **40 seeds**, measure edited events against the overlay and FogMod; stop on any new overlap | **high** |
-| **F** | NPC class and hostile NPCs | NPC allowlist, talk preservation, hostile sources, allegiance events | `npcReplacement`, `hostileNpcs` | activation | NPC fit rules, talk preservation fixtures | event-set diff vs FogMod first, then 40 seeds | **high** |
+| **F** (F1 built 2026-10-07, section 10.9; NPC replacement not built by decision) | NPC class and hostile NPCs | NPC classification, hostile sources, slot-owned rows, wake-up events | `hostileNpcs` (an extension key); `npcReplacement` is not built | activation | slot-owned drops, talk preservation (no talk file touched) | event-set diff vs FogMod, then 100 Fog seeds | **high** |
 | **G** | Default flip (product decision) | none | default `sampling`, docs, migration notes | default values | n/a | full 40-seed default sweep | low once A-F passed |
 
 ### 10.1 Part 0 as built (2026-10-05)
@@ -1533,6 +1533,116 @@ All on the real extracted catalog of a clean Dark Souls Remastered copy; zero un
 
 **Not verified by playing:** the wake-up, killability, the health bar, the unlocking of the way on, rewards and the absence of crashes for a body in each of the three arenas. The seven quick and the seventeen extended worlds
 (`docs/SMOKE_TESTS.md`; quick test "First boss fight - a normal enemy") are made for that.
+
+---
+
+### 10.9 Part F1 as built (2026-10-07): hostile NPCs (safe subset; friendly NPC replacement not built)
+
+**Scope and verdict.** Part F as planned has two legacy options: **Hostile NPCs** (E20) and **NPC replacement** (E3). DS1TR builds **F1 only: Hostile NPCs**, as a safe subset
+(three of the legacy's four NPC models). **NPC replacement is not built, by decision** (below): it would replace the Merchant, Andre, Vamos, Gough and the Fair Lady - a shop,
+three blacksmiths and a Fire Keeper - by enemies, which removes services and the Chaos ember; the task's own hard stop ("friendly NPC support cannot preserve services") applies.
+There are no "hostile NPC destination slots" and no "NPC to NPC" cases in the legacy data, so priorities 2 and 3 of the plan have nothing to build. The result is
+**PART F SAFE SUBSET - STATICALLY VERIFIED / GAMEPLAY UNVERIFIED**: nobody has played a hostile NPC yet.
+
+#### Legacy semantics (pinned Enemy Randomizer `83f008d`; reconstructed, not copied)
+
+Evidence: `randomizer.py` (options, config string positions 2 and 19), `randomizer_rng.py` (the draw, `newCharacterAllegiances`), `valid_new.txt`, `valid_replacements.txt`,
+`original_enemies_ref/*.txt`, `event_tools.py`. "No code found" means exactly that.
+
+| # | Question | Legacy behavior |
+|---|---|---|
+| 1 | NPC-related options | "NPC replacement" (`npcMode` 0 off / 1 only bosses / 2 only normal enemies / 3 either; default 0; config position 2) and "Hostile NPCs" (toggle, default off; position 19). The boss chance of normal slots also applies to NPC slots. |
+| 2 | Categories distinguished | Only the table column `Type`: 0 normal enemy, 1 boss, **2 NPC**. There is no friendly / hostile / scripted / invader / black phantom / merchant / covenant / summon category, and `c0000` (the player model: quest NPCs, phantoms, invaders, summons), `c1000` (bonfires) and the Fire Keepers `c5330` are in no table: **they are never touched**. |
+| 3 | Which NPCs can be replaced | The five type-2 models of `valid_replacements.txt`: Undead Merchant `c2510` (two slots: Undead Burg, Lower Undead Burg), Andre of Astora `c2640` (Parish), Vamos `c2920` (Catacombs), Hawkeye Gough `c4110` (Oolacile), the Fair Lady `c5340` (Quelaag's sister, Blighttown). Six slots. |
+| 4 | Which slots receive NPCs | None of those six. NPC models enter the **normal** candidate pool when Hostile NPCs is on (`parts[Type] == "0"` or `"2" and spawnNPCS`), so any normal draw can return one (also for a boss slot replaced "with normal enemies"). The Fair Lady is not in `valid_new.txt`: never a source. |
+| 5 | NPCs replacing normal enemies | Yes, with Hostile NPCs on: Merchant (size 1, difficulty 0), Andre (1, 6), Vamos (1, 5), Gough (4, 5), equal weight with every other candidate. |
+| 6 | Normal enemies replacing NPCs | Yes, with NPC replacement 2 or 3: the six slots, always with difficulty mode 2 (fully random), size limit 5 unless Placement is "anywhere except NPCs". |
+| 7 | NPC to NPC | Possible through the shared pool (an NPC slot drawing an NPC source); no special rule. |
+| 8 | Hostile NPCs as normal candidates | See 4-5. The only extra: an event per placed NPC that sets its team to 6 (hostile) through the entity (`SetCharacterAllegiance`, `2004[02]`); a slot without an entity id is given one. |
+| 9 | Quest-critical characters | No handling at all. NPC replacement removes the services; the option is off by default. Andre alone has a special case: with a boss mode he becomes Gwyndolin (index 117) with 40%. |
+| 10-12 | Merchants, blacksmiths, Fire Keepers | Merchant, Andre, Vamos, Gough, and the Fair Lady (a Fire Keeper) are **replaced** (their slot gets an enemy; the shop or service is gone). Other Fire Keepers (`c5330`) and bonfires (`c1000`) are not in the tables. |
+| 13 | Covenant leaders | Quest NPCs are `c0000`: not in the tables, untouched. |
+| 14 | Drops | No NPC drop handling found. The NPC's own NpcParam row (and so its own item lot) comes with the model, so a hostile Andre carries Andre's loot. |
+| 15 | Death flags | No handling found; the events of the entity are those of the slot. |
+| 16 | Respawn | No handling found; the NPC rows have `disableRespawn` 1. |
+| 17 | Team / faction | Only the allegiance event of 8 (team 6 for the four hostile models). The NPC AI of an NPC *slot* is not changed ("lets not mod npc ai for now"). |
+| 18 | Talk scripts | Not touched. |
+| 19-20 | Invaders, summons | Not in the data: never touched. |
+
+**Reading.** Hostile NPCs, in the legacy, is "four more models in the normal pool, hostile through one event each". NPC replacement is "six friendly NPCs become enemies and their services vanish".
+
+#### NPC classification (the real catalog)
+
+`classifyNpcSlot` (`generator.js`) gives every non-regular slot a semantic role; the table is what the real catalog produces. Unknown is `UNKNOWN_UNSAFE`.
+
+| Role | Slots | What | Use |
+|---|---|---|---|
+| SAFE_HOSTILE_SOURCE | 3 | Undead Merchant (Undead Burg `c2510_0000`), Andre `c2640_0000`, Vamos `c2920_0000` | source of a body (F1) |
+| MERCHANT_UNSAFE | 1 | the Lower Burg Merchant `m10_02 c2510_0000` | not a source: its think row (251001) names the logic script `251000_logic.lua` that the data tool does not copy to another map (it copies battle goals); a placed copy would name a missing script |
+| BLACKSMITH_UNSAFE | 1 | Hawkeye Gough `c4110` | not a source: the part has think id 0 (his AI row is never run as a part's brain in the vanilla game), `eye_dist` 0 (event driven), an 8 m x 2 m capsule, 20,000 souls; unproven. A deviation from the legacy. |
+| FIREKEEPER_OR_BONFIRE | 62 | 57 bonfires (`c1000`), 4 Fire Keepers (`c5330`), the Fair Lady (`c5340`) | never touched |
+| QUEST_NPC | 8 | talking NPCs of non-player models (`c3210`, `c3450`, `c4090`, `c4140`, `c2860`, `c5310`, `c5361` x2) | never touched |
+| PLAYER_MODEL_NPC | 80 | `c0000`: quest NPCs, phantoms, invaders, summons (teams 2 and 7) | never touched |
+| BOSS_COMPANION | 3 | talking boss-family bodies (Priscilla, Nito, Quelaag) | the boss audit (10.8) |
+| DUMMY_OR_PASSIVE | 35 | dummy parts (not spawned) | never touched |
+| UNKNOWN_UNSAFE | 8 | `c2750`, `c4520` x3, `c4531`, `c3451`, `c5320`, `c5291` (friendly or neutral, no talk) | never touched |
+
+#### What DS1TR builds
+
+| Option | Contract | Neutral | Rule |
+|---|---|---|---|
+| Hostile NPCs | `enemies.placement.hostileNpcs` (extension key) | `false` | `sampling-v1`, normal enemies replaced (`normalReplacement` `normals` or `both`), no custom pool; refused otherwise |
+
+UI: a toggle "Hostile NPCs" in the legacy options, shown only when it can apply; text: "Randomizes hostile NPC combatants: the Undead Merchant, Andre of Astora and Vamos can appear as enemies in place of regular enemies.
+Quest and service NPCs are kept safe". The old disabled placeholders "NPC replacement" and "Hostile NPCs" are removed from the planned group (the first is not built, the second is real).
+
+**Planner.** The three source slots become three *types* (`deriveHostileNpcTypes`: size from the capsule, difficulty with the formula of the regular classes, one variant per source slot) that are appended to the candidate table
+**after** the regular class table is derived, so every regular class, the table hash and the HP ranks are what they are without them. They are drawn from the existing streams (a slot's or a Type group's own stream) like any model: legacy semantics is
+pool membership, and a second pass with its own chance would invent a constant the legacy does not have. Consequently the option on gives a different world (different draws) and the option off gives exactly today's world (no type, no draw, no stream).
+Per-map limit **12** hostile NPCs (DS1TR safety limit, not legacy): once a map holds twelve they are no longer candidates there; a Type replacement group counts all its slots. Maps without an event file (the Darkroot Basin
+`m12_00_00_01` shares the Garden's, and the data tool writes no event for a part there) never get one. A dummy part (not spawned) can be assigned a body but gets no wake-up event.
+
+**Placement and entity.** A hostile NPC is a *body in a regular enemy slot*: `hostileNpc: true`, `makeTangible` (the NPC row's wandering-ghost transition is switched off like for every tangible replacement), a scaled NpcParam row (forced, like every sampled replacement), the standard wake-up event
+(`forceCombatActivation`: clear standby, team 6, enable AI, the legacy allegiance event and the one every portable boss gets), and an entity id that is the slot's own or one assigned from the 16099000 range. Passive slots keep their passive rule. No talk script, no shop, no quest binding: the part's talk id is the slot's (none).
+
+**Cell ownership (what the data tool writes, and asserts, for a hostile NPC row).** The row starts as a copy of the NPC's row and then takes from the slot's row every cell that says what kind of actor it is:
+
+| Cells | Owner | Why |
+|---|---|---|
+| `teamType` | slot (in `AddScaledNpcRows`, as for every replacement) | the NPC row says 2 (friendly); a regular slot says 0 |
+| `npcType`, `vowType` | slot | NPC type 2 and a covenant mark (Andre 1) are not the slot's kind of actor |
+| `disableRespawn` | slot | NPC rows are 1 (they never come back); a regular enemy of the slot comes back |
+| `dropType`, `humanityLotId`, `itemLotId_*` | slot | the reward and the humanity drop belong to the slot (Part A drop ownership); no blacksmith loot, no unique item |
+| `getSoul` | slot, **in every scaling mode** | Gough has 20,000 souls, Andre 1,000: a vanilla-scaled NPC must not pay NPC souls from a Hollow's place |
+| `hp`, defenses, resistances, `stamina`, every `spEffectID*` | slot with Area / Progressive scaling; the NPC's own with Vanilla scaling | the existing scaling setting |
+| `isGhost`, `isChangeWanderGhost`, `ghostModelId` | cleared | `makeTangible` |
+| model, animations, `behaviorVariationId`, `aiThinkId`, size, weight, material, ragdoll, knockback, `modelDispMask*`, `normalChangeTexChrId`, `animIdOffset`, `isWeakSaint`, guard levels | the NPC | the body and its way of fighting |
+
+**AI.** The NPC's own think row (cloned with the slot's perception, like every replacement) and its battle script (`GOAL_KajiyaAndre264000_Battle`, `HusibitoKojiki251000Battle`, the Vamos script) are copied into the destination map's AI bundle by the data tool; they are real combat scripts (`REGISTER_GOAL`, `TARGET_ENE_0`, attack and step functions). The static verifier checks that the destination bundle holds the battle script and the logic script of the variant that was placed.
+
+**Seed Codes.** `hostileNpcs` is an extension key (neutral `false`, appended after `bossChanceInBossSlots`): every earlier code keeps its text, decodes to off and generates the same world (all 22 earlier golden fixtures verify byte for byte). New worlds are pinned by `ds1tr-gen-v1.hostile-npcs.json`. Presets: version 13.
+
+**Data tool** (patch 0017). `PatchPlacement.HostileNpc`; `AddScaledNpcRows` copies and asserts the slot-owned cells of the table above. No talk file, no new overlay, no new event kind: the wake-up is the existing one, in the existing custom event window. **No talk script (ESD) file is read, written or present in any generated package** (checked on the package file list).
+
+**Deliberate deviations from the legacy.** (1) Gough and the second Merchant are not sources (classification). (2) The slot owns team, respawn, reward and drops (the legacy lets the NPC carry its row). (3) At most twelve per map. (4) No Darkroot Basin. (5) NPC replacement (E3) is not built. (6) With a custom pool the option is refused: the pool lists enemy models and the hostile NPCs are not part of it; widening its meaning silently would be wrong.
+
+**What it takes to build friendly NPC replacement (not done).** A friendly slot's body can be replaced only if its entity keeps its talk id, its ESD binding (`talkesdbnd`, also edited by FogMod's world data), its shop and upgrade menus and its quest flags; the legacy does none of it. That is broad talk-script and quest-event work with an unprovable result without playing: out of scope by the hard stop.
+
+#### Measurements and proofs
+
+All on the real extracted catalog and a clean copy of Dark Souls Remastered; zero unexplained failures; nothing was retried and no limit was relaxed. Fixed during the work: the per-map limit (an uncapped run put up to 117 hostile NPCs in one map under strict curve and 73 under Type replacement, which would have been that many wake-up events), the missing logic script of the Lower Burg Merchant (found by the verifier), the Darkroot Basin without events (found by the verifier), and wake-up events for dummy parts.
+
+| What | Result |
+|---|---|
+| Engine, 15 configurations x 100 seeds (`npcSweep.mjs`: basic, fits, anywhere + Easy Asylum, curve strict and loose, Type replacement enabled / except roaming, + roaming bosses, + boss bodies, + boss sampling both, Prevent same, Vanilla / Progressive scaling, Gwyn nerf + Second Gargoyle) | 1500/1500 worlds: deterministic; sources only the three authored slots; destinations only regular (team 0) slots; scaled row, tangible mark and wake-up present (none for a dummy); no hostile NPC in the Darkroot Basin; at most 12 per map; the model count of a map never above `max(30, vanilla)` (maximum 30); option off equals option absent |
+| Share | about 55 hostile NPCs per world with every slot replaced (twelve per map at most); 17-21 per world with Type replacement |
+| Static verifier (`tools/smoke-verify`, 29 checks for the quick world; 41 expectations of a 100%-replacement world pass 41/41) | model, entity, no talk, scaled row, `teamType` / `npcType` / `disableRespawn` / `dropType` / `getSoul` / `humanityLotId` / `vowType` / item lots equal the slot's row, no ghost transition, think row, battle and logic script in the map's AI bundle, wake-up event naming the entity |
+| Golden | all 22 earlier fixtures verify byte for byte with the F1 engine, data tool and presets; 5 new fixtures pin hostile NPC worlds (basic, Fog, roaming bosses, Type replacement, boss bodies) |
+| Fog (real format, `fogHostE2e.mjs`, `verify-skips` on every package) | 10 configurations x 10 seeds = **100/100** generated (normal enemies `normals` and `both`, curve strict / Easy Asylum / chance 60 / anywhere / fits, Type replacement enabled and except roaming bosses, roaming bosses with stay dead, boss bodies, boss sampling `both` + Unique bosses, Prevent same): 0 retries, 0 conflicts, 0 skip mismatches over 14,288 edited events and 39,119 surviving skips; the union of the Fog boss overlays is **inside the 15-event whitelist** and the merge IDs are the same 12 as without hostile NPCs: **no new overlay, no new merge**; maximum model count 30. No talk file in any package |
+| Real data tool matrix (`placementMatrix.mjs hostile-npc-f1`) | 10 cases x 40 seeds (E1 used 100 and 60): **399/400** on the first run and 400/400 with the one exception rerun: seed 36 of `npc-vanilla-scaling` failed once with a Windows file-lock error while the data tool wrote a map file (`The process cannot access the file ... m13_02_00_00.msb because it is being used by another process`, an environment error, not a generation error) and passed when run alone (`--only 36`). 0 retries, 0 event-window overruns, 0 non-deterministic reruns; at most 108 custom events in one map (Demon Ruins, Type replacement except roaming bosses + roaming bosses; the window moved off the Bed of Chaos floor event in 3 seeds, which is what `docs/EVENT_ALLOCATION.md` provides); maximum model count 30 (31 in a map whose fixed models already exceed 30, the non-worsening rule) |
+| E1 / E2 / Part D regression | with hostile NPCs off: `roamingSweep.mjs` (E1) 18 configurations x 100 seeds = 1800/1800 with exactly the numbers recorded before Part F; `bodySweep.mjs` (E2) 18 x 100 = 1800/1800; the Part D, E1 and E2 golden fixtures byte-identical. With hostile NPCs on together with E1, E2 and boss sampling: the engine sweeps above (`npc-plus-roaming-both`, `npc-plus-e2-normals`, `npc-plus-boss-sampling-both`, 300 worlds), Fog `h4`, `h6`-`h9`, the matrix cases `npc-plus-*`, and 3 golden fixtures |
+
+**Not verified by playing:** whether a hostile NPC wakes up, attacks, navigates, dies and gives only the slot's rewards; whether the NPC models show no T-pose in a regular slot; whether Gough would have worked (not tested). The quick world "Hostile NPC - Andre as an enemy" and five extended worlds (`docs/SMOKE_TESTS.md`) are made for that.
 
 ---
 

@@ -35,9 +35,9 @@ a scratch directory for this audit only. The commit ids above are the revisions 
 |---|---|
 | Original options audited (Item 11 + Enemy 27 + FogMod 16) | **54** |
 | FULL | 37 (3 in Part E1: Boss chance for normal-enemy slots, Roaming boss souls, Roaming boss respawn; 34 = 21 + 4 in Batch 1 + 3 in Batch 2 + 1 Second Gargoyle + 2 in Part A: Placement fit, Replacement chance + 2 in Part B: Difficulty mode, Difficulty strictness + 1 in Part C1: Type replacement) |
-| UI_ONLY (engine gap) | 10 (14 before Part E1, 11 before Part E2) |
-| PARTIAL | 5 (I11 hintsheet; I5 Soul items, where Transposed is unavailable; E2 Normal enemy replacement, added in Part A; E22 Custom enemy pool, added in Part C2: regular enemies only; E9 Boss chance for boss slots, added in Part E2: three of 24 boss encounters) |
-| INTENTIONALLY_UNSUPPORTED | 1 |
+| UI_ONLY (engine gap) | 8 (14 before Part E1, 11 before Part E2, 10 before Part F1) |
+| PARTIAL | 6 (I11 hintsheet; I5 Soul items, where Transposed is unavailable; E2 Normal enemy replacement, added in Part A; E22 Custom enemy pool, added in Part C2: regular enemies only; E9 Boss chance for boss slots, added in Part E2: three of 24 boss encounters; E20 Hostile NPCs, added in Part F1: three of the four legacy NPC models) |
+| INTENTIONALLY_UNSUPPORTED | 2 (E3 NPC replacement, by decision in Part F) |
 | DUPLICATE | 1 |
 | Newly wired in the audit task | 2 (settings preset import/export; restore default settings) |
 | Newly wired in Batch 1 | 4 (Fashion Souls, Replace mimics, Replace respawning mosquitoes, Prevent same enemy) |
@@ -77,7 +77,7 @@ All 21 configuration fields map to one position in the original config string. T
 |---|---|---|---|---|---|---|---|---|
 | E1 | Replace bosses | 0 don't, 1 only with bosses, 2 only with normal enemies, 3 either | select: Classic shuffle / Random bosses / Only normal enemies (early fights) / Bosses or normal enemies | yes (`enemies.placement.bossReplacement`, `sampling-v1`) | yes | yes | yes for "only with bosses" on single-body bosses (Part D; linked units stay classic); "only with normal enemies" and "either" (Part E2) for **three audited encounters only** (Asylum Demon, Taurus Demon, Capra Demon: a normal enemy is the body of the encounter, `ENEMY_PLACEMENT_MODEL.md` 10.8); every other boss keeps its boss (`normals`) or gets a boss (`both`) | PARTIAL (a boss with several bodies, a scripted entrance or an event-replaced map never gets a normal enemy) |
 | E2 | Replace normal enemies | same four values | select, `2` | yes (`enemies.placement.normalReplacement`, `sampling-v1`) | yes | yes | yes (`none`, `normals`; Part E1: `bosses` and `both` with the roaming-boss safety list, `ENEMY_PLACEMENT_MODEL.md` 10.7) | PARTIAL (a boss that needs its own arena or has several bodies never roams) |
-| E3 | Replace NPCs | same four values | select, `0` | placeholder | no | no | no | UI_ONLY |
+| E3 | Replace NPCs | same four values | none: no control is shown (Part F decision, `ENEMY_PLACEMENT_MODEL.md` 10.9) | no | no | no | no: the six NPC slots (Merchants, Andre, Vamos, Gough, the Fair Lady) are services; replacing them by enemies removes shops, blacksmiths and the Chaos ember | INTENTIONALLY_UNSUPPORTED |
 | E4 | Replace mimics | 0 no, 1 yes | toggle, on | yes (`enemies.replaceMimics`) | yes | yes | yes (Batch 1) | FULL |
 | E5 | Placement fit | 0 only where they fit, 1 anywhere, 2 anywhere except when replacing NPCs | select, `0` | yes (`enemies.placement.fit`, `sampling-v1`) | yes | yes | yes (Part A, regular slots; value 2 equals 1 until NPCs are replaced) | FULL |
 | E6 | Difficulty mode | 4 curve + easy Asylum, 1 random with curve, 3 random + easy Asylum, 2 fully random | select, `3` | yes (`enemies.placement.difficultyMode`, `sampling-v1`) | yes | yes | yes (Part B, regular enemies; project-derived classes) | FULL |
@@ -94,7 +94,7 @@ All 21 configuration fields map to one position in the original config string. T
 | E17 | Prevent replacement by the same enemy | 0 enabled, 1 disabled | toggle, disabled (default off) | yes (`enemies.preventSameEnemy`) | yes | yes | yes (Batch 1) | FULL |
 | E18 | Unique bosses | 1 enabled, 0 disabled | toggle, off | yes (`enemies.placement.uniqueBosses`, needs Random bosses) | yes | yes | yes (cycle over the single-body boss pool) | FULL for single-body bosses |
 | E19 | Roaming boss respawn | 0 enabled, 1 disabled | toggle "Roaming bosses stay dead", off; shown only with a boss mode | yes (`enemies.placement.roamingBossesStayDead`) | yes | yes | yes (Part E1, deliberate deviation: the game's own `NpcParam.disableRespawn` bit on the scaled row instead of the legacy per-entity event; stay dead on was played and passed in the real game on 2026-10-06; since backend 0.35.1 the bit is written for off as well, statically verified, not played yet) | FULL (stay dead on: verified in game) |
-| E20 | Hostile NPCs | 1 enabled, 0 disabled | toggle, off | placeholder | no | no | no | UI_ONLY |
+| E20 | Hostile NPCs | 1 enabled, 0 disabled | toggle, off; shown only when normal enemies are replaced with sampling and no custom pool (`enemies.placement.hostileNpcs`) | yes | yes | yes | yes for the Undead Merchant, Andre of Astora and Vamos as bodies in regular enemy slots (Part F1); Gough and the Lower Burg Merchant are left out (unproven AI / a logic script the data tool does not carry); the slot owns team, respawn, reward and drops; at most twelve per map | PARTIAL |
 | E21 | Replace respawning mosquitoes | 1 enabled, 0 disabled | toggle, on | yes (`enemies.replaceRespawningMosquitoes`) | yes | yes | yes (Batch 1) | FULL |
 | E22 | Custom enemy pool (config editor) | Per-enemy enable/disable lists with named, saved configs | filterable list of the regular enemies of the clean game data, All / None / Reset, counts | yes (`enemies.placement.customPool`, `sampling-v1`; presets v9) | yes (`POST /api/enemy-pool`, typed `ENEMY_PLACEMENT_CUSTOM_POOL_INVALID`) | yes | yes (Part C2, regular enemies only; the pool restricts replacements, unselected enemies stay; proven-impossible pools are refused, a one-model grace to 31 models only when proven necessary, see `ENEMY_PLACEMENT_MODEL.md` 10.5) | PARTIAL |
 | E23 | Seed | free text | master seed | yes | yes | yes | yes | FULL |
@@ -221,7 +221,7 @@ mapped one-to-one.
 | ID | Option(s) | Class | Notes and risk |
 |---|---|---|---|
 | G8 | Replacement chance (E7) | done (Part A) | Per-slot keep/replace decision before the permutation. A count-preserving permutation must be rebuilt over only the replaced subset. |
-| G9 | Boss replace/normal replace/NPC replace modes (E1, E2, E3) | B-C | Source/target class partitions. NPC replacement is the hardest: friendly NPCs are deliberately kept vanilla by the engine today. |
+| G9 | Boss replace/normal replace/NPC replace modes (E1, E2, E3) | E1, E2 done (Parts D, E1, E2 subset); E3 not built by decision | NPC replacement replaces the services themselves (10.9); the friendly NPCs stay vanilla. |
 | G10 | Boss chance for normal / boss slots (E8, E9) | E8 done (Part E1); E9 done for three encounters (Part E2) | The normal-slot side is the roaming pass. The boss-slot side keeps the boss entity and changes only the body, for the Asylum Demon, Taurus Demon and Capra Demon; the audit of every other boss and the reasons are in `ENEMY_PLACEMENT_MODEL.md` 10.8. |
 | G11 | Placement fit (E5) | done for regular slots (Part A) | The engine already checks compatibility via `pickCompatibleEnemy` and `bossGrounding`; "anywhere" requires relaxing these and accepting the crash and softlock risk, which the 40/40 sweeps do not cover. |
 | G12 | Difficulty mode and strictness (E6, E11) | done for regular enemies (Part B) | Needs a per-enemy tier table and area tiers. The prototype data shows tiers, but the real catalog needs them for all enemies. |
@@ -232,7 +232,7 @@ mapped one-to-one.
 | G17 | Type replacement (E15) | done for regular enemies (Part C1) | Sub-mode of G9. |
 | G18 | Prevent same enemy (E17) | done | See 6a. |
 | G19 | Unique bosses (E18) | B | Each boss at most once. Boss planning currently uses `shuffledPortableBosses`, so this needs a no-duplicate constraint. |
-| G20 | Hostile NPCs (E20) | B-C | Needs NPC AI and event flag handling; shares G9's NPC difficulty. |
+| G20 | Hostile NPCs (E20) | done for three NPC models (Part F1) | `ENEMY_PLACEMENT_MODEL.md` 10.9. |
 | G21 | Custom enemy pool (E22) | done for regular enemies (Part C2) | Boss and NPC entries of the original list need Part D and later; saved configs are the settings presets. |
 
 ### 6a. Batch 1 (implemented)
