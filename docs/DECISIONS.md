@@ -96,9 +96,7 @@ the vendored core (`patches/0003-legacy-parity-batch-2.patch`, same policy as Ba
   gives shields in the left hand, and with bosses on, Lord Gwyn is withheld from the boss pool in
   60% of seeds. Presets of version 1 and 2 migrate to the old-behavior values, so they reproduce
   their old output; presets are now version 3.
-- **Soul items "Transposed" is not offered.** It acts on boss souls (goods 700-711), which are in
-  none of the catalog's pools (boss rewards are not extracted), so it could not change anything. It
-  stays a disabled choice until the scan/patch can see boss reward lots.
+- **Soul items "Transposed" was not offered in Batch 2** because the boss souls were in none of the catalog's pools; it is built in Part H (see "Soul items Transposed and the boss reward catalog" at the end of this file).
 - **Replaced souls use a catalog-derived pool, not the legacy list.** Reusing the unlicensed legacy
   table is excluded by project policy. The pool is the unprotected world goods that already occur in
   at least two lots. The two-lot rule exists because FogMod tracks 27 key items by id and rejects a
@@ -1154,3 +1152,13 @@ Date: 2026-10-07.
 3. **Helpers are published as an uncompressed single file** (a compressed bundle is one 34 MB block of 7.8 bits-per-byte data, the profile antivirus heuristics associate with packers, and it decompresses at every start: DsrDataTool started in 1,054 ms against 373 ms uncompressed, FogHost in 315 ms against 384 ms). No UPX, no obfuscation, no elevation helper in the package.
 4. **No automatic uploads** of any build to an online scanner; no telemetry; no network use besides the one-time world data download.
 5. See `docs/RELEASE_TRUST.md` and `docs/SECURITY_AND_PRIVACY.md`.
+
+## Soul items Transposed and the boss reward catalog (Part H, backend 0.38.0 -> 0.39.0, contracts 0.25.0)
+
+Date: 2026-10-07.
+
+1. **Boss rewards belong to the encounter, not to the body.** They are awarded by the shared common event 970 (a trigger flag, three item lots), never by an NPC row. The scan records them as `bossRewards` (27, with the chain of rows awarded with each lot, the map that sets the trigger flag and the DLC flag) and fails with a typed scan error when event 970 changes shape or an NPC row names a reward lot. Boss sampling, roaming bosses, encounter bodies, the Second Gargoyle and Pinwheel Chaos cannot move, duplicate or delete a reward: the data tool never writes event 970 or its initialisations (asserted on every generated package, `SmokeVerify lots`).
+2. **Transposed = the legacy's behavior.** The twelve soul rows join the item pool only with Soul items Transposed; each soul with a recipe has a 75% chance (stream `soul-items-transposed`) to become a weapon of its boss (a family drawn uniformly, then a reinforcement level), then the whole pool is shuffled. The recipes are game data and equal the legacy lists for every soul. Shuffled and Replaced are byte-identical to before (the boss souls stay), so no Seed Code changes; `transposed` is the third value of the existing `items.soulItems`.
+3. **Recorded deviations** (all in `docs/ITEM_PROGRESSION_MODEL.md`): the two list partitions (Ornstein, Artorias), no Sunlight Spear for Gwyn's soul (a talk-script exchange, not game parameters), the boss souls stay put in the two older modes, a global permutation instead of the legacy's difficulty-ordered fill.
+4. **DLC.** The DLC boss rows carry `m12_01_00_00`, so the existing rule (no progression, Titanite, Ember or other restricted item in the DLC) holds for them.
+5. **includeDlc stays a fixed `true`** (decision C, section 7 of `docs/ITEM_PROGRESSION_MODEL.md`): no source has such an option; excluding the DLC is a separate phase.

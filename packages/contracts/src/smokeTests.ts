@@ -70,7 +70,7 @@ export const SMOKE_START = { map: 'm18_01_00_00', mapName: 'Undead Asylum', x: -
 
 /** One thing a quick world promises, in the words the tester reads and in the terms a static check of the generated files uses. */
 export interface SmokeExpectation {
-  kind: 'roaming-boss' | 'regular-enemy' | 'boss' | 'encounter-body' | 'hostile-npc';
+  kind: 'roaming-boss' | 'regular-enemy' | 'boss' | 'encounter-body' | 'hostile-npc' | 'item-lot';
   map: string;
   mapName: string;
   /** The part name in the map's MSB (`c2500_0006`), the same as the slot id after the colon. */
@@ -88,6 +88,14 @@ export interface SmokeExpectation {
   disableRespawn?: boolean;
   /** A roaming boss gets its own wake-up event; a static check looks for it. */
   wakeUpEvent?: boolean;
+  /**
+   * `item-lot` (Part H): a pickup that holds a given item. `slot` reads "lot <row>", `replacedName` is the item that lies there in the clean game, `name` the item
+   * that must lie there now, `model` its game id; `fromSoul` names the boss soul a transposed weapon was made from.
+   */
+  lotRow?: number;
+  itemId?: number;
+  itemCategory?: number;
+  fromSoul?: string;
 }
 
 /** What a person who played a world in the real game reported. Only a manual result belongs here; static checks never set it. */
@@ -124,11 +132,13 @@ const upText = (up: number) => (Math.abs(up) < 2 ? ', on the same floor as the s
 
 /** "Undead Asylum: the Hollow at slot c2500_0006, 8.7 m from where you wake up, on the same floor as the start". */
 export function describeSmokeTarget(expectation: SmokeExpectation): string {
+  if (expectation.kind === 'item-lot') return `${expectation.mapName}: the pickup where the ${expectation.replacedName} lies in the clean game (item lot ${expectation.lotRow}), ${expectation.meters} m from where you wake up${upText(expectation.up)}`;
   return `${expectation.mapName}: the ${expectation.replacedName} at slot ${expectation.slot}, ${expectation.meters} m from where you wake up${upText(expectation.up)}`;
 }
 
 /** "Capra Demon (c2240) replaces the Hollow at slot c2500_0006". */
 export function describeSmokeExpected(expectation: SmokeExpectation): string {
+  if (expectation.kind === 'item-lot') return `${expectation.name} (weapon id ${expectation.itemId}) lies where the ${expectation.replacedName} lay${expectation.fromSoul ? `: a weapon made from the ${expectation.fromSoul}, which no longer exists as a soul anywhere in this world` : ''}`;
   if (expectation.kind === 'encounter-body') return `${expectation.name} (${expectation.model}) takes the place of ${expectation.replacedName} as the body of the boss encounter; the health bar and the name on it stay ${expectation.replacedName}'s, and the fight completes when ${expectation.name} dies`;
   if (expectation.kind === 'hostile-npc') return `${expectation.name} (${expectation.model}) stands in place of the ${expectation.replacedName} at slot ${expectation.slot} as a hostile fighter: no dialogue, no shop, the drops and rewards of that slot`;
   if (expectation.kind === 'boss') return `${expectation.name} (${expectation.model}) takes the place of ${expectation.replacedName}, the first boss`;
@@ -192,6 +202,12 @@ export const QUICK_SMOKE_RECIPES: Readonly<Record<string, { seedPrefix: string; 
     settings: {
       items: { enabled: false }, fog: { enabled: false },
       enemies: { randomizeBosses: false, placement: { algorithm: 'sampling-v1', fit: 'anywhere', difficultyMode: 'random', replacementChance: 100, normalReplacement: 'normals', hostileNpcs: true } },
+    },
+  },
+  'quick-transposed-soul': {
+    seedPrefix: 'smoke-q9-soul',
+    settings: {
+      items: { soulItems: 'transposed' }, enemies: { enabled: false }, fog: { enabled: false },
     },
   },
   'quick-roaming-respawn': {
@@ -350,6 +366,25 @@ export const SMOKE_SCENARIOS: readonly SmokeScenario[] = [
     afterwards: [
       'The real Andre of Astora in the Undead Parish is not part of this test and is untouched: he still sells and upgrades there.',
       'The other first-visit Hollows are ordinary enemies of this world.',
+    ],
+  },
+  {
+    id: 'quick-transposed-soul', category: 'quick', title: 'Soul items Transposed - a boss weapon in your cell', masterSeed: 'smoke-q9-soul-33',
+    purpose: 'Soul items "Transposed": the boss souls join the item pool and some become the weapons they can be turned into; here the weapon made from the Soul of Smough lies in the first cell.',
+    settings: QUICK_SMOKE_RECIPES['quick-transposed-soul'].settings,
+    expectations: [{
+      kind: 'item-lot', map: 'm18_01_00_00', mapName: 'Undead Asylum', slot: 'lot 1810080', replacedModel: 'item', replacedName: 'Peculiar Doll', model: '856400', name: "Smough's Hammer",
+      meters: 2.8, up: 0.2, lotRow: 1810080, itemId: 856400, itemCategory: 0, fromSoul: 'Soul of Smough',
+    }],
+    estimateSeconds: 30,
+    observe: [
+      "You wake up in the cell. The Peculiar Doll lies in the clean game on the floor of this cell; here the same pickup holds Smough's Hammer (a reinforced copy: the weapon id is 856400).",
+      "Pick it up: it is a normal weapon item named Smough's Hammer, not a soul and not the Doll. (Do not equip it: it needs far more strength than a new character has.)",
+      'The Peculiar Doll is not in the cell any more: it is an ordinary item of the pool and lies in another place of this world.',
+    ],
+    afterwards: [
+      'Nothing else is to be checked in this world. Where the Soul of Smough itself would lie, a weapon (or another pool item) lies now: the soul of this seed no longer exists.',
+      'To see the whole picture turn on the spoiler log: the section BOSS REWARDS names every boss soul and what lies in its place.',
     ],
   },
   {

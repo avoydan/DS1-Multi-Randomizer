@@ -121,6 +121,7 @@ try {
       const expectations = scenario.expectations.map((entry) => ({
         id: `${scenario.id}/${entry.slot}`, map: entry.map, slot: entry.slot, model: entry.model, kind: entry.kind,
         souls: entry.souls, disableRespawn: entry.disableRespawn, wakeUpEvent: entry.wakeUpEvent,
+        lotRow: entry.lotRow, itemId: entry.itemId, itemCategory: entry.itemCategory,
       }));
       const expectationsFile = path.join(temp, `expect-${scenario.id}.json`);
       await writeFile(expectationsFile, JSON.stringify(expectations));

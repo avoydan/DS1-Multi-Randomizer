@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { access } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import type { PipelinePlan, RandomizerConfig } from '@ds1tr/contracts';
+import type { PipelinePlan, PlanBehavior, RandomizerConfig } from '@ds1tr/contracts';
 import { deriveSeeds } from './seeds.js';
 import { ExternalAdapter } from '../adapters/externalAdapter.js';
 import { effectiveCombinedEnabled, validateRandomizerConfig } from './configValidation.js';
@@ -28,6 +28,42 @@ const adapters = {
   }),
 };
 
+/** The plan preview in words: which behaviors the settings switch on. It names no location, so it can be shown before and without the spoiler log. */
+export function describePlanBehaviors(config: RandomizerConfig): PlanBehavior[] {
+  const lines: PlanBehavior[] = [];
+  const items = config.items;
+  if (!items.enabled) {
+    lines.push({ label: 'Items', value: 'not randomized' });
+  } else {
+    const pools = [
+      items.randomizeWorldItems && 'world items', items.randomizeGifts && 'NPC gifts', items.randomizeEnemyDrops && 'enemy drops', items.randomizeShops && 'shops',
+    ].filter(Boolean);
+    lines.push({ label: 'Items', value: pools.length > 0 ? `shuffled: ${pools.join(', ')}` : 'only the selected extras (no item pool is on)' });
+    const soulsActive = items.randomizeWorldItems || items.randomizeGifts || items.randomizeEnemyDrops;
+    const souls = soulsActive
+      ? ({
+        shuffled: 'Shuffled (the lesser souls move with the other items; the boss souls stay with their bosses)',
+        replaced: 'Replaced (the lesser souls become other consumables)',
+        transposed: 'Transposed (the boss souls join the item pool; each has a 75% chance to become a weapon made from that soul)',
+      } as const)[items.soulItems]
+      : 'no effect (turn on world items, NPC gifts or enemy drops)';
+    lines.push({ label: 'Soul items', value: souls });
+    lines.push({ label: 'Key items', value: 'stay where the game puts them (progression items are protected)' });
+    lines.push({ label: 'Lordvessel', value: 'stays where the game puts it (given by Gwynevere)' });
+    lines.push({ label: 'Lord Souls', value: 'stay where the game puts them (the rewards of the four Lords)' });
+  }
+  if (config.enemies.enabled) {
+    lines.push({
+      label: 'Enemy placement',
+      value: config.enemies.placement.algorithm === 'sampling-v1' ? 'Sampling (each slot chooses a compatible replacement)' : 'Classic permutation (the existing enemies are shuffled)',
+    });
+  } else {
+    lines.push({ label: 'Enemies and bosses', value: 'not randomized' });
+  }
+  lines.push({ label: 'Fog randomizer', value: config.fog.enabled ? 'on' : 'off' });
+  return lines;
+}
+
 export async function createPipelinePlan(config: RandomizerConfig): Promise<PipelinePlan> {
   validateRandomizerConfig(config);
   const seeds = deriveSeeds(config.masterSeed);
@@ -46,6 +82,7 @@ export async function createPipelinePlan(config: RandomizerConfig): Promise<Pipe
       { engine: 'fog', enabled: config.fog.enabled, seed: seeds.fog },
     ],
     engineStatus,
+    behaviors: describePlanBehaviors(config),
   };
 }
 

@@ -23,6 +23,7 @@ There are two kinds of world.
 | `quick-roaming-repeated` | Roaming boss - three at once | c2500_0006 (8.7 m), c2500_0007 (11.4 m), c2500_0005 (33.2 m) | ~35 s |
 | `quick-sampling-asylum` | Regular enemies - first three change | c2500_0006 (8.7 m), c2500_0007 (11.4 m), c2500_0005 (33.2 m) | ~35 s |
 | `quick-hostile-npc` | Hostile NPC - Andre as an enemy | c2500_0006 (8.7 m) | ~30 s |
+| `quick-transposed-soul` | Soul items Transposed - a boss weapon in your cell | lot 1810080 (2.8 m) | ~30 s |
 | `quick-boss-asylum-demon` | Boss sampling - the first boss | c2232_0000 (22.5 m) | ~90 s |
 
 ### How the targets were chosen
@@ -277,6 +278,41 @@ A hostile NPC combatant stands where a regular enemy stood: the real NPCs are un
 
 ```
 DS1TR1-06NJDCP6-577CVKTE-TMPV8045-JEQAK68H-R5X0FFBR-3PPQH1KA-RP1NWGGC-T6D0FE8C-31HDB3ME-A937WWA9-CS7AMQR1-5JJB3NA4-T001QBCA-N181A080-MY41T68
+```
+
+### Soul items Transposed - a boss weapon in your cell
+
+**Quick smoke test** - ID `quick-transposed-soul`
+
+Soul items "Transposed": the boss souls join the item pool and some become the weapons they can be turned into; here the weapon made from the Soul of Smough lies in the first cell.
+
+**Target**
+
+- Undead Asylum: the pickup where the Peculiar Doll lies in the clean game (item lot 1810080), 2.8 m from where you wake up, on the same floor as the start
+
+**Expected**
+
+- Smough's Hammer (weapon id 856400) lies where the Peculiar Doll lay: a weapon made from the Soul of Smough, which no longer exists as a soul anywhere in this world
+
+**Estimated time to the target:** ~30 seconds after you gain control.
+
+**Needs a reset or reload:** no
+
+**Gameplay result:** not played in the real game yet; only the static check exists.
+
+**Check**
+
+- [ ] You wake up in the cell. The Peculiar Doll lies in the clean game on the floor of this cell; here the same pickup holds Smough's Hammer (a reinforced copy: the weapon id is 856400).
+- [ ] Pick it up: it is a normal weapon item named Smough's Hammer, not a soul and not the Doll. (Do not equip it: it needs far more strength than a new character has.)
+- [ ] The Peculiar Doll is not in the cell any more: it is an ordinary item of the pool and lies in another place of this world.
+
+**Afterwards**
+
+- [ ] Nothing else is to be checked in this world. Where the Soul of Smough itself would lie, a weapon (or another pool item) lies now: the soul of this seed no longer exists.
+- [ ] To see the whole picture turn on the spoiler log: the section BOSS REWARDS names every boss soul and what lies in its place.
+
+```
+DS1TR1-06NJDCP6-577CVKTE-TMPV9N05-2P1BNHP6-MFTWXG6M-7CJMB2BS-RM2ZKHF4-TMYEGXMF-ARYM7EQA-G43D0T6X-8E2VM1R0-J025KYR
 ```
 
 ### Boss sampling - the first boss

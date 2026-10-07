@@ -12,10 +12,10 @@ import { canonicalizeSettings } from '../../dist/core/canonicalSettings.js';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.join(here, '..', '..', '..', '..');
 
-test('the smoke-test worlds are eight quick smoke tests and twenty-two extended gameplay tests with unique ids and seeds', () => {
+test('the smoke-test worlds are nine quick smoke tests and twenty-two extended gameplay tests with unique ids and seeds', () => {
   const quick = SMOKE_SCENARIOS.filter((scenario) => scenario.category === 'quick').map((scenario) => scenario.id);
   const extended = SMOKE_SCENARIOS.filter((scenario) => scenario.category === 'extended').map((scenario) => scenario.id);
-  assert.deepEqual(quick, ['quick-roaming-basic', 'quick-roaming-souls', 'quick-encounter-body', 'quick-roaming-respawn', 'quick-roaming-repeated', 'quick-sampling-asylum', 'quick-hostile-npc', 'quick-boss-asylum-demon']);
+  assert.deepEqual(quick, ['quick-roaming-basic', 'quick-roaming-souls', 'quick-encounter-body', 'quick-roaming-respawn', 'quick-roaming-repeated', 'quick-sampling-asylum', 'quick-hostile-npc', 'quick-transposed-soul', 'quick-boss-asylum-demon']);
   assert.deepEqual(extended, [
     'classic-triple', 'sampling-regular', 'second-gargoyle', 'parish-models', 'boss-sampling', 'boss-repeat', 'boss-unique', 'boss-partial',
     'roaming-repeat', 'roaming-gargoyle', 'roaming-fog', 'roaming-parish',
@@ -42,7 +42,7 @@ test('every quick smoke test states an exact target, an expected replacement and
       assert.doesNotMatch(line, /find a boss|somewhere|among the regular enemies/iu, `${id}: no vague instruction ("${line}")`);
     }
     for (const entry of scenario.expectations) {
-      assert.match(entry.slot, /^c\d{4}_\d{4}$/u, `${id}: an exact slot`);
+      assert.match(entry.slot, entry.kind === 'item-lot' ? /^lot \d+$/u : /^c\d{4}_\d{4}$/u, `${id}: an exact slot`);
       assert.ok(entry.meters > 0 && entry.meters <= 40 || entry.kind === 'boss', `${id}/${entry.slot}: close to the start (${entry.meters} m)`);
       assert.ok(entry.name && entry.replacedName && entry.model && entry.replacedModel, `${id}/${entry.slot} names both models`);
       assert.equal(entry.map, SMOKE_START.map, `${id}: the first visit of the Undead Asylum`);

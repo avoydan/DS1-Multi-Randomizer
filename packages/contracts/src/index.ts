@@ -1,8 +1,11 @@
 import type { GenerationSettings } from './generation.js';
 export type EngineName = 'combined' | 'fog';
 
-/** Legacy "Soul items": shuffled with the pool (default) or replaced by other consumables. "Transposed" needs boss-soul data the catalog lacks. */
-export type SoulItemsMode = 'shuffled' | 'replaced';
+/**
+ * Legacy "Soul items": shuffled with the pool (default), replaced by other consumables, or transposed (the boss souls join the pool and
+ * each has a 75% chance to become a boss weapon of its boss; docs/ITEM_PROGRESSION_MODEL.md).
+ */
+export type SoulItemsMode = 'shuffled' | 'replaced' | 'transposed';
 
 /** Legacy "Starting items": right-hand weapon rule and left-hand pool. 'shield-2h' is the legacy default. */
 export type StartingItemsMode = 'shield-1h' | 'shield-2h' | 'mixed-pool';
@@ -282,6 +285,12 @@ export interface EngineStatus {
   detail: string;
 }
 
+/** One line of the plan preview: what an active setting does, in plain words. Never a location (spoilers stay in the spoiler log). */
+export interface PlanBehavior {
+  label: string;
+  value: string;
+}
+
 export interface PipelinePlan {
   seeds: DerivedSeeds;
   stages: Array<{
@@ -290,6 +299,8 @@ export interface PipelinePlan {
     seed: string | number;
   }>;
   engineStatus: EngineStatus[];
+  /** The behaviors the selected settings switch on, for the preview (optional: older backends do not send it). */
+  behaviors?: PlanBehavior[];
 }
 
 export interface GameStateReport {

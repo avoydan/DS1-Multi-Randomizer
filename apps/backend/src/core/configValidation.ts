@@ -19,7 +19,7 @@ const fogKeys = [
   'pacifistMode', 'language',
 ] as const;
 const outputKeys = ['includeDlc', 'generateSpoilerLog'] as const;
-const soulItemModes = new Set(['shuffled', 'replaced']);
+const soulItemModes = new Set(['shuffled', 'replaced', 'transposed']);
 const startingItemModes = new Set(['shield-1h', 'shield-2h', 'mixed-pool']);
 const gwynNerfModes = new Set(['none', 'medium', 'strong']);
 const secondGargoyleModes = new Set(['replace', 'keep', 'single-boss']);
