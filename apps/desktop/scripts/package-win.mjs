@@ -53,8 +53,7 @@ await rm(path.join(desktop, 'dist-electron'), { recursive: true, force: true });
 await run(process.execPath, [npmCli, 'run', 'build', '-w', '@ds1tr/desktop']);
 // The helpers are published self-contained for win-x64, so a computer without any .NET installation can run them.
 // Nothing at run time uses the dotnet CLI, PATH or a global runtime. Single file, NOT compressed: a compressed single-file bundle is one
-// 34 MB block of 7.8 bits-per-byte data, the profile antivirus heuristics associate with packed executables, and it starts three times slower (every start
-// decompresses it). The uncompressed bundle (6.7 bits per byte, like the Electron executable itself) is 32 MB larger on disk, signs and starts the same
+// 34 MB block of 7.8 bits-per-byte data, the profile antivirus heuristics associate with packed executables, and it is decompressed at every start (DsrDataTool started in 1,054 ms against 373 ms, FogHost in 315 ms against 384 ms). The uncompressed bundle (6.7 bits per byte, like the Electron executable itself) is 32 MB larger on disk and signs the same
 // (docs/RELEASE_TRUST.md, "Helper packaging experiment"; tools/release/helper-format-experiment.mjs reproduces the numbers).
 const publishArgs = ['-c', 'Release', '-r', 'win-x64', '--self-contained', 'true', '--no-restore',
   '-p:PublishSingleFile=true', '-p:DebugType=None', '-p:DebugSymbols=false'];

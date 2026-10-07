@@ -90,7 +90,7 @@ The cap is a DS1TR limit, not a legacy rule; the window measurements are in `ENE
 activation, a disabled entity, the Moonlight Butterfly's deferred entrance, the hydra's disabled bodies) was silently dropped, and the model-specific analysis of its entities (which instructions of the owner file are tied to a model)
 found nothing to lock. The body, the params and the AI were correct; the runtime event was missing.
 
-**Proof from the game data** (`msbdump ownership` over a clean copy; every MSB's enemy and object entity IDs against every event file): `m12_00_00_01` has the same **108** entity IDs as `m12_00_00_00` (the two MSBs are two instances of the Darkroot area
+**Proof from the game data** (a one-off analysis of a clean copy, with a scratch tool that is not in the repository; the guards that stay are `EnsureEventOwnersExist` and `SmokeVerify audit`; every MSB's enemy and object entity IDs against every event file): `m12_00_00_01` has the same **108** entity IDs as `m12_00_00_00` (the two MSBs are two instances of the Darkroot area
 that use the same numbers); **96** of them are named in `m12_00_00_00.emevd.dcx` (4 in the DLC file) and in no other file. Every other gameplay MSB (`m10_00` ... `m18_01`, 17 maps) has its own event file and is named mainly by it
 (for example `m18_01_00_00`: 82 of 98 in its own file). So the Garden's file is the owner of the Basin, and the Basin is the only map that shares one. The same holds for the AI bundle (`script/m12_00_00_00.luabnd.dcx`; the tool always shared that).
 The legacy tool treats the Basin the same way for the AI bundle (`aiFileName = "m12_00_00_00"` when `inFile` is the Basin; "doesn't have one (This is supposed to happen)") and has no event file of its own to open for it.

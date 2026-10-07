@@ -179,7 +179,7 @@ test('the documented Seed Codes in docs/SMOKE_TESTS.md are the codes the app cre
   assert.match(text, /Nothing here is verified in the game/u);
 });
 
-test('the main screen starts from the same defaults the test worlds are built from', async () => {
+test('the main screen starts from the product default settings, a complete and valid configuration (the test worlds have their own frozen base)', async () => {
   const app = await readFile(path.join(repo, 'apps', 'desktop', 'src', 'App.tsx'), 'utf8');
   assert.match(app, /joinConfig\(structuredClone\(DEFAULT_GENERATION_SETTINGS\), '', '', true\)/u);
   // The defaults are a complete, valid configuration.

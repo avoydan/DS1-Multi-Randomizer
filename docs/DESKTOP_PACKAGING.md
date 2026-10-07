@@ -5,7 +5,7 @@
 The installer copies Electron and its `resources/runtime` payload to the install folder; the portable executable extracts them to a temporary folder at every start. The same payload is visible in `release/win-unpacked` for inspection. It includes:
 
 - compiled backend and vendored combined JavaScript core;
-- DsrDataTool and FogHost as **self-contained win-x64 single-file executables** (about 66 MB each, **not compressed** - a compressed bundle is one block of packer-like data and starts three times slower, see `docs/RELEASE_TRUST.md` section 3 - with the
+- DsrDataTool and FogHost as **self-contained win-x64 single-file executables** (about 66 MB each, **not compressed** - a compressed bundle is one block of packer-like data and is decompressed at every start (DsrDataTool 1,054 ms against 373 ms, FogHost 315 ms against 384 ms), see `docs/RELEASE_TRUST.md` section 3 - with the
   .NET 8 runtime inside); a computer without .NET runs them. The packager smoke-tests both with every .NET location hidden
   (no `DOTNET_ROOT`, a PATH that holds only System32) and fails the build if one does not start;
 - `@ds1tr/contracts`, which the backend imports at run time. electron-builder never copies a `node_modules` folder through

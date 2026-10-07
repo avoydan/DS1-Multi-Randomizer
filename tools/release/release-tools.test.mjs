@@ -73,3 +73,14 @@ test('the Authenticode reader reports an unsigned file as not signed (it never s
     assert.equal(row.signer, null);
   } finally { await rm(directory, { recursive: true, force: true }); }
 });
+
+// Needs a built package (apps/desktop/release/win-unpacked): it runs when a build is there, and is skipped otherwise.
+const built = await readFile(path.join(repositoryRoot, 'apps', 'desktop', 'release', 'win-unpacked', 'resources', 'app.asar')).then(() => true, () => false);
+test('the verifier fails an unsigned build in public mode and passes it in development mode (the exit code is what the release script and the gate rely on)', { skip: !built }, () => {
+  const verify = path.join(repositoryRoot, 'tools', 'release', 'release-verify.mjs');
+  const development = spawnSync(process.execPath, [verify], { encoding: 'utf8', timeout: 120000, windowsHide: true });
+  const strict = spawnSync(process.execPath, [verify, '--require-signature'], { encoding: 'utf8', timeout: 120000, windowsHide: true });
+  assert.equal(development.status, 0, development.stdout);
+  assert.notEqual(strict.status, 0, 'an unsigned build must never pass public mode');
+  assert.match(strict.stdout, /UNSIGNED/u);
+});
