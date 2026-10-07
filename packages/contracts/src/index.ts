@@ -11,11 +11,19 @@ export type SoulItemsMode = 'shuffled' | 'replaced' | 'transposed';
  * Legacy "Key placement" (Part H, docs/ITEM_PROGRESSION_MODEL.md). `vanilla`: every key stays where the game puts it (the behavior before the option existed).
  * `shuffled`: the keys of FogMod's annotation are placed by a progression-safe fill over the world graph. The legacy's Race Mode and Race Mode + are not built.
  */
-export type KeyPlacementMode = 'vanilla' | 'shuffled';
+export type KeyPlacementMode = 'vanilla' | 'shuffled' | 'race' | 'race-plus';
+
+/**
+ * Legacy item "Difficulty" (Part I, docs/ITEM_DIFFICULTY_MODEL.md): `fair` (the legacy default, DS1TR's neutral value: items have an equal chance anywhere),
+ * `unfair` (desirable items are not placed in plain view), `very-unfair` (desirable items are hidden and rarely in early areas).
+ */
+export type ItemDifficultyMode = 'fair' | 'unfair' | 'very-unfair';
 
 /** The values under which key placement does nothing: what an older Seed Code, preset or settings file means. They never change. */
-export const NEUTRAL_KEY_OPTIONS: { keyPlacement: KeyPlacementMode; randomizeLordvessel: boolean; randomizeLordSouls: boolean } = {
+export const NEUTRAL_KEY_OPTIONS: { keyPlacement: KeyPlacementMode; randomizeLordvessel: boolean; randomizeLordSouls: boolean; itemDifficulty: ItemDifficultyMode; laundromat: boolean } = {
   keyPlacement: 'vanilla',
+  itemDifficulty: 'fair',
+  laundromat: false,
   randomizeLordvessel: false,
   randomizeLordSouls: false,
 };
@@ -50,6 +58,10 @@ export interface ItemOptions {
   startingItems: StartingItemsMode;
   /** Part H: key placement. Needs world items. Neutral: vanilla. */
   keyPlacement: KeyPlacementMode;
+  /** Part I: item difficulty. Neutral: fair. Race Mode + is only available with fair. */
+  itemDifficulty: ItemDifficultyMode;
+  /** Legacy "Laundromat Mixup": NPC characters wear armor pieces other NPCs wear (docs/LAUNDROMAT_MIXUP.md). Neutral: off. */
+  laundromat: boolean;
   /** Legacy "Senile Gwynevere": the Lordvessel joins the key shuffle (needs key placement "shuffled"). Neutral: off. */
   randomizeLordvessel: boolean;
   /** Legacy "Senile Primordial Serpents": the four Lord Soul items join the key shuffle (needs key placement "shuffled"). Neutral: off. */
@@ -354,7 +366,7 @@ export type GenerationResult =
   | { ok: false; code: string; message: string; stage: string };
 
 export const PRESET_FORMAT = 'ds1tr-preset';
-export const PRESET_VERSION = 14;
+export const PRESET_VERSION = 15;
 
 /** Shareable settings: everything in RandomizerConfig except the machine-specific game path. */
 export interface PresetDocument {

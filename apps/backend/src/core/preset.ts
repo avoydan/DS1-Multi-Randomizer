@@ -18,6 +18,10 @@ const batch2Defaults: SectionDefaults = {
 const batch14Defaults: SectionDefaults = {
   items: { keyPlacement: NEUTRAL_KEY_OPTIONS.keyPlacement, randomizeLordvessel: NEUTRAL_KEY_OPTIONS.randomizeLordvessel, randomizeLordSouls: NEUTRAL_KEY_OPTIONS.randomizeLordSouls },
 };
+/** Version 15: item difficulty and Laundromat Mixup (Part I); every older preset means Fair and off. */
+const batch15Defaults: SectionDefaults = {
+  items: { itemDifficulty: NEUTRAL_KEY_OPTIONS.itemDifficulty, laundromat: NEUTRAL_KEY_OPTIONS.laundromat },
+};
 /** Batch 3: the earlier DS1TR Bell Gargoyle behavior (extra bodies disabled), not the new legacy default. */
 const batch3Defaults: SectionDefaults = {
   enemies: { secondGargoyle: 'single-boss' },
@@ -75,19 +79,20 @@ const placementKeysAddedIn: Array<{ version: number; defaults: Record<string, un
 ];
 /** What each older preset version lacks, newest additions last (the nested v6 placement keys are handled apart). */
 const missingByVersion: Record<number, SectionDefaults[]> = {
-  1: [batch1Defaults, batch2Defaults, batch3Defaults, batch4Defaults, batch14Defaults],
-  2: [batch2Defaults, batch3Defaults, batch4Defaults, batch14Defaults],
-  3: [batch3Defaults, batch4Defaults, batch14Defaults],
-  4: [batch4Defaults, batch14Defaults],
-  5: [batch14Defaults],
-  6: [batch14Defaults],
-  7: [batch14Defaults],
-  8: [batch14Defaults],
-  9: [batch14Defaults],
-  10: [batch14Defaults],
-  11: [batch14Defaults],
-  12: [batch14Defaults],
-  13: [batch14Defaults],
+  1: [batch1Defaults, batch2Defaults, batch3Defaults, batch4Defaults, batch14Defaults, batch15Defaults],
+  2: [batch2Defaults, batch3Defaults, batch4Defaults, batch14Defaults, batch15Defaults],
+  3: [batch3Defaults, batch4Defaults, batch14Defaults, batch15Defaults],
+  4: [batch4Defaults, batch14Defaults, batch15Defaults],
+  5: [batch14Defaults, batch15Defaults],
+  6: [batch14Defaults, batch15Defaults],
+  7: [batch14Defaults, batch15Defaults],
+  8: [batch14Defaults, batch15Defaults],
+  9: [batch14Defaults, batch15Defaults],
+  10: [batch14Defaults, batch15Defaults],
+  11: [batch14Defaults, batch15Defaults],
+  12: [batch14Defaults, batch15Defaults],
+  13: [batch14Defaults, batch15Defaults],
+  14: [batch15Defaults],
 };
 
 const presetKeys = ['format', 'presetVersion', 'masterSeed', 'items', 'enemies', 'fog', 'output'];
@@ -120,6 +125,8 @@ export function exportPreset(config: RandomizerConfig): PresetDocument {
       keyPlacement: config.items.keyPlacement ?? NEUTRAL_KEY_OPTIONS.keyPlacement,
       randomizeLordvessel: config.items.randomizeLordvessel ?? NEUTRAL_KEY_OPTIONS.randomizeLordvessel,
       randomizeLordSouls: config.items.randomizeLordSouls ?? NEUTRAL_KEY_OPTIONS.randomizeLordSouls,
+      itemDifficulty: config.items.itemDifficulty ?? NEUTRAL_KEY_OPTIONS.itemDifficulty,
+      laundromat: config.items.laundromat ?? NEUTRAL_KEY_OPTIONS.laundromat,
     },
     enemies: canonicalEnemies(config.enemies), fog: config.fog, output: config.output,
   };
@@ -139,7 +146,7 @@ export function importPreset(text: string): PresetImportResult {
   const problems: string[] = [];
   if (record.format !== PRESET_FORMAT) problems.push(`Preset format must be "${PRESET_FORMAT}".`);
   if (record.presetVersion !== PRESET_VERSION && !(typeof record.presetVersion === 'number' && missingByVersion[record.presetVersion])) {
-    problems.push(`Preset version must be ${PRESET_VERSION} (versions 1 to 13 are migrated).`);
+    problems.push(`Preset version must be ${PRESET_VERSION} (versions 1 to 14 are migrated).`);
   }
   for (const key of Object.keys(record)) {
     if (!presetKeys.includes(key)) problems.push(`preset.${key} is not supported.`);

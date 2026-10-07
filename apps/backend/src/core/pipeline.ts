@@ -49,8 +49,14 @@ export function describePlanBehaviors(config: RandomizerConfig): PlanBehavior[] 
       : 'no effect (turn on world items, NPC gifts or enemy drops)';
     lines.push({ label: 'Soul items', value: souls });
     // A configuration with key placement but no world items is refused by the validation before a plan exists.
-    if ((items.keyPlacement ?? 'vanilla') === 'shuffled') {
-      lines.push({ label: 'Key items', value: 'Shuffled (placed by a safety-checked fill over the world graph: every area stays reachable and Firelink Altar can be reached; gifts, shops and drops never hold a key)' });
+    const keyMode = items.keyPlacement ?? 'vanilla';
+    if (keyMode !== 'vanilla') {
+      const keyValue = ({
+        shuffled: 'Shuffled (placed by a safety-checked fill over the world graph: every area stays reachable and Firelink Altar can be reached; gifts, shops and drops never hold a key)',
+        race: 'Race Mode (the keys and embers lie only in boss rewards, chests and the places where keys normally are; the same safety check applies)',
+        'race-plus': 'Race Mode + (as Race Mode, but a world may need skips and glitches such as the Capra skip or the Seal skip to be completed; softlocking is possible without them)',
+      } as const)[keyMode];
+      lines.push({ label: 'Key items', value: keyValue });
       lines.push({ label: 'Lordvessel', value: items.randomizeLordvessel ? 'shuffled with the keys (Gwynevere then hands over another item of the pool)' : 'stays where the game puts it (given by Gwynevere)' });
       lines.push({ label: 'Lord Souls', value: items.randomizeLordSouls ? 'shuffled with the keys (the four rewards go to other pickups, and the Lords drop other items)' : 'stay where the game puts them (the rewards of the four Lords)' });
     } else {
@@ -58,6 +64,16 @@ export function describePlanBehaviors(config: RandomizerConfig): PlanBehavior[] 
       lines.push({ label: 'Lordvessel', value: 'stays where the game puts it (given by Gwynevere)' });
       lines.push({ label: 'Lord Souls', value: 'stay where the game puts them (the rewards of the four Lords)' });
     }
+    const difficulty = items.itemDifficulty ?? 'fair';
+    lines.push({
+      label: 'Item difficulty',
+      value: ({
+        fair: 'Fair (items have an equal chance to be placed anywhere)',
+        unfair: 'Unfair (desirable items are not placed in plain view)',
+        'very-unfair': 'Very Unfair (desirable items are hidden and rarely in early areas)',
+      } as const)[difficulty],
+    });
+    if (items.laundromat) lines.push({ label: 'Laundromat Mixup', value: 'on (NPC characters wear armor pieces other NPCs wear; only their appearance and armor stats change)' });
   }
   if (config.enemies.enabled) {
     lines.push({

@@ -50,10 +50,13 @@ export interface UpstreamCombinedRandomizerConfig {
   /** Items the world randomizer follows and the lots it can follow them in; null when it does not run. */
   fogTrackedItems: FogTrackedItems | null;
   /** Part H: key placement. "vanilla" is the engine's behavior without the option. */
-  keyPlacement: 'vanilla' | 'shuffled';
+  keyPlacement: 'vanilla' | 'shuffled' | 'race' | 'race-plus';
+  /** Part I: item difficulty (fair = the engine's neutral behavior) and Laundromat Mixup. */
+  itemDifficulty: 'fair' | 'unfair' | 'very-unfair';
+  laundromat: boolean;
   keyRandomizeLordvessel: boolean;
   keyRandomizeLordSouls: boolean;
-  /** The exported progression model; null unless key placement is "shuffled". */
+  /** The exported progression model; null unless key placement or an item difficulty needs it. */
   progressionModel: unknown | null;
   generateSpoilerLog: boolean;
 }
@@ -75,7 +78,7 @@ export function mapCombinedRandomizerConfig(
   const itemPoolsWithSouls = request.items.enabled && (
     request.items.randomizeWorldItems || request.items.randomizeGifts || request.items.randomizeEnemyDrops
   );
-  const keysShuffled = request.items.enabled && request.items.randomizeWorldItems && (request.items.keyPlacement ?? 'vanilla') === 'shuffled';
+  const keysOn = request.items.enabled && request.items.randomizeWorldItems && (request.items.keyPlacement ?? 'vanilla') !== 'vanilla';
   const config: UpstreamCombinedRandomizerConfig = {
     seed: request.combinedSeed,
     gameDirectory: request.gamePath,
@@ -133,10 +136,12 @@ export function mapCombinedRandomizerConfig(
     placementDiagnosticsLevel: request.placementDiagnosticsLevel ?? 'summary',
     fogTrackedItems: request.fogTrackedItems ?? null,
     // Part H options are optional on input (an older configuration means the keys stay where the game puts them).
-    keyPlacement: keysShuffled ? 'shuffled' : 'vanilla',
-    keyRandomizeLordvessel: keysShuffled && (request.items.randomizeLordvessel ?? false),
-    keyRandomizeLordSouls: keysShuffled && (request.items.randomizeLordSouls ?? false),
-    progressionModel: keysShuffled ? (request.progressionModel ?? null) : null,
+    keyPlacement: keysOn ? (request.items.keyPlacement as UpstreamCombinedRandomizerConfig['keyPlacement']) : 'vanilla',
+    itemDifficulty: request.items.enabled ? (request.items.itemDifficulty ?? 'fair') : 'fair',
+    laundromat: request.items.enabled && (request.items.laundromat ?? false),
+    keyRandomizeLordvessel: keysOn && (request.items.randomizeLordvessel ?? false),
+    keyRandomizeLordSouls: keysOn && (request.items.randomizeLordSouls ?? false),
+    progressionModel: keysOn || (request.items.enabled && (request.items.itemDifficulty ?? 'fair') !== 'fair') ? (request.progressionModel ?? null) : null,
     generateSpoilerLog: request.generateSpoilerLog,
   };
 
@@ -146,6 +151,7 @@ export function mapCombinedRandomizerConfig(
     || config.randomizeGifts
     || config.randomizeEnemyDrops
     || config.randomizeShops
+    || config.laundromat
     || config.randomizeEnemies
     || config.randomizeBosses;
 

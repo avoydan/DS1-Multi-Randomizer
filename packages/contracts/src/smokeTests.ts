@@ -20,7 +20,7 @@ export const SMOKE_TEST_BASE_SETTINGS: GenerationSettings = {
     enabled: true, randomizeWorldItems: true, randomizeProtectedItems: false, progressionLogic: true, guaranteeEarlyWeapon: true,
     balancedEarlyLoot: true, randomizeStartingClass: false, randomizeStartingEquipment: false, randomizeGifts: false,
     randomizeEnemyDrops: false, guaranteedEnemyDrops: false, randomizeShops: false, fashionSouls: true, soulItems: 'shuffled',
-    startingItems: 'shield-2h', keyPlacement: 'vanilla', randomizeLordvessel: false, randomizeLordSouls: false,
+    startingItems: 'shield-2h', keyPlacement: 'vanilla', randomizeLordvessel: false, randomizeLordSouls: false, itemDifficulty: 'fair', laundromat: false,
   },
   enemies: {
     enabled: true, randomizeRegularEnemies: true, randomizeBosses: true, scaling: 'area', replaceMimics: true,
@@ -229,6 +229,26 @@ export const QUICK_SMOKE_RECIPES: Readonly<Record<string, { seedPrefix: string; 
     settings: {
       items: { keyPlacement: 'shuffled', randomizeLordSouls: true }, enemies: { enabled: false }, fog: { enabled: false },
     },
+  },
+  'quick-race': {
+    seedPrefix: 'smoke-q13-race',
+    settings: { items: { keyPlacement: 'race' }, enemies: { enabled: false }, fog: { enabled: false } },
+  },
+  'quick-race-plus': {
+    seedPrefix: 'smoke-q14-raceplus',
+    settings: { items: { keyPlacement: 'race-plus' }, enemies: { enabled: false }, fog: { enabled: false } },
+  },
+  'quick-fair': {
+    seedPrefix: 'smoke-q15-diff',
+    settings: { items: { itemDifficulty: 'fair' }, enemies: { enabled: false }, fog: { enabled: false } },
+  },
+  'quick-unfair': {
+    seedPrefix: 'smoke-q15-diff',
+    settings: { items: { itemDifficulty: 'unfair' }, enemies: { enabled: false }, fog: { enabled: false } },
+  },
+  'quick-very-unfair': {
+    seedPrefix: 'smoke-q15-diff',
+    settings: { items: { itemDifficulty: 'very-unfair' }, enemies: { enabled: false }, fog: { enabled: false } },
   },
   'quick-roaming-respawn': {
     seedPrefix: 'smoke-q6-respawn',
@@ -465,6 +485,96 @@ export const SMOKE_SCENARIOS: readonly SmokeScenario[] = [
     ],
   },
   {
+    id: 'quick-race', category: 'quick', title: 'Race Mode - a key in your cell', masterSeed: 'smoke-q13-race-4',
+    purpose: 'Key placement "Race Mode": the keys and the embers lie only in boss rewards, chests and where keys normally are; here the Blighttown Key lies in the first cell, where the clean game has the Peculiar Doll (the Doll is one of those key places).',
+    settings: QUICK_SMOKE_RECIPES['quick-race'].settings,
+    expectations: [{
+      kind: 'item-lot', map: 'm18_01_00_00', mapName: 'Undead Asylum', slot: 'lot 1810080', replacedModel: 'item', replacedName: 'Peculiar Doll', model: '2007', name: 'Blighttown Key',
+      meters: 2.8, up: 0.2, lotRow: 1810080, itemId: 2007, itemCategory: 1073741824, movedKeyFrom: "as the reward of the Gaping Dragon in the Depths",
+    }],
+    estimateSeconds: 30,
+    observe: [
+      'You wake up in the cell. In the clean game the Peculiar Doll lies on the floor of this cell; here the same pickup holds the Blighttown Key.',
+      'Pick it up: it is a normal key item named Blighttown Key (it opens the way from the Depths to Blighttown; you will not need it in the Asylum).',
+      'The Peculiar Doll is not in the cell any more: it lies in another place of this world, in one of the Race Mode places.',
+    ],
+    afterwards: [
+      'Nothing else is to be checked in this world. In Race Mode every key and every ember lies in a boss reward, a chest or a place where a key normally lies; to see where, turn on the spoiler log: the section KEY PLACEMENT names each one.',
+    ],
+  },
+  {
+    id: 'quick-race-plus', category: 'quick', title: 'Race Mode + - a key in your cell, a world that needs a skip', masterSeed: 'smoke-q14-raceplus-239',
+    purpose: 'Key placement "Race Mode +": as Race Mode, but the world may need skips and glitches; here the Basement Key lies in the first cell, and this world is one whose keys are placed so that a skip of the list (the Capra skip, the Lower Burg skip, the Annex jump or the Seal skip) is needed to complete it.',
+    settings: QUICK_SMOKE_RECIPES['quick-race-plus'].settings,
+    expectations: [{
+      kind: 'item-lot', map: 'm18_01_00_00', mapName: 'Undead Asylum', slot: 'lot 1810080', replacedModel: 'item', replacedName: 'Peculiar Doll', model: '2001', name: 'Basement Key',
+      meters: 2.8, up: 0.2, lotRow: 1810080, itemId: 2001, itemCategory: 1073741824, movedKeyFrom: "in the Undead Parish",
+    }],
+    estimateSeconds: 30,
+    observe: [
+      'You wake up in the cell. In the clean game the Peculiar Doll lies on the floor of this cell; here the same pickup holds the Basement Key.',
+      'Pick it up: it is a normal key item named Basement Key (it opens the Undead Burg basement; you will not need it in the Asylum).',
+      'The Peculiar Doll is not in the cell any more: it lies in another place of this world.',
+    ],
+    afterwards: [
+      'Nothing else is to be checked in this world. It exists to show that Race Mode + makes a different world from Race Mode: at least one key lies where only a skip reaches it (the spoiler log names every key). Whether the skips work in the game is not part of this test.',
+    ],
+  },
+  {
+    id: 'quick-fair', category: 'quick', title: 'Item difficulty Fair - what lies in your cell', masterSeed: 'smoke-q15-diff-5',
+    purpose: 'Item difficulty "Fair": items have an equal chance anywhere. In this world the first cell, an easy place, holds a weapon, the Mace, where the clean game has the Peculiar Doll (one sample of what Fair does; Unfair and Very Unfair have their own tests with the same master seed).',
+    settings: QUICK_SMOKE_RECIPES['quick-fair'].settings,
+    expectations: [{
+      kind: 'item-lot', map: 'm18_01_00_00', mapName: 'Undead Asylum', slot: 'lot 1810080', replacedModel: 'item', replacedName: 'Peculiar Doll', model: '801000', name: 'Mace',
+      meters: 2.8, up: 0.2, lotRow: 1810080, itemId: 801000, itemCategory: 0,
+    }],
+    estimateSeconds: 30,
+    observe: [
+      'You wake up in the cell. In the clean game the Peculiar Doll lies on the floor of this cell; here the same pickup holds a Mace (a weapon).',
+      'Pick it up: it is a normal weapon item named Mace. (You can equip it; it needs only modest strength.)',
+      'The Peculiar Doll is not in the cell any more: it is an ordinary item of the pool and lies in another place of this world.',
+    ],
+    afterwards: [
+      'This is one sample. With the same master seed, Unfair and Very Unfair put a Soul of a Lost Undead in this cell instead: an easy place gets an easy item. See the tests quick-unfair and quick-very-unfair.',
+    ],
+  },
+  {
+    id: 'quick-unfair', category: 'quick', title: 'Item difficulty Unfair - what lies in your cell', masterSeed: 'smoke-q15-diff-5',
+    purpose: 'Item difficulty "Unfair": desirable items are not placed in plain view. The same master seed as the Fair test: the first cell, an easy place, now holds a Soul of a Lost Undead instead of the Mace (one sample of the bias).',
+    settings: QUICK_SMOKE_RECIPES['quick-unfair'].settings,
+    expectations: [{
+      kind: 'item-lot', map: 'm18_01_00_00', mapName: 'Undead Asylum', slot: 'lot 1810080', replacedModel: 'item', replacedName: 'Peculiar Doll', model: '400', name: 'Soul of a Lost Undead',
+      meters: 2.8, up: 0.2, lotRow: 1810080, itemId: 400, itemCategory: 1073741824,
+    }],
+    estimateSeconds: 30,
+    observe: [
+      'You wake up in the cell. In the clean game the Peculiar Doll lies on the floor of this cell; here the same pickup holds a Soul of a Lost Undead.',
+      'Pick it up: it is a normal consumable item named Soul of a Lost Undead.',
+      'The Peculiar Doll is not in the cell any more: it lies in another place of this world.',
+    ],
+    afterwards: [
+      'This is one sample of an easy place: the Mace of the Fair test is not here. A single world proves nothing about the distribution; the distribution is measured by the automated sweeps.',
+    ],
+  },
+  {
+    id: 'quick-very-unfair', category: 'quick', title: 'Item difficulty Very Unfair - what lies in your cell', masterSeed: 'smoke-q15-diff-5',
+    purpose: 'Item difficulty "Very Unfair": desirable items are hidden and rarely in early areas. The same master seed as the Fair test: the first cell, the easiest place of the world, holds a Soul of a Lost Undead.',
+    settings: QUICK_SMOKE_RECIPES['quick-very-unfair'].settings,
+    expectations: [{
+      kind: 'item-lot', map: 'm18_01_00_00', mapName: 'Undead Asylum', slot: 'lot 1810080', replacedModel: 'item', replacedName: 'Peculiar Doll', model: '400', name: 'Soul of a Lost Undead',
+      meters: 2.8, up: 0.2, lotRow: 1810080, itemId: 400, itemCategory: 1073741824,
+    }],
+    estimateSeconds: 30,
+    observe: [
+      'You wake up in the cell. In the clean game the Peculiar Doll lies on the floor of this cell; here the same pickup holds a Soul of a Lost Undead.',
+      'Pick it up: it is a normal consumable item named Soul of a Lost Undead.',
+      'The Peculiar Doll is not in the cell any more: it lies in another place of this world.',
+    ],
+    afterwards: [
+      'This is one sample of an easy place. Very Unfair keeps desirable items (good weapons, keys, big souls) out of early places like this one; the early game of this world is poorer than a Fair world of the same master seed.',
+    ],
+  },
+  {
     id: 'quick-boss-asylum-demon', category: 'quick', title: 'Boss sampling - the first boss', masterSeed: 'smoke-q5-demon-9',
     purpose: 'The first boss of the game is replaced by another boss: model, health bar, AI, death and the way on.',
     settings: QUICK_SMOKE_RECIPES['quick-boss-asylum-demon'].settings,
@@ -673,6 +783,17 @@ export const SMOKE_SCENARIOS: readonly SmokeScenario[] = [
       enemies: { randomizeRegularEnemies: true, gwynNerf: 'strong', secondGargoyle: 'keep', placement: { algorithm: 'sampling-v1', fit: 'anywhere', difficultyMode: 'random', replacementChance: 100, normalReplacement: 'normals', bossReplacement: 'both', bossChanceInBossSlots: 60, hostileNpcs: true } },
     },
     observe: ['The boss fights work as in the boss tests; the hostile NPCs around them are ordinary enemies and do not take part in any boss fight.'],
+  },
+  {
+    id: 'laundromat-npcs', category: 'extended', title: 'Laundromat Mixup - NPCs in other armor', masterSeed: 'smoke-p-laundromat-1',
+    purpose: 'The NPC characters wear armor pieces other NPCs wear (only their look and armor stats change); nothing you can pick up changes.',
+    settings: { items: { laundromat: true }, enemies: { enabled: false }, fog: { enabled: false } },
+    observe: [
+      'Play the first areas as usual and look at every NPC you meet: each wears armor that some other NPC wears in the normal game, not its own set.',
+      'Nothing breaks: the armor shows on the NPC model, the NPC talks, trades and fights as always (a hostile NPC fights in its new armor).',
+      'Hollowed NPCs (the undead versions) keep their normal look.',
+    ],
+    afterwards: ['The exact armor of every NPC row is listed by the static check (SmokeVerify laundromat); what is judged here is only how it looks in the game.'],
   },
 ];
 

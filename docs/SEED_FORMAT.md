@@ -54,6 +54,10 @@ world cannot be forgotten in the Seed Code.
    decodes to the neutral values (the code of a world that does not use the option is byte for byte what it was), and stating the neutral values or leaving them out is the
    same code (`seedCode.test.mjs`). Soul items gained its third value `transposed` in the same way (an extension of an existing enumeration, no new key). Presets are version 14;
    versions 1 to 13 import with the neutral values and a document below 14 that states them is refused.
+   **Part I.** `items.keyPlacement` gained the values `"race"` and `"race-plus"` (an extension of an existing enumeration: no old record contains them, and `"shuffled"` keeps its meaning).
+   Two more item extension keys follow the three above, in this order: `items.itemDifficulty` (neutral `"fair"`; `"unfair"`, `"very-unfair"`) and `items.laundromat` (neutral `false`).
+   They are stored only when non-neutral, so every earlier code keeps its exact text, and Fair is the legacy default and DS1TR's neutral value, so a Fair world is the same world as before the option
+   existed. `race-plus` with a difficulty other than Fair is refused (the legacy GUI forces Fair under Race Mode +). Presets are version 15; versions 1 to 14 import with the neutral values.
 2. `deflate-raw` (level 9) with a fixed preset dictionary (`SEED_DICTIONARY`, part of the format; it only makes codes short).
 3. Bytes = `[0x01 format][deflated envelope][first 4 bytes of SHA-256 of the preceding bytes]`.
 4. Crockford base32 (`0123456789ABCDEFGHJKMNPQRSTVWXYZ`) in groups of 8, prefix `DS1TR1-`.

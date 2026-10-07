@@ -126,6 +126,8 @@ test('maps both enabled capabilities deterministically', () => {
       placementDiagnosticsLevel: 'summary',
       fogTrackedItems: null,
       keyPlacement: 'vanilla',
+      itemDifficulty: 'fair',
+      laundromat: false,
       keyRandomizeLordvessel: false,
       keyRandomizeLordSouls: false,
       progressionModel: null,

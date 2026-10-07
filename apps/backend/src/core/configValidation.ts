@@ -9,8 +9,9 @@ const itemKeys = [
   'guaranteedEnemyDrops', 'randomizeShops', 'fashionSouls', 'soulItems', 'startingItems',
 ] as const;
 /** Item options added after format 1 (Part H): optional on input (an older configuration means their neutral value), validated when present. */
-const itemExtensionKeys = ['keyPlacement', 'randomizeLordvessel', 'randomizeLordSouls'] as const;
-const keyPlacementModes = new Set(['vanilla', 'shuffled']);
+const itemExtensionKeys = ['keyPlacement', 'randomizeLordvessel', 'randomizeLordSouls', 'itemDifficulty', 'laundromat'] as const;
+const keyPlacementModes = new Set(['vanilla', 'shuffled', 'race', 'race-plus']);
+const itemDifficultyModes = new Set(['fair', 'unfair', 'very-unfair']);
 const enemyKeys = [
   'enabled', 'randomizeRegularEnemies', 'randomizeBosses', 'scaling',
   'replaceMimics', 'replaceRespawningMosquitoes', 'preventSameEnemy', 'pinwheelChaos', 'gwynNerf', 'secondGargoyle', 'placement',
@@ -72,7 +73,8 @@ export function effectiveCombinedEnabled(config: RandomizerConfig): boolean {
     config.items.randomizeGifts ||
     config.items.randomizeEnemyDrops ||
     config.items.guaranteedEnemyDrops ||
-    config.items.randomizeShops
+    config.items.randomizeShops ||
+    config.items.laundromat
   );
   const enemyEnabled = config.enemies.enabled && (
     config.enemies.randomizeRegularEnemies || config.enemies.randomizeBosses
@@ -112,14 +114,17 @@ export function validateRandomizerConfig(input: unknown): asserts input is Rando
     if (!startingItemModes.has(String(input.items.startingItems))) problems.push('Starting items mode is invalid.');
     const keyMode = input.items.keyPlacement ?? 'vanilla';
     if (!keyPlacementModes.has(String(keyMode))) problems.push('Key placement mode is invalid.');
-    for (const optional of ['randomizeLordvessel', 'randomizeLordSouls'] as const) {
+    const difficulty = input.items.itemDifficulty ?? 'fair';
+    if (!itemDifficultyModes.has(String(difficulty))) problems.push('Item difficulty mode is invalid.');
+    for (const optional of ['randomizeLordvessel', 'randomizeLordSouls', 'laundromat'] as const) {
       if (Object.hasOwn(input.items, optional) && typeof input.items[optional] !== 'boolean') problems.push(`config.items.${optional} must be a boolean.`);
     }
-    if (keyMode === 'shuffled') {
+    if (keyMode === 'race-plus' && difficulty !== 'fair') problems.push('Race Mode + is only available with Fair item difficulty.');
+    if (keyMode !== 'vanilla') {
       if (!input.items.enabled || !input.items.randomizeWorldItems) problems.push('Key placement needs the world items: turn on Items and World items.');
       if (input.items.randomizeProtectedItems) problems.push('Key placement and protected-item randomization cannot be combined.');
     } else if (input.items.randomizeLordvessel === true || input.items.randomizeLordSouls === true) {
-      problems.push('The Lordvessel and Lord Souls switches need key placement "shuffled".');
+      problems.push('The Lordvessel and Lord Souls switches need key placement other than Vanilla.');
     }
   }
   if (isObject(input.enemies)) {

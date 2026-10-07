@@ -4,7 +4,10 @@ import { exportPreset, importPreset } from '../../dist/core/preset.js';
 
 /** The key placement options exist from preset version 14; an older document must not state them. */
 const keyOptionKeys = ['keyPlacement', 'randomizeLordvessel', 'randomizeLordSouls'];
-const withoutKeyOptions = (document) => { for (const key of keyOptionKeys) delete document.items[key]; return document; };
+/** Item difficulty and Laundromat exist from preset version 15. */
+const difficultyOptionKeys = ['itemDifficulty', 'laundromat'];
+const withoutV15Options = (document) => { for (const key of difficultyOptionKeys) delete document.items[key]; return document; };
+const withoutKeyOptions = (document) => { for (const key of keyOptionKeys) delete document.items[key]; return withoutV15Options(document); };
 
 function config() {
   return {
@@ -38,7 +41,7 @@ test('import rejects malformed, foreign and unsupported presets', () => {
   assert.equal(importPreset('[]').ok, false);
   const preset = exportPreset(config());
   assert.match(importPreset(JSON.stringify({ ...preset, format: 'other' })).problems.join(' '), /format/);
-  assert.match(importPreset(JSON.stringify({ ...preset, presetVersion: 15 })).problems.join(' '), /version/);
+  assert.match(importPreset(JSON.stringify({ ...preset, presetVersion: 16 })).problems.join(' '), /version/);
   assert.match(importPreset(JSON.stringify({ ...preset, gamePath: 'C:/x' })).problems.join(' '), /gamePath is not supported/);
   const unknown = { ...preset, fog: { ...preset.fog, bogus: true } };
   assert.match(importPreset(JSON.stringify(unknown)).problems.join(' '), /bogus is not supported/);
@@ -59,7 +62,7 @@ test('a version-1 preset is migrated with the legacy defaults', () => {
   for (const key of ['pinwheelChaos', 'gwynNerf', 'secondGargoyle', 'placement']) delete v1.enemies[key];
   const imported = importPreset(JSON.stringify(v1));
   assert.equal(imported.ok, true);
-  assert.equal(imported.preset.presetVersion, 14);
+  assert.equal(imported.preset.presetVersion, 15);
   assert.equal(imported.preset.items.fashionSouls, true);
   assert.equal(imported.preset.enemies.replaceMimics, true);
   assert.equal(imported.preset.enemies.replaceRespawningMosquitoes, true);
@@ -78,7 +81,7 @@ test('a version-1 preset is migrated with the legacy defaults', () => {
 
 test('a version-2 preset round-trips the Batch 1 options', () => {
   const preset = exportPreset(config());
-  assert.equal(preset.presetVersion, 14);
+  assert.equal(preset.presetVersion, 15);
   assert.equal(preset.items.fashionSouls, false);
   assert.equal(preset.enemies.replaceMimics, false);
   assert.equal(preset.enemies.preventSameEnemy, true);
@@ -96,7 +99,7 @@ test('a version-2 preset is migrated with the behavior-preserving Batch 2 values
   for (const key of ['pinwheelChaos', 'gwynNerf', 'secondGargoyle', 'placement']) delete v2.enemies[key];
   const imported = importPreset(JSON.stringify(v2));
   assert.equal(imported.ok, true);
-  assert.equal(imported.preset.presetVersion, 14);
+  assert.equal(imported.preset.presetVersion, 15);
   assert.equal(imported.preset.items.fashionSouls, false, 'version-2 keys are kept');
   assert.equal(imported.preset.items.soulItems, 'shuffled');
   assert.equal(imported.preset.items.startingItems, 'mixed-pool');
@@ -132,7 +135,7 @@ test('presets of versions 1 to 3 migrate the second Gargoyle to the earlier sing
     }
     const imported = importPreset(JSON.stringify(old));
     assert.equal(imported.ok, true, `version ${version}`);
-    assert.equal(imported.preset.presetVersion, 14);
+    assert.equal(imported.preset.presetVersion, 15);
     // Not the new legacy default: the old preset keeps reproducing the old Bell Gargoyle handling.
     assert.equal(imported.preset.enemies.secondGargoyle, 'single-boss');
     const smuggled = JSON.parse(JSON.stringify(old));
@@ -141,9 +144,9 @@ test('presets of versions 1 to 3 migrate the second Gargoyle to the earlier sing
   }
 });
 
-test('presets of versions 1 to 12 migrate to permutation-v1 with neutral sampling settings; versions 13 and 14 state them', () => {
+test('presets of versions 1 to 12 migrate to permutation-v1 with neutral sampling settings; versions 13, 14 and 15 state them', () => {
   const v6 = exportPreset(config());
-  assert.equal(v6.presetVersion, 14);
+  assert.equal(v6.presetVersion, 15);
   assert.deepEqual(v6.enemies.placement, { algorithm: 'permutation-v1', replacementChance: 100, normalReplacement: 'normals', fit: 'anywhere', difficultyMode: 'random', difficultyStrictness: 'loose', typeReplacement: 'disabled', customPool: null, bossReplacement: 'classic', uniqueBosses: false, bossChanceInNormalSlots: 10, roamingBossSouls: 50, roamingBossesStayDead: false, bossChanceInBossSlots: 90, hostileNpcs: false });
   for (const version of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]) {
     const old = JSON.parse(JSON.stringify(v6));
@@ -306,6 +309,30 @@ test('boss sampling options round-trip in a sampling preset, are optional on inp
   const completed = importPreset(JSON.stringify(optional));
   assert.equal(completed.ok, true, 'a document without the options means the classic boss planner');
   assert.equal(completed.preset.enemies.placement.bossReplacement, 'classic');
+});
+
+test('item difficulty and Laundromat: stated by version 15, neutral for every older preset, refused in older documents', () => {
+  const current = exportPreset(config());
+  assert.deepEqual(difficultyOptionKeys.map((key) => current.items[key]), ['fair', false]);
+  const v14 = withoutV15Options(JSON.parse(JSON.stringify(current)));
+  v14.presetVersion = 14;
+  const migrated = importPreset(JSON.stringify(v14));
+  assert.equal(migrated.ok, true, (migrated.problems ?? []).join(' '));
+  assert.deepEqual(difficultyOptionKeys.map((key) => migrated.preset.items[key]), ['fair', false]);
+  assert.deepEqual(keyOptionKeys.map((key) => migrated.preset.items[key]), ['vanilla', false, false], 'the version 14 key options are kept');
+  const smuggled = JSON.parse(JSON.stringify(v14));
+  smuggled.items.itemDifficulty = 'unfair';
+  assert.match(importPreset(JSON.stringify(smuggled)).problems.join(' '), /not supported in version 14/);
+  const chosen = { ...config() };
+  chosen.items = { ...chosen.items, keyPlacement: 'race', itemDifficulty: 'very-unfair', laundromat: true };
+  const exported = exportPreset(chosen);
+  assert.deepEqual(importPreset(JSON.stringify(exported)).preset, exported);
+  const doc = exportPreset(config());
+  doc.items.keyPlacement = 'race-plus';
+  doc.items.itemDifficulty = 'unfair';
+  const refused = importPreset(JSON.stringify(doc));
+  assert.equal(refused.ok, false);
+  assert.match(refused.problems.join(' '), /Race Mode \+ is only available with Fair/);
 });
 
 test('key placement options: stated by version 14, neutral for every older preset, refused in older documents', () => {

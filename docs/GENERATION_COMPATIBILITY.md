@@ -148,6 +148,15 @@ placements (it embeds the run folder path). Verified stable across workspaces.
 
 Golden fixtures: all earlier fixtures regenerate from their Seed Codes with the Part H engine and helpers, and two new sets were recorded the day the options appeared and are never touched again: `soul-items` (4 worlds, Transposed) and `key-placement` (5 worlds: items only, Lordvessel + Lord Souls + Transposed, all pools, with Fog, full Triple). Results: section 9 of `docs/ITEM_PROGRESSION_MODEL.md` and `docs/IMPLEMENTATION_STATUS.md`.
 
+## Part I: Race Mode, Race Mode +, item difficulty and the Laundromat Mixup (backend 0.41.0, contracts 0.27.0, desktop 0.29.0)
+
+**No new generation profile.** Every new value is an extension: `keyPlacement: race / race-plus` (new values of an existing enumeration), `itemDifficulty` (neutral `fair`), `laundromat` (neutral off). With
+the neutral values nothing about a world changes: the engine reads the new keys only when they are non-neutral (`combinedItemDifficulty.test.mjs`: Fair with and without a model attached, and the plain
+config, give the same `placementHash`), the data tool scan only *adds* sections to the catalog (`treasures`, `itemTraits`, `npcArmor`) and writes nothing it was not asked to, and `placements.laundromat` and
+`validation.itemDifficulty` exist only with their option. FogHost keeps `HostVersion` 0.5.0 (the progression commands gained a `--variant` option and the model a `variant` field; `generate` is unchanged).
+All 31 earlier golden worlds plus the 5 key placement worlds of Part H regenerate from their Seed Codes byte for byte with the Part I engine and helpers. New sets, recorded the day the options appeared and never
+touched again: `item-modes` (Race, Race +, Unfair, Very Unfair, Race with Very Unfair, with Fog, the Laundromat Mixup, a full Triple with the high-risk item options).
+
 ## Part G: the default changed, no generation did (desktop 0.26.0)
 
 New configurations start with `sampling-v1`. **This is a default, not a generation change:** a Seed Code carries its algorithm, a record without the key still decodes to the classic permutation, and no package of an existing Seed Code differs because of it. Verified: all 27 golden fixtures regenerate from their Seed Codes (classic and unaffected cases byte-identical; the recorded exception 2 above is the only difference, and it predates this part), `placementDefault.test.mjs`, `seedUx.test.mjs`. The classic quirks that stay frozen (a Basin placement of the classic permutation has no events; Vanilla scaling keeps the replacement's drops) are listed in `docs/ENEMY_PLACEMENT_MODEL.md` 10.10.

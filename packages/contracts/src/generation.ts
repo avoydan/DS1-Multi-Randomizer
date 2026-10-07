@@ -71,6 +71,8 @@ export const CANONICAL_ITEM_EXTENSION_KEYS = [
   { key: 'keyPlacement', neutral: 'vanilla' },
   { key: 'randomizeLordvessel', neutral: false },
   { key: 'randomizeLordSouls', neutral: false },
+  { key: 'itemDifficulty', neutral: 'fair' },
+  { key: 'laundromat', neutral: false },
 ] as const;
 export const CANONICAL_ENEMY_KEYS = [
   'enabled', 'randomizeRegularEnemies', 'randomizeBosses', 'scaling', 'replaceMimics', 'replaceRespawningMosquitoes',

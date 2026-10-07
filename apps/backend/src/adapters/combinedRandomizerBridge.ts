@@ -89,6 +89,9 @@ export type CombinedGenerationFailureCode =
   | 'KEY_PLACEMENT_MODEL_INVALID'
   | 'KEY_PLACEMENT_MODEL_MISSING'
   | 'KEY_PLACEMENT_NOTHING_TO_PLACE'
+  | 'RACE_LOCATION_INVALID'
+  | 'RACE_PLUS_LOCATION_INVALID'
+  | 'DIFFICULTY_POLICY_UNSATISFIED'
   | 'JS_CORE_MISSING'
   | 'JS_CORE_INCOMPLETE'
   | 'INVALID_CONFIG'
@@ -451,10 +454,10 @@ export async function executeCombinedGeneration(
     // attempt (a new combined seed) can solve it. It keeps its own code so the attempt log shows why it retried.
     // Key placement (Part H): an assumed fill that finds no place depends on the draws (another combined seed can solve it); every other
     // failure is structural and the same for any seed.
-    if (errorCode === 'KEY_PLACEMENT_UNSATISFIABLE' || errorCode === 'KEY_PLACEMENT_FILL_IMPOSSIBLE') {
+    if (errorCode === 'KEY_PLACEMENT_UNSATISFIABLE' || errorCode === 'KEY_PLACEMENT_FILL_IMPOSSIBLE' || errorCode === 'DIFFICULTY_POLICY_UNSATISFIED') {
       return { ok: false, code: errorCode, message: messageOf(error), retryable: true };
     }
-    if (errorCode === 'KEY_PLACEMENT_INVALID' || errorCode === 'KEY_PLACEMENT_MODEL_INVALID' || errorCode === 'KEY_PLACEMENT_MODEL_MISSING' || errorCode === 'KEY_PLACEMENT_NOTHING_TO_PLACE') {
+    if (errorCode === 'KEY_PLACEMENT_INVALID' || errorCode === 'RACE_LOCATION_INVALID' || errorCode === 'RACE_PLUS_LOCATION_INVALID' || errorCode === 'KEY_PLACEMENT_MODEL_INVALID' || errorCode === 'KEY_PLACEMENT_MODEL_MISSING' || errorCode === 'KEY_PLACEMENT_NOTHING_TO_PLACE') {
       return { ok: false, code: errorCode, message: messageOf(error), retryable: false };
     }
     if (errorCode === 'ENEMY_PLACEMENT_INFEASIBLE') {

@@ -7,7 +7,7 @@ import { buildFogCompatibility, decideFogRetry, defaultFogRetryBounds, planFogSt
 import { FogHostProcess, type FogHostResponse } from '../adapters/fogHostProcess.js';
 import { userMessageFor } from './userMessages.js';
 import { readFogItemRules, type FogTrackedItems } from '../adapters/fogItemRules.js';
-import { loadProgressionModel, type ProgressionModel, type ProgressionModelResult } from '../adapters/progressionModel.js';
+import { loadProgressionModel, type ProgressionModel, type ProgressionModelResult, type ProgressionModelVariant } from '../adapters/progressionModel.js';
 import { resolveFogPrerequisites, type FogPreparationContext, type FogPrerequisiteFailure, type FogPrerequisites } from '../adapters/fogPrerequisites.js';
 import { effectiveCombinedEnabled, validateRandomizerConfig } from './configValidation.js';
 import { validateInstallation } from './installation.js';
@@ -60,7 +60,7 @@ export interface GenerationManifest {
     validation: Record<string, unknown> | null;
   };
   /** Key placement (Part H): null unless it ran. Counters and the model identity only; the locations are in the placements file and the spoiler. */
-  keyPlacement: { mode: 'shuffled'; lordvessel: boolean; lordSouls: boolean; modelAnnotationSha256: string | null; summary: Record<string, unknown> | null } | null;
+  keyPlacement: { mode: 'shuffled' | 'race' | 'race-plus' | 'vanilla'; effectiveMode: string; itemDifficulty: string; lordvessel: boolean; lordSouls: boolean; modelAnnotationSha256: string | null; summary: Record<string, unknown> | null } | null;
   attempts: Array<{ combinedAttempt: number; fogAttempt: number; combinedSeed: string; fogSeed: number; result: string }>;
   engines: { combined?: string; fog?: string };
   validation: string[];
@@ -82,7 +82,7 @@ export interface GenerationDependencies {
   combined: typeof executeCombinedGeneration;
   fog: FogHostProcess;
   /** The progression model of the prepared world data (key placement only). */
-  progressionModel: (prerequisites: FogPrerequisites) => Promise<ProgressionModelResult>;
+  progressionModel: (prerequisites: FogPrerequisites, variant: ProgressionModelVariant) => Promise<ProgressionModelResult>;
   /** Recorded in the manifest only; it never influences the output (a Seed Code does not depend on the app version). */
   appVersion: string;
 }
@@ -95,8 +95,8 @@ const defaults: GenerationDependencies = {
   getFogPrerequisites: (language, context) => resolveFogPrerequisites(language, process.env, context),
   combined: executeCombinedGeneration,
   fog: new FogHostProcess(),
-  progressionModel: (prerequisites) => loadProgressionModel(prerequisites),
-  appVersion: '0.40.0',
+  progressionModel: (prerequisites, variant) => loadProgressionModel(prerequisites, undefined, variant),
+  appVersion: '0.41.0',
 };
 
 async function fingerprint(file: string): Promise<{ size: number; sha256: string }> {
@@ -184,7 +184,14 @@ export async function generateRun(
   progress('import', 0.1, 'Verified pristine source available.');
 
   // Key placement evaluates FogMod's own world graph, so it needs the prepared world data even when the fog randomizer itself is off.
-  const keysShuffled = effectiveCombinedEnabled(config) && config.items.enabled && config.items.randomizeWorldItems && (config.items.keyPlacement ?? 'vanilla') === 'shuffled';
+  const keyMode = config.items.keyPlacement ?? 'vanilla';
+  // Race Mode + differs from Race Mode only by the skips of its graph; with the fog randomizer on, the world is rebuilt around the key pickups and FogMod
+  // (which assumes no skips unless its own glitched logic is on) is the authority, so the skips would only make FogMod's layout impossible: the run is planned as Race Mode.
+  const engineKeyMode = keyMode === 'race-plus' && config.fog.enabled ? 'race' : keyMode;
+  const keysOn = effectiveCombinedEnabled(config) && config.items.enabled && config.items.randomizeWorldItems && keyMode !== 'vanilla';
+  // Item difficulty orders the candidate locations by depth in the world graph, so it needs the same model (the vanilla variant) as key placement.
+  const difficultyOn = effectiveCombinedEnabled(config) && config.items.enabled && (config.items.itemDifficulty ?? 'fair') !== 'fair';
+  const keysShuffled = keysOn || difficultyOn;
   let fogReady: FogPrerequisites | null = null;
   if (config.fog.enabled || keysShuffled) {
     progress('fog', 0.12, config.fog.enabled ? 'Preparing fog randomizer...' : 'Preparing world data for key placement...');
@@ -221,7 +228,7 @@ export async function generateRun(
 
   let progressionModel: ProgressionModel | null = null;
   if (keysShuffled && fogReady) {
-    const loaded = await services.progressionModel(fogReady);
+    const loaded = await services.progressionModel(fogReady, engineKeyMode === 'race-plus' ? 'race-plus' : 'vanilla');
     if (!loaded.ok) {
       manifest.validation.push(`key placement: ${loaded.code}: ${loaded.technical}`);
       onEvent({ type: 'log', stage: 'combined', level: 'info', message: `Details: ${loaded.code}: ${loaded.technical}` });
@@ -229,7 +236,7 @@ export async function generateRun(
     }
     progressionModel = loaded.model;
     manifest.keyPlacement = {
-      mode: 'shuffled', lordvessel: config.items.randomizeLordvessel ?? false, lordSouls: config.items.randomizeLordSouls ?? false,
+      mode: keyMode, effectiveMode: engineKeyMode, itemDifficulty: config.items.itemDifficulty ?? 'fair', lordvessel: config.items.randomizeLordvessel ?? false, lordSouls: config.items.randomizeLordSouls ?? false,
       modelAnnotationSha256: loaded.model.annotationSha256, summary: null,
     };
   }
@@ -246,7 +253,7 @@ export async function generateRun(
       combined = await services.combined({
         gamePath: pristine.directory, workspacePath: attemptWorkspace,
         masterSeed: config.masterSeed, combinedSeed: seeds.combined,
-        items: config.items, enemies: config.enemies,
+        items: engineKeyMode === keyMode ? config.items : { ...config.items, keyPlacement: engineKeyMode }, enemies: config.enemies,
         generateSpoilerLog: config.output.generateSpoilerLog,
         placementDiagnosticsLevel: process.env[placementDiagnosticsVariable] === 'detail' ? 'detail' : 'summary',
         fogTrackedItems,

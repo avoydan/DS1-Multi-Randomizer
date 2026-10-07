@@ -30,3 +30,23 @@ What is **not** included: the **starting classes** (not part of Laundromat), wea
 Documented deviations: no hat-drop chance, no legacy "usable on NPC" flags (only armor NPCs already wear), hollowed variants skipped, DS1TR's own draw order.
 
 The implementation and its measurements are recorded below as they are built.
+
+## 3. What is built
+
+* **Contracts and UI.** `items.laundromat` (neutral off); the toggle "Laundromat Mixup" in the Legacy options of the Items card. It counts as an item feature on its own (a run with only the Laundromat Mixup is valid; it needs no item pool and no world data).
+* **Engine** (`laundromat.js`, patch 0024). `planLaundromat` takes the scan's `npcArmor` (the CharaInitParam rows from 6000 with the four armor ids), groups the rows by `npcPlayerFaceGenId` into characters, drops the characters that have a hollowed piece or no armor, and gives every remaining character one outfit from the pieces NPCs already wear (stream `item-laundromat`, characters in face order): Fashion Souls off, the four pieces of one donor row that wears all four; on, each slot independently from the pool of that slot. A row keeps an empty slot empty; only rows whose armor changes are planned. `placements.laundromat` exists only with the option.
+* **Data tool** (`patch-enemies`, patch 0024). The planned rows are checked against the scan (a changed game is refused) and written into CharaInitParam (the four cells `equip_Helm`, `equip_Armer`, `equip_Gaunt`, `equip_Leg`); nothing else is touched. A catalog that predates the scan section is refused with a plain message (`LAUNDROMAT_CATALOG_OUTDATED`).
+* **Verifier** `SmokeVerify laundromat`: every planned row wears the planned armor, every planned piece is worn by some NPC in the clean game, no empty slot was filled, no hollowed piece is involved, and **no other cell of any NPC row differs from the clean game**.
+* **Fog.** The CharaInitParam rows survive the merge into the Fog package (the verifier runs on the final Fog tree in the sweeps).
+
+## 4. Measurements
+
+On the clean game the scan finds 205 NPC rows (60 characters), 202 with armor, 752 non-hollow pieces whose base id exists in `EquipParamProtector`; the eligible characters leave about 157 planned rows per world (**31,398 rows in 200 engine-level worlds**, 0 audit problems: every piece worn by an NPC in the clean game, no hollowed piece, no empty slot filled). Real data tool and FogHost sweeps: `docs/IMPLEMENTATION_STATUS.md` (Part I).
+
+## 5. What is still needed
+
+GAMEPLAY UNVERIFIED: that a plain NPC model shows another NPC's armor correctly (the pieces are loaded on NPC models in the clean game, but hat and hair interactions are a visual judgement) and that the armor weight of an NPC does not change a fight in a way a player notices. There is no quick Asylum target (no dressed NPC stands within reach of the start): the test world is an extended gameplay test.
+
+## 6. Real data tool and FogHost sweeps (AUTOMATED VERIFIED)
+
+`item-modes-h`: the Laundromat Mixup with the item pool 30, with Fashion Souls off 20, alone (no item pool at all) 20, with the fog randomizer 20 and in the three full-Triple cases 75: **185 worlds, 0 failures; 25,757 planned CharaInitParam rows read back from the written packages (the final Fog tree included) and compared with the clean game cell by cell: 0 problems** (every planned piece worn by some NPC in the clean game, no empty slot filled, no hollowed row touched, no other cell of any NPC row changed). The packages are deterministic (reruns identical) and the verifier is the same code for the Fog and the combined-only package.

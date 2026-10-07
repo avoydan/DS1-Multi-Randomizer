@@ -57,3 +57,33 @@ Source of the behavior: the pinned legacy Item Randomizer (`HotPocketRemix/DarkS
 **Ordering with the other options.** Key placement first (the keys take the best-tier destination among the **reachable** ones, uniformly, exactly like the legacy's HARD-ranked keys); then the remaining pool is assigned with the policy, and only then the existing repairs run (DLC, fog tracking, armor sets). Transposed weapons keep the HARD tier of the soul. Starting equipment is a separate pool and is never touched. Fashion Souls does not change the tiers. Difficulty draws only from the stream `item-difficulty`; when it is Fair nothing is drawn and no stream exists.
 
 The implementation and its measurements are recorded in sections 3 to 6 below as they are built.
+
+## 3. What is built
+
+* **Contracts and UI.** `items.itemDifficulty`: `fair` (neutral), `unfair`, `very-unfair`; the select "Difficulty" in the "Item difficulty" group of the Items card (the legacy order and wording). Race Mode + forces and disables Fair, as the legacy GUI does.
+* **Engine** (`difficulty.js`, `generator.js`, patch 0024). `buildTierModel` derives the tiers (section 2) once, before anything moves, from the pool and the progression model (the vanilla variant: the depth of a pickup is the number of areas between the start and its area, every edge counted as open). The key planner prefers, for every key, the best tier that has a *reachable* destination (`preferByTier`, a key is HARD) and draws uniformly inside it; the rest of the pool is assigned by `difficultyShuffle`: the sources in a seeded order (stream `item-difficulty:<attempt>`, at most 32 attempts), each taking a free target from the first group of its policy that has one, with the hard constraints of the plain permutation (no source on its own target, no DLC-restricted item in the DLC). The existing repairs (keeping consumable souls out of finite shops, the fog tracked-item rules) run afterwards, exactly as for the plain permutation. Armor sets that move as sets (Fashion Souls off) and the bulk shop consumables keep their own streams and are not tiered.
+* **Ordering with the other options (locked by `combinedItemDifficulty.test.mjs`).** Key placement first (with the difficulty preference), then the pool. Transposed: a transposed boss weapon is HARD (it keeps the tier of the soul). Starting items: a separate pool, never touched. Fashion Souls: no effect on the tiers. A neutral difficulty draws nothing and reports nothing.
+* **Needs the world data** (the depth of a pickup comes from the model), so the pipeline prepares it for any non-Fair difficulty, with or without the fog randomizer.
+* **Typed outcome.** `DIFFICULTY_POLICY_UNSATISFIED` (an assignment that cannot be made; retryable with another combined seed; never seen in the sweeps). The key validity check takes no difficulty input: **no mode can make a world unwinnable.**
+
+## 4. Measurements (AUTOMATED VERIFIED; engine level, 200 worlds per mode, all pools, Transposed; the shares are measured on the finished layout after every repair)
+
+Where the items of each tier end, by tier of location (EASY / MEDIUM / HARD, % of the items of that tier):
+
+| Mode | EASY items | MEDIUM items | HARD items |
+|---|---|---|---|
+| Fair (baseline) | 40.6 / 45.9 / 13.5 | 38.9 / 46.9 / 14.1 | 38.2 / 47.7 / 14.1 |
+| Unfair | 81.6 / 8.4 / 10.0 | 4.9 / 94.2 / 0.9 | 3.9 / 63.2 / 32.8 |
+| Very Unfair | 81.6 / 18.4 / 0.0 | 4.9 / 95.1 / 0.0 | 3.9 / 45.9 / 50.1 |
+
+Fair is uniform (each tier of item lands in a tier of location in proportion to the size of the tiers: 40 / 46 / 14%). Under Unfair the HARD items in EASY locations fall from **38.2% to 3.9%** and in HARD locations rise from **14.1% to 32.8%**; under Very Unfair they reach **50.1%** and nothing EASY lies in a HARD location (**13.5% to 0.0%**). So Fair, Unfair and Very Unfair differ in the intended direction at every step. The ordering is the same with Race Mode, with the Lord switches and with the fog randomizer's tracked-item rules (Very Unfair: HARD in HARD 49.1% with Race Mode, 46.5% with Fog rules). The location tiers hold few HARD places (14% of the pool), which is why even Very Unfair cannot put every HARD item in a HARD place; the rest go to the next group of the policy.
+
+**Agreement with the legacy tables** (measured in scratch against the legacy's per-lot ratings on the lots both know; the tables are not in the repository): item tier **40.3%** of 335 lots, location tier **39.4%** of 373 lots; chance is 33%. DS1TR's tiers are a data-derived model of the same idea, not the legacy ratings.
+
+## 5. What is still needed
+
+GAMEPLAY UNVERIFIED (nobody has played a Very Unfair world to see whether the early game feels poorer). Not built: the legacy's separate NPC and shop classes (DS1TR's pool permutes the pools together and gives gifts and shops a single tier), the emptiness-first ordering of the legacy (every DS1TR target holds one item), the hand-rated classes.
+
+## 6. Real data tool and FogHost sweeps (AUTOMATED VERIFIED)
+
+The same `item-modes-h` run (645 worlds, 0 failures): Unfair 40 and Very Unfair 40 with the item pool, Unfair with all pools and the keys 30, Very Unfair with the keys, the Lordvessel and the Lord Souls 30, Very Unfair with Fog 30, Race with each difficulty 90, and the full Triple with Unfair / Very Unfair 50; each world passed the lot verifier (the planned rows are in the package, no other lot changed, event 970 is the clean game's) and the tier counters of the finished layout were read from the written plan. **Guard:** the item "Cast Light" opens the hidden Oolacile Township; FogMod found it in that area in one Very Unfair world (a HARD unique spell placed in the deepest pickup). Every mode of Part I now keeps a "random only" item out of the area it opens (`guardRandomOnlyItems`, one swap with the next free place of a seeded order, stream `item-guard` created only when needed); Fair and Shuffled keep their worlds byte for byte.

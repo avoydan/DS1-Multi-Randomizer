@@ -27,6 +27,11 @@ There are two kinds of world.
 | `quick-key-placement` | Key placement - a key in your cell | lot 1810080 (2.8 m) | ~30 s |
 | `quick-lordvessel` | Lordvessel placement - the Lordvessel in your cell | lot 1810080 (2.8 m) | ~30 s |
 | `quick-lord-soul` | Lord Soul placement - a Lord Soul in your cell | lot 1810080 (2.8 m) | ~30 s |
+| `quick-race` | Race Mode - a key in your cell | lot 1810080 (2.8 m) | ~30 s |
+| `quick-race-plus` | Race Mode + - a key in your cell, a world that needs a skip | lot 1810080 (2.8 m) | ~30 s |
+| `quick-fair` | Item difficulty Fair - what lies in your cell | lot 1810080 (2.8 m) | ~30 s |
+| `quick-unfair` | Item difficulty Unfair - what lies in your cell | lot 1810080 (2.8 m) | ~30 s |
+| `quick-very-unfair` | Item difficulty Very Unfair - what lies in your cell | lot 1810080 (2.8 m) | ~30 s |
 | `quick-boss-asylum-demon` | Boss sampling - the first boss | c2232_0000 (22.5 m) | ~90 s |
 
 ### How the targets were chosen
@@ -421,6 +426,176 @@ Key placement "Shuffled" with Lord Soul placement on: the four Lord Souls join t
 
 ```
 DS1TR1-06NJDCP6-577CVKTE-TMPK8D6J-0PJM6M29-N1NP8EAT-Z46E5JJ7-8WMKQD9J-02MNRGYJ-0PVHEB9B-WEMB1M2X-7DD663F9-385HMG53-AMB1BAHC-019QYDSY
+```
+
+### Race Mode - a key in your cell
+
+**Quick smoke test** - ID `quick-race`
+
+Key placement "Race Mode": the keys and the embers lie only in boss rewards, chests and where keys normally are; here the Blighttown Key lies in the first cell, where the clean game has the Peculiar Doll (the Doll is one of those key places).
+
+**Target**
+
+- Undead Asylum: the pickup where the Peculiar Doll lies in the clean game (item lot 1810080), 2.8 m from where you wake up, on the same floor as the start
+
+**Expected**
+
+- Blighttown Key (item id 2007) lies where the Peculiar Doll lay: a key that the clean game puts as the reward of the Gaping Dragon in the Depths
+
+**Estimated time to the target:** ~30 seconds after you gain control.
+
+**Needs a reset or reload:** no
+
+**Gameplay result:** not played in the real game yet; only the static check exists.
+
+**Check**
+
+- [ ] You wake up in the cell. In the clean game the Peculiar Doll lies on the floor of this cell; here the same pickup holds the Blighttown Key.
+- [ ] Pick it up: it is a normal key item named Blighttown Key (it opens the way from the Depths to Blighttown; you will not need it in the Asylum).
+- [ ] The Peculiar Doll is not in the cell any more: it lies in another place of this world, in one of the Race Mode places.
+
+**Afterwards**
+
+- [ ] Nothing else is to be checked in this world. In Race Mode every key and every ember lies in a boss reward, a chest or a place where a key normally lies; to see where, turn on the spoiler log: the section KEY PLACEMENT names each one.
+
+```
+DS1TR1-06NJDCP6-577CVKTE-TMPK8D6P-5N54RKPN-6MCTTXR6-E6YT78WM-KND1K02M-MJ0Y432Q-DP2EX7PH-X9M4GNT7-T001NBCF-N181Y080-4BZ75XG
+```
+
+### Race Mode + - a key in your cell, a world that needs a skip
+
+**Quick smoke test** - ID `quick-race-plus`
+
+Key placement "Race Mode +": as Race Mode, but the world may need skips and glitches; here the Basement Key lies in the first cell, and this world is one whose keys are placed so that a skip of the list (the Capra skip, the Lower Burg skip, the Annex jump or the Seal skip) is needed to complete it.
+
+**Target**
+
+- Undead Asylum: the pickup where the Peculiar Doll lies in the clean game (item lot 1810080), 2.8 m from where you wake up, on the same floor as the start
+
+**Expected**
+
+- Basement Key (item id 2001) lies where the Peculiar Doll lay: a key that the clean game puts in the Undead Parish
+
+**Estimated time to the target:** ~30 seconds after you gain control.
+
+**Needs a reset or reload:** no
+
+**Gameplay result:** not played in the real game yet; only the static check exists.
+
+**Check**
+
+- [ ] You wake up in the cell. In the clean game the Peculiar Doll lies on the floor of this cell; here the same pickup holds the Basement Key.
+- [ ] Pick it up: it is a normal key item named Basement Key (it opens the Undead Burg basement; you will not need it in the Asylum).
+- [ ] The Peculiar Doll is not in the cell any more: it lies in another place of this world.
+
+**Afterwards**
+
+- [ ] Nothing else is to be checked in this world. It exists to show that Race Mode + makes a different world from Race Mode: at least one key lies where only a skip reaches it (the spoiler log names every key). Whether the skips work in the game is not part of this test.
+
+```
+DS1TR1-06NJDCP6-577CVKTE-TMPK8D6H-5N54RKHD-S0MJVNHN-6AV1SBBX-0SRYV8X3-JJENM6C0-AJR82RJE-2WA7BE1A-4ST4F3EP-9H1VMSM2-0V86HNA4-GPN0J00K-VSVDR
+```
+
+### Item difficulty Fair - what lies in your cell
+
+**Quick smoke test** - ID `quick-fair`
+
+Item difficulty "Fair": items have an equal chance anywhere. In this world the first cell, an easy place, holds a weapon, the Mace, where the clean game has the Peculiar Doll (one sample of what Fair does; Unfair and Very Unfair have their own tests with the same master seed).
+
+**Target**
+
+- Undead Asylum: the pickup where the Peculiar Doll lies in the clean game (item lot 1810080), 2.8 m from where you wake up, on the same floor as the start
+
+**Expected**
+
+- Mace (weapon id 801000) lies where the Peculiar Doll lay
+
+**Estimated time to the target:** ~30 seconds after you gain control.
+
+**Needs a reset or reload:** no
+
+**Gameplay result:** not played in the real game yet; only the static check exists.
+
+**Check**
+
+- [ ] You wake up in the cell. In the clean game the Peculiar Doll lies on the floor of this cell; here the same pickup holds a Mace (a weapon).
+- [ ] Pick it up: it is a normal weapon item named Mace. (You can equip it; it needs only modest strength.)
+- [ ] The Peculiar Doll is not in the cell any more: it is an ordinary item of the pool and lies in another place of this world.
+
+**Afterwards**
+
+- [ ] This is one sample. With the same master seed, Unfair and Very Unfair put a Soul of a Lost Undead in this cell instead: an easy place gets an easy item. See the tests quick-unfair and quick-very-unfair.
+
+```
+DS1TR1-06NJDCP6-577CVKTE-TMPK8D6N-0QJJEQEK-T5X6FT6N-7FM3D3TP-7H1VNRM1-0V86HKA3-GPD0E05M-354R4
+```
+
+### Item difficulty Unfair - what lies in your cell
+
+**Quick smoke test** - ID `quick-unfair`
+
+Item difficulty "Unfair": desirable items are not placed in plain view. The same master seed as the Fair test: the first cell, an easy place, now holds a Soul of a Lost Undead instead of the Mace (one sample of the bias).
+
+**Target**
+
+- Undead Asylum: the pickup where the Peculiar Doll lies in the clean game (item lot 1810080), 2.8 m from where you wake up, on the same floor as the start
+
+**Expected**
+
+- Soul of a Lost Undead (item id 400) lies where the Peculiar Doll lay
+
+**Estimated time to the target:** ~30 seconds after you gain control.
+
+**Needs a reset or reload:** no
+
+**Gameplay result:** not played in the real game yet; only the static check exists.
+
+**Check**
+
+- [ ] You wake up in the cell. In the clean game the Peculiar Doll lies on the floor of this cell; here the same pickup holds a Soul of a Lost Undead.
+- [ ] Pick it up: it is a normal consumable item named Soul of a Lost Undead.
+- [ ] The Peculiar Doll is not in the cell any more: it lies in another place of this world.
+
+**Afterwards**
+
+- [ ] This is one sample of an easy place: the Mace of the Fair test is not here. A single world proves nothing about the distribution; the distribution is measured by the automated sweeps.
+
+```
+DS1TR1-06NJDCP6-577CVKTE-TMPK8D6N-0QJJEQEK-T5X6E46Q-7CXE1Y3G-G4BQRJJP-9AJQJTC9-K52VGTH4-EGVRTNJ9-8EX4N0G6-T1M9TH45-784G1Q57-YDAG
+```
+
+### Item difficulty Very Unfair - what lies in your cell
+
+**Quick smoke test** - ID `quick-very-unfair`
+
+Item difficulty "Very Unfair": desirable items are hidden and rarely in early areas. The same master seed as the Fair test: the first cell, the easiest place of the world, holds a Soul of a Lost Undead.
+
+**Target**
+
+- Undead Asylum: the pickup where the Peculiar Doll lies in the clean game (item lot 1810080), 2.8 m from where you wake up, on the same floor as the start
+
+**Expected**
+
+- Soul of a Lost Undead (item id 400) lies where the Peculiar Doll lay
+
+**Estimated time to the target:** ~30 seconds after you gain control.
+
+**Needs a reset or reload:** no
+
+**Gameplay result:** not played in the real game yet; only the static check exists.
+
+**Check**
+
+- [ ] You wake up in the cell. In the clean game the Peculiar Doll lies on the floor of this cell; here the same pickup holds a Soul of a Lost Undead.
+- [ ] Pick it up: it is a normal consumable item named Soul of a Lost Undead.
+- [ ] The Peculiar Doll is not in the cell any more: it lies in another place of this world.
+
+**Afterwards**
+
+- [ ] This is one sample of an easy place. Very Unfair keeps desirable items (good weapons, keys, big souls) out of early places like this one; the early game of this world is poorer than a Fair world of the same master seed.
+
+```
+DS1TR1-06NJDCP6-577CVKTE-TMPK8D6N-0QJJEQEK-T5X6E46Q-7CXE1Y3G-G4BQRJJP-J0J5N6MQ-JTC5K15B-B917FP38-QMTA9TS5-D008TNJC-AJM9G03P-PGYF8
 ```
 
 ### Boss sampling - the first boss
@@ -1187,4 +1362,22 @@ Hostile NPCs in this world: 80 (Andre of Astora x40, Undead Merchant x12, Vamos 
 - Undead Burg / Parish: c2540 (slot c2540_0023) -> Andre of Astora
 - Painted World: c2310 (slot c2310_0004) -> Vamos
 - Painted World: c2500 (slot c2500_0026) -> Vamos
+
+### Laundromat Mixup - NPCs in other armor
+
+**Extended gameplay test** - ID `laundromat-npcs`
+
+The NPC characters wear armor pieces other NPCs wear (only their look and armor stats change); nothing you can pick up changes.
+
+**Gameplay result:** not played in the real game yet; only the static check exists.
+
+```
+DS1TR1-06NJDCP6-577CVKTE-TMPX1KA9-5K6MPAEA-SX6JSM9N-3JPQP1KH-VM1WN05G-N216CC7C-PM8VMPT6-NEHJ2Q8X-841PHD1Y-M917T100-GHK44P0
+```
+
+**In this world**
+
+- Play the first areas as usual and look at every NPC you meet: each wears armor that some other NPC wears in the normal game, not its own set.
+- Nothing breaks: the armor shows on the NPC model, the NPC talks, trades and fights as always (a hostile NPC fights in its new armor).
+- Hollowed NPCs (the undead versions) keep their normal look.
 

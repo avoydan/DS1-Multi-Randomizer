@@ -96,6 +96,17 @@ Key placement moves the **key items themselves** (Basement Key, Lordvessel, Lord
 * The destinations of a key are limited to lots that are in `LotLocations` (the model covers exactly those), so FogMod can always follow the key. The two rules do not overlap: the movable keys leave the pool before the shuffle (they are placed by the fill and their displaced items are paired with the freed pickups from a separate stream), so the tracked-item repair works only on the items that remain in the pool; the keys that stay (Orange Charred Ring, Crest of Artorias ...) are tracked as before.
 * A fog layout that cannot be found around the shuffled keys is retried (bounded, deterministic seeds) and reported as `FOG_KEY_CONFLICT`.
 
+## Race Mode, Race Mode + and item difficulty (Part I)
+
+* **Race Mode with the fog randomizer** is Race Mode: the race destinations are lots FogMod can follow (they are in `LotLocations`), exactly as for Shuffled.
+* **Race Mode + with the fog randomizer** is made as **Race Mode**. The skips of Race + are edges of the *vanilla* world graph; the fog randomizer rebuilds the topology around the key lots it reads, and
+  FogMod (which assumes no skips unless its own glitched logic is on) is the authority for the played world. Planning with the skips would only place keys where FogMod's layout cannot reach them: a
+  first run of Race + with the Lordvessel and Lord Souls and the fog randomizer failed 2 of 2 seeds with `FOG_KEY_CONFLICT` before this rule; with it, Race + with Fog behaves like Race with Fog (the
+  manifest says `mode: race-plus, effectiveMode: race`).
+* **Item difficulty with the fog randomizer** orders the pool before the tracked-item repair runs; the repair can move an item the policy placed, so the bias is slightly weaker with Fog (measured, engine level:
+  Very Unfair puts 46.5% of the HARD-tier items in HARD locations with Fog and 50.1% without it).
+* **Laundromat Mixup with the fog randomizer**: the CharaInitParam rows of the NPC characters survive the merge into the Fog package (verified cell by cell on every sweep world).
+
 ## What the player sees
 
 The old text ("try another seed") was wrong for this case. `FOG_UPSTREAM_INCOMPATIBLE` now reads "These item and world settings

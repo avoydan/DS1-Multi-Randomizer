@@ -66,7 +66,7 @@ test('presets always state the algorithm: the new default exports as sampling, a
   const classicPreset = exportPreset(joinConfig(fullSettings(), 'C:\\Game', 'preset-test-seed', false));
   const old = JSON.parse(JSON.stringify(classicPreset));
   old.presetVersion = 4;
-  for (const key of ['keyPlacement', 'randomizeLordvessel', 'randomizeLordSouls']) delete old.items[key];
+  for (const key of ['keyPlacement', 'randomizeLordvessel', 'randomizeLordSouls', 'itemDifficulty', 'laundromat']) delete old.items[key];
   delete old.enemies.placement;
   const imported = importPreset(JSON.stringify(old));
   assert.equal(imported.ok, true, (imported.problems ?? []).join(' '));

@@ -121,6 +121,35 @@ export const sets = {
     { name: 'keys-triple', patch: merge2(structuredClone(DEFAULT_GENERATION_SETTINGS), { items: { keyPlacement: 'shuffled', randomizeLordvessel: true, randomizeLordSouls: true, soulItems: 'transposed' } }), seeds: 120 },
     { name: 'keys-triple-vanilla-fog-options', patch: merge2(structuredClone(DEFAULT_GENERATION_SETTINGS), { items: { keyPlacement: 'shuffled' } }), seeds: 100 },
   ],
+  /**
+   * Part I (docs/RACE_MODE.md, docs/ITEM_DIFFICULTY_MODEL.md, docs/LAUNDROMAT_MIXUP.md): Race Mode, Race Mode +, the item difficulties and the Laundromat Mixup through the
+   * real data tool and, where Fog is on, the real FogHost. Every key world is also read back by FogMod's own reader and checker (the variant of its mode), the race
+   * destinations are re-derived from the scan by the script itself, and every Laundromat package is compared with the clean game cell by cell.
+   */
+  'item-modes-h': [
+    { name: 'race', patch: merge2({ enemies: { enabled: false } }, noFog, { items: { keyPlacement: 'race' } }), seeds: 40 },
+    { name: 'race-lords', patch: merge2({ enemies: { enabled: false } }, noFog, { items: { keyPlacement: 'race', randomizeLordvessel: true, randomizeLordSouls: true, soulItems: 'transposed' } }), seeds: 30 },
+    { name: 'race-plus', patch: merge2({ enemies: { enabled: false } }, noFog, { items: { keyPlacement: 'race-plus' } }), seeds: 40 },
+    { name: 'race-plus-lords', patch: merge2({ enemies: { enabled: false } }, noFog, { items: { keyPlacement: 'race-plus', randomizeLordvessel: true, randomizeLordSouls: true } }), seeds: 30 },
+    { name: 'race-fair-all-pools', patch: merge2({ enemies: { enabled: false } }, noFog, { items: { keyPlacement: 'race', itemDifficulty: 'fair', randomizeGifts: true, randomizeEnemyDrops: true, randomizeShops: true } }), seeds: 30 },
+    { name: 'race-unfair', patch: merge2({ enemies: { enabled: false } }, noFog, { items: { keyPlacement: 'race', itemDifficulty: 'unfair' } }), seeds: 30 },
+    { name: 'race-very-unfair-all-pools', patch: merge2({ enemies: { enabled: false } }, noFog, { items: { keyPlacement: 'race', itemDifficulty: 'very-unfair', randomizeGifts: true, randomizeEnemyDrops: true, randomizeShops: true, soulItems: 'transposed' } }), seeds: 30 },
+    { name: 'fair-keys-shuffled', patch: merge2({ enemies: { enabled: false } }, noFog, { items: { keyPlacement: 'shuffled', itemDifficulty: 'fair' } }), seeds: 20 },
+    { name: 'unfair', patch: merge2({ enemies: { enabled: false } }, noFog, { items: { itemDifficulty: 'unfair' } }), seeds: 40 },
+    { name: 'very-unfair', patch: merge2({ enemies: { enabled: false } }, noFog, { items: { itemDifficulty: 'very-unfair' } }), seeds: 40 },
+    { name: 'unfair-keys-all-pools', patch: merge2({ enemies: { enabled: false } }, noFog, { items: { keyPlacement: 'shuffled', itemDifficulty: 'unfair', randomizeGifts: true, randomizeEnemyDrops: true, randomizeShops: true } }), seeds: 30 },
+    { name: 'very-unfair-keys-lords', patch: merge2({ enemies: { enabled: false } }, noFog, { items: { keyPlacement: 'shuffled', itemDifficulty: 'very-unfair', randomizeLordvessel: true, randomizeLordSouls: true } }), seeds: 30 },
+    { name: 'laundromat', patch: merge2({ enemies: { enabled: false } }, noFog, { items: { laundromat: true } }), seeds: 30 },
+    { name: 'laundromat-fashion-off', patch: merge2({ enemies: { enabled: false } }, noFog, { items: { laundromat: true, fashionSouls: false } }), seeds: 20 },
+    { name: 'laundromat-only', patch: merge2({ enemies: { enabled: false } }, noFog, { items: { randomizeWorldItems: false, laundromat: true } }), seeds: 20 },
+    { name: 'race-fog', patch: merge2({ enemies: { enabled: false } }, { items: { keyPlacement: 'race' } }), seeds: 30 },
+    { name: 'race-plus-fog', patch: merge2({ enemies: { enabled: false } }, { items: { keyPlacement: 'race-plus', randomizeLordvessel: true, randomizeLordSouls: true } }), seeds: 30 },
+    { name: 'difficulty-fog', patch: merge2({ enemies: { enabled: false } }, { items: { itemDifficulty: 'very-unfair' } }), seeds: 30 },
+    { name: 'laundromat-fog', patch: merge2({ enemies: { enabled: false } }, { items: { laundromat: true } }), seeds: 20 },
+    { name: 'triple-race', patch: merge2(structuredClone(DEFAULT_GENERATION_SETTINGS), { items: { keyPlacement: 'race', randomizeLordvessel: true, randomizeLordSouls: true, soulItems: 'transposed', itemDifficulty: 'unfair', laundromat: true } }), seeds: 25 },
+    { name: 'triple-race-plus', patch: merge2(structuredClone(DEFAULT_GENERATION_SETTINGS), { items: { keyPlacement: 'race-plus', soulItems: 'transposed', laundromat: true } }), seeds: 25 },
+    { name: 'triple-very-unfair', patch: merge2(structuredClone(DEFAULT_GENERATION_SETTINGS), { items: { keyPlacement: 'shuffled', itemDifficulty: 'very-unfair', laundromat: true } }), seeds: 25 },
+  ],
   /** Part F1: hostile NPCs through the real data tool (Fog is covered by the fogHostE2e sweeps): events, rows and AI bundles of every placed NPC. */
   'hostile-npc-f1': [
     { name: 'npc-anywhere', patch: merge2(noItems, noFog, sampling({ hostileNpcs: true, fit: 'anywhere', difficultyMode: 'random' })) },
@@ -228,7 +257,7 @@ async function main() {
       const tree = await readdir(path.join(run.result.packagePath, 'param')).then(() => run.result.packagePath, () => path.join(run.result.packagePath, 'mod'));
       const dataRoot = path.join(worldRoot, (await readdir(worldRoot))[0]);
       const out = path.join(temp, `progression-${path.basename(run.workspacePath)}.json`);
-      const proc = spawnSync(fogHost, ['progression-check', '--data-root', dataRoot, '--game', tree, '--out', out], { encoding: 'utf8' });
+      const proc = spawnSync(fogHost, ['progression-check', '--data-root', dataRoot, ...(run.prepared.config.items.keyPlacement === 'race-plus' && !run.prepared.config.fog.enabled ? ['--variant', 'race-plus'] : []), '--game', tree, '--out', out], { encoding: 'utf8' });
       try { return JSON.parse(await readFile(out, 'utf8')); } catch { return { worldCompletable: false, prisonEscapable: false, unvisited: [`the progression check did not run: ${String(proc.stderr).slice(0, 200)}`], keyAreas: {} }; }
     };
 
@@ -258,6 +287,60 @@ async function main() {
       return { count: all.length, keys: keyNames.length, problems: problems.slice(0, 3) };
     };
 
+    // Part I audits. The race destinations are re-derived here from the scan of the run itself (the catalog the engine used), independently of the engine code.
+    const catalogOf = async (run) => {
+      const attempts = (await readdir(run.workspacePath)).filter((name) => /^combined-\d+$/u.test(name)).sort((a, b) => Number(b.slice(9)) - Number(a.slice(9)));
+      const base = path.join(run.workspacePath, attempts[0]);
+      const candidates = [path.join(base, 'dsr-catalog.json'), ...(await readdir(base)).map((name) => path.join(base, name, 'dsr-catalog.json'))];
+      for (const candidate of candidates) { try { return JSON.parse(await readFile(candidate, 'utf8')); } catch { /* next */ } }
+      return null;
+    };
+    const embers = new Set([800, 801, 802, 806, 807, 808, 809, 810, 812, 813, 2607, 2018, 2017]);
+    const auditRace = async (run, mode) => {
+      const catalog = await catalogOf(run);
+      const document = await placementsOf(run);
+      if (!catalog) return { checked: 0, problems: ['the catalog of the run was not found'] };
+      const chestRows = new Set((catalog.treasures ?? []).filter((entry) => entry.model === 'o0110').map((entry) => entry.rowId));
+      const keyIds = new Set(model.keys.map((entry) => entry.id));
+      const vanillaKeyRows = new Set();
+      const noteRows = (rows, pool) => { for (const row of rows) for (const entry of row.entries ?? []) if (keyIds.has(`${entry.equipType}:${entry.itemId}`) || (entry.equipType === 3 && embers.has(entry.itemId))) vanillaKeyRows.add(row.rowId); void pool; };
+      noteRows(catalog.worldItemLots ?? [], 'world'); noteRows(catalog.gifts ?? [], 'gift');
+      for (const reward of catalog.bossRewards ?? []) for (const lot of reward.lots) noteRows(lot.chain, 'boss');
+      const all = ['items', 'gifts', 'enemyDrops', 'shops', 'bossRewards'].flatMap((list) => document.placements[list] ?? []);
+      const problems = [];
+      let checked = 0;
+      for (const placement of all.filter((entry) => entry.keyName || entry.raceItem)) {
+        checked += 1;
+        const ok = placement.targetPool === 'boss' || chestRows.has(placement.rowId) || vanillaKeyRows.has(placement.rowId);
+        if (!ok) problems.push(`${placement.itemName} lies in row ${placement.rowId}, which is no race destination`);
+        if (placement.targetPool === 'gift' || placement.targetPool === 'shop' || placement.targetPool === 'enemy') problems.push(`${placement.itemName} lies in a ${placement.targetPool}`);
+      }
+      const racers = all.filter((entry) => entry.raceItem).length;
+      if (racers < 1) problems.push(`no race item was placed in ${mode}`);
+      return { checked, raceItems: racers, problems: problems.slice(0, 3) };
+    };
+    const placementsOf = async (run) => {
+      let dir = run.result.packagePath;
+      if (!(await readFile(path.join(dir, 'randomizer.json')).then(() => true, () => false))) {
+        const attempts = (await readdir(run.workspacePath)).filter((name) => /^combined-\d+$/u.test(name)).sort((a, b) => Number(b.slice(9)) - Number(a.slice(9)));
+        dir = path.join(run.workspacePath, attempts[0], (await readdir(path.join(run.workspacePath, attempts[0]))).find((name) => name.startsWith('seed_')));
+      }
+      return JSON.parse(await readFile(path.join(dir, 'randomizer.json'), 'utf8'));
+    };
+    const auditLaundromat = async (run) => {
+      const document = await placementsOf(run);
+      let dir = run.result.packagePath;
+      if (!(await readFile(path.join(dir, 'randomizer.json')).then(() => true, () => false))) {
+        const attempts = (await readdir(run.workspacePath)).filter((name) => /^combined-\d+$/u.test(name)).sort((a, b) => Number(b.slice(9)) - Number(a.slice(9)));
+        dir = path.join(run.workspacePath, attempts[0], (await readdir(path.join(run.workspacePath, attempts[0]))).find((name) => name.startsWith('seed_')));
+      }
+      const tree = await readdir(path.join(run.result.packagePath, 'param')).then(() => run.result.packagePath, () => path.join(run.result.packagePath, 'mod'));
+      const out = spawnSync(verifier, ['laundromat', tree, path.join(source, 'paramdef', 'paramdef.paramdefbnd.dcx'), path.join(dir, 'randomizer.json'), source], { encoding: 'utf8' });
+      void document;
+      try { return JSON.parse(out.stdout.trim().split(/\r?\n/u).pop()); } catch { return { plannedRows: 0, problems: [`the laundromat verifier did not run: ${String(out.stderr).slice(0, 200)}`] }; }
+    };
+    const difficultyOf = async (run) => (await placementsOf(run)).validation?.itemDifficulty ?? null;
+
     const generate = async (spec, seed, label) => {
       const prepared = prepareRun({ gamePath: game, masterSeed: seed, ...buildSettings(spec.patch) });
       if (!prepared.ok) throw new Error(`${label}: ${prepared.code}: ${prepared.technical}`);
@@ -277,7 +360,7 @@ async function main() {
 
     for (const spec of caseList.filter((entry) => !args.cases || args.cases.includes(entry.name))) {
       const seeds = args.seeds ?? spec.seeds ?? 12;
-      const stats = { case: spec.name, seeds, ok: 0, failed: [], retries: 0, windowOverruns: 0, windowInexact: 0, eventOwnerChecked: 0, eventOwnerFrozen: 0, eventOwnerFailures: [], lotsChecked: 0, progressionChecked: 0, placementsChecked: 0, keysPlaced: 0, placementFailures: [], progressionFailures: [], keyAttempts: 0, keysMoved: 0, bossRewardsChecked: 0, lotFailures: [], floorReserved: 0, windowMoved: 0, movedSeeds: [], maxEvents: 0, maxEventsMap: '', nonDeterministic: 0, maxModels: 0, started: Date.now() };
+      const stats = { case: spec.name, seeds, ok: 0, failed: [], retries: 0, windowOverruns: 0, windowInexact: 0, eventOwnerChecked: 0, eventOwnerFrozen: 0, eventOwnerFailures: [], lotsChecked: 0, raceChecked: 0, raceItems: 0, raceFailures: [], laundromatRows: 0, laundromatFailures: [], difficultyFailures: [], tiers: {}, progressionChecked: 0, placementsChecked: 0, keysPlaced: 0, placementFailures: [], progressionFailures: [], keyAttempts: 0, keysMoved: 0, bossRewardsChecked: 0, lotFailures: [], floorReserved: 0, windowMoved: 0, movedSeeds: [], maxEvents: 0, maxEventsMap: '', nonDeterministic: 0, maxModels: 0, started: Date.now() };
       const indices = args.only ?? Array.from({ length: seeds }, (_, offset) => offset + 1);
       stats.seeds = indices.length;
       for (const index of indices) {
@@ -296,7 +379,23 @@ async function main() {
           stats.lotsChecked += lots.checkedTargets;
           stats.bossRewardsChecked += lots.bossRewardTargets;
           if (lots.problems.length > 0) stats.lotFailures.push(`#${index}: ${lots.problems.slice(0, 2).join(' | ')}`);
-          if (run.prepared.config.items.keyPlacement === 'shuffled') {
+          const items = run.prepared.config.items;
+          if (items.laundromat) {
+            const laundromat = await auditLaundromat(run);
+            stats.laundromatRows += laundromat.plannedRows;
+            if (laundromat.problems.length > 0 || laundromat.plannedRows === 0) stats.laundromatFailures.push(`#${index}: ${laundromat.problems.slice(0, 2).join(' | ') || 'no row was planned'}`);
+          }
+          if (items.itemDifficulty && items.itemDifficulty !== 'fair') {
+            const tier = await difficultyOf(run);
+            if (!tier) stats.difficultyFailures.push(`#${index}: no tier counters`);
+            else for (const [k, v] of Object.entries(tier.matrix)) stats.tiers[k] = (stats.tiers[k] ?? 0) + v;
+          }
+          if (items.keyPlacement === 'race' || items.keyPlacement === 'race-plus') {
+            const race = await auditRace(run, items.keyPlacement);
+            stats.raceChecked += race.checked; stats.raceItems += race.raceItems ?? 0;
+            if (race.problems.length > 0) stats.raceFailures.push(`#${index}: ${race.problems.join(' | ')}`);
+          }
+          if (items.keyPlacement && items.keyPlacement !== 'vanilla') {
             const progression = await auditProgression(run);
             stats.progressionChecked += 1;
             const written = await auditPlacements(run);
@@ -337,7 +436,7 @@ async function main() {
             await rm(again.workspacePath, { recursive: true, force: true });
           }
         }
-        await rm(run.workspacePath, { recursive: true, force: true });
+        if (process.env.DS1TR_MATRIX_KEEP) console.log(`kept: ${run.workspacePath}`); else await rm(run.workspacePath, { recursive: true, force: true });
       }
       stats.seconds = Math.round((Date.now() - stats.started) / 1000);
       delete stats.started;
@@ -345,11 +444,11 @@ async function main() {
       console.log(JSON.stringify(stats));
     }
     const failed = summary.reduce((total, entry) => total + entry.failed.length, 0);
-    const bad = summary.reduce((total, entry) => total + entry.windowOverruns + entry.nonDeterministic + entry.eventOwnerFailures.length + entry.lotFailures.length + entry.progressionFailures.length + entry.placementFailures.length, 0);
+    const bad = summary.reduce((total, entry) => total + entry.windowOverruns + entry.nonDeterministic + entry.eventOwnerFailures.length + entry.lotFailures.length + entry.progressionFailures.length + entry.placementFailures.length + entry.raceFailures.length + entry.laundromatFailures.length + entry.difficultyFailures.length, 0);
     console.log(`MATRIX ${args.set}: ${summary.reduce((total, entry) => total + entry.ok, 0)} ok, ${failed} failed, ${bad} invariant violations (window overruns / non-deterministic reruns / event owner audit)`);
     if (failed > 0 || bad > 0) process.exitCode = 1;
   } finally {
-    await rm(temp, { recursive: true, force: true });
+    if (!process.env.DS1TR_MATRIX_KEEP) await rm(temp, { recursive: true, force: true });
   }
 }
 
