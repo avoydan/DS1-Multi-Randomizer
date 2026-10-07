@@ -26,7 +26,14 @@ export const defaultConfig = Object.freeze({
   // Part H (patches/0023): key placement. "vanilla" keeps every key where the game puts it (the behavior before the option existed); "shuffled" places the
   // keys of FogMod's annotation with a progression-safe assumed fill over the exported progression model (keys.js). Lordvessel and Lord Souls join only
   // with their own switches. Needs the exported model (progressionModel) and the world items.
+  // Part H (patches/0024): "race" and "race-plus" are shuffled-family modes (docs/RACE_MODE.md): the same fill, restricted to the race destinations;
+  // "race-plus" also uses the skip-extended model. itemDifficulty ("fair" = neutral: no draw, current behavior; "unfair"; "very-unfair") orders the
+  // candidate locations of every item by tier (docs/ITEM_DIFFICULTY_MODEL.md). laundromat randomizes the armor of NPC characters (docs/LAUNDROMAT_MIXUP.md).
   keyPlacement: "vanilla",
+  itemDifficulty: "fair",
+  laundromat: false,
+  // Analysis only (the tier measurements of docs/ITEM_DIFFICULTY_MODEL.md): report the tier matrix of the layout without changing it. Never set by the product.
+  measureTiers: false,
   keyRandomizeLordvessel: false,
   keyRandomizeLordSouls: false,
   progressionModel: null,
@@ -113,6 +120,8 @@ const booleanKeys = [
   "pinwheelChaos",
   "keyRandomizeLordvessel",
   "keyRandomizeLordSouls",
+  "laundromat",
+  "measureTiers",
   "useExtractedData",
   "dryRun",
 ];
@@ -142,7 +151,8 @@ export function normalizeConfig(input = {}) {
     ["startingItems", ["shield-1h", "shield-2h", "mixed-pool"]],
     ["gwynNerf", ["none", "medium", "strong"]],
     ["secondGargoyle", ["single-boss", "replace", "keep"]],
-    ["keyPlacement", ["vanilla", "shuffled"]],
+    ["keyPlacement", ["vanilla", "shuffled", "race", "race-plus"]],
+    ["itemDifficulty", ["fair", "unfair", "very-unfair"]],
   ]) {
     if (!allowed.includes(config[key])) config[key] = defaultConfig[key];
   }
@@ -172,12 +182,16 @@ export function validateConfig(config, { requireGame = false } = {}) {
     !config.randomizeGifts &&
     !config.randomizeEnemyDrops &&
     !config.guaranteedEnemyDrops &&
-    !config.randomizeShops
+    !config.randomizeShops &&
+    !config.laundromat
   ) {
     errors.push("Enable at least one category to randomize.");
   }
-  if (config.keyPlacement === "shuffled") {
+  if (config.itemDifficulty !== "fair" && !config.progressionModel) errors.push("ITEM_DIFFICULTY_MODEL_MISSING: item difficulty needs the progression model of the world data.");
+  if (config.keyPlacement !== "vanilla") {
     if (!config.progressionModel) errors.push("KEY_PLACEMENT_MODEL_MISSING: key placement needs the progression model of the world data.");
+    // The legacy GUI forces Fair under Race Mode + (the skips make the placement a puzzle of its own).
+    if (config.keyPlacement === "race-plus" && config.itemDifficulty !== "fair") errors.push("RACE_PLUS_DIFFICULTY: Race Mode + is only available with Fair item difficulty.");
     if (!config.randomizeItems) errors.push("KEY_PLACEMENT_NEEDS_WORLD_ITEMS: key placement needs the world items.");
     if (config.randomizeProtectedItems) errors.push("KEY_PLACEMENT_CONFLICT: key placement and protected-item randomization cannot be combined.");
   } else if (config.keyRandomizeLordvessel || config.keyRandomizeLordSouls) {

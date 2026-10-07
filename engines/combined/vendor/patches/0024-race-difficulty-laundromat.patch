@@ -1,0 +1,660 @@
+diff --git a/engines/combined/vendor/src/core/config.js b/engines/combined/vendor/src/core/config.js
+index 39b5b35..a366d81 100644
+--- a/engines/combined/vendor/src/core/config.js
++++ b/engines/combined/vendor/src/core/config.js
+@@ -26,7 +26,14 @@ export const defaultConfig = Object.freeze({
+   // Part H (patches/0023): key placement. "vanilla" keeps every key where the game puts it (the behavior before the option existed); "shuffled" places the
+   // keys of FogMod's annotation with a progression-safe assumed fill over the exported progression model (keys.js). Lordvessel and Lord Souls join only
+   // with their own switches. Needs the exported model (progressionModel) and the world items.
++  // Part H (patches/0024): "race" and "race-plus" are shuffled-family modes (docs/RACE_MODE.md): the same fill, restricted to the race destinations;
++  // "race-plus" also uses the skip-extended model. itemDifficulty ("fair" = neutral: no draw, current behavior; "unfair"; "very-unfair") orders the
++  // candidate locations of every item by tier (docs/ITEM_DIFFICULTY_MODEL.md). laundromat randomizes the armor of NPC characters (docs/LAUNDROMAT_MIXUP.md).
+   keyPlacement: "vanilla",
++  itemDifficulty: "fair",
++  laundromat: false,
++  // Analysis only (the tier measurements of docs/ITEM_DIFFICULTY_MODEL.md): report the tier matrix of the layout without changing it. Never set by the product.
++  measureTiers: false,
+   keyRandomizeLordvessel: false,
+   keyRandomizeLordSouls: false,
+   progressionModel: null,
+@@ -113,6 +120,8 @@ const booleanKeys = [
+   "pinwheelChaos",
+   "keyRandomizeLordvessel",
+   "keyRandomizeLordSouls",
++  "laundromat",
++  "measureTiers",
+   "useExtractedData",
+   "dryRun",
+ ];
+@@ -142,7 +151,8 @@ export function normalizeConfig(input = {}) {
+     ["startingItems", ["shield-1h", "shield-2h", "mixed-pool"]],
+     ["gwynNerf", ["none", "medium", "strong"]],
+     ["secondGargoyle", ["single-boss", "replace", "keep"]],
+-    ["keyPlacement", ["vanilla", "shuffled"]],
++    ["keyPlacement", ["vanilla", "shuffled", "race", "race-plus"]],
++    ["itemDifficulty", ["fair", "unfair", "very-unfair"]],
+   ]) {
+     if (!allowed.includes(config[key])) config[key] = defaultConfig[key];
+   }
+@@ -172,12 +182,16 @@ export function validateConfig(config, { requireGame = false } = {}) {
+     !config.randomizeGifts &&
+     !config.randomizeEnemyDrops &&
+     !config.guaranteedEnemyDrops &&
+-    !config.randomizeShops
++    !config.randomizeShops &&
++    !config.laundromat
+   ) {
+     errors.push("Enable at least one category to randomize.");
+   }
+-  if (config.keyPlacement === "shuffled") {
++  if (config.itemDifficulty !== "fair" && !config.progressionModel) errors.push("ITEM_DIFFICULTY_MODEL_MISSING: item difficulty needs the progression model of the world data.");
++  if (config.keyPlacement !== "vanilla") {
+     if (!config.progressionModel) errors.push("KEY_PLACEMENT_MODEL_MISSING: key placement needs the progression model of the world data.");
++    // The legacy GUI forces Fair under Race Mode + (the skips make the placement a puzzle of its own).
++    if (config.keyPlacement === "race-plus" && config.itemDifficulty !== "fair") errors.push("RACE_PLUS_DIFFICULTY: Race Mode + is only available with Fair item difficulty.");
+     if (!config.randomizeItems) errors.push("KEY_PLACEMENT_NEEDS_WORLD_ITEMS: key placement needs the world items.");
+     if (config.randomizeProtectedItems) errors.push("KEY_PLACEMENT_CONFLICT: key placement and protected-item randomization cannot be combined.");
+   } else if (config.keyRandomizeLordvessel || config.keyRandomizeLordSouls) {
+diff --git a/engines/combined/vendor/src/core/generator.js b/engines/combined/vendor/src/core/generator.js
+index a415632..b05da5b 100644
+--- a/engines/combined/vendor/src/core/generator.js
++++ b/engines/combined/vendor/src/core/generator.js
+@@ -19,7 +19,9 @@ import {
+   resolveEnemyPlacementAlgorithm,
+   resolveEnemyPlacementOptions,
+ } from "./placement.js";
+-import { KeyPlacementError, checkCompletable, coveredRowAreas, pairDisplaced, placeKeys, prepareModel } from "./keys.js";
++import { KEY_PLACEMENT_STRATEGIES, KeyPlacementError, RACE_ITEM_GOODS, areasBehindKey, checkCompletable, coveredRowAreas, pairDisplaced, placeKeys, prepareModel } from "./keys.js";
++import { planLaundromat } from "./laundromat.js";
++import { TIER, buildTierModel, difficultyShuffle, preferByTier, summarizeTiers } from "./difficulty.js";
+ import { bossDestinationClass, deriveBodyTypes, deriveRegularClassTable, deriveRoamingBossTypes, planRoamingBosses, planSampledBosses, planSampledRegularEnemies } from "./sampling.js";
+ import {
+   enemies,
+@@ -2133,8 +2135,23 @@ function randomizeExtractedItemLots(config, catalog) {
+       catalog,
+     ));
+   }
++  // Item difficulty (Part I, patches/0024): the tiers are built once, before anything moves, from the pool and the progression model.
++  const difficultyOn = config.itemDifficulty !== "fair";
++  const measureOn = difficultyOn || config.measureTiers;
++  const keysOn = config.keyPlacement !== "vanilla";
++  let tiers = null;
++  let tierPrepared = null;
++  let tierRowAreas = null;
++  if (measureOn || keysOn) {
++    const tierEntries = [...lotTargets, ...shopTargets.filter((entry) => !isBulkShopConsumable(entry))];
++    tierPrepared = prepareModel(config.progressionModel, keysOn ? KEY_PLACEMENT_STRATEGIES[config.keyPlacement].graph : "vanilla");
++    const tierKnown = new Set([...(catalog?.worldItemLots ?? []).map((lot) => lot.rowId), ...lotTargets.map((entry) => entry.rowId)]);
++    tierRowAreas = coveredRowAreas(tierPrepared, tierKnown);
++    if (measureOn) tiers = buildTierModel({ catalog, prepared: tierPrepared, entries: tierEntries, rowAreas: tierRowAreas });
++  }
+   // Key placement (Part H, patches/0023): the keys are placed first, by their own planner; what they displace is placed at the pickups they free.
+-  const keyPlan = config.keyPlacement === "shuffled" ? planKeys(config, catalog, lotTargets) : null;
++  // Race Mode and Race Mode + (Part I) are strategies of the same planner.
++  const keyPlan = keysOn ? planKeys(config, catalog, lotTargets, tiers) : null;
+   // Legacy "Fashion Souls" off: world armor sets move as whole sets.
+   const armorSetHomes = config.fashionSouls ? [] : findArmorSetHomes(lotTargets);
+   const armorSetTargets = new Set(armorSetHomes.flat());
+@@ -2143,7 +2160,7 @@ function randomizeExtractedItemLots(config, catalog) {
+     ...shopTargets.filter((entry) => !isBulkShopConsumable(entry)),
+   ];
+   const result = { items: [], gifts: [], enemyDrops: [], shops: [] };
+-  if (config.soulItems === "transposed" || config.keyPlacement === "shuffled") result.bossRewards = [];
++  if (config.soulItems === "transposed" || keysOn) result.bossRewards = [];
+   if (globalTargets.length + shopOnlyTargets.length < 2 && armorSetHomes.length === 0) {
+     return result;
+   }
+@@ -2181,7 +2198,9 @@ function randomizeExtractedItemLots(config, catalog) {
+               map: "ItemLotParam",
+               itemLot: entry.rowId,
+             };
++  const tierPairs = [];
+   const addPlacement = (target, source) => {
++    if (tiers) tierPairs.push([source, target]);
+     const singleQuantity =
+       [0, 1, 2, 4].includes(source.equipType) ||
+       /^(Sorcery|Pyromancy|Miracle):/.test(source.name);
+@@ -2210,6 +2229,8 @@ function randomizeExtractedItemLots(config, catalog) {
+       progression: source.progression,
+       // Only a key placed by the key planner says which key it is (hint metadata); every other placement keeps its exact shape.
+       ...(source.keyName ? { keyName: source.keyName } : {}),
++      // Only a race item (an ember, the Rite of Kindling, the Sewer Chamber Key, the Mystery Key held to the race destinations) says so (hint metadata).
++      ...(source.raceItem ? { raceItem: true } : {}),
+       // Only a transposed boss soul says what it was (hint metadata); every other placement keeps its exact shape.
+       ...(source.pool === "boss" && source.transmuted ? { transposedFrom: source.originalName } : {}),
+       preserved:
+@@ -2240,9 +2261,19 @@ function randomizeExtractedItemLots(config, catalog) {
+     if (targets.length === 0) continue;
+     const rng = createStream(config.seed, stream, config.version);
+     let sources = stream === "all-item-sources"
+-      ? shuffledWithoutDlcRestrictedItems(rng, targets)
++      ? (difficultyOn
++        ? difficultyShuffle({
++          seed: config.seed, version: config.version, values: targets, mode: config.itemDifficulty, tiers,
++          restricted: isDlcRestrictedItem, isDlcTarget: (target) => target.mapId === DLC_MAP,
++        })
++        : shuffledWithoutDlcRestrictedItems(rng, targets))
+       : shuffledWithoutFixedPoints(rng, targets);
+     if (stream === "all-item-sources") {
++      // Item difficulty and the race modes (docs/ITEM_DIFFICULTY_MODEL.md section 3): a "random only" item that opens an area (Cast Light) must not end up in that
++      // area. The neutral and the Shuffled worlds keep their placements byte for byte, so the guard acts only in the modes that came with it.
++      if (tierPrepared && (difficultyOn || config.keyPlacement === "race" || config.keyPlacement === "race-plus")) {
++        sources = guardRandomOnlyItems({ seed: config.seed, version: config.version, targets, sources, prepared: tierPrepared, rowAreas: tierRowAreas, isDlcRestricted: isDlcRestrictedItem });
++      }
+       sources = keepConsumableSoulsInFiniteShops(targets, sources);
+       const fogRules = fogPlacementRules(config, catalog, targets);
+       if (fogRules) sources = repairFogTrackedItems(rng, targets, sources, fogRules);
+@@ -2253,6 +2284,10 @@ function randomizeExtractedItemLots(config, catalog) {
+     for (const { target, source } of [...keyPlan.keyPlacements, ...keyPlan.pairs]) addPlacement(target, source);
+     result.keyPlacement = keyPlan.diagnostics;
+   }
++  // Counters of the finished layout by tier ("item>location"), only when an item difficulty is on (the neutral value reports nothing).
++  if (tiers) {
++    result.itemDifficulty = { mode: config.itemDifficulty, cuts: tiers.cuts, matrix: summarizeTiers(tierPairs, tiers) };
++  }
+   if (armorSetHomes.length > 0) {
+     const rng = createStream(config.seed, "armor-sets", config.version);
+     for (const [home, sourceSet] of permutedArmorSets(rng, armorSetHomes)) {
+@@ -2270,6 +2305,8 @@ function randomizeExtractedItemLots(config, catalog) {
+ // the DLC and is not part of an armor set that moves as a whole. The finished placement is checked as a whole against the model.
+ const KEY_EQUIP_CATEGORY = { 0: 0, 1: 0x10000000, 2: 0x20000000, 3: 0x40000000 };
+ const DLC_MAP = "m12_01_00_00";
++// The object model of a treasure chest (the treasure events of the maps that hold a chest rather than a pickup on the ground; docs/RACE_MODE.md).
++const RACE_CHEST_MODEL = "o0110";
+ 
+ function keySourceEntries(catalog) {
+   const entries = [];
+@@ -2295,8 +2332,9 @@ function keySourceEntries(catalog) {
+   return entries;
+ }
+ 
+-function planKeys(config, catalog, lotTargets) {
+-  const prepared = prepareModel(config.progressionModel);
++function planKeys(config, catalog, lotTargets, tiers) {
++  const strategy = KEY_PLACEMENT_STRATEGIES[config.keyPlacement];
++  const prepared = prepareModel(config.progressionModel, strategy.graph);
+   const all = keySourceEntries(catalog);
+   const known = new Set(all.map((entry) => entry.rowId));
+   const rowArea = coveredRowAreas(prepared, known);
+@@ -2306,7 +2344,7 @@ function planKeys(config, catalog, lotTargets) {
+     if (!bySignature.has(signature)) bySignature.set(signature, []);
+     bySignature.get(signature).push(entry);
+   }
+-  const diagnostics = { mode: "shuffled", movableKeys: [], fixedKeys: [], notMovable: {} };
++  const diagnostics = { mode: config.keyPlacement, movableKeys: [], fixedKeys: [], notMovable: {} };
+   const movableSources = new Map();
+   const fixed = new Map();
+   for (const key of prepared.raw.keys) {
+@@ -2329,21 +2367,38 @@ function planKeys(config, catalog, lotTargets) {
+   const movable = [...movableSources.keys()].sort();
+   diagnostics.movableKeys = movable;
+   if (movable.length === 0) throw new KeyPlacementError("KEY_PLACEMENT_NOTHING_TO_PLACE", "No key of the catalog can be moved.", diagnostics);
+-  // The vanilla pickups of the movable keys leave the pool (they are keys, not pool items); they are pickups the keys free or fill.
+   const sourceSignature = (entry) => `${entry.rowId}:${entry.slot}`;
++  // Race and Race + (docs/RACE_MODE.md): a pool item the legacy holds to the race locations although the graph has no condition on it (the embers, the Rite
++  // of Kindling, the Sewer Chamber Key, the Mystery Key). They leave the pool like the keys and are placed after them, at random, in the race destinations.
++  const raceItemRows = new Map();
++  if (strategy.raceItems) {
++    for (const entry of lotTargets) if (entry.equipType === 3 && RACE_ITEM_GOODS.has(entry.itemId) && entry.pool === "world" && !entry.transmuted) raceItemRows.set(sourceSignature(entry), entry);
++  }
++  // The vanilla pickups of the movable keys and of the race items leave the pool (they are keys, not pool items); they are pickups the keys free or fill.
+   const keyRows = new Map([...movableSources.values()].map((entry) => [sourceSignature(entry), entry]));
+-  for (let index = lotTargets.length - 1; index >= 0; index -= 1) if (keyRows.has(sourceSignature(lotTargets[index]))) lotTargets.splice(index, 1);
++  const vacatedRows = new Map([...keyRows, ...raceItemRows]);
++  const raceItems = [...raceItemRows.values()].sort((left, right) => left.rowId - right.rowId || left.slot - right.slot);
++  for (let index = lotTargets.length - 1; index >= 0; index -= 1) if (vacatedRows.has(sourceSignature(lotTargets[index]))) lotTargets.splice(index, 1);
+   const armorMembers = config.fashionSouls ? new Set() : new Set(findArmorSetHomes(lotTargets).flat().map(sourceSignature));
+   const eligible = (entry) => (entry.pool === "world" || entry.pool === "boss") && entry.kind === "lot" && rowArea.has(entry.rowId) && entry.mapId !== DLC_MAP
+     && !armorMembers.has(sourceSignature(entry)) && lotEntriesOf(catalog, entry) === 1 && !isUnsupportedCutItem(entry);
+-  const poolDestinations = lotTargets.filter((entry) => eligible(entry) && entry.pool !== "gift");
+-  const keyDestinations = [...keyRows.values()].filter(eligible);
++  // The race destinations, derived from the game data: a boss reward, a treasure chest (the treasure events whose object is the chest model), or the
++  // vanilla pickup of a key or an ember (the lot where the clean game puts the item).
++  const raceChestRows = new Set((catalog?.treasures ?? []).filter((treasure) => treasure.model === RACE_CHEST_MODEL).map((treasure) => treasure.rowId));
++  const raceKeySignatures = new Set([...prepared.raw.keys.map((key) => key.id), ...[...RACE_ITEM_GOODS].map((id) => `3:${id}`)]);
++  const raceVanillaRows = new Set(all.filter((entry) => raceKeySignatures.has(`${entry.equipType}:${entry.itemId}`)).map(sourceSignature));
++  const isRaceDestination = (entry) => entry.pool === "boss" || raceChestRows.has(entry.rowId) || raceVanillaRows.has(sourceSignature(entry));
++  const allowed = (entry) => eligible(entry) && (!strategy.raceDestinations || isRaceDestination(entry));
++  const poolDestinations = lotTargets.filter((entry) => allowed(entry) && entry.pool !== "gift");
++  const vacatedDestinations = [...vacatedRows.values()].filter(allowed);
+   const destinationEntries = new Map();
+-  for (const entry of [...poolDestinations, ...keyDestinations]) destinationEntries.set(sourceSignature(entry), entry);
++  for (const entry of [...poolDestinations, ...vacatedDestinations]) destinationEntries.set(sourceSignature(entry), entry);
+   const destinations = [...destinationEntries.values()]
+     .sort((left, right) => left.rowId - right.rowId || left.slot - right.slot)
+     .map((entry) => ({ id: sourceSignature(entry), area: rowArea.get(entry.rowId), entry }));
+-  const result = placeKeys({ prepared, seed: config.seed, version: config.version, movable, fixed, destinations });
++  // Item difficulty: a key ranks as HARD and prefers the best tier that has a reachable destination (the legacy orders the keys like any other item).
++  const prefer = tiers ? (_key, candidates) => preferByTier(config.itemDifficulty, TIER.HARD, candidates, (candidate) => tiers.locationTier(candidate.entry)) : null;
++  const result = placeKeys({ prepared, seed: config.seed, version: config.version, movable, fixed, destinations, prefer });
+   const byId = new Map(destinations.map((destination) => [destination.id, destination.entry]));
+   const keyPlacements = [];
+   const takenIds = new Set();
+@@ -2352,9 +2407,22 @@ function planKeys(config, catalog, lotTargets) {
+     takenIds.add(sourceSignature(target));
+     keyPlacements.push({ source: { ...movableSources.get(key), progression: true, keyName: key }, target });
+   }
+-  // What the keys displaced lies at the pickups the keys left; a displaced item goes where it is accepted (the DLC rule).
++  // The race items take free race destinations from their own stream (no graph condition applies to them).
++  const racePlacements = [];
++  if (raceItems.length > 0) {
++    const rng = createStream(config.seed, "item-race", config.version);
++    const free = rng.shuffle(destinations.filter((destination) => !takenIds.has(destination.id)).map((destination) => destination.entry));
++    if (free.length < raceItems.length) {
++      throw new KeyPlacementError("KEY_PLACEMENT_UNSATISFIABLE", "The race destinations cannot hold every race item (RACE_DESTINATIONS_EXHAUSTED).", { ...diagnostics, reason: "RACE_DESTINATIONS_EXHAUSTED", raceDestinations: destinations.length, raceItems: raceItems.length });
++    }
++    raceItems.forEach((item, index) => {
++      takenIds.add(sourceSignature(free[index]));
++      racePlacements.push({ source: { ...item, raceItem: true }, target: free[index] });
++    });
++  }
++  // What the keys and race items displaced lies at the pickups they left; a displaced item goes where it is accepted (the DLC rule).
+   const displaced = lotTargets.filter((entry) => takenIds.has(sourceSignature(entry)));
+-  const freed = [...keyRows.values()].filter((entry) => !takenIds.has(sourceSignature(entry)));
++  const freed = [...vacatedRows.values()].filter((entry) => !takenIds.has(sourceSignature(entry)));
+   const pairs = displaced.length === 0 && freed.length === 0 ? [] : pairDisplaced({
+     seed: config.seed, version: config.version, displaced, freed,
+     accepts: { restricted: (row) => row.mapId === DLC_MAP, fits: (item, row) => !(row.mapId === DLC_MAP && isDlcRestrictedItem(item)) },
+@@ -2365,18 +2433,52 @@ function planKeys(config, catalog, lotTargets) {
+   for (const { source, target } of keyPlacements) finalAreas.set(source.keyName, rowArea.get(target.rowId));
+   const check = checkCompletable(prepared, finalAreas);
+   if (!check.completable || !check.prisonEscapable) throw new KeyPlacementError("KEY_PLACEMENT_INVALID", "The written key placement failed the final check.", { unvisited: check.unvisited, prisonEscapable: check.prisonEscapable });
++  if (strategy.raceDestinations) {
++    const outside = [...keyPlacements, ...racePlacements].filter(({ target }) => !isRaceDestination(target));
++    if (outside.length > 0) {
++      throw new KeyPlacementError(config.keyPlacement === "race-plus" ? "RACE_PLUS_LOCATION_INVALID" : "RACE_LOCATION_INVALID", "A key or race item was placed outside the race destinations.", { count: outside.length });
++    }
++  }
+   diagnostics.attempts = result.attempts;
+   diagnostics.deadEnds = result.diagnostics.deadEnds;
+   diagnostics.destinations = destinations.length;
+   diagnostics.displacedItems = displaced.length;
+   diagnostics.freedPickups = freed.length;
++  diagnostics.raceItems = racePlacements.length;
+   diagnostics.annotationSha256 = prepared.raw.annotationSha256;
+   // The area every key lies in at the end (the same names as the model); the sweeps compare them with FogMod's own reading of the written lots.
+   diagnostics.keyAreas = Object.fromEntries([...finalAreas].sort((left, right) => (left[0] < right[0] ? -1 : 1)));
+   diagnostics.keysMoved = keyPlacements.filter(({ source, target }) => source.rowId !== target.rowId || source.slot !== target.slot).length;
+   diagnostics.completable = check.completable;
+   diagnostics.prisonEscapable = check.prisonEscapable;
+-  return { keyPlacements, pairs, diagnostics };
++  return { keyPlacements: [...keyPlacements, ...racePlacements], pairs, diagnostics };
++}
++
++// A "random only" key (FogMod tags Cast Light so) is an ordinary pool item that opens an area (a shop sells it as a spell of equip type 4; in a lot it is goods 3500, one item); where it may lie is limited by that area: never behind itself. Deterministic:
++// a violation is swapped with the next free place of a seeded order (stream item-guard, created only when there is a violation).
++function guardRandomOnlyItems({ seed, version, targets, sources, prepared, rowAreas, isDlcRestricted }) {
++  const guarded = prepared.raw.keys.filter((key) => (key.tags ?? []).includes("randomonly")).map((key) => ({ id: key.id, behind: areasBehindKey(prepared, key.name) })).filter((entry) => entry.behind.size > 0);
++  if (guarded.length === 0) return sources;
++  const result = [...sources];
++  const forbidden = (source, target) => guarded.some((entry) => entry.id === `${source.equipType === 4 ? 3 : source.equipType}:${source.itemId}` && entry.behind.has(rowAreas.get(target.rowId)));
++  let rng = null;
++  result.forEach((source, index) => {
++    if (!forbidden(source, targets[index])) return;
++    rng ??= createStream(seed, "item-guard", version);
++    const order = rng.shuffle(targets.map((_, other) => other).filter((other) => other !== index));
++    const swap = order.find((other) => !forbidden(result[index], targets[other]) && !forbidden(result[other], targets[index])
++      && !(targets[other].mapId === DLC_MAP && isDlcRestricted(result[index])) && !(targets[index].mapId === DLC_MAP && isDlcRestricted(result[other])));
++    if (swap === undefined) throw new KeyPlacementError("KEY_PLACEMENT_UNSATISFIABLE", "A random-only item could not be moved out of the area it opens.", { reason: "RANDOM_ONLY_ITEM_BEHIND_ITSELF" });
++    [result[index], result[swap]] = [result[swap], result[index]];
++  });
++  return result;
++}
++
++function requireNpcArmor(catalog) {
++  if (!Array.isArray(catalog?.npcArmor)) {
++    throw Object.assign(new Error("LAUNDROMAT_CATALOG_OUTDATED: the game catalog has no NPC armor; scan the game again."), { code: "LAUNDROMAT_CATALOG_OUTDATED" });
++  }
++  return catalog.npcArmor;
+ }
+ 
+ /** Entries in the lot a pickup belongs to, from the catalog (a key may only lie in a pickup that is awarded for certain: one entry). */
+@@ -3505,11 +3607,14 @@ export function generate(inputConfig, { gameCatalog = null } = {}) {
+       shops: extractedData ? itemLotPlan.shops : [],
+       // Only with Soul items Transposed: every other world keeps its placement (and so its placement hash) exactly.
+       ...(extractedData && itemLotPlan.bossRewards ? { bossRewards: itemLotPlan.bossRewards } : {}),
++      // Only with the Laundromat Mixup (Part I): the planned armor of the NPC characters (docs/LAUNDROMAT_MIXUP.md); every other world keeps its placements.
++      ...(extractedData && config.laundromat ? { laundromat: planLaundromat({ seed: config.seed, version: config.version, npcArmor: requireNpcArmor(gameCatalog), fashionSouls: config.fashionSouls }) } : {}),
+     },
+     validation: {
+       valid: true,
+       finalBossReachable: !config.randomizeProtectedItems,
+       ...(extractedData && itemLotPlan.keyPlacement ? { keyPlacement: itemLotPlan.keyPlacement } : {}),
++      ...(extractedData && itemLotPlan.itemDifficulty ? { itemDifficulty: itemLotPlan.itemDifficulty } : {}),
+       notes: extractedData
+         ? [
+             "All hostile regular-enemy slots use a count-preserving global permutation within a 30-character-model total map budget; friendly NPCs and invisible technical helpers stay vanilla.",
+@@ -3550,8 +3655,14 @@ export function generate(inputConfig, { gameCatalog = null } = {}) {
+             ...(config.soulItems === "replaced"
+               ? ["Soul items replaced: lesser souls (goods 400-409) were swapped for other consumables before shuffling."]
+               : []),
+-            ...(config.keyPlacement === "shuffled"
+-              ? ["Key items shuffled: the keys were placed with a progression-safe assumed fill over the progression model; the finished placement passed the final check."]
++            ...(config.keyPlacement !== "vanilla"
++              ? [`Key items (${config.keyPlacement}): the keys were placed with a progression-safe assumed fill over the progression model${config.keyPlacement === "race" || config.keyPlacement === "race-plus" ? ", restricted to the race destinations" : ""}; the finished placement passed the final check.`]
++              : []),
++            ...(config.laundromat
++              ? ["Laundromat Mixup: NPC characters wear armor pieces other NPCs wear (only their appearance and armor stats change)."]
++              : []),
++            ...(config.itemDifficulty !== "fair"
++              ? [`Item difficulty (${config.itemDifficulty}): the candidate locations of every item were ordered by tier.`]
+               : []),
+             ...(config.soulItems === "transposed"
+               ? ["Soul items transposed: the boss souls joined the item pool and each had a 75% chance to become a boss weapon of its boss."]
+diff --git a/engines/combined/vendor/src/core/keys.js b/engines/combined/vendor/src/core/keys.js
+index f3f64c0..d25fccf 100644
+--- a/engines/combined/vendor/src/core/keys.js
++++ b/engines/combined/vendor/src/core/keys.js
+@@ -14,7 +14,24 @@
+ // Nothing here draws from a stream that another option uses: every draw comes from `item-keys:<attempt>` or `item-keys-fill`.
+ import { createStream } from "./rng.js";
+ 
+-export const KEY_PLACEMENT_MODES = ["vanilla", "shuffled"];
++export const KEY_PLACEMENT_MODES = ["vanilla", "shuffled", "race", "race-plus"];
++
++/**
++ * The modes are strategies (docs/RACE_MODE.md), not scattered conditionals. Every shuffled-family mode shares the assumed fill, the pairing of the
++ * displaced items, the typed failures and the final check; a strategy only says which destinations are allowed, which model variant the fill reasons
++ * over and which pool items are held to the race destinations (the legacy places the embers and a few more items "as keys" in Race and Race +).
++ *   raceDestinations: keys may only lie in a race destination (a boss reward, a chest, the vanilla pickup of a key or an ember)
++ *   graph:            the model variant ("vanilla", or "race-plus": the vanilla graph plus the skips of the legacy list)
++ *   raceItems:        the embers, the Rite of Kindling, the Sewer Chamber Key and the Mystery Key must end up in a race destination as well
++ */
++export const KEY_PLACEMENT_STRATEGIES = Object.freeze({
++  shuffled: Object.freeze({ raceDestinations: false, graph: "vanilla", raceItems: false }),
++  race: Object.freeze({ raceDestinations: true, graph: "vanilla", raceItems: true }),
++  "race-plus": Object.freeze({ raceDestinations: true, graph: "race-plus", raceItems: true }),
++});
++
++/** Goods the legacy holds to the race locations although the graph has no condition on them: Large Ember to Chaos Flame Ember (800-813), the Rite of Kindling, the Sewer Chamber Key and the Mystery Key. */
++export const RACE_ITEM_GOODS = Object.freeze(new Set([800, 801, 802, 806, 807, 808, 809, 810, 812, 813, 2607, 2018, 2017]));
+ export const PROGRESSION_MODEL_FORMAT = "ds1tr-progression-model-1";
+ const MAX_ATTEMPTS = 32;
+ 
+@@ -45,10 +62,14 @@ function compile(expr) {
+ }
+ 
+ /** Validates an exported model and prepares it for evaluation. */
+-export function prepareModel(model) {
++export function prepareModel(model, variant = "vanilla") {
+   if (!model || model.format !== PROGRESSION_MODEL_FORMAT) {
+     throw new KeyPlacementError("KEY_PLACEMENT_MODEL_INVALID", `The progression model has the wrong format (expected ${PROGRESSION_MODEL_FORMAT}).`);
+   }
++  // A model exported before the variants existed is the vanilla graph. The fill must reason over the graph its mode names, never another one.
++  if ((model.variant ?? "vanilla") !== variant) {
++    throw new KeyPlacementError("KEY_PLACEMENT_MODEL_INVALID", `The progression model is the "${model.variant ?? "vanilla"}" variant; this mode needs "${variant}".`);
++  }
+   for (const field of ["areas", "edges", "keys", "lotAreas", "start", "prison"]) {
+     if (model[field] === undefined) throw new KeyPlacementError("KEY_PLACEMENT_MODEL_INVALID", `The progression model has no ${field}.`);
+   }
+@@ -84,6 +105,16 @@ export function visitedAreas(prepared, keyAreas, inHand = new Set(), start = pre
+   return countOnly ? countOnly(visited) : visited;
+ }
+ 
++/**
++ * The areas a player cannot reach without a given key although every OTHER key is in hand (what lies "behind" the key: the hidden Oolacile Township behind
++ * Cast Light). An item that opens an area must not be placed there. Empty for a key that opens nothing.
++ */
++export function areasBehindKey(prepared, keyName) {
++  const others = new Set(prepared.raw.keys.map((key) => key.name).filter((name) => name !== keyName));
++  const reached = visitedAreas(prepared, new Map(), others);
++  return new Set([...prepared.areas].filter((area) => !reached.has(area)));
++}
++
+ /** The areas that must be visited for a completable world (everything but the optional areas), and the Seath capture rule. */
+ export function checkCompletable(prepared, keyAreas) {
+   const visited = visitedAreas(prepared, keyAreas);
+@@ -113,9 +144,10 @@ export function coveredRowAreas(prepared, knownRows) {
+  *   movable:      key names the planner may move
+  *   fixed:        Map key name -> area for every other key (they stay where the game puts them)
+  *   destinations: [{ id, area }] pickups a key may lie in (each at most once)
++ *   prefer:       optional (key, candidates) -> the sub-list the draw is made from (item difficulty: the best tier that has a candidate); absent = all
+  * Returns { placed: Map key name -> destination id, attempts, diagnostics }. Bounded and deterministic: attempt n draws from the stream item-keys:n.
+  */
+-export function placeKeys({ prepared, seed, version, movable, fixed, destinations }) {
++export function placeKeys({ prepared, seed, version, movable, fixed, destinations, prefer = null }) {
+   const diagnostics = { movableKeys: movable.length, destinations: destinations.length, attempts: 0, deadEnds: [] };
+   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
+     diagnostics.attempts = attempt + 1;
+@@ -130,7 +162,8 @@ export function placeKeys({ prepared, seed, version, movable, fixed, destination
+       const reachable = visitedAreas(prepared, areaOf, unplaced);
+       const candidates = destinations.filter((destination) => !used.has(destination.id) && reachable.has(destination.area));
+       if (candidates.length === 0) { failed = key; break; }
+-      const pick = candidates[rng.int(candidates.length)];
++      const preferred = prefer ? prefer(key, candidates) : candidates;
++      const pick = preferred[rng.int(preferred.length)];
+       placed.set(key, pick.id);
+       used.add(pick.id);
+       areaOf.set(key, pick.area);
+diff --git a/engines/combined/vendor/tools/DsrDataTool/Program.cs b/engines/combined/vendor/tools/DsrDataTool/Program.cs
+index c7f9a10..44eb0a7 100644
+--- a/engines/combined/vendor/tools/DsrDataTool/Program.cs
++++ b/engines/combined/vendor/tools/DsrDataTool/Program.cs
+@@ -214,6 +214,7 @@ static GameCatalog ScanGame(string gameDirectory)
+         sourceFiles.Add(DescribeSource(commonEventPath, gameDirectory));
+ 
+     var maps = new List<MapRecord>();
++    var treasures = new List<TreasureRecord>();
+     var slots = new List<EnemySlotRecord>();
+     var eventAwardItemLotIds = new HashSet<int>();
+     var ignoredFiles = new List<string>();
+@@ -250,6 +251,16 @@ static GameCatalog ScanGame(string gameDirectory)
+                 mapNames.GetValueOrDefault(mapId, mapId),
+                 map.Parts.Enemies.Count,
+                 map.Parts.DummyEnemies.Count));
++            // Part H (patches/0024): which object holds each treasure (a chest or a pickup on the ground), by the model of the object part.
++            var objectModels = map.Parts.Objects
++                .GroupBy(part => part.Name, StringComparer.Ordinal)
++                .ToDictionary(group => group.Key, group => group.First().ModelName, StringComparer.Ordinal);
++            foreach (var treasure in map.Events.Treasures)
++            {
++                objectModels.TryGetValue(treasure.TreasurePartName ?? "", out var model);
++                foreach (var lotId in treasure.ItemLots.Where(id => id > 0).Distinct())
++                    treasures.Add(new TreasureRecord(mapId, lotId, model ?? ""));
++            }
+ 
+             slots.AddRange(map.Parts.Enemies.Select(
+                 enemy => ToSlot(
+@@ -348,6 +359,8 @@ static GameCatalog ScanGame(string gameDirectory)
+     var shopEntries = new List<ShopEntryRecord>();
+     var bossRewards = new List<BossRewardRecord>();
+     var transpositionRecipes = new List<TranspositionRecipeRecord>();
++    var itemTraits = new List<ItemTraitRecord>();
++    var npcArmor = new List<NpcArmorRecord>();
+     var startingEquipmentPools = new StartingEquipmentPools(
+         new(), new(), new(), new(), new());
+     var itemNames = ReadEnglishItemNames(itemMessagePath);
+@@ -380,6 +393,8 @@ static GameCatalog ScanGame(string gameDirectory)
+                     Path.Combine(gameDirectory, "event"));
+                 bossRewards = randomizerData.BossRewards;
+                 transpositionRecipes = randomizerData.TranspositionRecipes;
++                itemTraits = randomizerData.ItemTraits;
++                npcArmor = randomizerData.NpcArmor;
+                 errors.AddRange(randomizerData.Errors);
+                 gifts = randomizerData.Gifts;
+                 enemyDropLots = randomizerData.EnemyDropLots;
+@@ -423,7 +438,10 @@ static GameCatalog ScanGame(string gameDirectory)
+         ignoredFiles,
+         EventOwners.Shared ? "shared" : null,
+         bossRewards,
+-        transpositionRecipes);
++        transpositionRecipes,
++        treasures,
++        itemTraits,
++        npcArmor);
+ }
+ 
+ static RandomizerParamData ReadRandomizerParamData(
+@@ -680,6 +698,29 @@ static RandomizerParamData ReadRandomizerParamData(
+         armorBySlot.GetValueOrDefault(2, new()),
+         armorBySlot.GetValueOrDefault(3, new()));
+ 
++    // Part H (patches/0024): what the game itself says about the equipment (the item difficulty tiers are derived from it) and
++    // the armor every NPC character wears (the Laundromat Mixup draws only from pieces an NPC already wears).
++    var itemTraits = new List<ItemTraitRecord>();
++    foreach (var row in weaponParam.Rows)
++        itemTraits.Add(new ItemTraitRecord(0, row.ID,
++            GetCellInt(row, "attackBasePhysics", 0) + GetCellInt(row, "attackBaseMagic", 0) +
++            GetCellInt(row, "attackBaseFire", 0) + GetCellInt(row, "attackBaseThunder", 0),
++            Convert.ToDouble(row.Cells.FirstOrDefault(cell => cell.Def.InternalName == "weight")?.Value ?? 0.0)));
++    foreach (var row in protectorParam.Rows)
++        itemTraits.Add(new ItemTraitRecord(1, row.ID,
++            GetCellInt(row, "defensePhysics", 0) + GetCellInt(row, "defenseMagic", 0) +
++            GetCellInt(row, "defenseFire", 0) + GetCellInt(row, "defenseThunder", 0),
++            Convert.ToDouble(row.Cells.FirstOrDefault(cell => cell.Def.InternalName == "weight")?.Value ?? 0.0)));
++    var npcArmor = new List<NpcArmorRecord>();
++    foreach (var row in ReadParam("CharaInitParam.param").Rows.Where(row => row.ID >= 6_000))
++        npcArmor.Add(new NpcArmorRecord(
++            row.ID,
++            GetCellInt(row, "npcPlayerFaceGenId", -1),
++            GetCellInt(row, "equip_Helm", -1),
++            GetCellInt(row, "equip_Armer", -1),
++            GetCellInt(row, "equip_Gaunt", -1),
++            GetCellInt(row, "equip_Leg", -1)));
++
+     return new RandomizerParamData(
+         gifts,
+         enemyDropLots,
+@@ -688,7 +729,9 @@ static RandomizerParamData ReadRandomizerParamData(
+         startingEquipmentPools,
+         bossRewards,
+         transpositionRecipes,
+-        scanErrors);
++        scanErrors,
++        itemTraits,
++        npcArmor);
+ }
+ 
+ // Part H (patches/0021): the boss rewards. The shared common event 970 waits for a trigger flag (a boss defeat) and then awards up
+@@ -1470,6 +1513,27 @@ static PatchReport PatchEnemies(
+                     : null))
+         .ToList();
+ 
++    // Part I (patches/0024): the Laundromat Mixup. The engine plans the armor of NPC characters; the rows are checked against the scan and written.
++    var laundromat = new List<LaundromatRow>();
++    if (placementsRoot.TryGetProperty("laundromat", out var laundromatElement) && laundromatElement.ValueKind == JsonValueKind.Array)
++    {
++        laundromat = laundromatElement.EnumerateArray()
++            .Select(row => new LaundromatRow(
++                row.GetProperty("id").GetInt32(),
++                row.GetProperty("head").GetInt32(),
++                row.GetProperty("chest").GetInt32(),
++                row.GetProperty("hands").GetInt32(),
++                row.GetProperty("legs").GetInt32()))
++            .ToList();
++        var known = catalog.NpcArmor?.ToDictionary(entry => entry.Id)
++            ?? throw new InvalidDataException("The Laundromat Mixup needs a catalog with NPC armor. Generate a new package from a fresh catalog.");
++        foreach (var row in laundromat)
++        {
++            if (!known.ContainsKey(row.Id) || known[row.Id].Id < 6_000)
++                throw new InvalidDataException($"Laundromat Mixup names a row that is not an NPC character row: {row.Id}.");
++        }
++    }
++
+     Directory.CreateDirectory(outputDirectory);
+     var patchedMaps = new List<PatchedMap>();
+     var changedSlots = 0;
+@@ -1769,6 +1833,7 @@ static PatchReport PatchEnemies(
+         worldItemPlacements.Count > 0 ||
+         shopPlacements.Count > 0 ||
+         itemAssignments.Count > 0 ||
++        laundromat.Count > 0 ||
+         guaranteedEnemyDrops
+         ? PatchGameParam(
+             gameDirectory,
+@@ -1781,7 +1846,8 @@ static PatchReport PatchEnemies(
+             worldItemPlacements,
+             shopPlacements,
+             itemAssignments,
+-            guaranteedEnemyDrops)
++            guaranteedEnemyDrops,
++            laundromat)
+         : null;
+ 
+     var report = new PatchReport(
+@@ -4064,7 +4130,8 @@ static PatchedFile? PatchGameParam(
+     List<RowPlacement> worldItemPlacements,
+     List<RowPlacement> shopPlacements,
+     List<ItemAssignment> itemAssignments,
+-    bool guaranteedEnemyDrops)
++    bool guaranteedEnemyDrops,
++    List<LaundromatRow>? laundromat = null)
+ {
+     if (!enemyPlacements.Any(placement => placement.ScaledNpcParamId.HasValue) &&
+         !enemyPlacements.Any(placement => placement.BaseThinkParamId.HasValue) &&
+@@ -4075,6 +4142,7 @@ static PatchedFile? PatchGameParam(
+         worldItemPlacements.Count == 0 &&
+         shopPlacements.Count == 0 &&
+         itemAssignments.Count == 0 &&
++        (laundromat == null || laundromat.Count == 0) &&
+         !guaranteedEnemyDrops)
+         return null;
+ 
+@@ -4373,6 +4441,7 @@ static PatchedFile? PatchGameParam(
+         name => name.Equals("equipId", StringComparison.Ordinal),
+         "shop");
+     ApplyItemAssignments(itemLotParam, shopParam, itemAssignments);
++    ApplyLaundromat(charaParam, catalog, laundromat ?? new List<LaundromatRow>());
+     var guaranteedEnemyDropRowIds = guaranteedEnemyDrops
+         ? catalog.EnemyDropLots.Select(lot => lot.RowId).Distinct().ToList()
+         : new List<int>();
+@@ -4900,6 +4969,28 @@ static void AssertGuaranteedEnemyDropRates(PARAM itemLotParam, List<int> rowIds)
+     }
+ }
+ 
++// Part I (patches/0024): the armor of the NPC characters. Only the four armor cells of the planned CharaInitParam rows change; each row is checked against
++// the scan first (the clean game's value), so a changed game cannot be written over.
++static void ApplyLaundromat(PARAM charaParam, GameCatalog catalog, List<LaundromatRow> rows)
++{
++    if (rows.Count == 0) return;
++    var known = catalog.NpcArmor!.ToDictionary(entry => entry.Id);
++    var byId = charaParam.Rows.ToDictionary(row => row.ID);
++    foreach (var plan in rows)
++    {
++        if (!byId.TryGetValue(plan.Id, out var row))
++            throw new InvalidDataException($"Laundromat Mixup: CharaInitParam row {plan.Id} does not exist.");
++        var original = known[plan.Id];
++        if (GetCellInt(row, "equip_Helm") != original.Head || GetCellInt(row, "equip_Armer") != original.Chest ||
++            GetCellInt(row, "equip_Gaunt") != original.Hands || GetCellInt(row, "equip_Leg") != original.Legs)
++            throw new InvalidDataException($"Laundromat Mixup: CharaInitParam row {plan.Id} changed after extraction.");
++        row["equip_Helm"].Value = plan.Head;
++        row["equip_Armer"].Value = plan.Chest;
++        row["equip_Gaunt"].Value = plan.Hands;
++        row["equip_Leg"].Value = plan.Legs;
++    }
++}
++
+ static int GetCellInt(PARAM.Row row, string name, int fallback = -1)
+ {
+     var cell = row.Cells.SingleOrDefault(entry =>
+@@ -5451,7 +5542,10 @@ record GameCatalog(
+     List<string> IgnoredFiles,
+     string? EventOwners = null,
+     List<BossRewardRecord>? BossRewards = null,
+-    List<TranspositionRecipeRecord>? TranspositionRecipes = null);
++    List<TranspositionRecipeRecord>? TranspositionRecipes = null,
++    List<TreasureRecord>? Treasures = null,
++    List<ItemTraitRecord>? ItemTraits = null,
++    List<NpcArmorRecord>? NpcArmor = null);
+ 
+ // Which map's event file serves a map: see EventOwnerMap. One mode per run.
+ static class EventOwners
+@@ -5662,7 +5756,17 @@ record RandomizerParamData(
+     StartingEquipmentPools StartingEquipmentPools,
+     List<BossRewardRecord> BossRewards,
+     List<TranspositionRecipeRecord> TranspositionRecipes,
+-    List<ScanError> Errors);
++    List<ScanError> Errors,
++    List<ItemTraitRecord> ItemTraits,
++    List<NpcArmorRecord> NpcArmor);
++// Part H (patches/0024). A treasure event of a map: the item lot it awards and the model of the object that holds it (a chest or a pickup).
++record TreasureRecord(string MapId, int RowId, string Model);
++// Equipment parameters used to rank items (EquipType 0 = weapon: Score is the sum of the base attack values; 1 = armor: the sum of the defenses).
++record ItemTraitRecord(int EquipType, int Id, int Score, double Weight);
++// A CharaInitParam row of an NPC character (id from 6000) with the armor ids it wears (-1: nothing in that slot).
++record NpcArmorRecord(int Id, int FaceId, int Head, int Chest, int Hands, int Legs);
++// Part I (patches/0024). One planned CharaInitParam row of the Laundromat Mixup: the armor ids the row wears afterwards (-1: nothing in that slot).
++record LaundromatRow(int Id, int Head, int Chest, int Hands, int Legs);
+ // Part H (patches/0021). One boss reward = one initialisation of the common boss reward event: the flag it waits for (TriggerFlag), the
+ // map that sets that flag (MapId; null when the data does not say) and the lots it awards, each with the chain of rows awarded with it.
+ record BossRewardRecord(

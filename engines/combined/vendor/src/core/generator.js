@@ -19,7 +19,9 @@ import {
   resolveEnemyPlacementAlgorithm,
   resolveEnemyPlacementOptions,
 } from "./placement.js";
-import { KeyPlacementError, checkCompletable, coveredRowAreas, pairDisplaced, placeKeys, prepareModel } from "./keys.js";
+import { KEY_PLACEMENT_STRATEGIES, KeyPlacementError, RACE_ITEM_GOODS, areasBehindKey, checkCompletable, coveredRowAreas, pairDisplaced, placeKeys, prepareModel } from "./keys.js";
+import { planLaundromat } from "./laundromat.js";
+import { TIER, buildTierModel, difficultyShuffle, preferByTier, summarizeTiers } from "./difficulty.js";
 import { bossDestinationClass, deriveBodyTypes, deriveRegularClassTable, deriveRoamingBossTypes, planRoamingBosses, planSampledBosses, planSampledRegularEnemies } from "./sampling.js";
 import {
   enemies,
@@ -2133,8 +2135,23 @@ function randomizeExtractedItemLots(config, catalog) {
       catalog,
     ));
   }
+  // Item difficulty (Part I, patches/0024): the tiers are built once, before anything moves, from the pool and the progression model.
+  const difficultyOn = config.itemDifficulty !== "fair";
+  const measureOn = difficultyOn || config.measureTiers;
+  const keysOn = config.keyPlacement !== "vanilla";
+  let tiers = null;
+  let tierPrepared = null;
+  let tierRowAreas = null;
+  if (measureOn || keysOn) {
+    const tierEntries = [...lotTargets, ...shopTargets.filter((entry) => !isBulkShopConsumable(entry))];
+    tierPrepared = prepareModel(config.progressionModel, keysOn ? KEY_PLACEMENT_STRATEGIES[config.keyPlacement].graph : "vanilla");
+    const tierKnown = new Set([...(catalog?.worldItemLots ?? []).map((lot) => lot.rowId), ...lotTargets.map((entry) => entry.rowId)]);
+    tierRowAreas = coveredRowAreas(tierPrepared, tierKnown);
+    if (measureOn) tiers = buildTierModel({ catalog, prepared: tierPrepared, entries: tierEntries, rowAreas: tierRowAreas });
+  }
   // Key placement (Part H, patches/0023): the keys are placed first, by their own planner; what they displace is placed at the pickups they free.
-  const keyPlan = config.keyPlacement === "shuffled" ? planKeys(config, catalog, lotTargets) : null;
+  // Race Mode and Race Mode + (Part I) are strategies of the same planner.
+  const keyPlan = keysOn ? planKeys(config, catalog, lotTargets, tiers) : null;
   // Legacy "Fashion Souls" off: world armor sets move as whole sets.
   const armorSetHomes = config.fashionSouls ? [] : findArmorSetHomes(lotTargets);
   const armorSetTargets = new Set(armorSetHomes.flat());
@@ -2143,7 +2160,7 @@ function randomizeExtractedItemLots(config, catalog) {
     ...shopTargets.filter((entry) => !isBulkShopConsumable(entry)),
   ];
   const result = { items: [], gifts: [], enemyDrops: [], shops: [] };
-  if (config.soulItems === "transposed" || config.keyPlacement === "shuffled") result.bossRewards = [];
+  if (config.soulItems === "transposed" || keysOn) result.bossRewards = [];
   if (globalTargets.length + shopOnlyTargets.length < 2 && armorSetHomes.length === 0) {
     return result;
   }
@@ -2181,7 +2198,9 @@ function randomizeExtractedItemLots(config, catalog) {
               map: "ItemLotParam",
               itemLot: entry.rowId,
             };
+  const tierPairs = [];
   const addPlacement = (target, source) => {
+    if (tiers) tierPairs.push([source, target]);
     const singleQuantity =
       [0, 1, 2, 4].includes(source.equipType) ||
       /^(Sorcery|Pyromancy|Miracle):/.test(source.name);
@@ -2210,6 +2229,8 @@ function randomizeExtractedItemLots(config, catalog) {
       progression: source.progression,
       // Only a key placed by the key planner says which key it is (hint metadata); every other placement keeps its exact shape.
       ...(source.keyName ? { keyName: source.keyName } : {}),
+      // Only a race item (an ember, the Rite of Kindling, the Sewer Chamber Key, the Mystery Key held to the race destinations) says so (hint metadata).
+      ...(source.raceItem ? { raceItem: true } : {}),
       // Only a transposed boss soul says what it was (hint metadata); every other placement keeps its exact shape.
       ...(source.pool === "boss" && source.transmuted ? { transposedFrom: source.originalName } : {}),
       preserved:
@@ -2240,9 +2261,19 @@ function randomizeExtractedItemLots(config, catalog) {
     if (targets.length === 0) continue;
     const rng = createStream(config.seed, stream, config.version);
     let sources = stream === "all-item-sources"
-      ? shuffledWithoutDlcRestrictedItems(rng, targets)
+      ? (difficultyOn
+        ? difficultyShuffle({
+          seed: config.seed, version: config.version, values: targets, mode: config.itemDifficulty, tiers,
+          restricted: isDlcRestrictedItem, isDlcTarget: (target) => target.mapId === DLC_MAP,
+        })
+        : shuffledWithoutDlcRestrictedItems(rng, targets))
       : shuffledWithoutFixedPoints(rng, targets);
     if (stream === "all-item-sources") {
+      // Item difficulty and the race modes (docs/ITEM_DIFFICULTY_MODEL.md section 3): a "random only" item that opens an area (Cast Light) must not end up in that
+      // area. The neutral and the Shuffled worlds keep their placements byte for byte, so the guard acts only in the modes that came with it.
+      if (tierPrepared && (difficultyOn || config.keyPlacement === "race" || config.keyPlacement === "race-plus")) {
+        sources = guardRandomOnlyItems({ seed: config.seed, version: config.version, targets, sources, prepared: tierPrepared, rowAreas: tierRowAreas, isDlcRestricted: isDlcRestrictedItem });
+      }
       sources = keepConsumableSoulsInFiniteShops(targets, sources);
       const fogRules = fogPlacementRules(config, catalog, targets);
       if (fogRules) sources = repairFogTrackedItems(rng, targets, sources, fogRules);
@@ -2252,6 +2283,10 @@ function randomizeExtractedItemLots(config, catalog) {
   if (keyPlan) {
     for (const { target, source } of [...keyPlan.keyPlacements, ...keyPlan.pairs]) addPlacement(target, source);
     result.keyPlacement = keyPlan.diagnostics;
+  }
+  // Counters of the finished layout by tier ("item>location"), only when an item difficulty is on (the neutral value reports nothing).
+  if (tiers) {
+    result.itemDifficulty = { mode: config.itemDifficulty, cuts: tiers.cuts, matrix: summarizeTiers(tierPairs, tiers) };
   }
   if (armorSetHomes.length > 0) {
     const rng = createStream(config.seed, "armor-sets", config.version);
@@ -2270,6 +2305,8 @@ function randomizeExtractedItemLots(config, catalog) {
 // the DLC and is not part of an armor set that moves as a whole. The finished placement is checked as a whole against the model.
 const KEY_EQUIP_CATEGORY = { 0: 0, 1: 0x10000000, 2: 0x20000000, 3: 0x40000000 };
 const DLC_MAP = "m12_01_00_00";
+// The object model of a treasure chest (the treasure events of the maps that hold a chest rather than a pickup on the ground; docs/RACE_MODE.md).
+const RACE_CHEST_MODEL = "o0110";
 
 function keySourceEntries(catalog) {
   const entries = [];
@@ -2295,8 +2332,9 @@ function keySourceEntries(catalog) {
   return entries;
 }
 
-function planKeys(config, catalog, lotTargets) {
-  const prepared = prepareModel(config.progressionModel);
+function planKeys(config, catalog, lotTargets, tiers) {
+  const strategy = KEY_PLACEMENT_STRATEGIES[config.keyPlacement];
+  const prepared = prepareModel(config.progressionModel, strategy.graph);
   const all = keySourceEntries(catalog);
   const known = new Set(all.map((entry) => entry.rowId));
   const rowArea = coveredRowAreas(prepared, known);
@@ -2306,7 +2344,7 @@ function planKeys(config, catalog, lotTargets) {
     if (!bySignature.has(signature)) bySignature.set(signature, []);
     bySignature.get(signature).push(entry);
   }
-  const diagnostics = { mode: "shuffled", movableKeys: [], fixedKeys: [], notMovable: {} };
+  const diagnostics = { mode: config.keyPlacement, movableKeys: [], fixedKeys: [], notMovable: {} };
   const movableSources = new Map();
   const fixed = new Map();
   for (const key of prepared.raw.keys) {
@@ -2329,21 +2367,38 @@ function planKeys(config, catalog, lotTargets) {
   const movable = [...movableSources.keys()].sort();
   diagnostics.movableKeys = movable;
   if (movable.length === 0) throw new KeyPlacementError("KEY_PLACEMENT_NOTHING_TO_PLACE", "No key of the catalog can be moved.", diagnostics);
-  // The vanilla pickups of the movable keys leave the pool (they are keys, not pool items); they are pickups the keys free or fill.
   const sourceSignature = (entry) => `${entry.rowId}:${entry.slot}`;
+  // Race and Race + (docs/RACE_MODE.md): a pool item the legacy holds to the race locations although the graph has no condition on it (the embers, the Rite
+  // of Kindling, the Sewer Chamber Key, the Mystery Key). They leave the pool like the keys and are placed after them, at random, in the race destinations.
+  const raceItemRows = new Map();
+  if (strategy.raceItems) {
+    for (const entry of lotTargets) if (entry.equipType === 3 && RACE_ITEM_GOODS.has(entry.itemId) && entry.pool === "world" && !entry.transmuted) raceItemRows.set(sourceSignature(entry), entry);
+  }
+  // The vanilla pickups of the movable keys and of the race items leave the pool (they are keys, not pool items); they are pickups the keys free or fill.
   const keyRows = new Map([...movableSources.values()].map((entry) => [sourceSignature(entry), entry]));
-  for (let index = lotTargets.length - 1; index >= 0; index -= 1) if (keyRows.has(sourceSignature(lotTargets[index]))) lotTargets.splice(index, 1);
+  const vacatedRows = new Map([...keyRows, ...raceItemRows]);
+  const raceItems = [...raceItemRows.values()].sort((left, right) => left.rowId - right.rowId || left.slot - right.slot);
+  for (let index = lotTargets.length - 1; index >= 0; index -= 1) if (vacatedRows.has(sourceSignature(lotTargets[index]))) lotTargets.splice(index, 1);
   const armorMembers = config.fashionSouls ? new Set() : new Set(findArmorSetHomes(lotTargets).flat().map(sourceSignature));
   const eligible = (entry) => (entry.pool === "world" || entry.pool === "boss") && entry.kind === "lot" && rowArea.has(entry.rowId) && entry.mapId !== DLC_MAP
     && !armorMembers.has(sourceSignature(entry)) && lotEntriesOf(catalog, entry) === 1 && !isUnsupportedCutItem(entry);
-  const poolDestinations = lotTargets.filter((entry) => eligible(entry) && entry.pool !== "gift");
-  const keyDestinations = [...keyRows.values()].filter(eligible);
+  // The race destinations, derived from the game data: a boss reward, a treasure chest (the treasure events whose object is the chest model), or the
+  // vanilla pickup of a key or an ember (the lot where the clean game puts the item).
+  const raceChestRows = new Set((catalog?.treasures ?? []).filter((treasure) => treasure.model === RACE_CHEST_MODEL).map((treasure) => treasure.rowId));
+  const raceKeySignatures = new Set([...prepared.raw.keys.map((key) => key.id), ...[...RACE_ITEM_GOODS].map((id) => `3:${id}`)]);
+  const raceVanillaRows = new Set(all.filter((entry) => raceKeySignatures.has(`${entry.equipType}:${entry.itemId}`)).map(sourceSignature));
+  const isRaceDestination = (entry) => entry.pool === "boss" || raceChestRows.has(entry.rowId) || raceVanillaRows.has(sourceSignature(entry));
+  const allowed = (entry) => eligible(entry) && (!strategy.raceDestinations || isRaceDestination(entry));
+  const poolDestinations = lotTargets.filter((entry) => allowed(entry) && entry.pool !== "gift");
+  const vacatedDestinations = [...vacatedRows.values()].filter(allowed);
   const destinationEntries = new Map();
-  for (const entry of [...poolDestinations, ...keyDestinations]) destinationEntries.set(sourceSignature(entry), entry);
+  for (const entry of [...poolDestinations, ...vacatedDestinations]) destinationEntries.set(sourceSignature(entry), entry);
   const destinations = [...destinationEntries.values()]
     .sort((left, right) => left.rowId - right.rowId || left.slot - right.slot)
     .map((entry) => ({ id: sourceSignature(entry), area: rowArea.get(entry.rowId), entry }));
-  const result = placeKeys({ prepared, seed: config.seed, version: config.version, movable, fixed, destinations });
+  // Item difficulty: a key ranks as HARD and prefers the best tier that has a reachable destination (the legacy orders the keys like any other item).
+  const prefer = tiers ? (_key, candidates) => preferByTier(config.itemDifficulty, TIER.HARD, candidates, (candidate) => tiers.locationTier(candidate.entry)) : null;
+  const result = placeKeys({ prepared, seed: config.seed, version: config.version, movable, fixed, destinations, prefer });
   const byId = new Map(destinations.map((destination) => [destination.id, destination.entry]));
   const keyPlacements = [];
   const takenIds = new Set();
@@ -2352,9 +2407,22 @@ function planKeys(config, catalog, lotTargets) {
     takenIds.add(sourceSignature(target));
     keyPlacements.push({ source: { ...movableSources.get(key), progression: true, keyName: key }, target });
   }
-  // What the keys displaced lies at the pickups the keys left; a displaced item goes where it is accepted (the DLC rule).
+  // The race items take free race destinations from their own stream (no graph condition applies to them).
+  const racePlacements = [];
+  if (raceItems.length > 0) {
+    const rng = createStream(config.seed, "item-race", config.version);
+    const free = rng.shuffle(destinations.filter((destination) => !takenIds.has(destination.id)).map((destination) => destination.entry));
+    if (free.length < raceItems.length) {
+      throw new KeyPlacementError("KEY_PLACEMENT_UNSATISFIABLE", "The race destinations cannot hold every race item (RACE_DESTINATIONS_EXHAUSTED).", { ...diagnostics, reason: "RACE_DESTINATIONS_EXHAUSTED", raceDestinations: destinations.length, raceItems: raceItems.length });
+    }
+    raceItems.forEach((item, index) => {
+      takenIds.add(sourceSignature(free[index]));
+      racePlacements.push({ source: { ...item, raceItem: true }, target: free[index] });
+    });
+  }
+  // What the keys and race items displaced lies at the pickups they left; a displaced item goes where it is accepted (the DLC rule).
   const displaced = lotTargets.filter((entry) => takenIds.has(sourceSignature(entry)));
-  const freed = [...keyRows.values()].filter((entry) => !takenIds.has(sourceSignature(entry)));
+  const freed = [...vacatedRows.values()].filter((entry) => !takenIds.has(sourceSignature(entry)));
   const pairs = displaced.length === 0 && freed.length === 0 ? [] : pairDisplaced({
     seed: config.seed, version: config.version, displaced, freed,
     accepts: { restricted: (row) => row.mapId === DLC_MAP, fits: (item, row) => !(row.mapId === DLC_MAP && isDlcRestrictedItem(item)) },
@@ -2365,18 +2433,52 @@ function planKeys(config, catalog, lotTargets) {
   for (const { source, target } of keyPlacements) finalAreas.set(source.keyName, rowArea.get(target.rowId));
   const check = checkCompletable(prepared, finalAreas);
   if (!check.completable || !check.prisonEscapable) throw new KeyPlacementError("KEY_PLACEMENT_INVALID", "The written key placement failed the final check.", { unvisited: check.unvisited, prisonEscapable: check.prisonEscapable });
+  if (strategy.raceDestinations) {
+    const outside = [...keyPlacements, ...racePlacements].filter(({ target }) => !isRaceDestination(target));
+    if (outside.length > 0) {
+      throw new KeyPlacementError(config.keyPlacement === "race-plus" ? "RACE_PLUS_LOCATION_INVALID" : "RACE_LOCATION_INVALID", "A key or race item was placed outside the race destinations.", { count: outside.length });
+    }
+  }
   diagnostics.attempts = result.attempts;
   diagnostics.deadEnds = result.diagnostics.deadEnds;
   diagnostics.destinations = destinations.length;
   diagnostics.displacedItems = displaced.length;
   diagnostics.freedPickups = freed.length;
+  diagnostics.raceItems = racePlacements.length;
   diagnostics.annotationSha256 = prepared.raw.annotationSha256;
   // The area every key lies in at the end (the same names as the model); the sweeps compare them with FogMod's own reading of the written lots.
   diagnostics.keyAreas = Object.fromEntries([...finalAreas].sort((left, right) => (left[0] < right[0] ? -1 : 1)));
   diagnostics.keysMoved = keyPlacements.filter(({ source, target }) => source.rowId !== target.rowId || source.slot !== target.slot).length;
   diagnostics.completable = check.completable;
   diagnostics.prisonEscapable = check.prisonEscapable;
-  return { keyPlacements, pairs, diagnostics };
+  return { keyPlacements: [...keyPlacements, ...racePlacements], pairs, diagnostics };
+}
+
+// A "random only" key (FogMod tags Cast Light so) is an ordinary pool item that opens an area (a shop sells it as a spell of equip type 4; in a lot it is goods 3500, one item); where it may lie is limited by that area: never behind itself. Deterministic:
+// a violation is swapped with the next free place of a seeded order (stream item-guard, created only when there is a violation).
+function guardRandomOnlyItems({ seed, version, targets, sources, prepared, rowAreas, isDlcRestricted }) {
+  const guarded = prepared.raw.keys.filter((key) => (key.tags ?? []).includes("randomonly")).map((key) => ({ id: key.id, behind: areasBehindKey(prepared, key.name) })).filter((entry) => entry.behind.size > 0);
+  if (guarded.length === 0) return sources;
+  const result = [...sources];
+  const forbidden = (source, target) => guarded.some((entry) => entry.id === `${source.equipType === 4 ? 3 : source.equipType}:${source.itemId}` && entry.behind.has(rowAreas.get(target.rowId)));
+  let rng = null;
+  result.forEach((source, index) => {
+    if (!forbidden(source, targets[index])) return;
+    rng ??= createStream(seed, "item-guard", version);
+    const order = rng.shuffle(targets.map((_, other) => other).filter((other) => other !== index));
+    const swap = order.find((other) => !forbidden(result[index], targets[other]) && !forbidden(result[other], targets[index])
+      && !(targets[other].mapId === DLC_MAP && isDlcRestricted(result[index])) && !(targets[index].mapId === DLC_MAP && isDlcRestricted(result[other])));
+    if (swap === undefined) throw new KeyPlacementError("KEY_PLACEMENT_UNSATISFIABLE", "A random-only item could not be moved out of the area it opens.", { reason: "RANDOM_ONLY_ITEM_BEHIND_ITSELF" });
+    [result[index], result[swap]] = [result[swap], result[index]];
+  });
+  return result;
+}
+
+function requireNpcArmor(catalog) {
+  if (!Array.isArray(catalog?.npcArmor)) {
+    throw Object.assign(new Error("LAUNDROMAT_CATALOG_OUTDATED: the game catalog has no NPC armor; scan the game again."), { code: "LAUNDROMAT_CATALOG_OUTDATED" });
+  }
+  return catalog.npcArmor;
 }
 
 /** Entries in the lot a pickup belongs to, from the catalog (a key may only lie in a pickup that is awarded for certain: one entry). */
@@ -3505,11 +3607,14 @@ export function generate(inputConfig, { gameCatalog = null } = {}) {
       shops: extractedData ? itemLotPlan.shops : [],
       // Only with Soul items Transposed: every other world keeps its placement (and so its placement hash) exactly.
       ...(extractedData && itemLotPlan.bossRewards ? { bossRewards: itemLotPlan.bossRewards } : {}),
+      // Only with the Laundromat Mixup (Part I): the planned armor of the NPC characters (docs/LAUNDROMAT_MIXUP.md); every other world keeps its placements.
+      ...(extractedData && config.laundromat ? { laundromat: planLaundromat({ seed: config.seed, version: config.version, npcArmor: requireNpcArmor(gameCatalog), fashionSouls: config.fashionSouls }) } : {}),
     },
     validation: {
       valid: true,
       finalBossReachable: !config.randomizeProtectedItems,
       ...(extractedData && itemLotPlan.keyPlacement ? { keyPlacement: itemLotPlan.keyPlacement } : {}),
+      ...(extractedData && itemLotPlan.itemDifficulty ? { itemDifficulty: itemLotPlan.itemDifficulty } : {}),
       notes: extractedData
         ? [
             "All hostile regular-enemy slots use a count-preserving global permutation within a 30-character-model total map budget; friendly NPCs and invisible technical helpers stay vanilla.",
@@ -3550,8 +3655,14 @@ export function generate(inputConfig, { gameCatalog = null } = {}) {
             ...(config.soulItems === "replaced"
               ? ["Soul items replaced: lesser souls (goods 400-409) were swapped for other consumables before shuffling."]
               : []),
-            ...(config.keyPlacement === "shuffled"
-              ? ["Key items shuffled: the keys were placed with a progression-safe assumed fill over the progression model; the finished placement passed the final check."]
+            ...(config.keyPlacement !== "vanilla"
+              ? [`Key items (${config.keyPlacement}): the keys were placed with a progression-safe assumed fill over the progression model${config.keyPlacement === "race" || config.keyPlacement === "race-plus" ? ", restricted to the race destinations" : ""}; the finished placement passed the final check.`]
+              : []),
+            ...(config.laundromat
+              ? ["Laundromat Mixup: NPC characters wear armor pieces other NPCs wear (only their appearance and armor stats change)."]
+              : []),
+            ...(config.itemDifficulty !== "fair"
+              ? [`Item difficulty (${config.itemDifficulty}): the candidate locations of every item were ordered by tier.`]
               : []),
             ...(config.soulItems === "transposed"
               ? ["Soul items transposed: the boss souls joined the item pool and each had a 75% chance to become a boss weapon of its boss."]

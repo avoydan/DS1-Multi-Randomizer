@@ -27,14 +27,18 @@ const allowedSpecifiers = new Set([
   './placement.js',
   './sampling.js',
   './keys.js',
+  './difficulty.js',
+  './laundromat.js',
   '../data/prototype-data.js',
 ]);
 
 /** Files the vendored core is expected to consist of, relative to its `src/` root. */
 const expectedVendoredFiles = [
   'core/config.js',
+  'core/difficulty.js',
   'core/generator.js',
   'core/keys.js',
+  'core/laundromat.js',
   'core/output.js',
   'core/placement.js',
   'core/rng.js',

@@ -33,6 +33,30 @@ namespace FogHost
         /// <summary>The vanilla rules: nothing randomized, the Kiln needs the four Lord Soul items. Anything else is a different world.</summary>
         private static readonly string[] VanillaFlags = { "lords" };
 
+        /// <summary>
+        /// Race Mode + (docs/RACE_MODE.md): the vanilla world plus the skips of the legacy list that FogMod's own glitched logic models. FogMod has more
+        /// "hard" edges than the legacy lists skips (Gaping Dragon, Tomb of the Giants and Duke's Library drops), and those are NOT used; the skips the
+        /// legacy lists that FogMod does not model (Sen's Gate, the Master Key routes, killing Gwynevere, the Duke skip) are not assumed either, so a
+        /// world made with this variant never needs a skip outside the list below. Key: "from>to", value: the name of the skip.
+        /// </summary>
+        private static readonly Dictionary<string, string> RacePlusSkips = new Dictionary<string, string>
+        {
+            { "burg_upper>depths", "capra" },
+            { "burg_upper>burg_lower", "lower-burg" },
+            { "burg_start>burg_lower", "lower-burg" },
+            { "paintedworld>paintedworld_annex", "annex-jump" },
+            { "newlondo>newlondo_lowerskip", "seal-skip" },
+            { "newlondo>newlondo_fourkings", "four-kings-oob" },
+            { "darkroot>dlc_hallway", "purple-crystal-wrong-warp" },
+            { "dlc_sanctuary>kiln", "purple-crystal-kiln" },
+            { "dlc_forest>kiln", "purple-crystal-kiln" },
+            { "dlc_hallway>kiln", "purple-crystal-kiln" },
+            { "dlc_township>kiln", "purple-crystal-kiln" },
+        };
+
+        private static bool IsHard(Graph.Edge edge) => edge.Side != null && edge.Side.HasTag("hard");
+        private static string SkipOf(Graph.Edge edge) => IsHard(edge) && RacePlusSkips.TryGetValue($"{edge.From}>{edge.To}", out string name) ? name : null;
+
         /// <summary>The Duke's Archives prison (docs/ITEM_PROGRESSION_MODEL.md): where the player starts after Seath's capture, with no key.</summary>
         private static readonly string[] PrisonAreas = { "dukes_prison", "dukes_extra", "dukes_giantcell" };
         private const string PrisonStart = "dukes_prison";
@@ -47,6 +71,12 @@ namespace FogHost
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
             string root = Option(args, "--data-root");
             string output = Option(args, "--out");
+            string variant = Option(args, "--variant") ?? "vanilla";
+            if (variant != "vanilla" && variant != "race-plus")
+            {
+                Console.Error.WriteLine("--variant must be vanilla or race-plus.");
+                return 2;
+            }
             if (root == null || output == null)
             {
                 Console.Error.WriteLine("Usage: FogHost progression-model --data-root <dir> --out <model.json>");
@@ -60,8 +90,8 @@ namespace FogHost
                 output = Path.GetFullPath(output);
                 DataRoot.Verify(root);
                 Environment.CurrentDirectory = root;
-                (Annotations ann, Graph graph, RandomizerOptions opt, string annotationHash) = Build();
-                byte[] json = args[0] == "progression-model" ? Model(ann, graph, annotationHash) : Check(args, ann, graph, opt, annotationHash);
+                (Annotations ann, Graph graph, RandomizerOptions opt, string annotationHash) = Build(variant);
+                byte[] json = args[0] == "progression-model" ? Model(ann, graph, annotationHash, variant) : Check(args, ann, graph, opt, annotationHash);
                 Environment.CurrentDirectory = original;
                 File.WriteAllBytes(output + ".tmp", json);
                 File.Move(output + ".tmp", output, true);
@@ -87,21 +117,31 @@ namespace FogHost
             return null;
         }
 
-        private static (Annotations, Graph, RandomizerOptions, string) Build()
+        private static (Annotations, Graph, RandomizerOptions, string) Build(string variant)
         {
             var opt = new RandomizerOptions { Seed = 1 };
             foreach (string flag in VanillaFlags) opt[flag] = true;
+            if (variant == "race-plus") opt["hard"] = true;
             Annotations ann;
             using (StreamReader reader = File.OpenText("dist/fog.txt")) ann = new DeserializerBuilder().Build().Deserialize<Annotations>(reader);
             var graph = new Graph();
             graph.Construct(opt, ann);
+            if (variant == "race-plus")
+            {
+                // FogMod's glitched logic is wider than the legacy skip list: keep only the skips of the list (RacePlusSkips).
+                foreach (Graph.Node node in graph.graph.Values)
+                {
+                    node.To.RemoveAll(edge => IsHard(edge) && SkipOf(edge) == null);
+                    node.From.RemoveAll(edge => IsHard(edge) && RacePlusSkips.ContainsKey($"{edge.From}>{edge.To}") == false);
+                }
+            }
             string annotationHash = DataRoot.Hash("dist/fog.txt", true);
             return (ann, graph, opt, annotationHash);
         }
 
         // ---- the model -------------------------------------------------------------------------------------------------------------
 
-        private static byte[] Model(Annotations ann, Graph graph, string annotationHash)
+        private static byte[] Model(Annotations ann, Graph graph, string annotationHash, string variant)
         {
             using var stream = new MemoryStream();
             using (var json = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = false }))
@@ -110,8 +150,10 @@ namespace FogHost
                 json.WriteString("format", ModelFormat);
                 json.WriteString("fogModCommit", DataRoot.FogModCommit);
                 json.WriteString("annotationSha256", annotationHash);
+                json.WriteString("variant", variant);
                 json.WriteStartArray("options");
                 foreach (string flag in VanillaFlags) json.WriteStringValue(flag);
+                if (variant == "race-plus") json.WriteStringValue("hard");
                 json.WriteEndArray();
                 json.WriteString("start", WorldStart);
                 json.WriteStartArray("areas");
@@ -122,22 +164,23 @@ namespace FogHost
                 json.WriteEndArray();
                 // Every traversable edge once, with the condition FogMod's checker evaluates (LinkedExpr).
                 var seen = new HashSet<string>();
-                var edges = new List<(string From, string To, string Expr)>();
+                var edges = new List<(string From, string To, string Expr, string Skip)>();
                 foreach (Graph.Node node in graph.graph.Values)
                 {
                     foreach (Graph.Edge edge in node.To)
                     {
                         if (edge.To == null) throw new FogHostException(HostErrors.EngineFailed, $"The vanilla graph has an unconnected edge leaving {node.Area}.");
                         string expr = edge.LinkedExpr == null ? "true" : edge.LinkedExpr.ToString();
-                        if (seen.Add($"{node.Area}>{edge.To}>{expr}")) edges.Add((node.Area, edge.To, expr));
+                        if (seen.Add($"{node.Area}>{edge.To}>{expr}")) edges.Add((node.Area, edge.To, expr, SkipOf(edge)));
                     }
                 }
                 json.WriteStartArray("edges");
-                foreach ((string from, string to, string expr) in edges.OrderBy(e => e.From, StringComparer.Ordinal).ThenBy(e => e.To, StringComparer.Ordinal).ThenBy(e => e.Expr, StringComparer.Ordinal))
+                foreach ((string from, string to, string expr, string skip) in edges.OrderBy(e => e.From, StringComparer.Ordinal).ThenBy(e => e.To, StringComparer.Ordinal).ThenBy(e => e.Expr, StringComparer.Ordinal))
                 {
                     json.WriteStartObject();
                     json.WriteString("from", from);
                     json.WriteString("to", to);
+                    if (skip != null) json.WriteString("skip", skip);
                     json.WritePropertyName("when");
                     ExprJson.Write(json, expr);
                     json.WriteEndObject();

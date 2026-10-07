@@ -66,6 +66,60 @@ if (args.Length > 0 && args[0] == "audit")
     return missing.Count == 0 && duplicateOwners.Count == 0 ? 0 : 1;
 }
 
+// SmokeVerify laundromat <package mod dir> <paramdef.paramdefbnd.dcx> <randomizer.json> <original game dir>
+// The Laundromat Mixup (docs/LAUNDROMAT_MIXUP.md) in the package against the plan and the clean game: every planned CharaInitParam row wears the planned armor, every
+// planned piece is a piece some NPC already wears in that slot in the clean game, no hollowed row (piece ids from 2,000,000) changed, and no other cell of any NPC row
+// (id from 6000) differs from the clean game.
+if (args.Length > 0 && args[0] == "laundromat")
+{
+    var defs = BND3.Read(args[2]).Files.Select(file => PARAMDEF.Read(file.Bytes)).ToList();
+    PARAM Read(BND3 bnd)
+    {
+        var file = bnd.Files.Single(entry => entry.Name.EndsWith("CharaInitParam.param", StringComparison.OrdinalIgnoreCase));
+        var param = PARAM.Read(file.Bytes);
+        param.ApplyParamdef(defs.First(definition => definition.ParamType == param.ParamType));
+        return param;
+    }
+    var nowRows = Read(BND3.Read(Path.Combine(args[1], "param", "GameParam", "GameParam.parambnd.dcx"))).Rows.ToDictionary(row => row.ID);
+    var thenRows = Read(BND3.Read(Path.Combine(args[4], "param", "GameParam", "GameParam.parambnd.dcx"))).Rows.ToDictionary(row => row.ID);
+    var plan = JsonDocument.Parse(File.ReadAllText(args[3])).RootElement.GetProperty("placements");
+    var slots = new[] { ("head", "equip_Helm"), ("chest", "equip_Armer"), ("hands", "equip_Gaunt"), ("legs", "equip_Leg") };
+    var problems = new List<string>();
+    var planned = new Dictionary<int, JsonElement>();
+    if (plan.TryGetProperty("laundromat", out var list)) foreach (var row in list.EnumerateArray()) planned[row.GetProperty("id").GetInt32()] = row;
+    var worn = slots.ToDictionary(slot => slot.Item2, slot => thenRows.Values.Where(row => row.ID >= 6000).Select(row => Convert.ToInt32(row[slot.Item2].Value)).Where(id => id > 0).ToHashSet());
+    var armorCells = slots.Select(slot => slot.Item2).ToHashSet();
+    foreach (var (id, row) in planned)
+    {
+        if (id < 6000 || !nowRows.TryGetValue(id, out var written)) { problems.Add($"row {id} is not a present NPC row"); continue; }
+        foreach (var (name, cell) in slots)
+        {
+            var wanted = row.GetProperty(name).GetInt32();
+            var actual = Convert.ToInt32(written[cell].Value);
+            if (actual != wanted) problems.Add($"row {id} {cell}: package {actual}, plan {wanted}");
+            var original = Convert.ToInt32(thenRows[id][cell].Value);
+            if (original <= 0 && wanted != original) problems.Add($"row {id} {cell}: an empty slot was filled");
+            if (wanted > 0 && !worn[cell].Contains(wanted)) problems.Add($"row {id} {cell}: {wanted} is worn by no NPC in the clean game");
+            if (wanted >= 2_000_000 || original >= 2_000_000) problems.Add($"row {id} {cell}: a hollowed piece");
+        }
+    }
+    var changedOutside = new List<int>();
+    foreach (var (id, row) in nowRows.Where(entry => entry.Key >= 6000))
+    {
+        if (!thenRows.TryGetValue(id, out var original)) { changedOutside.Add(id); continue; }
+        foreach (var cell in row.Cells)
+        {
+            var name = cell.Def.InternalName;
+            if (planned.ContainsKey(id) && armorCells.Contains(name)) continue;
+            static string Text(object? value) => value is byte[] bytes ? Convert.ToHexString(bytes) : Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture) ?? "";
+            if (Text(cell.Value) != Text(original[name].Value)) { changedOutside.Add(id); break; }
+        }
+    }
+    if (changedOutside.Count > 0) problems.Add($"{changedOutside.Count} NPC rows changed outside the plan: {string.Join(",", changedOutside.Take(5))}");
+    Console.WriteLine(JsonSerializer.Serialize(new { plannedRows = planned.Count, problems }));
+    return problems.Count == 0 ? 0 : 1;
+}
+
 // SmokeVerify lots <package mod dir> <paramdef.paramdefbnd.dcx> <randomizer.json> <original game dir>
 // Item lot rows of the package against the plan: every item placement that targets a lot row (world lots, gifts, enemy drops, boss rewards) must
 // be in the row; no other ItemLotParam row may differ from the clean game (except the guaranteed-drop normalization, which only touches rates);

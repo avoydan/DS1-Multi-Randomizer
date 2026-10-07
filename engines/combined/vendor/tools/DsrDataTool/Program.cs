@@ -214,6 +214,7 @@ static GameCatalog ScanGame(string gameDirectory)
         sourceFiles.Add(DescribeSource(commonEventPath, gameDirectory));
 
     var maps = new List<MapRecord>();
+    var treasures = new List<TreasureRecord>();
     var slots = new List<EnemySlotRecord>();
     var eventAwardItemLotIds = new HashSet<int>();
     var ignoredFiles = new List<string>();
@@ -250,6 +251,16 @@ static GameCatalog ScanGame(string gameDirectory)
                 mapNames.GetValueOrDefault(mapId, mapId),
                 map.Parts.Enemies.Count,
                 map.Parts.DummyEnemies.Count));
+            // Part H (patches/0024): which object holds each treasure (a chest or a pickup on the ground), by the model of the object part.
+            var objectModels = map.Parts.Objects
+                .GroupBy(part => part.Name, StringComparer.Ordinal)
+                .ToDictionary(group => group.Key, group => group.First().ModelName, StringComparer.Ordinal);
+            foreach (var treasure in map.Events.Treasures)
+            {
+                objectModels.TryGetValue(treasure.TreasurePartName ?? "", out var model);
+                foreach (var lotId in treasure.ItemLots.Where(id => id > 0).Distinct())
+                    treasures.Add(new TreasureRecord(mapId, lotId, model ?? ""));
+            }
 
             slots.AddRange(map.Parts.Enemies.Select(
                 enemy => ToSlot(
@@ -348,6 +359,8 @@ static GameCatalog ScanGame(string gameDirectory)
     var shopEntries = new List<ShopEntryRecord>();
     var bossRewards = new List<BossRewardRecord>();
     var transpositionRecipes = new List<TranspositionRecipeRecord>();
+    var itemTraits = new List<ItemTraitRecord>();
+    var npcArmor = new List<NpcArmorRecord>();
     var startingEquipmentPools = new StartingEquipmentPools(
         new(), new(), new(), new(), new());
     var itemNames = ReadEnglishItemNames(itemMessagePath);
@@ -380,6 +393,8 @@ static GameCatalog ScanGame(string gameDirectory)
                     Path.Combine(gameDirectory, "event"));
                 bossRewards = randomizerData.BossRewards;
                 transpositionRecipes = randomizerData.TranspositionRecipes;
+                itemTraits = randomizerData.ItemTraits;
+                npcArmor = randomizerData.NpcArmor;
                 errors.AddRange(randomizerData.Errors);
                 gifts = randomizerData.Gifts;
                 enemyDropLots = randomizerData.EnemyDropLots;
@@ -423,7 +438,10 @@ static GameCatalog ScanGame(string gameDirectory)
         ignoredFiles,
         EventOwners.Shared ? "shared" : null,
         bossRewards,
-        transpositionRecipes);
+        transpositionRecipes,
+        treasures,
+        itemTraits,
+        npcArmor);
 }
 
 static RandomizerParamData ReadRandomizerParamData(
@@ -680,6 +698,29 @@ static RandomizerParamData ReadRandomizerParamData(
         armorBySlot.GetValueOrDefault(2, new()),
         armorBySlot.GetValueOrDefault(3, new()));
 
+    // Part H (patches/0024): what the game itself says about the equipment (the item difficulty tiers are derived from it) and
+    // the armor every NPC character wears (the Laundromat Mixup draws only from pieces an NPC already wears).
+    var itemTraits = new List<ItemTraitRecord>();
+    foreach (var row in weaponParam.Rows)
+        itemTraits.Add(new ItemTraitRecord(0, row.ID,
+            GetCellInt(row, "attackBasePhysics", 0) + GetCellInt(row, "attackBaseMagic", 0) +
+            GetCellInt(row, "attackBaseFire", 0) + GetCellInt(row, "attackBaseThunder", 0),
+            Convert.ToDouble(row.Cells.FirstOrDefault(cell => cell.Def.InternalName == "weight")?.Value ?? 0.0)));
+    foreach (var row in protectorParam.Rows)
+        itemTraits.Add(new ItemTraitRecord(1, row.ID,
+            GetCellInt(row, "defensePhysics", 0) + GetCellInt(row, "defenseMagic", 0) +
+            GetCellInt(row, "defenseFire", 0) + GetCellInt(row, "defenseThunder", 0),
+            Convert.ToDouble(row.Cells.FirstOrDefault(cell => cell.Def.InternalName == "weight")?.Value ?? 0.0)));
+    var npcArmor = new List<NpcArmorRecord>();
+    foreach (var row in ReadParam("CharaInitParam.param").Rows.Where(row => row.ID >= 6_000))
+        npcArmor.Add(new NpcArmorRecord(
+            row.ID,
+            GetCellInt(row, "npcPlayerFaceGenId", -1),
+            GetCellInt(row, "equip_Helm", -1),
+            GetCellInt(row, "equip_Armer", -1),
+            GetCellInt(row, "equip_Gaunt", -1),
+            GetCellInt(row, "equip_Leg", -1)));
+
     return new RandomizerParamData(
         gifts,
         enemyDropLots,
@@ -688,7 +729,9 @@ static RandomizerParamData ReadRandomizerParamData(
         startingEquipmentPools,
         bossRewards,
         transpositionRecipes,
-        scanErrors);
+        scanErrors,
+        itemTraits,
+        npcArmor);
 }
 
 // Part H (patches/0021): the boss rewards. The shared common event 970 waits for a trigger flag (a boss defeat) and then awards up
@@ -1470,6 +1513,27 @@ static PatchReport PatchEnemies(
                     : null))
         .ToList();
 
+    // Part I (patches/0024): the Laundromat Mixup. The engine plans the armor of NPC characters; the rows are checked against the scan and written.
+    var laundromat = new List<LaundromatRow>();
+    if (placementsRoot.TryGetProperty("laundromat", out var laundromatElement) && laundromatElement.ValueKind == JsonValueKind.Array)
+    {
+        laundromat = laundromatElement.EnumerateArray()
+            .Select(row => new LaundromatRow(
+                row.GetProperty("id").GetInt32(),
+                row.GetProperty("head").GetInt32(),
+                row.GetProperty("chest").GetInt32(),
+                row.GetProperty("hands").GetInt32(),
+                row.GetProperty("legs").GetInt32()))
+            .ToList();
+        var known = catalog.NpcArmor?.ToDictionary(entry => entry.Id)
+            ?? throw new InvalidDataException("The Laundromat Mixup needs a catalog with NPC armor. Generate a new package from a fresh catalog.");
+        foreach (var row in laundromat)
+        {
+            if (!known.ContainsKey(row.Id) || known[row.Id].Id < 6_000)
+                throw new InvalidDataException($"Laundromat Mixup names a row that is not an NPC character row: {row.Id}.");
+        }
+    }
+
     Directory.CreateDirectory(outputDirectory);
     var patchedMaps = new List<PatchedMap>();
     var changedSlots = 0;
@@ -1769,6 +1833,7 @@ static PatchReport PatchEnemies(
         worldItemPlacements.Count > 0 ||
         shopPlacements.Count > 0 ||
         itemAssignments.Count > 0 ||
+        laundromat.Count > 0 ||
         guaranteedEnemyDrops
         ? PatchGameParam(
             gameDirectory,
@@ -1781,7 +1846,8 @@ static PatchReport PatchEnemies(
             worldItemPlacements,
             shopPlacements,
             itemAssignments,
-            guaranteedEnemyDrops)
+            guaranteedEnemyDrops,
+            laundromat)
         : null;
 
     var report = new PatchReport(
@@ -4064,7 +4130,8 @@ static PatchedFile? PatchGameParam(
     List<RowPlacement> worldItemPlacements,
     List<RowPlacement> shopPlacements,
     List<ItemAssignment> itemAssignments,
-    bool guaranteedEnemyDrops)
+    bool guaranteedEnemyDrops,
+    List<LaundromatRow>? laundromat = null)
 {
     if (!enemyPlacements.Any(placement => placement.ScaledNpcParamId.HasValue) &&
         !enemyPlacements.Any(placement => placement.BaseThinkParamId.HasValue) &&
@@ -4075,6 +4142,7 @@ static PatchedFile? PatchGameParam(
         worldItemPlacements.Count == 0 &&
         shopPlacements.Count == 0 &&
         itemAssignments.Count == 0 &&
+        (laundromat == null || laundromat.Count == 0) &&
         !guaranteedEnemyDrops)
         return null;
 
@@ -4373,6 +4441,7 @@ static PatchedFile? PatchGameParam(
         name => name.Equals("equipId", StringComparison.Ordinal),
         "shop");
     ApplyItemAssignments(itemLotParam, shopParam, itemAssignments);
+    ApplyLaundromat(charaParam, catalog, laundromat ?? new List<LaundromatRow>());
     var guaranteedEnemyDropRowIds = guaranteedEnemyDrops
         ? catalog.EnemyDropLots.Select(lot => lot.RowId).Distinct().ToList()
         : new List<int>();
@@ -4897,6 +4966,28 @@ static void AssertGuaranteedEnemyDropRates(PARAM itemLotParam, List<int> rowIds)
             throw new InvalidDataException(
                 $"Enemy Item Lot {rowId} does not have a guaranteed drop rate.");
         }
+    }
+}
+
+// Part I (patches/0024): the armor of the NPC characters. Only the four armor cells of the planned CharaInitParam rows change; each row is checked against
+// the scan first (the clean game's value), so a changed game cannot be written over.
+static void ApplyLaundromat(PARAM charaParam, GameCatalog catalog, List<LaundromatRow> rows)
+{
+    if (rows.Count == 0) return;
+    var known = catalog.NpcArmor!.ToDictionary(entry => entry.Id);
+    var byId = charaParam.Rows.ToDictionary(row => row.ID);
+    foreach (var plan in rows)
+    {
+        if (!byId.TryGetValue(plan.Id, out var row))
+            throw new InvalidDataException($"Laundromat Mixup: CharaInitParam row {plan.Id} does not exist.");
+        var original = known[plan.Id];
+        if (GetCellInt(row, "equip_Helm") != original.Head || GetCellInt(row, "equip_Armer") != original.Chest ||
+            GetCellInt(row, "equip_Gaunt") != original.Hands || GetCellInt(row, "equip_Leg") != original.Legs)
+            throw new InvalidDataException($"Laundromat Mixup: CharaInitParam row {plan.Id} changed after extraction.");
+        row["equip_Helm"].Value = plan.Head;
+        row["equip_Armer"].Value = plan.Chest;
+        row["equip_Gaunt"].Value = plan.Hands;
+        row["equip_Leg"].Value = plan.Legs;
     }
 }
 
@@ -5451,7 +5542,10 @@ record GameCatalog(
     List<string> IgnoredFiles,
     string? EventOwners = null,
     List<BossRewardRecord>? BossRewards = null,
-    List<TranspositionRecipeRecord>? TranspositionRecipes = null);
+    List<TranspositionRecipeRecord>? TranspositionRecipes = null,
+    List<TreasureRecord>? Treasures = null,
+    List<ItemTraitRecord>? ItemTraits = null,
+    List<NpcArmorRecord>? NpcArmor = null);
 
 // Which map's event file serves a map: see EventOwnerMap. One mode per run.
 static class EventOwners
@@ -5662,7 +5756,17 @@ record RandomizerParamData(
     StartingEquipmentPools StartingEquipmentPools,
     List<BossRewardRecord> BossRewards,
     List<TranspositionRecipeRecord> TranspositionRecipes,
-    List<ScanError> Errors);
+    List<ScanError> Errors,
+    List<ItemTraitRecord> ItemTraits,
+    List<NpcArmorRecord> NpcArmor);
+// Part H (patches/0024). A treasure event of a map: the item lot it awards and the model of the object that holds it (a chest or a pickup).
+record TreasureRecord(string MapId, int RowId, string Model);
+// Equipment parameters used to rank items (EquipType 0 = weapon: Score is the sum of the base attack values; 1 = armor: the sum of the defenses).
+record ItemTraitRecord(int EquipType, int Id, int Score, double Weight);
+// A CharaInitParam row of an NPC character (id from 6000) with the armor ids it wears (-1: nothing in that slot).
+record NpcArmorRecord(int Id, int FaceId, int Head, int Chest, int Hands, int Legs);
+// Part I (patches/0024). One planned CharaInitParam row of the Laundromat Mixup: the armor ids the row wears afterwards (-1: nothing in that slot).
+record LaundromatRow(int Id, int Head, int Chest, int Hands, int Legs);
 // Part H (patches/0021). One boss reward = one initialisation of the common boss reward event: the flag it waits for (TriggerFlag), the
 // map that sets that flag (MapId; null when the data does not say) and the lots it awards, each with the chain of rows awarded with it.
 record BossRewardRecord(

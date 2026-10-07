@@ -14,7 +14,24 @@
 // Nothing here draws from a stream that another option uses: every draw comes from `item-keys:<attempt>` or `item-keys-fill`.
 import { createStream } from "./rng.js";
 
-export const KEY_PLACEMENT_MODES = ["vanilla", "shuffled"];
+export const KEY_PLACEMENT_MODES = ["vanilla", "shuffled", "race", "race-plus"];
+
+/**
+ * The modes are strategies (docs/RACE_MODE.md), not scattered conditionals. Every shuffled-family mode shares the assumed fill, the pairing of the
+ * displaced items, the typed failures and the final check; a strategy only says which destinations are allowed, which model variant the fill reasons
+ * over and which pool items are held to the race destinations (the legacy places the embers and a few more items "as keys" in Race and Race +).
+ *   raceDestinations: keys may only lie in a race destination (a boss reward, a chest, the vanilla pickup of a key or an ember)
+ *   graph:            the model variant ("vanilla", or "race-plus": the vanilla graph plus the skips of the legacy list)
+ *   raceItems:        the embers, the Rite of Kindling, the Sewer Chamber Key and the Mystery Key must end up in a race destination as well
+ */
+export const KEY_PLACEMENT_STRATEGIES = Object.freeze({
+  shuffled: Object.freeze({ raceDestinations: false, graph: "vanilla", raceItems: false }),
+  race: Object.freeze({ raceDestinations: true, graph: "vanilla", raceItems: true }),
+  "race-plus": Object.freeze({ raceDestinations: true, graph: "race-plus", raceItems: true }),
+});
+
+/** Goods the legacy holds to the race locations although the graph has no condition on them: Large Ember to Chaos Flame Ember (800-813), the Rite of Kindling, the Sewer Chamber Key and the Mystery Key. */
+export const RACE_ITEM_GOODS = Object.freeze(new Set([800, 801, 802, 806, 807, 808, 809, 810, 812, 813, 2607, 2018, 2017]));
 export const PROGRESSION_MODEL_FORMAT = "ds1tr-progression-model-1";
 const MAX_ATTEMPTS = 32;
 
@@ -45,9 +62,13 @@ function compile(expr) {
 }
 
 /** Validates an exported model and prepares it for evaluation. */
-export function prepareModel(model) {
+export function prepareModel(model, variant = "vanilla") {
   if (!model || model.format !== PROGRESSION_MODEL_FORMAT) {
     throw new KeyPlacementError("KEY_PLACEMENT_MODEL_INVALID", `The progression model has the wrong format (expected ${PROGRESSION_MODEL_FORMAT}).`);
+  }
+  // A model exported before the variants existed is the vanilla graph. The fill must reason over the graph its mode names, never another one.
+  if ((model.variant ?? "vanilla") !== variant) {
+    throw new KeyPlacementError("KEY_PLACEMENT_MODEL_INVALID", `The progression model is the "${model.variant ?? "vanilla"}" variant; this mode needs "${variant}".`);
   }
   for (const field of ["areas", "edges", "keys", "lotAreas", "start", "prison"]) {
     if (model[field] === undefined) throw new KeyPlacementError("KEY_PLACEMENT_MODEL_INVALID", `The progression model has no ${field}.`);
@@ -84,6 +105,16 @@ export function visitedAreas(prepared, keyAreas, inHand = new Set(), start = pre
   return countOnly ? countOnly(visited) : visited;
 }
 
+/**
+ * The areas a player cannot reach without a given key although every OTHER key is in hand (what lies "behind" the key: the hidden Oolacile Township behind
+ * Cast Light). An item that opens an area must not be placed there. Empty for a key that opens nothing.
+ */
+export function areasBehindKey(prepared, keyName) {
+  const others = new Set(prepared.raw.keys.map((key) => key.name).filter((name) => name !== keyName));
+  const reached = visitedAreas(prepared, new Map(), others);
+  return new Set([...prepared.areas].filter((area) => !reached.has(area)));
+}
+
 /** The areas that must be visited for a completable world (everything but the optional areas), and the Seath capture rule. */
 export function checkCompletable(prepared, keyAreas) {
   const visited = visitedAreas(prepared, keyAreas);
@@ -113,9 +144,10 @@ export function coveredRowAreas(prepared, knownRows) {
  *   movable:      key names the planner may move
  *   fixed:        Map key name -> area for every other key (they stay where the game puts them)
  *   destinations: [{ id, area }] pickups a key may lie in (each at most once)
+ *   prefer:       optional (key, candidates) -> the sub-list the draw is made from (item difficulty: the best tier that has a candidate); absent = all
  * Returns { placed: Map key name -> destination id, attempts, diagnostics }. Bounded and deterministic: attempt n draws from the stream item-keys:n.
  */
-export function placeKeys({ prepared, seed, version, movable, fixed, destinations }) {
+export function placeKeys({ prepared, seed, version, movable, fixed, destinations, prefer = null }) {
   const diagnostics = { movableKeys: movable.length, destinations: destinations.length, attempts: 0, deadEnds: [] };
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
     diagnostics.attempts = attempt + 1;
@@ -130,7 +162,8 @@ export function placeKeys({ prepared, seed, version, movable, fixed, destination
       const reachable = visitedAreas(prepared, areaOf, unplaced);
       const candidates = destinations.filter((destination) => !used.has(destination.id) && reachable.has(destination.area));
       if (candidates.length === 0) { failed = key; break; }
-      const pick = candidates[rng.int(candidates.length)];
+      const preferred = prefer ? prefer(key, candidates) : candidates;
+      const pick = preferred[rng.int(preferred.length)];
       placed.set(key, pick.id);
       used.add(pick.id);
       areaOf.set(key, pick.area);
