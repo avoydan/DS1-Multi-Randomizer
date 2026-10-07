@@ -22,6 +22,19 @@ int Cell(PARAM.Row row, string startsWith) =>
 var gameParam = BND3.Read(Path.Combine(modDir, "param", "GameParam", "GameParam.parambnd.dcx"));
 var npc = ReadParam(gameParam, "NpcParam.param").Rows.ToDictionary(row => row.ID);
 var think = ReadParam(gameParam, "NpcThinkParam.param").Rows.ToDictionary(row => row.ID);
+// The Darkroot Basin shares the event file and the AI bundle of the Darkroot Garden (the data tool normalizes it the same way).
+// An enemy part and a dummy enemy part carry the same fields in two classes; the checks read them through one view.
+PartView? FindPart(MSB1 file, string name, bool dummy)
+{
+    if (dummy)
+    {
+        var d = file.Parts.DummyEnemies.SingleOrDefault(entry => entry.Name == name);
+        return d == null ? null : new PartView(d.Name, d.ModelName, d.EntityID, d.NPCParamID, d.ThinkParamID, d.TalkID);
+    }
+    var e = file.Parts.Enemies.SingleOrDefault(entry => entry.Name == name);
+    return e == null ? null : new PartView(e.Name, e.ModelName, e.EntityID, e.NPCParamID, e.ThinkParamID, e.TalkID);
+}
+string AiMap(string map) => map == "m12_00_00_01" ? "m12_00_00_00" : map;
 var results = new List<object>();
 foreach (var expectation in expectations)
 {
@@ -29,7 +42,7 @@ foreach (var expectation in expectations)
     void Check(string name, bool ok, string detail) => checks.Add(new { name, ok, detail });
     var msbPath = Path.Combine(modDir, "map", "MapStudio", expectation.Map + ".msb");
     var msb = MSB1.Read(msbPath);
-    var part = msb.Parts.Enemies.SingleOrDefault(entry => entry.Name == expectation.Slot);
+    var part = FindPart(msb, expectation.Slot, expectation.Dummy);
     Check("part exists", part != null, expectation.Slot);
     if (part != null)
     {
@@ -42,7 +55,7 @@ foreach (var expectation in expectations)
             if (expectation.Souls.HasValue) Check("souls", Cell(row, "getSoul") == expectation.Souls.Value, $"{Cell(row, "getSoul")} (expected {expectation.Souls})");
             if (expectation.DisableRespawn.HasValue) Check("respawn bit", (Cell(row, "disableRespawn") == 1) == expectation.DisableRespawn.Value, $"disableRespawn={Cell(row, "disableRespawn")} (expected {(expectation.DisableRespawn.Value ? 1 : 0)})");
         }
-        var emevd = EMEVD.Read(Path.Combine(modDir, "event", expectation.Map + ".emevd.dcx"));
+        var emevd = EMEVD.Read(Path.Combine(modDir, "event", AiMap(expectation.Map) + ".emevd.dcx"));
         var duplicates = emevd.Events.GroupBy(entry => entry.ID).Where(group => group.Count() > 1).Select(group => group.Key).ToList();
         Check("event IDs are unique", duplicates.Count == 0, duplicates.Count == 0 ? $"{emevd.Events.Count} events" : $"duplicate IDs: {string.Join(",", duplicates)}");
         int References(EMEVD file) => file.Events.Count(entry => entry.Instructions.Any(instruction =>
@@ -53,7 +66,7 @@ foreach (var expectation in expectations)
         }));
         if (expectation.WakeUpEvent == true && originalDir != null)
         {
-            var original = EMEVD.Read(Path.Combine(originalDir, "event", expectation.Map + ".emevd.dcx"));
+            var original = EMEVD.Read(Path.Combine(originalDir, "event", AiMap(expectation.Map) + ".emevd.dcx"));
             Check("a wake-up event was added for the entity", References(emevd) > References(original), $"events naming entity {part.EntityID}: {References(emevd)} now, {References(original)} in the clean game");
         }
         if (expectation.Kind == "encounter-body" && originalDir != null)
@@ -82,7 +95,7 @@ foreach (var expectation in expectations)
                 }
                 else Check("NpcParam rows readable", false, $"rows {originalPart.NPCParamID} / {part.NPCParamID}");
                 // Every event of the clean game that names the entity still exists (the death, the defeated flag, the fog, the exit all hang on them).
-                var originalEmevd = EMEVD.Read(Path.Combine(originalDir, "event", expectation.Map + ".emevd.dcx"));
+                var originalEmevd = EMEVD.Read(Path.Combine(originalDir, "event", AiMap(expectation.Map) + ".emevd.dcx"));
                 bool Names(EMEVD.Event entry) => entry.Instructions.Any(instruction =>
                 {
                     var data = instruction.ArgData;
@@ -112,6 +125,60 @@ foreach (var expectation in expectations)
                 Check("completion conditions are kept", weakened.Count == 0, weakened.Count == 0 ? "no condition or flag instruction was removed from an event naming the entity" : $"weakened: {string.Join(",", weakened)}");
             }
         }
+        if (expectation.Kind == "hostile-npc" && originalDir != null)
+        {
+            // Part F1: a hostile NPC body in a regular slot. The body, its animations and its AI are the NPC's; what makes it an actor of the
+            // slot's kind (allegiance class, respawn, rewards, drops, covenant mark) is the slot's. No talk script, no shop, no quest binding.
+            var originalMsb = MSB1.Read(Path.Combine(originalDir, "map", "MapStudio", expectation.Map + ".msb"));
+            var originalPart = FindPart(originalMsb, expectation.Slot, expectation.Dummy);
+            Check("the slot exists in the clean game", originalPart != null, expectation.Slot);
+            if (originalPart != null)
+            {
+                Check("the slot's own enemy was replaced", originalPart.ModelName != part.ModelName, $"{originalPart.ModelName} -> {part.ModelName}");
+                Check("the part has no talk script", part.TalkID == originalPart.TalkID && part.TalkID <= 0, $"talk {part.TalkID} (clean game {originalPart.TalkID})");
+                Check("the entity id is kept or assigned", originalPart.EntityID < 0 ? (part.EntityID >= 0 || expectation.Dummy) : part.EntityID == originalPart.EntityID, $"{part.EntityID} (clean game {originalPart.EntityID})");
+                var originalParam = BND3.Read(Path.Combine(originalDir, "param", "GameParam", "GameParam.parambnd.dcx"));
+                var originalNpc = ReadParam(originalParam, "NpcParam.param").Rows.ToDictionary(entry => entry.ID);
+                if (originalNpc.TryGetValue(originalPart.NPCParamID, out var slotRow) && npc.TryGetValue(part.NPCParamID, out var bodyRow))
+                {
+                    Check("the body has its own scaled row", part.NPCParamID != originalPart.NPCParamID, $"row {part.NPCParamID} (slot row {originalPart.NPCParamID})");
+                    foreach (var cellName in new[] { "teamType", "npcType", "disableRespawn", "dropType", "getSoul", "humanityLotId", "vowType" })
+                        Check($"{cellName} is the slot's", Cell(bodyRow, cellName) == Cell(slotRow, cellName) || (expectation.Passive && cellName == "teamType" && Cell(bodyRow, cellName) == 2), $"{Cell(bodyRow, cellName)} (slot row: {Cell(slotRow, cellName)})");
+                    foreach (var cell in slotRow.Cells.Where(cell => cell.Def.InternalName.StartsWith("itemLotId", StringComparison.Ordinal)))
+                    {
+                        var name = cell.Def.InternalName;
+                        var value = bodyRow.Cells.Single(entry => entry.Def.InternalName == name).Value;
+                        Check($"{name} is the slot's", Convert.ToInt32(value) == Convert.ToInt32(cell.Value), $"{value} (slot row: {cell.Value})");
+                    }
+                    Check("no ghost transition", Cell(bodyRow, "isGhost") == 0 && Cell(bodyRow, "isChangeWanderGhost") == 0 && Cell(bodyRow, "ghostModelId") == -1, $"isGhost {Cell(bodyRow, "isGhost")}, isChangeWanderGhost {Cell(bodyRow, "isChangeWanderGhost")}, ghostModelId {Cell(bodyRow, "ghostModelId")}");
+                }
+                else Check("NpcParam rows readable", false, $"rows {originalPart.NPCParamID} / {part.NPCParamID}");
+                // The think row exists, and the map's AI bundle holds the scripts of the goals it names (battle and logic) for the variant that was placed.
+                if (think.TryGetValue(part.ThinkParamID, out var thinkRow))
+                {
+                    var battle = Cell(thinkRow, "battleGoalID");
+                    var logic = Cell(thinkRow, "logicId");
+                    var scriptPath = Path.Combine(modDir, "script", AiMap(expectation.Map) + ".luabnd.dcx");
+                    if (!File.Exists(scriptPath)) scriptPath = Path.Combine(originalDir, "script", AiMap(expectation.Map) + ".luabnd.dcx");
+                    var scripts = BND3.Read(scriptPath).Files.Select(file => Path.GetFileName(file.Name)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                    var common = BND3.Read(Path.Combine(originalDir, "script", "aiCommon.luabnd.dcx")).Files.Select(file => Path.GetFileName(file.Name)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                    bool Has(string file) => scripts.Contains(file) || common.Contains(file);
+                    Check("the battle script of the placed AI is in the map's AI bundle", Has($"{battle}_battle.lua"), $"{battle}_battle.lua");
+                    Check("the logic script of the placed AI is in the map's AI bundle", logic == 10000 || Has($"{logic}_logic.lua"), logic == 10000 ? "common logic 10000" : $"{logic}_logic.lua");
+                }
+                if (!expectation.Dummy && !expectation.Passive)
+                {
+                    var originalEmevd = EMEVD.Read(Path.Combine(originalDir, "event", AiMap(expectation.Map) + ".emevd.dcx"));
+                    int Named(EMEVD file) => file.Events.Count(entry => entry.Instructions.Any(instruction =>
+                    {
+                        var data = instruction.ArgData;
+                        for (var offset = 0; offset + 4 <= data.Length; offset += 4) if (BitConverter.ToInt32(data, offset) == part.EntityID) return true;
+                        return false;
+                    }));
+                    Check("a wake-up event names the entity", Named(emevd) > Named(originalEmevd), $"events naming entity {part.EntityID}: {Named(emevd)} now, {Named(originalEmevd)} in the clean game");
+                }
+            }
+        }
         int Models(MSB1 file) => file.Parts.Enemies.Where(entry => entry.ModelName.StartsWith('c')).Select(entry => entry.ModelName).Distinct().Count();
         var now = Models(msb);
         var vanilla = originalDir != null ? Models(MSB1.Read(Path.Combine(originalDir, "map", "MapStudio", expectation.Map + ".msb"))) : 0;
@@ -122,4 +189,5 @@ foreach (var expectation in expectations)
 Console.WriteLine(JsonSerializer.Serialize(results));
 return results.All(result => (bool)result.GetType().GetProperty("ok")!.GetValue(result)!) ? 0 : 1;
 
-record Expectation(string Id, string Map, string Slot, string Model, string Kind, int? Souls, bool? DisableRespawn, bool? WakeUpEvent);
+record PartView(string Name, string ModelName, int EntityID, int NPCParamID, int ThinkParamID, int TalkID);
+record Expectation(string Id, string Map, string Slot, string Model, string Kind, int? Souls, bool? DisableRespawn, bool? WakeUpEvent, bool Dummy = false, bool Passive = false);

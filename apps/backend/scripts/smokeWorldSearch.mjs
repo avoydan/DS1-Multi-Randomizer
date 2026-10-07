@@ -5,7 +5,7 @@
 //
 //   node apps/backend/scripts/smokeWorldSearch.mjs <catalog.json> <test> [--from 1] [--to 2000] [--prefix smoke-q1-capra]
 //
-// <test>: quick-roaming-basic | quick-roaming-souls | quick-roaming-repeated | quick-sampling-asylum | quick-boss-asylum-demon.
+// <test>: any key of QUICK_SMOKE_RECIPES (packages/contracts/src/smokeTests.ts), for example quick-roaming-basic or quick-hostile-npc.
 // Prints one JSON line per accepted seed. Several processes with disjoint --from/--to ranges can run side by side.
 
 import { readFileSync } from 'node:fs';
@@ -67,6 +67,16 @@ const ACCEPT = {
     if (!body || body.targetModelName !== 'c2560') return null;
     const others = plan.placements.bosses.filter((entry) => entry.compatibility === 'sampled-encounter-body').map((entry) => `${entry.slot.split(':')[1]}>${entry.targetModelName}`);
     return { bodies: others, source: body.sourceSlot, scaledNpcParamId: body.scaledNpcParamId, think: body.targetThinkParamId };
+  },
+  'quick-hostile-npc': ({ plan, slotById }) => {
+    // Part F1: Andre of Astora as a hostile fighter in one of the two nearest first-visit Hollow slots; no other hostile NPC around it.
+    const hostile = plan.placements.enemies.filter((entry) => entry.map === ASYLUM && entry.hostileNpc === true);
+    const live = hostile.filter((entry) => !slotById.get(entry.slot).dummy);
+    if (live.length !== 1) return null;
+    const [entry] = live;
+    const slot = slotById.get(entry.slot);
+    if (!['c2500_0006', 'c2500_0007'].includes(short(entry.slot)) || entry.targetModelName !== 'c2640' || entry.passiveUntilAttacked || !firstVisit(slot) || entry.forceCombatActivation !== true) return null;
+    return { slot: short(entry.slot), model: entry.targetModelName, meters: Number(metersFromSpawn(slot).toFixed(1)), entityId: entry.entityId, source: entry.sourceSlot, scaledNpcParamId: entry.scaledNpcParamId, think: entry.targetThinkParamId };
   },
   'quick-boss-asylum-demon': ({ plan }) => {
     const placement = plan.placements.bosses.find((entry) => entry.slot === `${ASYLUM}:c2232_0000`);

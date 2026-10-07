@@ -72,6 +72,19 @@ export const sets = {
     { name: 'roaming-both-fog', patch: merge2(noItems, sampling({ normalReplacement: 'both', bossChanceInNormalSlots: 25, fit: 'fits' })), seeds: 20 },
     { name: 'roaming-bosses-fog', patch: merge2(noItems, sampling({ normalReplacement: 'bosses', replacementChance: 40, fit: 'anywhere', typeReplacement: 'enabled-except-roaming-bosses' })), seeds: 20 },
   ],
+  /** Part F1: hostile NPCs through the real data tool (Fog is covered by the fogHostE2e sweeps): events, rows and AI bundles of every placed NPC. */
+  'hostile-npc-f1': [
+    { name: 'npc-anywhere', patch: merge2(noItems, noFog, sampling({ hostileNpcs: true, fit: 'anywhere', difficultyMode: 'random' })) },
+    { name: 'npc-fits-curve-strict', patch: merge2(noItems, noFog, sampling({ hostileNpcs: true, fit: 'fits', difficultyMode: 'curve', difficultyStrictness: 'strict' })) },
+    { name: 'npc-easy-asylum-c60', patch: merge2(noItems, noFog, sampling({ hostileNpcs: true, fit: 'fits', difficultyMode: 'random-easy-asylum', replacementChance: 60 })) },
+    { name: 'npc-type-enabled', patch: merge2(noItems, noFog, sampling({ hostileNpcs: true, fit: 'fits', typeReplacement: 'enabled' })) },
+    { name: 'npc-type-except-roaming-both', patch: merge2(noItems, noFog, sampling({ hostileNpcs: true, fit: 'anywhere', typeReplacement: 'enabled-except-roaming-bosses', normalReplacement: 'both', bossChanceInNormalSlots: 25 })) },
+    { name: 'npc-plus-roaming', patch: merge2(noItems, noFog, sampling({ hostileNpcs: true, fit: 'fits', normalReplacement: 'both', bossChanceInNormalSlots: 20 })) },
+    { name: 'npc-plus-boss-bodies', patch: merge2(noItems, noFog, sampling({ hostileNpcs: true, fit: 'anywhere', bossReplacement: 'normals' })) },
+    { name: 'npc-plus-boss-sampling-both', patch: merge2(noItems, noFog, sampling({ hostileNpcs: true, fit: 'anywhere', bossReplacement: 'both', bossChanceInBossSlots: 50, normalReplacement: 'both', bossChanceInNormalSlots: 15 })) },
+    { name: 'npc-vanilla-scaling', patch: merge2(noItems, noFog, sampling({ hostileNpcs: true, fit: 'anywhere' }, { scaling: 'vanilla' })) },
+    { name: 'npc-prevent-same-gargoyle-gwyn', patch: merge2(noItems, noFog, sampling({ hostileNpcs: true, fit: 'fits' }, { preventSameEnemy: true, secondGargoyle: 'replace', gwynNerf: 'strong' })) },
+  ],
   /** Part E2: a normal enemy as the body of a boss encounter through the real data tool (Fog is covered by the fogHostE2e sweeps). */
   'encounter-e2': [
     { name: 'body-normals-anywhere', patch: merge2(noItems, noFog, sampling({ bossReplacement: 'normals', fit: 'anywhere', difficultyMode: 'random' })) },

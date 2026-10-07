@@ -68,12 +68,21 @@ try {
     // Bosses standing in regular enemy slots (Part E1): where, which boss, what it replaced.
     const BOSS_NAME = { c2230: 'Stray Demon', c2231: 'Demon Firesage', c2232: 'Asylum Demon', c2240: 'Capra Demon', c2250: 'Taurus Demon', c2320: 'Iron Golem', c2360: 'Smough', c3230: 'Moonlight Butterfly', c3320: 'Pinwheel', c4100: 'Artorias', c4500: 'Manus', c5210: 'Sif', c5220: 'Gravelord Nito', c5270: 'Ornstein', c5271: 'Super Ornstein', c5280: 'Quelaag' };
     const AREA = { m10_00_00_00: 'The Depths', m10_01_00_00: 'Undead Burg / Parish', m10_02_00_00: 'Lower Undead Burg', m11_00_00_00: 'Painted World', m12_00_00_00: 'Darkroot Garden', m12_00_00_01: 'Darkroot Basin', m12_01_00_00: 'Oolacile', m13_00_00_00: 'Catacombs', m13_01_00_00: 'Tomb of the Giants', m13_02_00_00: 'Ash Lake', m14_00_00_00: 'Blighttown', m14_01_00_00: 'Demon Ruins', m15_00_00_00: "Sen's Fortress", m15_01_00_00: 'Anor Londo', m16_00_00_00: 'New Londo Ruins', m17_00_00_00: "Duke's Archives", m18_00_00_00: 'The Kiln', m18_01_00_00: 'Undead Asylum' };
+    // Hostile NPCs (Part F1): the live (not dummy) placements; the real NPCs are never destinations.
+    const NPC_NAME = { c2510: 'Undead Merchant', c2640: 'Andre of Astora', c2920: 'Vamos' };
+    // A live placement has its wake-up (or is passive until attacked); a dummy part is not spawned in the game and has neither.
+    const hostileRows = plan.placements.enemies.filter((p) => p.hostileNpc === true && (p.forceCombatActivation === true || p.passiveUntilAttacked === true));
+    const hostileCounts = new Map();
+    for (const p of hostileRows) hostileCounts.set(NPC_NAME[p.targetModelName], (hostileCounts.get(NPC_NAME[p.targetModelName]) ?? 0) + 1);
     const roamingRows = plan.placements.enemies.filter((p) => p.compatibility === 'sampled-roaming-boss');
     const roamingNames = roamingRows.map((p) => BOSS_NAME[p.targetModelName] ?? p.targetModelName);
     const roamingCounts = new Map();
     for (const name of roamingNames) roamingCounts.set(name, (roamingCounts.get(name) ?? 0) + 1);
     const out = {
       masterSeed, seedCode, ok: true, ...(keep ? { packagePath: result.packagePath, manifest: result.manifest, workspacePath } : {}),
+      hostileCount: hostileRows.length,
+      hostileKinds: [...hostileCounts].map(([name, n]) => `${name} x${n}`),
+      hostileTable: hostileRows.map((p) => `${AREA[p.map] ?? p.map}: ${p.from.split(' [')[0]} (slot ${p.slot.split(':')[1]}) -> ${NPC_NAME[p.targetModelName] ?? p.targetModelName}${p.passiveUntilAttacked ? ' (passive until attacked)' : ''}`),
       roamingCount: roamingRows.length,
       roamingTable: roamingRows.map((p) => `${AREA[p.map] ?? p.map}: a boss replaces enemy ${p.from.split(' [')[0]} (slot ${p.slot.split(':')[1]}): ${BOSS_NAME[p.targetModelName] ?? p.targetModelName}, souls ${p.roamingBossSouls}${p.disableRespawn ? ', stays dead' : ''}`),
       roamingKinds: [...roamingCounts].map(([name, n]) => `${name} x${n}`),
@@ -183,6 +192,10 @@ try {
       if (result.secondGargoyle) {
         const first = result.bossTable.find((line) => line.includes(': Bell Gargoyle -> '));
         lines.push('', `Expected: the second Bell Gargoyle of the Undead Parish fight becomes **${result.secondGargoyle}**${first ? `; the first Gargoyle body becomes ${first.split(' -> ')[1]}` : ''}. It is released when the first body drops to about 60% health, on the rooftop.`);
+      }
+      if (result.hostileCount > 0) {
+        const firstNpc = result.hostileTable.slice(0, 14);
+        lines.push('', `Hostile NPCs in this world: ${result.hostileCount} (${result.hostileKinds.join(', ')}). The first ${firstNpc.length} by map order:`, '', ...firstNpc.map((line) => `- ${line}`));
       }
       if (result.roamingCount > 0) {
         const first = result.roamingTable.slice(0, 14);

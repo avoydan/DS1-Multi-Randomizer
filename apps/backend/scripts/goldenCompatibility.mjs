@@ -141,6 +141,19 @@ export const v1ExtraCaseSets = {
     { name: 'encounter-body-custom-pool-edge', masterSeed: 'golden-v1-body-pool', patch: { items: { enabled: false }, fog: { enabled: false },
       enemies: { randomizeRegularEnemies: false, gwynNerf: 'none', secondGargoyle: 'keep', placement: { algorithm: 'sampling-v1', replacementChance: 100, fit: 'anywhere', difficultyMode: 'random', bossReplacement: 'normals', customPool: poolC } } } },
   ],
+  /** Hostile NPCs (Part F1): worlds that use the non-neutral extension key, frozen from the day they exist. */
+  'hostile-npcs': [
+    { name: 'hostile-npc-basic', masterSeed: 'golden-v1-npc-basic', patch: { items: { enabled: false }, fog: { enabled: false },
+      enemies: { randomizeBosses: false, placement: { algorithm: 'sampling-v1', replacementChance: 100, fit: 'fits', difficultyMode: 'random-easy-asylum', hostileNpcs: true } } } },
+    { name: 'hostile-npc-fog', masterSeed: 'golden-v1-npc-fog', patch: { items: { enabled: false },
+      enemies: { randomizeBosses: false, placement: { algorithm: 'sampling-v1', replacementChance: 60, fit: 'anywhere', difficultyMode: 'curve', difficultyStrictness: 'loose', hostileNpcs: true } } } },
+    { name: 'hostile-npc-roaming-bosses', masterSeed: 'golden-v1-npc-roaming', patch: { items: { enabled: false }, fog: { enabled: false },
+      enemies: { randomizeBosses: false, placement: { algorithm: 'sampling-v1', replacementChance: 50, fit: 'fits', normalReplacement: 'both', bossChanceInNormalSlots: 15, hostileNpcs: true } } } },
+    { name: 'hostile-npc-type-replacement-drops', masterSeed: 'golden-v1-npc-type', patch: { items: { enabled: false }, fog: { enabled: false },
+      enemies: { randomizeBosses: false, placement: { algorithm: 'sampling-v1', replacementChance: 100, fit: 'fits', difficultyMode: 'random', typeReplacement: 'enabled', hostileNpcs: true } } } },
+    { name: 'hostile-npc-boss-bodies', masterSeed: 'golden-v1-npc-bodies', patch: { items: { enabled: false }, fog: { enabled: false },
+      enemies: { gwynNerf: 'medium', secondGargoyle: 'keep', placement: { algorithm: 'sampling-v1', replacementChance: 100, fit: 'anywhere', bossReplacement: 'both', bossChanceInBossSlots: 50, hostileNpcs: true } } } },
+  ],
   'boss-baseline': [
     { name: 'sampling-bosses-fog', masterSeed: 'golden-v1-boss-fog', patch: { enemies: { gwynNerf: 'strong', secondGargoyle: 'replace',
       placement: { algorithm: 'sampling-v1', replacementChance: 70, fit: 'fits', difficultyMode: 'curve', difficultyStrictness: 'strict' } } } },
