@@ -18,6 +18,7 @@ export interface NewRun {
   packagePath: string;
   manifestPath: string;
   spoilerPath: string | null;
+  hintsPath?: string | null;
   now?: Date;
 }
 
@@ -61,7 +62,7 @@ export class RunHistory {
       const entry: RunHistoryEntry = {
         id: randomUUID(), createdAt: (run.now ?? new Date()).toISOString(), seedCode: run.seedCode, profile: run.profile,
         masterSeed: run.masterSeed, settings: run.settings, status: 'generated', packagePath: run.packagePath,
-        manifestPath: run.manifestPath, spoilerPath: run.spoilerPath,
+        manifestPath: run.manifestPath, spoilerPath: run.spoilerPath, hintsPath: run.hintsPath ?? null,
       };
       await this.#write([entry, ...(await this.#read())]);
       return entry;
@@ -80,13 +81,13 @@ export class RunHistory {
         const entry: RunHistoryEntry = {
           id: randomUUID(), createdAt: (run.now ?? new Date()).toISOString(), seedCode: run.seedCode, profile: run.profile,
           masterSeed: run.masterSeed, settings: run.settings, status: 'generated', packagePath: run.packagePath,
-          manifestPath: run.manifestPath, spoilerPath: run.spoilerPath,
+          manifestPath: run.manifestPath, spoilerPath: run.spoilerPath, hintsPath: run.hintsPath ?? null,
         };
         await this.#write([entry, ...entries]);
         return entry;
       }
       const refreshed: RunHistoryEntry = {
-        ...entries[index], packagePath: run.packagePath, manifestPath: run.manifestPath, spoilerPath: run.spoilerPath, status: 'generated',
+        ...entries[index], packagePath: run.packagePath, manifestPath: run.manifestPath, spoilerPath: run.spoilerPath, hintsPath: run.hintsPath ?? null, status: 'generated',
       };
       await this.#write(entries.map((entry, position) => (position === index ? refreshed : entry)));
       return refreshed;

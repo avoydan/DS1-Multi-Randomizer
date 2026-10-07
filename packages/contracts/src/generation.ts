@@ -166,8 +166,12 @@ export interface RunHistoryEntry {
   packagePath: string;
   manifestPath: string;
   spoilerPath: string | null;
+  /** The hint data written at generation (docs/HINT_SHEET.md); absent on entries from before the hint sheet existed. */
+  hintsPath?: string | null;
   /** Computed when the history is read. */
   packageExists?: boolean;
+  /** Computed when the history is read: the hint sheet can be shown (the hint data exists, or the run folder still holds the placements). */
+  hintsAvailable?: boolean;
 }
 
 /** Settings kept between sessions (not machine state: the game path is managed separately). */

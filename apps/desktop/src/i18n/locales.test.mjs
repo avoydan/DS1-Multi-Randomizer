@@ -126,7 +126,7 @@ test('the screens contain no untranslated literal text', () => {
     for (const match of source.matchAll(/>([^<>{}=;()\n][^<>{}\n]*[A-Za-z]{3,}[^<>{}\n]*)</gu)) {
       const text = match[1].trim();
       // Generic type arguments and member expressions that merely look like text (`Promise<string>`, `a.size < b`).
-      const looksLikeCode = /^[\w$]+\.[\w.$]+$/u.test(text) || text === 'Promise';
+      const looksLikeCode = /^[\w$]+\.[\w.$]+$/u.test(text) || text === 'Promise' || /&&|\|\||===|!==|=>/u.test(text);
       if (text !== '' && !/^[\s\W]*$/u.test(text) && !looksLikeCode) problems.push(`${name}: text "${text}"`);
     }
     for (const match of source.matchAll(/\b(title|placeholder|aria-label|alt|label|hint)="([^"{]*[A-Za-z]{3,}[^"]*)"/gu)) {

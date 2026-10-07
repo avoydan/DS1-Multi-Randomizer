@@ -6,6 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { migrateSettings, normalizeGamePath, type StoredSettings } from './settings.js';
 import { launchGame } from './launchGame.js';
+import { MAX_SAVE_BYTES, SAVE_KINDS, parseSaveRequest, saveBytes } from './saveFile.js';
 import { mainMessage, normalizeLanguageSetting, resolveLanguage, type AppLanguage, type LanguageSetting, type MainMessageKey } from './language.js';
 
 const currentDirectory = path.dirname(fileURLToPath(import.meta.url));
@@ -150,6 +151,23 @@ ipcMain.handle('language:set', async (_event, value: unknown) => {
   settings = next === 'auto' ? rest : { ...rest, language: next };
   await saveSettings();
   return { setting: languageSetting(), resolved: currentLanguage() };
+});
+// Export a document the renderer made (hint sheet, support bundle): the person chooses where; the renderer never supplies a path.
+ipcMain.handle('file:save', async (event, value: unknown) => {
+  const request = parseSaveRequest(value);
+  if (!request) return { ok: false, canceled: false, code: 'INVALID_REQUEST' };
+  const bytes = saveBytes(request);
+  if (bytes.length > MAX_SAVE_BYTES) return { ok: false, canceled: false, code: 'TOO_LARGE' };
+  const parent = BrowserWindow.fromWebContents(event.sender) ?? undefined;
+  const options = { title: say('saveFileTitle'), defaultPath: path.join(app.getPath('documents'), request.defaultName), filters: [{ name: SAVE_KINDS[request.kind].filter, extensions: [SAVE_KINDS[request.kind].extension] }] };
+  const chosen = parent ? await dialog.showSaveDialog(parent, options) : await dialog.showSaveDialog(options);
+  if (chosen.canceled || !chosen.filePath) return { ok: false, canceled: true };
+  try {
+    await writeFile(chosen.filePath, bytes);
+    return { ok: true, name: path.basename(chosen.filePath) };
+  } catch {
+    return { ok: false, canceled: false, code: 'WRITE_FAILED' };
+  }
 });
 ipcMain.handle('game:remember-path', async (_event, gamePath: unknown) => {
   const normalized = normalizeGamePath(gamePath);

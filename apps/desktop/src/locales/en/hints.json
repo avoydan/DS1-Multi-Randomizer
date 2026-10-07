@@ -1,0 +1,109 @@
+{
+  "action": {
+    "view": "View hints",
+    "export": "Export hints",
+    "unavailable": "No hint data for this world."
+  },
+  "levels": {
+    "low": {
+      "name": "Low spoilers",
+      "description": "Only the most important progression items (keys, the Lordvessel, Lord Souls), and only the broad area or kind of place where each lies."
+    },
+    "progression": {
+      "name": "Progression",
+      "description": "Every progression item, with the exact named place where it lies."
+    },
+    "full": {
+      "name": "Full spoilers",
+      "description": "Every item placement: where it lies now, where it lay in the clean game, and what kind of item it is."
+    }
+  },
+  "languages": {
+    "en": "English",
+    "pl": "Polski"
+  },
+  "sections": {
+    "keys": "Key items",
+    "lord": "Lordvessel and Lord Souls",
+    "progression": "Other progression items",
+    "bossSouls": "Boss souls",
+    "other": "Other items"
+  },
+  "summary": {
+    "items": "Items",
+    "enemies": "Enemies",
+    "bosses": "Bosses",
+    "fog": "Fog randomizer",
+    "keyPlacement": "Key placement",
+    "itemDifficulty": "Item difficulty",
+    "soulItems": "Soul items",
+    "laundromat": "Laundromat Mixup",
+    "enemyAlgorithm": "Enemy placement algorithm",
+    "gameLanguage": "In-game text language"
+  },
+  "on": "on",
+  "off": "off",
+  "where": {
+    "world": {
+      "broad": "in {{area}}",
+      "exact": "{{area}}, at the pickup where the {{former}} lies in the clean game"
+    },
+    "boss": {
+      "broad": "as a boss reward",
+      "exact": "as the reward of {{owner}}"
+    },
+    "gift": {
+      "broad": "given by an NPC",
+      "exact": "given by {{owner}}"
+    },
+    "enemy": {
+      "broad": "dropped by an enemy",
+      "exact": "dropped by {{owner}}"
+    },
+    "shop": {
+      "broad": "sold in a shop",
+      "exact": "sold by {{owner}}"
+    }
+  },
+  "cleanGame": "In the clean game: {{place}}",
+  "note": {
+    "transposed": "A weapon made from the {{soul}}."
+  },
+  "empty": "This world has no item placements to list.",
+  "export": {
+    "title": "DS1 Triple Randomizer - Hint sheet",
+    "seedCode": "Seed Code",
+    "profile": "Generation profile",
+    "created": "World created",
+    "level": "Spoiler level",
+    "language": "Language",
+    "settings": "World settings",
+    "footer": "Made by DS1 Triple Randomizer. This sheet contains spoilers. It is not a guide and changes nothing in the game."
+  },
+  "viewer": {
+    "title": "Hint sheet",
+    "close": "Close",
+    "loading": "Loading the hint sheet...",
+    "unavailable": "The hint sheet is not available for this world. It was made before the hint sheet existed and its data is gone. Use Regenerate files to create the world again.",
+    "spoilerWarning": "This sheet contains spoilers. Switching the level only changes what is shown; the world does not change.",
+    "level": "Spoiler level",
+    "search": "Search",
+    "searchPlaceholder": "Item, area, boss or NPC",
+    "noMatch": "Nothing matches the search.",
+    "count_one": "{{count}} hint",
+    "count_other": "{{count}} hints",
+    "world": "World",
+    "exportTitle": "Export",
+    "exportLanguage": "Language of the export",
+    "exportCurrent": "Current app language ({{language}})",
+    "exportHtml": "Export HTML",
+    "exportTxt": "Export TXT",
+    "exportJson": "Export JSON",
+    "exported": "Saved: {{name}}",
+    "exportFailed": "The file could not be saved.",
+    "exportCancelled": "Export cancelled.",
+    "exportNote": "The export has the spoiler level you chose here. HTML opens in any browser and works offline.",
+    "unhintable_one": "{{count}} placement could not be described and is not listed.",
+    "unhintable_other": "{{count}} placements could not be described and are not listed."
+  }
+}

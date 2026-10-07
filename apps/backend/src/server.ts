@@ -21,6 +21,7 @@ import { decodeSeedCode } from './core/seedCode.js';
 import { smokeTestWorlds } from './core/smokeTests.js';
 import { supportedGenerationProfiles } from './core/generationProfiles.js';
 import { defaultWorldDataCacheRoot } from './adapters/fogPrerequisites.js';
+import { hintsAvailableFor, hintsForEntry, persistHints } from './core/hintStore.js';
 
 const HOST = process.env.DS1TR_HOST ?? '127.0.0.1';
 const PORT = Number(process.env.DS1TR_PORT ?? 43177);
@@ -53,7 +54,7 @@ async function findSpoiler(workspacePath: string, packagePath: string): Promise<
   return null;
 }
 
-const APP_VERSION = '0.42.1';
+const APP_VERSION = '0.43.0';
 const runDependencies = { ...generationDependencies, appVersion: APP_VERSION };
 
 function send(res: http.ServerResponse, status: number, body: unknown): void {
@@ -173,7 +174,8 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === 'POST' && url.pathname === '/api/history/list') {
-      return send(res, 200, { entries: await history.list(), supportedProfiles: supportedGenerationProfiles() });
+      const entries = await history.list();
+      return send(res, 200, { entries: await Promise.all(entries.map(async (entry) => ({ ...entry, hintsAvailable: await hintsAvailableFor(entry, runRoot).catch(() => false) }))), supportedProfiles: supportedGenerationProfiles() });
     }
 
     if (req.method === 'POST' && url.pathname === '/api/history/delete') {
@@ -190,6 +192,13 @@ const server = http.createServer(async (req, res) => {
       } catch {
         return send(res, 200, { ok: false, code: 'SPOILER_UNAVAILABLE', message: 'The spoiler log is no longer available. Use Regenerate files to create it again.' });
       }
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/hints/get') {
+      const body = await readJson<{ id?: string }>(req);
+      const entry = typeof body.id === 'string' ? await history.get(body.id) : null;
+      const document = entry ? await hintsForEntry(entry, runRoot, APP_VERSION).catch(() => null) : null;
+      return send(res, 200, document ? { ok: true, document } : { ok: false, code: 'HINTS_UNAVAILABLE' });
     }
 
     if (req.method === 'POST' && url.pathname === '/api/settings/load') {
@@ -227,10 +236,14 @@ const server = http.createServer(async (req, res) => {
         }, runDependencies);
         if (result.ok) {
           const spoilerPath = await findSpoiler(workspacePath, result.packagePath);
+          // The hint data is built once, from the placements the generator just wrote, and kept next to the run (never in the package).
+          const hintsPath = await persistHints(workspacePath, {
+            seedCode: prepared.seedCode, profile: prepared.profile.id, createdAt: new Date().toISOString(), appVersion: APP_VERSION, settings: prepared.envelope.settings,
+          }).catch(() => null);
           // The same world generated again (Load seed, Regenerate files) refreshes its entry; it is not a new run.
           const entry = await history.addOrRefresh({
             seedCode: prepared.seedCode, profile: prepared.profile.id, masterSeed: prepared.config.masterSeed, settings: prepared.envelope.settings,
-            packagePath: result.packagePath, manifestPath: result.manifestPath, spoilerPath,
+            packagePath: result.packagePath, manifestPath: result.manifestPath, spoilerPath, hintsPath,
           }).catch(() => null);
           res.write(`event: result\ndata: ${JSON.stringify({ ...result, seedCode: prepared.seedCode, profile: prepared.profile.id, masterSeed: prepared.config.masterSeed, historyId: entry?.id ?? null, settings: prepared.envelope.settings })}\n\n`);
         } else {

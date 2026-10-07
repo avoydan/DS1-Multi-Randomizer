@@ -1,4 +1,4 @@
-import type { DecodedSeedPayload, EnemyPoolDescription, GenerationSettings, PersistedSettings, RunHistoryEntry, GameStateReport, GenerationEvent, GenerationResult, InstallationValidation, OperationResult, PipelinePlan, PresetDocument, PresetImportResult, RandomizerConfig } from '@ds1tr/contracts';
+import type { HintDocument, DecodedSeedPayload, EnemyPoolDescription, GenerationSettings, PersistedSettings, RunHistoryEntry, GameStateReport, GenerationEvent, GenerationResult, InstallationValidation, OperationResult, PipelinePlan, PresetDocument, PresetImportResult, RandomizerConfig } from '@ds1tr/contracts';
 
 export interface DetectedInstallation { gamePath: string; label: string; valid: boolean; problems: string[] }
 export interface SmokeTestList {
@@ -77,6 +77,7 @@ export const api = {
   history: () => post<{ entries: RunHistoryEntry[] }>('/history/list', {}),
   deleteHistoryEntry: (id: string) => post<{ ok: boolean }>('/history/delete', { id }),
   spoiler: (id: string) => post<{ ok: true; text: string } | { ok: false; code?: string; message: string }>('/history/spoiler', { id }),
+  hints: (id: string) => post<{ ok: true; document: HintDocument } | { ok: false; code: string }>('/hints/get', { id }),
   smokeTests: () => post<SmokeTestList>('/smoke/list', {}),
   loadSettings: () => post<{ found: boolean; persisted: PersistedSettings | null; warning: string | null }>('/settings/load', {}),
   saveSettings: (settings: GenerationSettings, generateSpoilerLog: boolean) => post<{ ok: boolean }>('/settings/save', { settings, generateSpoilerLog }, true),

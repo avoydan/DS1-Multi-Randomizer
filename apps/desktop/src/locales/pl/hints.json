@@ -1,0 +1,113 @@
+{
+  "action": {
+    "view": "Pokaż podpowiedzi",
+    "export": "Eksportuj podpowiedzi",
+    "unavailable": "Brak danych podpowiedzi dla tego świata."
+  },
+  "levels": {
+    "low": {
+      "name": "Mało spoilerów",
+      "description": "Tylko najważniejsze przedmioty postępu (klucze, Lordvessel, Lord Souls) i tylko ogólny obszar lub rodzaj miejsca, w którym leżą."
+    },
+    "progression": {
+      "name": "Progresja",
+      "description": "Każdy przedmiot postępu z dokładnie nazwanym miejscem, w którym leży."
+    },
+    "full": {
+      "name": "Pełne spoilery",
+      "description": "Każde rozmieszczenie przedmiotu: gdzie leży teraz, gdzie leżał w czystej grze i jakiego jest rodzaju."
+    }
+  },
+  "languages": {
+    "en": "English",
+    "pl": "Polski"
+  },
+  "sections": {
+    "keys": "Przedmioty kluczowe",
+    "lord": "Lordvessel i Lord Souls",
+    "progression": "Pozostałe przedmioty postępu",
+    "bossSouls": "Dusze bossów",
+    "other": "Pozostałe przedmioty"
+  },
+  "summary": {
+    "items": "Przedmioty",
+    "enemies": "Wrogowie",
+    "bosses": "Bossowie",
+    "fog": "Randomizer mgieł",
+    "keyPlacement": "Rozmieszczenie kluczy",
+    "itemDifficulty": "Trudność przedmiotów",
+    "soulItems": "Przedmioty z dusz",
+    "laundromat": "Laundromat Mixup",
+    "enemyAlgorithm": "Algorytm rozmieszczenia wrogów",
+    "gameLanguage": "Język tekstów w grze"
+  },
+  "on": "włączone",
+  "off": "wyłączone",
+  "where": {
+    "world": {
+      "broad": "w obszarze {{area}}",
+      "exact": "{{area}}, w miejscu, w którym w czystej grze leży {{former}}"
+    },
+    "boss": {
+      "broad": "jako nagroda za bossa",
+      "exact": "jako nagroda za pokonanie: {{owner}}"
+    },
+    "gift": {
+      "broad": "dawany przez NPC",
+      "exact": "dawany przez: {{owner}}"
+    },
+    "enemy": {
+      "broad": "upuszczany przez wroga",
+      "exact": "upuszczany przez: {{owner}}"
+    },
+    "shop": {
+      "broad": "sprzedawany w sklepie",
+      "exact": "sprzedawany przez: {{owner}}"
+    }
+  },
+  "cleanGame": "W czystej grze: {{place}}",
+  "note": {
+    "transposed": "Broń wykonana z duszy: {{soul}}."
+  },
+  "empty": "Ten świat nie ma rozmieszczenia przedmiotów do wypisania.",
+  "export": {
+    "title": "DS1 Triple Randomizer - Arkusz podpowiedzi",
+    "seedCode": "Kod seeda",
+    "profile": "Profil generowania",
+    "created": "Świat utworzony",
+    "level": "Poziom spoilerów",
+    "language": "Język",
+    "settings": "Ustawienia świata",
+    "footer": "Wygenerowano w DS1 Triple Randomizer. Ten arkusz zawiera spoilery. To nie jest poradnik i niczego nie zmienia w grze."
+  },
+  "viewer": {
+    "title": "Arkusz podpowiedzi",
+    "close": "Zamknij",
+    "loading": "Wczytywanie arkusza podpowiedzi...",
+    "unavailable": "Arkusz podpowiedzi nie jest dostępny dla tego świata. Powstał, zanim arkusz podpowiedzi istniał, a jego dane zniknęły. Użyj opcji Wygeneruj pliki ponownie, aby utworzyć świat jeszcze raz.",
+    "spoilerWarning": "Ten arkusz zawiera spoilery. Zmiana poziomu zmienia tylko to, co widać; świat się nie zmienia.",
+    "level": "Poziom spoilerów",
+    "search": "Szukaj",
+    "searchPlaceholder": "Przedmiot, obszar, boss lub NPC",
+    "noMatch": "Nic nie pasuje do wyszukiwania.",
+    "count_one": "{{count}} podpowiedź",
+    "count_few": "{{count}} podpowiedzi",
+    "count_many": "{{count}} podpowiedzi",
+    "count_other": "{{count}} podpowiedzi",
+    "world": "Świat",
+    "exportTitle": "Eksport",
+    "exportLanguage": "Język eksportu",
+    "exportCurrent": "Bieżący język aplikacji ({{language}})",
+    "exportHtml": "Eksportuj HTML",
+    "exportTxt": "Eksportuj TXT",
+    "exportJson": "Eksportuj JSON",
+    "exported": "Zapisano: {{name}}",
+    "exportFailed": "Nie udało się zapisać pliku.",
+    "exportCancelled": "Eksport anulowany.",
+    "exportNote": "Eksport ma poziom spoilerów wybrany tutaj. HTML otwiera się w każdej przeglądarce i działa offline.",
+    "unhintable_one": "Nie udało się opisać {{count}} rozmieszczenia; nie ma go na liście.",
+    "unhintable_few": "Nie udało się opisać {{count}} rozmieszczeń; nie ma ich na liście.",
+    "unhintable_many": "Nie udało się opisać {{count}} rozmieszczeń; nie ma ich na liście.",
+    "unhintable_other": "Nie udało się opisać {{count}} rozmieszczeń; nie ma ich na liście."
+  }
+}

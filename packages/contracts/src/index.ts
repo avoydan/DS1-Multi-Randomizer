@@ -390,3 +390,4 @@ export type PresetImportResult =
 export * from './generation.js';
 export * from './installation.js';
 export * from './smokeTests.js';
+export * from './hintSheet.js';

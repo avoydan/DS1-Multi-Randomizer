@@ -18,9 +18,14 @@ test('a placement becomes a record with the item, its kind, where it was, where 
     itemId: 2001, itemName: 'Basement Key', itemKind: 'goods', importance: 'key',
     original: { area: 'Undead Parish', map: 'm10_01_00_00', acquisition: 'world pickup', owner: 'Undead Parish', lot: 1010140 },
     randomized: { area: 'Depths', map: 'm10_00_00_00', acquisition: 'world pickup', owner: 'Depths', lot: 1000240 },
-    keyName: 'basement_key', transposedFrom: null,
+    keyName: 'basement_key', transposedFrom: null, placedAt: null,
   });
   assert.equal(describeHint(record), 'Basement Key (key) now lies in Depths, a world pickup; in the clean game it lay in Undead Parish, a world pickup.');
+});
+
+test('the item that lay at the destination in the clean game is carried (the engine from field)', () => {
+  assert.equal(toHintRecord(placement({ from: 'Estus Flask' })).placedAt, 'Estus Flask');
+  assert.equal(toHintRecord(placement({ from: '' })).placedAt, null);
 });
 
 test('the semantic owner of a boss reward, a gift, a drop and a shop is the boss, the NPC, the enemy and the shop, never a row id', () => {

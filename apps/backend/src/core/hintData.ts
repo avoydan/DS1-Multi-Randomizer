@@ -4,38 +4,12 @@
  * placements document (`randomizer.json`, `placements`) and nothing else. It reveals nothing a spoiler log does not, and exposes no internal row ids by default
  * (`lot` is kept for the diagnostics, never shown in a hint).
  *
- * Spoiler severity is not part of the architecture yet (every hint is a spoiler of one placement), so the record carries no severity field.
+ * Spoiler severity is applied on top of these records by `filterHints` in the contracts (docs/HINT_SHEET.md); a record itself is the full detail.
  */
 
-export type HintAcquisition = 'world pickup' | 'NPC gift' | 'boss reward' | 'enemy drop' | 'shop';
-export type HintImportance = 'key' | 'lord' | 'race item' | 'progression' | 'boss soul' | 'boss soul weapon' | 'normal';
+import type { HintLocation, HintRecord, HintLocationAcquisition as HintAcquisition, HintRecordImportance as HintImportance } from '@ds1tr/contracts';
 
-export interface HintLocation {
-  /** Human-readable area or owner ("Undead Parish", "Boss reward: Gaping Dragon", "Shop inventory: Andre"). */
-  area: string;
-  /** The map, or the parameter table for a gift, shop or drop. */
-  map: string;
-  acquisition: HintAcquisition;
-  /** The semantic owner of the pickup: the area for a world pickup, the NPC / boss / enemy / shop for the rest. */
-  owner: string;
-  /** Diagnostics only: the item lot (or shop) row. */
-  lot: number | null;
-}
-
-export interface HintRecord {
-  itemId: number;
-  itemName: string;
-  /** What kind of thing it is: a weapon, armor, ring, or goods (spells, keys, materials, souls and consumables). */
-  itemKind: 'weapon' | 'armor' | 'ring' | 'goods';
-  importance: HintImportance;
-  /** Where the item was in the clean game, and where it lies now. */
-  original: HintLocation;
-  randomized: HintLocation;
-  /** The key (or race item) name when the item is placed by the key planner, else null. */
-  keyName: string | null;
-  /** For a transposed boss weapon: the soul it was made from. */
-  transposedFrom: string | null;
-}
+export type { HintAcquisition, HintImportance, HintLocation, HintRecord };
 
 interface PlacementLocation { area?: unknown; map?: unknown; itemLot?: unknown }
 export interface PlacementLike {
@@ -48,6 +22,8 @@ export interface PlacementLike {
   keyName?: unknown;
   raceItem?: unknown;
   transposedFrom?: unknown;
+  /** The name of the item that lay at the destination in the clean game (`from` in the engine's placement). */
+  from?: unknown;
   originalLocation?: PlacementLocation;
   randomizedLocation?: PlacementLocation;
 }
@@ -88,6 +64,7 @@ export function toHintRecord(placement: PlacementLike): HintRecord | null {
     itemId: placement.itemId, itemName: placement.itemName, itemKind: kind, importance: importanceOf(placement), original, randomized,
     keyName: typeof placement.keyName === 'string' ? placement.keyName : null,
     transposedFrom: typeof placement.transposedFrom === 'string' ? placement.transposedFrom : null,
+    placedAt: typeof placement.from === 'string' && placement.from !== '' ? placement.from : null,
   };
 }
 

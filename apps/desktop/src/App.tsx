@@ -4,6 +4,7 @@ import type { TFunction } from 'i18next';
 import { ErrorNotice, type ErrorInfo } from './ErrorNotice';
 import { LanguageSelect } from './LanguageSelect';
 import { behaviorLabel, behaviorValue } from './planText';
+import { HintSheetPanel } from './HintSheetPanel';
 import { EnemyPoolEditor } from './EnemyPoolEditor';
 import { Readiness } from './Readiness';
 import { SeedPanel, SummaryChips, shortSeedCode, type LoadedSeed } from './SeedPanel';
@@ -120,6 +121,8 @@ export function App() {
   const [pendingSeed, setPendingSeed] = useState<LoadedSeed | null>(null);
   const [workLabel, setWorkLabel] = useState<WorkKey>('working');
   const [runMenuOpen, setRunMenuOpen] = useState(false);
+  /** The world whose hint sheet is open (history entry id), and whether it opened on the export options. */
+  const [hintTarget, setHintTarget] = useState<{ id: string; exportFirst: boolean } | null>(null);
 
   useEffect(() => {
     api.health().then(setBackendOnline);
@@ -650,6 +653,7 @@ export function App() {
                     <div className="menu" role="menu">
                       <button role="menuitem" onClick={() => void generateRun()} disabled={!config.gamePath || enabledCount === 0}>{t('app.run.randomizeAgain')}</button>
                       <button role="menuitem" onClick={() => { setRunMenuOpen(false); setSeedPanelOpen(true); }}>{t('common.loadSeed')}</button>
+                      <button role="menuitem" disabled={!generation.historyId} onClick={() => { setRunMenuOpen(false); if (generation.historyId) setHintTarget({ id: generation.historyId, exportFirst: false }); }}>{t('hints.action.view')}</button>
                     </div>
                   )}
                 </div>
@@ -671,6 +675,7 @@ export function App() {
                   {runMenuOpen && (
                     <div className="menu" role="menu">
                       <button role="menuitem" onClick={() => { setRunMenuOpen(false); setSeedPanelOpen(true); }}>{t('common.loadSeed')}</button>
+                      <button role="menuitem" disabled={!appliedEntry?.hintsAvailable} onClick={() => { setRunMenuOpen(false); if (appliedEntry) setHintTarget({ id: appliedEntry.id, exportFirst: false }); }}>{t('hints.action.view')}</button>
                     </div>
                   )}
                 </div>
@@ -694,7 +699,7 @@ export function App() {
             entries={history} gameState={gameState} busy={busy}
             onApply={(entry) => void applyPackage(entry.packagePath)} onRegenerate={(entry) => void regenerate(entry)}
             onCopy={(entry) => void copySeed(entry.seedCode)} onLaunch={() => void launch()}
-            onDelete={(entry) => void deleteEntry(entry)} onSpoiler={spoilerOf}
+            onDelete={(entry) => void deleteEntry(entry)} onSpoiler={spoilerOf} onHints={(entry, exportFirst) => setHintTarget({ id: entry.id, exportFirst })}
           />
           <details className="log-panel" open={logs.length > 0}><summary>{t('app.advanced.title')}</summary>
             <div className="run-actions">
@@ -709,6 +714,8 @@ export function App() {
         </section>
 
         {plan && <section className="card plan-card"><div className="section-title"><span>02</span><h2>{t('app.plan.title')}</h2></div>{plan.behaviors && plan.behaviors.length > 0 && <ul className="plan-behaviors" aria-label={t('app.plan.behaviorsAria')}>{plan.behaviors.map((line) => <li key={line.labelKey ?? line.label}><strong>{behaviorLabel(t, line)}</strong><span>{behaviorValue(t, line)}</span></li>)}</ul>}<div className="seed-grid">{plan.stages.map((stage) => <div key={stage.engine}><span>{t(`plan.engines.${stage.engine}`)}</span><strong>{stage.enabled ? stage.seed : t('app.plan.disabled')}</strong></div>)}</div><div className="engine-status-list">{plan.engineStatus.map((status) => <div key={status.name} className="engine-status"><strong>{t(`plan.engines.${status.name}`)}</strong><span className={`pill ${status.ready ? 'ready' : ''}`}>{t(`plan.modes.${status.mode}`)}</span><p>{t(`plan.details.${status.mode === 'executable' && status.ready ? 'ready' : status.mode}`)}</p></div>)}</div></section>}
+
+        {hintTarget && <HintSheetPanel entryId={hintTarget.id} exportFirst={hintTarget.exportFirst} onClose={() => setHintTarget(null)} />}
 
         <section className="card legal-card">
           <div><div className="eyebrow">{t('app.legal.eyebrow')}</div><h2>{t('app.legal.title')}</h2></div>
