@@ -320,6 +320,10 @@ export interface EngineStatus {
 export interface PlanBehavior {
   label: string;
   value: string;
+  /** Stable ids of the line and of its value, and the variables of the value, so a translated interface never reads the English sentence. */
+  labelKey?: string;
+  valueKey?: string;
+  params?: Record<string, string>;
 }
 
 export interface PipelinePlan {

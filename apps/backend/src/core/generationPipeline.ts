@@ -96,7 +96,7 @@ const defaults: GenerationDependencies = {
   combined: executeCombinedGeneration,
   fog: new FogHostProcess(),
   progressionModel: (prerequisites, variant) => loadProgressionModel(prerequisites, undefined, variant),
-  appVersion: '0.42.0',
+  appVersion: '0.42.1',
 };
 
 async function fingerprint(file: string): Promise<{ size: number; sha256: string }> {

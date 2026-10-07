@@ -1,0 +1,60 @@
+{
+  "engines": { "combined": "Items and enemies", "fog": "Fog randomizer" },
+  "modes": { "source": "source", "executable": "program", "missing": "missing" },
+  "details": {
+    "ready": "Packaged runtime files detected.",
+    "source": "Source detected; the adapter bridge is not ready in this workspace.",
+    "executable": "Executable detected; the bridge is not ready in this workspace.",
+    "missing": "Engine files are missing; reinstall the desktop application."
+  },
+  "labels": {
+    "items": "Items",
+    "soulItems": "Soul items",
+    "keyItems": "Key items",
+    "lordvessel": "Lordvessel",
+    "lordSouls": "Lord Souls",
+    "itemDifficulty": "Item difficulty",
+    "laundromat": "Laundromat Mixup",
+    "enemyPlacement": "Enemy placement",
+    "enemiesAndBosses": "Enemies and bosses",
+    "fogRandomizer": "Fog randomizer"
+  },
+  "pools": { "worldItems": "world items", "npcGifts": "NPC gifts", "enemyDrops": "enemy drops", "shops": "shops" },
+  "values": {
+    "notRandomized": "not randomized",
+    "itemsShuffled": "shuffled: {{pools}}",
+    "itemsExtrasOnly": "only the selected extras (no item pool is on)",
+    "souls": {
+      "noEffect": "no effect (turn on world items, NPC gifts or enemy drops)",
+      "shuffled": "Shuffled (the lesser souls move with the other items; the boss souls stay with their bosses)",
+      "replaced": "Replaced (the lesser souls become other consumables)",
+      "transposed": "Transposed (the boss souls join the item pool; each has a 75% chance to become a weapon made from that soul)"
+    },
+    "keys": {
+      "vanilla": "stay where the game puts them (progression items are protected)",
+      "shuffled": "Shuffled (placed by a safety-checked fill over the world graph: every area stays reachable and Firelink Altar can be reached; gifts, shops and drops never hold a key)",
+      "race": "Race Mode (the keys and embers lie only in boss rewards, chests and the places where keys normally are; the same safety check applies)",
+      "race-plus": "Race Mode + (as Race Mode, but a world may need skips and glitches such as the Capra skip or the Seal skip to be completed; softlocking is possible without them)"
+    },
+    "vessel": {
+      "vanilla": "stays where the game puts it (given by Gwynevere)",
+      "shuffled": "shuffled with the keys (Gwynevere then hands over another item of the pool)"
+    },
+    "lordSouls": {
+      "vanilla": "stay where the game puts them (the rewards of the four Lords)",
+      "shuffled": "shuffled with the keys (the four rewards go to other pickups, and the Lords drop other items)"
+    },
+    "difficulty": {
+      "fair": "Fair (items have an equal chance to be placed anywhere)",
+      "unfair": "Unfair (desirable items are not placed in plain view)",
+      "very-unfair": "Very Unfair (desirable items are hidden and rarely in early areas)"
+    },
+    "laundromatOn": "on (NPC characters wear armor pieces other NPCs wear; only their appearance and armor stats change)",
+    "placement": {
+      "sampling": "Sampling (each slot chooses a compatible replacement)",
+      "permutation": "Classic permutation (the existing enemies are shuffled)"
+    },
+    "on": "on",
+    "off": "off"
+  }
+}

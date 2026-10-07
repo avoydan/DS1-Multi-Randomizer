@@ -1,0 +1,60 @@
+{
+  "engines": { "combined": "Przedmioty i wrogowie", "fog": "Randomizer mgieł" },
+  "modes": { "source": "źródła", "executable": "program", "missing": "brak" },
+  "details": {
+    "ready": "Wykryto spakowane pliki aplikacji.",
+    "source": "Wykryto źródła; most adaptera nie jest gotowy w tym środowisku.",
+    "executable": "Wykryto program; most nie jest gotowy w tym środowisku.",
+    "missing": "Brakuje plików silnika; zainstaluj aplikację ponownie."
+  },
+  "labels": {
+    "items": "Przedmioty",
+    "soulItems": "Przedmioty z dusz",
+    "keyItems": "Przedmioty kluczowe",
+    "lordvessel": "Lordvessel",
+    "lordSouls": "Lord Souls",
+    "itemDifficulty": "Trudność przedmiotów",
+    "laundromat": "Laundromat Mixup",
+    "enemyPlacement": "Rozmieszczenie wrogów",
+    "enemiesAndBosses": "Wrogowie i bossowie",
+    "fogRandomizer": "Randomizer mgieł"
+  },
+  "pools": { "worldItems": "przedmioty ze świata", "npcGifts": "dary od NPC", "enemyDrops": "łupy z wrogów", "shops": "sklepy" },
+  "values": {
+    "notRandomized": "nie jest losowane",
+    "itemsShuffled": "przetasowane: {{pools}}",
+    "itemsExtrasOnly": "tylko wybrane dodatki (żadna pula przedmiotów nie jest włączona)",
+    "souls": {
+      "noEffect": "bez efektu (włącz przedmioty ze świata, dary od NPC lub łupy z wrogów)",
+      "shuffled": "Przetasowane (mniejsze dusze przemieszczają się razem z innymi przedmiotami; dusze bossów zostają przy swoich bossach)",
+      "replaced": "Zastąpione (mniejsze dusze zamieniają się w inne przedmioty jednorazowe)",
+      "transposed": "Przekształcone (dusze bossów trafiają do puli przedmiotów; każda ma 75% szans stać się bronią wykonaną z tej duszy)"
+    },
+    "keys": {
+      "vanilla": "zostają tam, gdzie umieszcza je gra (przedmioty postępu są chronione)",
+      "shuffled": "Przetasowane (rozmieszczone przez sprawdzane pod kątem bezpieczeństwa wypełnianie grafu świata: każdy obszar pozostaje osiągalny i można dojść do Firelink Altar; dary, sklepy i łupy nigdy nie zawierają klucza)",
+      "race": "Tryb wyścigu (klucze i żary leżą tylko w nagrodach za bossów, w skrzyniach i tam, gdzie zwykle są klucze; obowiązuje ta sama kontrola bezpieczeństwa)",
+      "race-plus": "Tryb wyścigu + (jak Tryb wyścigu, ale ukończenie świata może wymagać skipów i glitchy, takich jak skip Capry czy skip Seal; bez nich możliwe jest zablokowanie gry)"
+    },
+    "vessel": {
+      "vanilla": "zostaje tam, gdzie umieszcza go gra (wręcza go Gwynevere)",
+      "shuffled": "przetasowany razem z kluczami (Gwynevere wręcza wtedy inny przedmiot z puli)"
+    },
+    "lordSouls": {
+      "vanilla": "zostają tam, gdzie umieszcza je gra (nagrody czterech Lordów)",
+      "shuffled": "przetasowane razem z kluczami (cztery nagrody trafiają do innych miejsc, a Lordowie upuszczają inne przedmioty)"
+    },
+    "difficulty": {
+      "fair": "Uczciwy (przedmioty mają równe szanse znaleźć się gdziekolwiek)",
+      "unfair": "Nieuczciwy (pożądane przedmioty nie leżą na widoku)",
+      "very-unfair": "Bardzo nieuczciwy (pożądane przedmioty są ukryte i rzadko trafiają do wczesnych obszarów)"
+    },
+    "laundromatOn": "włączone (postacie NPC noszą elementy zbroi, które nosią inne NPC; zmienia się tylko ich wygląd i statystyki zbroi)",
+    "placement": {
+      "sampling": "Losowanie na slotach (każdy slot wybiera zgodny zamiennik)",
+      "permutation": "Klasyczna permutacja (istniejący wrogowie są tasowani)"
+    },
+    "on": "włączony",
+    "off": "wyłączony"
+  }
+}

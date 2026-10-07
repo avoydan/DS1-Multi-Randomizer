@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { ErrorNotice, type ErrorInfo } from './ErrorNotice';
 import { LanguageSelect } from './LanguageSelect';
+import { behaviorLabel, behaviorValue } from './planText';
 import { EnemyPoolEditor } from './EnemyPoolEditor';
 import { Readiness } from './Readiness';
 import { SeedPanel, SummaryChips, shortSeedCode, type LoadedSeed } from './SeedPanel';
@@ -707,7 +708,7 @@ export function App() {
           </details>
         </section>
 
-        {plan && <section className="card plan-card"><div className="section-title"><span>02</span><h2>{t('app.plan.title')}</h2></div>{plan.behaviors && plan.behaviors.length > 0 && <ul className="plan-behaviors" aria-label={t('app.plan.behaviorsAria')}>{plan.behaviors.map((line) => <li key={line.label}><strong>{line.label}</strong><span>{line.value}</span></li>)}</ul>}<div className="seed-grid">{plan.stages.map((stage) => <div key={stage.engine}><span>{stage.engine}</span><strong>{stage.enabled ? stage.seed : t('app.plan.disabled')}</strong></div>)}</div><div className="engine-status-list">{plan.engineStatus.map((status) => <div key={status.name} className="engine-status"><strong>{status.name}</strong><span className={`pill ${status.ready ? 'ready' : ''}`}>{status.mode}</span><p>{status.detail}</p></div>)}</div></section>}
+        {plan && <section className="card plan-card"><div className="section-title"><span>02</span><h2>{t('app.plan.title')}</h2></div>{plan.behaviors && plan.behaviors.length > 0 && <ul className="plan-behaviors" aria-label={t('app.plan.behaviorsAria')}>{plan.behaviors.map((line) => <li key={line.labelKey ?? line.label}><strong>{behaviorLabel(t, line)}</strong><span>{behaviorValue(t, line)}</span></li>)}</ul>}<div className="seed-grid">{plan.stages.map((stage) => <div key={stage.engine}><span>{t(`plan.engines.${stage.engine}`)}</span><strong>{stage.enabled ? stage.seed : t('app.plan.disabled')}</strong></div>)}</div><div className="engine-status-list">{plan.engineStatus.map((status) => <div key={status.name} className="engine-status"><strong>{t(`plan.engines.${status.name}`)}</strong><span className={`pill ${status.ready ? 'ready' : ''}`}>{t(`plan.modes.${status.mode}`)}</span><p>{t(`plan.details.${status.mode === 'executable' && status.ready ? 'ready' : status.mode}`)}</p></div>)}</div></section>}
 
         <section className="card legal-card">
           <div><div className="eyebrow">{t('app.legal.eyebrow')}</div><h2>{t('app.legal.title')}</h2></div>
