@@ -149,7 +149,20 @@ export function joinConfig(settings: GenerationSettings, gamePath: string, maste
  * longer applies: the comparison is on the generation settings only, never on the machine or output preferences.
  */
 export function isLoadedSeedModified(loaded: GenerationSettings, current: GenerationSettings): boolean {
-  return JSON.stringify(loaded) !== JSON.stringify(current);
+  return JSON.stringify(byMeaning(loaded)) !== JSON.stringify(byMeaning(current));
+}
+
+/** The settings by their meaning: the order of the keys (the interface builds them in its own order, a Seed Code in the canonical one) and the order of a custom enemy pool do not matter. */
+function byMeaning(value: unknown, key = ''): unknown {
+  if (Array.isArray(value)) {
+    const items = value.map((item) => byMeaning(item));
+    return key === 'customPool' ? (items as string[]).sort() : items;
+  }
+  if (value !== null && typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    return Object.fromEntries(Object.keys(record).sort().map((name) => [name, byMeaning(record[name], name)]));
+  }
+  return value;
 }
 
 export type RunStatus = 'generated' | 'applied' | 'restored';

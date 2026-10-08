@@ -3,9 +3,6 @@
     "worldItems": {
       "label": "World items"
     },
-    "protectedItems": {
-      "label": "Protected items (unsafe: may softlock)"
-    },
     "progressionLogic": {
       "label": "Protect selected gift/shop progression entries"
     },

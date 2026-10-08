@@ -1,7 +1,6 @@
 {
   "items": {
     "worldItems": { "label": "Przedmioty ze świata" },
-    "protectedItems": { "label": "Przedmioty chronione (niebezpieczne: możliwe zablokowanie gry)" },
     "progressionLogic": { "label": "Chroń wybrane dary i pozycje sklepowe ważne dla postępu" },
     "earlyWeapon": { "label": "Gwarantuj wczesną broń" },
     "balancedEarlyLoot": { "label": "Wyważony wczesny łup" },

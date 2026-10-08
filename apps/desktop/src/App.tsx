@@ -511,7 +511,6 @@ export function App() {
             <div className="engine-heading"><div><span className="engine-index">{t('settings.items.index')}</span><h2>{t('settings.items.title')}</h2></div><input type="checkbox" checked={config.items.enabled} onChange={(event) => setItem('enabled', event.target.checked)} /></div>
             <div className="option-group"><h3>{t('settings.items.groups.main')}</h3>
               <Toggle label={t('settings.items.worldItems.label')} checked={config.items.randomizeWorldItems} onChange={(value) => setItem('randomizeWorldItems', value)} />
-              <Toggle disabled label={t('settings.items.protectedItems.label')} checked={config.items.randomizeProtectedItems} onChange={(value) => setItem('randomizeProtectedItems', value)} />
               <Toggle label={t('settings.items.progressionLogic.label')} checked={config.items.progressionLogic} onChange={(value) => setItem('progressionLogic', value)} />
               <Toggle label={t('settings.items.earlyWeapon.label')} checked={config.items.guaranteeEarlyWeapon} onChange={(value) => setItem('guaranteeEarlyWeapon', value)} />
               <Toggle label={t('settings.items.balancedEarlyLoot.label')} checked={config.items.balancedEarlyLoot} onChange={(value) => setItem('balancedEarlyLoot', value)} />

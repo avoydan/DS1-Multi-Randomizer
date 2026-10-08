@@ -26,6 +26,7 @@ const defaultConfig = joinConfig(defaults, 'C:/Games/DSR', 'audit-seed', false);
 const UI_NOTES = {
   'enemies.placement.customPool': 'EnemyPoolEditor',
   'enemies.placement.algorithm': 'the algorithm choice sets the legacy and the classic option groups',
+  'items.randomizeProtectedItems': 'blocked until progression safety is proven: validation refuses it, so the interface offers no control (a disabled placeholder was removed in 0.34.1)',
   'output.includeDlc': 'the DLC switch (locked on while the fog randomizer is on)',
 };
 

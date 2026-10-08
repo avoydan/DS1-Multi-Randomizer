@@ -40,6 +40,8 @@ Result: **no dead, missing or ambiguous setting.** Settings that are *not* part 
 | 3 | 15 backend failure codes had only the generic message (data tool, game data / catalog, output write, nothing enabled, fog component missing / crashed / timed out, merge conflict, ...) | Own plain messages (what happened, what to do) in both languages; a test pins that every code in `userMessages.ts` is translated and equal to the English resource |
 | 4 | The problem lines of an invalid preset were English validator sentences | 17 sentences a person can meet are translated (`errors.problems.*`, tested with their variables); an unknown sentence stays as written, with the sentence always in a tooltip |
 | 5 | The world summary (chips, hint sheet, diagnostics) had no word about the DLC | A DLC chip / summary line appears only for a world without the DLC (every earlier world reads exactly as before) |
+| 6 | A world generated from untouched default settings showed "You changed the settings after this world was created" (found in the packaged app: the interface builds the placement options in a different key order than the canonical settings, and the comparison was by text) | `isLoadedSeedModified` compares by meaning (key order and the order of a custom pool do not matter); tested with the real default settings |
+| 7 | A permanently disabled control ("Protected items", marked planned) sat among the live ones | Removed from the screen (the setting stays false and is refused by validation); the consistency test names it explicitly |
 
 ## 3. Game path (existing tests, re-run)
 

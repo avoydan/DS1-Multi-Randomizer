@@ -367,3 +367,29 @@ test('the DLC switch is part of the world: ON keeps every earlier code, OFF is a
   assert.equal(isLoadedSeedModified(decoded.envelope.settings, canonicalizeSettings(off)), false);
   assert.equal(isLoadedSeedModified(decoded.envelope.settings, canonicalizeSettings(on)), true);
 });
+
+test('whether a loaded seed was changed is decided by the settings, never by the order the interface builds them in', async () => {
+  const { DEFAULT_GENERATION_SETTINGS } = await import('@ds1tr/contracts');
+  // The interface builds the product defaults in its own key order, a Seed Code and a generated world hold the canonical order: the same settings.
+  const asBuilt = structuredClone(DEFAULT_GENERATION_SETTINGS);
+  const canonical = canonicalizeSettings(asBuilt);
+  assert.notEqual(JSON.stringify(asBuilt), JSON.stringify(canonical), 'the two orders really differ (this is what showed a changed-settings notice after every untouched world)');
+  assert.equal(isLoadedSeedModified(canonical, asBuilt), false);
+  assert.equal(isLoadedSeedModified(canonicalizeSettings(decodeSeedCode(encodeSeedCode(envelopeOf(asBuilt))).envelope.settings), asBuilt), false);
+  // A custom pool is a set.
+  const pooled = structuredClone(asBuilt);
+  pooled.enemies.placement.customPool = ['c3200', 'c1200'];
+  const reordered = structuredClone(pooled);
+  reordered.enemies.placement.customPool = ['c1200', 'c3200'];
+  assert.equal(isLoadedSeedModified(pooled, reordered), false);
+  // A real change is still a change.
+  const changed = structuredClone(asBuilt);
+  changed.items.laundromat = true;
+  assert.equal(isLoadedSeedModified(canonical, changed), true);
+  const dlcOff = structuredClone(asBuilt);
+  dlcOff.output.includeDlc = false;
+  assert.equal(isLoadedSeedModified(canonical, dlcOff), true);
+  const pool2 = structuredClone(pooled);
+  pool2.enemies.placement.customPool = ['c1200'];
+  assert.equal(isLoadedSeedModified(pooled, pool2), true);
+});
