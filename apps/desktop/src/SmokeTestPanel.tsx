@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { GenerationSettings } from '@ds1tr/contracts';
+import { describeSmokeExpectedWith, describeSmokeTargetWith, type GenerationSettings, type SmokeTranslate } from '@ds1tr/contracts';
 import { api, type SmokeTestList } from './api';
 import { ErrorNotice, type ErrorInfo } from './ErrorNotice';
 import { currentLanguage } from './i18n';
@@ -39,6 +39,9 @@ export function SmokeTestPanel({ busy, onCreate }: Props) {
   /** One text of a scenario in the current language, or its English source. */
   const text = (id: string, field: string, source: string): string => t(`smoke.worlds.${id}.${field}` as never, { defaultValue: source }) as string;
   const lines = (id: string, field: string, source: readonly string[]): string[] => source.map((line, index) => text(id, `${field}.${index}`, line));
+  // The target and the expectation are built from the structured data with the templates of the current language; game names stay English.
+  const translate: SmokeTranslate = (key, params) => t(key as never, params as never) as unknown as string;
+  const locale = currentLanguage() === 'pl' ? 'pl-PL' : 'en-GB';
   const estimate = (seconds: number): string => {
     if (seconds < 90) return t('smoke.estimateSeconds', { count: seconds });
     const minutes = Math.round(seconds / 30) / 2;
@@ -74,9 +77,9 @@ export function SmokeTestPanel({ busy, onCreate }: Props) {
               {world.category === 'quick' ? (
                 <>
                   <strong>{t('smoke.target')}</strong>
-                  <ul>{world.targets.map((line, index) => <li key={line}>{text(world.id, `targets.${index}`, line)}</li>)}</ul>
+                  <ul>{world.expectations.map((expectation, index) => <li key={index}>{describeSmokeTargetWith(expectation, translate, locale)}</li>)}</ul>
                   <strong>{t('smoke.expected')}</strong>
-                  <ul>{world.expected.map((line, index) => <li key={line}>{text(world.id, `expected.${index}`, line)}</li>)}</ul>
+                  <ul>{world.expectations.map((expectation, index) => <li key={index}>{describeSmokeExpectedWith(expectation, translate, locale)}</li>)}</ul>
                   {world.estimateSeconds !== null && <p><strong>{t('smoke.estimatedTime')}</strong> {t('smoke.estimateAfter', { time: estimate(world.estimateSeconds) })}</p>}
                   <strong>{t('smoke.check')}</strong>
                   <ul>{lines(world.id, 'observe', world.observe).map((line) => <li key={line}>{line}</li>)}</ul>

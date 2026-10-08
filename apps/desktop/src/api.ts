@@ -1,10 +1,10 @@
-import type { Diagnostics, HintDocument, DecodedSeedPayload, EnemyPoolDescription, GenerationSettings, PersistedSettings, RunHistoryEntry, GameStateReport, GenerationEvent, GenerationResult, InstallationValidation, OperationResult, PipelinePlan, PresetDocument, PresetImportResult, RandomizerConfig } from '@ds1tr/contracts';
+import type { SmokeExpectation, Diagnostics, HintDocument, DecodedSeedPayload, EnemyPoolDescription, GenerationSettings, PersistedSettings, RunHistoryEntry, GameStateReport, GenerationEvent, GenerationResult, InstallationValidation, OperationResult, PipelinePlan, PresetDocument, PresetImportResult, RandomizerConfig } from '@ds1tr/contracts';
 
 export interface DetectedInstallation { gamePath: string; label: string; valid: boolean; problems: string[] }
 export interface SmokeTestList {
   worlds: Array<{
     id: string; title: string; category: 'quick' | 'extended'; purpose: string; seedCode: string; settings: unknown; observe: string[];
-    targets: string[]; expected: string[]; estimateSeconds: number | null; afterwards: string[];
+    targets: string[]; expected: string[]; expectations: SmokeExpectation[]; estimateSeconds: number | null; afterwards: string[];
     gameplay: { result: 'passed'; date: string; note: string } | null;
   }>;
   checklist: string[];

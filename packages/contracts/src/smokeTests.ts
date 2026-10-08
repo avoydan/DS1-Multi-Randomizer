@@ -148,6 +148,38 @@ export function describeSmokeExpected(expectation: SmokeExpectation): string {
   return `${expectation.name} (${expectation.model}) replaces the ${expectation.replacedName} at slot ${expectation.slot}${extra}`;
 }
 
+/**
+ * The same two sentences built from translated templates (`smoke.template.*` in the interface resources), so that the target and the expectation of a quick
+ * world can be shown in any language from the structured data. With the English templates the result equals `describeSmokeTarget` / `describeSmokeExpected`
+ * (asserted by a test). Game names (maps, enemies, items) stay as the game writes them.
+ */
+export type SmokeTranslate = (key: string, params?: Record<string, string | number>) => string;
+
+const decimal = (value: number, locale: string): string => new Intl.NumberFormat(locale, { maximumFractionDigits: 1, useGrouping: false }).format(value);
+
+export function describeSmokeTargetWith(expectation: SmokeExpectation, t: SmokeTranslate, locale: string): string {
+  const where = Math.abs(expectation.up) < 2 ? t('smoke.template.where.same') : t(expectation.up > 0 ? 'smoke.template.where.higher' : 'smoke.template.where.lower', { count: Math.round(Math.abs(expectation.up)) });
+  const common = { map: expectation.mapName, replaced: expectation.replacedName, meters: decimal(expectation.meters, locale), where };
+  if (expectation.kind === 'item-lot') return t('smoke.template.target.itemLot', { ...common, lot: expectation.lotRow ?? 0 });
+  return t('smoke.template.target.default', { ...common, slot: expectation.slot });
+}
+
+export function describeSmokeExpectedWith(expectation: SmokeExpectation, t: SmokeTranslate, locale: string): string {
+  const base = { name: expectation.name, model: expectation.model, replaced: expectation.replacedName, slot: expectation.slot };
+  if (expectation.kind === 'item-lot') {
+    return t('smoke.template.expected.itemLot', {
+      name: expectation.name, category: t(expectation.itemCategory === 0 ? 'smoke.template.category.weapon' : 'smoke.template.category.item'), id: expectation.itemId ?? 0, replaced: expectation.replacedName,
+      soul: expectation.fromSoul ? t('smoke.template.expected.fromSoul', { soul: expectation.fromSoul }) : '',
+      key: expectation.movedKeyFrom ? t('smoke.template.expected.movedKey', { from: expectation.movedKeyFrom }) : '',
+    });
+  }
+  if (expectation.kind === 'encounter-body') return t('smoke.template.expected.encounterBody', base);
+  if (expectation.kind === 'hostile-npc') return t('smoke.template.expected.hostileNpc', base);
+  if (expectation.kind === 'boss') return t('smoke.template.expected.boss', base);
+  const extra = expectation.souls === undefined ? '' : t(expectation.disableRespawn ? 'smoke.template.expected.extraSoulsDead' : 'smoke.template.expected.extraSouls', { souls: decimal(expectation.souls, locale) });
+  return t('smoke.template.expected.default', { ...base, extra });
+}
+
 /** What to check in every smoke-test world. A person ticks these off while playing; nothing marks them as passed. */
 export const SMOKE_TEST_CHECKLIST: readonly string[] = [
   'The area loads and the enemy or boss model appears (no invisible body, no T-pose).',

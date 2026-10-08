@@ -1,5 +1,5 @@
 import { SMOKE_SCENARIOS, SMOKE_START, SMOKE_TEST_CHECKLIST, SMOKE_TEST_PROFILE, describeSmokeExpected, describeSmokeTarget, resolveScenarioSettings } from '@ds1tr/contracts';
-import type { GenerationSettings, SmokeCategory, SmokeGameplayResult } from '@ds1tr/contracts';
+import type { GenerationSettings, SmokeCategory, SmokeExpectation, SmokeGameplayResult } from '@ds1tr/contracts';
 import { canonicalizeSettings } from './canonicalSettings.js';
 import { encodeSeedCode } from './seedCode.js';
 
@@ -15,6 +15,8 @@ export interface SmokeTestWorld {
   /** Quick worlds: where to look and what must be there (one line each), the estimated seconds to the target and the steps after the first check. */
   targets: readonly string[];
   expected: readonly string[];
+  /** The structured form of the targets and expectations, so the interface can state them in its own language. */
+  expectations: readonly SmokeExpectation[];
   estimateSeconds: number | null;
   afterwards: readonly string[];
   /** Set only when a person played this world in the real game and reported the result; null otherwise (static checks never set it). */
@@ -29,6 +31,7 @@ export function smokeTestWorlds(): { worlds: SmokeTestWorld[]; checklist: readon
       seedCode: encodeSeedCode({ profile: SMOKE_TEST_PROFILE, masterSeed: scenario.masterSeed, settings }),
       targets: (scenario.expectations ?? []).map(describeSmokeTarget),
       expected: (scenario.expectations ?? []).map(describeSmokeExpected),
+      expectations: scenario.expectations ?? [],
       estimateSeconds: scenario.estimateSeconds ?? null,
       afterwards: scenario.afterwards ?? [],
       gameplay: scenario.gameplay ?? null,

@@ -25,5 +25,452 @@
   "inThisWorld": "In this world",
   "checkInGame": "Check in the game",
   "seedCode": "Seed code",
-  "create": "Create this test world"
+  "create": "Create this test world",
+  "worlds": {
+    "quick-roaming-basic": {
+      "title": "Roaming boss - basic",
+      "purpose": "A boss stands where a regular enemy stood: the smallest check that a boss works outside its arena.",
+      "gameplayNote": "The replacement appeared, rendered, woke up, fought and died, it had no boss bar and the souls were as expected. Played before the respawn fix (backend 0.35.1). That fix changed this world's package in one cell only: the roaming rows now carry disableRespawn = 0 where they carried an inherited 1. The world has not been played again.",
+      "observe": {
+        "0": "The Capra Demon is there, fully textured (no T-pose, no invisible body) - not a Hollow.",
+        "1": "It wakes up when you come close, walks to you and attacks.",
+        "2": "It has no boss health bar and there is no fog gate.",
+        "3": "You can kill it. Its souls are 3000 (50% of the 6000 that DS1TR lists for that fight).",
+        "4": "Nothing freezes or crashes when it appears, fights or dies."
+      }
+    },
+    "quick-roaming-souls": {
+      "title": "Roaming boss - souls and respawn",
+      "purpose": "A roaming boss with 100% souls that stays dead: the reward and the \"does not come back\" setting in one short loop.",
+      "gameplayNote": "The souls were as expected and the boss stayed dead after the reset. The respawn fix leaves this world's package byte-identical.",
+      "observe": {
+        "0": "A Taurus Demon stands where the first Hollow would be; it wakes up, moves and attacks (no boss health bar, no fog gate).",
+        "1": "Note your soul count, then kill the Taurus Demon: you gain exactly 3000 souls (100% of the 3000 that DS1TR lists for that fight).",
+        "2": "Control: the other Hollows of the cell block (slots c2500_0007, 11.4 m, and c2500_0005, 33.2 m from the start) are normal Hollows."
+      },
+      "afterwards": {
+        "0": "Reset the area: the Asylum has no bonfire (none in its map data), so die once (any way). Everything that respawns comes back when you wake up again.",
+        "1": "Return to the same place: the Hollows are back, the Taurus Demon is NOT (the stay-dead setting; not yet confirmed in the game)."
+      }
+    },
+    "quick-encounter-body": {
+      "title": "First boss fight - a normal enemy",
+      "purpose": "A normal enemy takes the place of the first boss: the fight must still start, show its health bar, end when it dies and open the way on.",
+      "gameplayNote": "Reported by the person who played it: the Asylum Demon encounter with a normal enemy as its body worked in the real game.",
+      "observe": {
+        "0": "A Balder Knight stands in the arena where the Asylum Demon normally appears; the Asylum Demon is not there.",
+        "1": "The fight starts as the Asylum Demon fight does: the Balder Knight wakes up, moves and attacks (no T-pose, no frozen idle).",
+        "2": "The boss health bar appears and it says \"Asylum Demon\" (the fight keeps the boss name on purpose). The knight has the health of the Asylum Demon (area scaling), so it should take noticeably more hits than a Balder Knight normally does.",
+        "3": "Kill it: the bar disappears, the fight is over and the way on opens as after the Asylum Demon (you can leave the Asylum). The rewards of the fight are those of the boss (the drops of the knight itself do not appear).",
+        "4": "Nothing freezes or crashes when the fight starts, runs or ends."
+      },
+      "afterwards": {
+        "0": "Quit to the main menu and continue: the arena stays clear and the fight does not start again.",
+        "1": "The time above is for reaching the arena and seeing the replacement; the fight itself is not estimated."
+      }
+    },
+    "quick-roaming-respawn": {
+      "title": "Roaming boss - respawns",
+      "purpose": "A roaming boss with stay dead switched OFF: after the area is reset it must be back. The counterpart of the souls test, where it must stay dead.",
+      "observe": {
+        "0": "A Capra Demon stands where a Hollow would be; it wakes up, moves and attacks (no boss health bar, no fog gate).",
+        "1": "Kill it: you gain 3000 souls (50% of the 6000 that DS1TR lists for that fight).",
+        "2": "Control: the other Hollows of the cell block (slots c2500_0006, 8.7 m, and c2500_0005, 33.2 m from the start) are normal Hollows."
+      },
+      "afterwards": {
+        "0": "Reset the area: the Asylum has no bonfire (none in its map data), so die once (any way). Everything that respawns comes back when you wake up again.",
+        "1": "Return to the same place. After resetting the area, this boss should respawn: the Capra Demon MUST be alive again, together with the Hollows."
+      }
+    },
+    "quick-roaming-repeated": {
+      "title": "Roaming boss - three at once",
+      "purpose": "The same boss in three neighbouring slots: separate bodies, separate fights, nothing shared between them.",
+      "gameplayNote": "Three independent bosses. Played before the respawn fix (backend 0.35.1). That fix changed this world's package in one cell only: the roaming rows now carry disableRespawn = 0 where they carried an inherited 1. The world has not been played again.",
+      "observe": {
+        "0": "Three Executioner Smoughs stand in the cell block, 8.7, 11.4 and 33.2 m from the start.",
+        "1": "Each wakes up, moves and attacks on its own; killing one does not touch the others.",
+        "2": "Each gives its own 5000 souls (50% of 10000) and none has a boss bar.",
+        "3": "Nothing else in the Asylum is a boss on this first visit (other roaming bosses of this world are in the part you only reach on the second visit)."
+      }
+    },
+    "quick-sampling-asylum": {
+      "title": "Regular enemies - first three change",
+      "purpose": "Legacy-style sampling at runtime: the first Hollows are different enemies and behave like enemies.",
+      "gameplayNote": "The three replacements appeared, rendered, woke up and fought. The respawn fix leaves this world's package byte-identical.",
+      "observe": {
+        "0": "Where the first three Hollows stood there are a Balder Knight, an Undead Soldier and an Undead Assassin.",
+        "1": "None is in a T-pose or invisible; each wakes up, moves and attacks; none floats or sinks into the floor.",
+        "2": "Their size looks right for the cell block (the setting only allows enemies that fit)."
+      }
+    },
+    "quick-hostile-npc": {
+      "title": "Hostile NPC - Andre as an enemy",
+      "purpose": "A hostile NPC combatant stands where a regular enemy stood: the real NPCs are untouched, this one only borrows the body and the fighting.",
+      "observe": {
+        "0": "Andre of Astora (the blacksmith model with his hammer) stands where the first Hollow of the cell block stands; he is not at a forge and he does not talk.",
+        "1": "He attacks you as soon as you come near (he is a hostile fighter; there is no talk prompt and no shop) and fights with his own moves: no T-pose, no frozen idle.",
+        "2": "His health is that of a Hollow of this area, not that of the real Andre; he dies like a regular enemy.",
+        "3": "He gives what a Hollow of that slot gives (a few souls, perhaps a drop); no blacksmith items or unique rewards appear.",
+        "4": "Die once or rest and come back: he is there again like every regular enemy (he is not a stay-dead NPC)."
+      },
+      "afterwards": {
+        "0": "The real Andre of Astora in the Undead Parish is not part of this test and is untouched: he still sells and upgrades there.",
+        "1": "The other first-visit Hollows are ordinary enemies of this world."
+      }
+    },
+    "quick-transposed-soul": {
+      "title": "Soul items Transposed - a boss weapon in your cell",
+      "purpose": "Soul items \"Transposed\": the boss souls join the item pool and some become the weapons they can be turned into; here the weapon made from the Soul of Smough lies in the first cell.",
+      "observe": {
+        "0": "You wake up in the cell. The Peculiar Doll lies in the clean game on the floor of this cell; here the same pickup holds Smough's Hammer (a reinforced copy: the weapon id is 856400).",
+        "1": "Pick it up: it is a normal weapon item named Smough's Hammer, not a soul and not the Doll. (Do not equip it: it needs far more strength than a new character has.)",
+        "2": "The Peculiar Doll is not in the cell any more: it is an ordinary item of the pool and lies in another place of this world."
+      },
+      "afterwards": {
+        "0": "Nothing else is to be checked in this world. Where the Soul of Smough itself would lie, a weapon (or another pool item) lies now: the soul of this seed no longer exists.",
+        "1": "To see the whole picture turn on the spoiler log: the section BOSS REWARDS names every boss soul and what lies in its place."
+      }
+    },
+    "quick-key-placement": {
+      "title": "Key placement - a key in your cell",
+      "purpose": "Key placement \"Shuffled\": the keys of the world move to other pickups, with a check that every area stays reachable; here the Cage Key lies in the first cell, where the clean game has the Peculiar Doll.",
+      "observe": {
+        "0": "You wake up in the cell. In the clean game the Peculiar Doll lies on the floor of this cell; here the same pickup holds the Cage Key.",
+        "1": "Pick it up: it is a normal key item named Cage Key (it opens the cage in Sen's Fortress; you will not need it in the Asylum).",
+        "2": "The Peculiar Doll is not in the cell any more: it lies in another place of this world, reachable before anything that needs it."
+      },
+      "afterwards": {
+        "0": "Nothing else is to be checked in this world. The other keys moved too, and the placement guarantees that every area can be reached; to see where every key lies turn on the spoiler log: the section KEY PLACEMENT names each key and the pickup it lies in.",
+        "1": "The full check is a run through the game with the keys where the spoiler says: this world only shows that a moved key can be picked up and used."
+      }
+    },
+    "quick-lordvessel": {
+      "title": "Lordvessel placement - the Lordvessel in your cell",
+      "purpose": "Key placement \"Shuffled\" with Lordvessel placement on: the Lordvessel joins the key shuffle; here it lies in the first cell, where the clean game has the Peculiar Doll.",
+      "observe": {
+        "0": "You wake up in the cell. In the clean game the Peculiar Doll lies on the floor of this cell; here the same pickup holds the Lordvessel.",
+        "1": "Pick it up: it is a normal key item named Lordvessel. (It is used at the Firelink Altar; you cannot do that here, and this test does not need it.)",
+        "2": "The Peculiar Doll is not in the cell any more: it lies in another place of this world."
+      },
+      "afterwards": {
+        "0": "Nothing else is to be checked in this world. In Anor Londo, Gwynevere hands over another item of the pool instead of the Lordvessel; that part of the world is far from the start and is not part of this test.",
+        "1": "To see every key turn on the spoiler log: the section KEY PLACEMENT names each key and the pickup it lies in."
+      }
+    },
+    "quick-lord-soul": {
+      "title": "Lord Soul placement - a Lord Soul in your cell",
+      "purpose": "Key placement \"Shuffled\" with Lord Soul placement on: the four Lord Souls join the key shuffle; here the Lord Soul that Gravelord Nito carries lies in the first cell, where the clean game has the Peculiar Doll.",
+      "observe": {
+        "0": "You wake up in the cell. In the clean game the Peculiar Doll lies on the floor of this cell; here the same pickup holds a Lord Soul.",
+        "1": "Pick it up: it is a normal item named Lord Soul. (Do not use it before you need it at the Kiln.)",
+        "2": "The Peculiar Doll is not in the cell any more: it lies in another place of this world."
+      },
+      "afterwards": {
+        "0": "Nothing else is to be checked in this world. Gravelord Nito, when you reach him, drops another item of the pool instead of the Lord Soul: the Lord Soul itself exists once in this world, in your cell.",
+        "1": "To see every key turn on the spoiler log: the section KEY PLACEMENT names each key and the pickup it lies in."
+      }
+    },
+    "quick-race": {
+      "title": "Race Mode - a key in your cell",
+      "purpose": "Key placement \"Race Mode\": the keys and the embers lie only in boss rewards, chests and where keys normally are; here the Blighttown Key lies in the first cell, where the clean game has the Peculiar Doll (the Doll is one of those key places).",
+      "observe": {
+        "0": "You wake up in the cell. In the clean game the Peculiar Doll lies on the floor of this cell; here the same pickup holds the Blighttown Key.",
+        "1": "Pick it up: it is a normal key item named Blighttown Key (it opens the way from the Depths to Blighttown; you will not need it in the Asylum).",
+        "2": "The Peculiar Doll is not in the cell any more: it lies in another place of this world, in one of the Race Mode places."
+      },
+      "afterwards": {
+        "0": "Nothing else is to be checked in this world. In Race Mode every key and every ember lies in a boss reward, a chest or a place where a key normally lies; to see where, turn on the spoiler log: the section KEY PLACEMENT names each one."
+      }
+    },
+    "quick-race-plus": {
+      "title": "Race Mode + - a key in your cell, a world that needs a skip",
+      "purpose": "Key placement \"Race Mode +\": as Race Mode, but the world may need skips and glitches; here the Basement Key lies in the first cell, and this world is one whose keys are placed so that a skip of the list (the Capra skip, the Lower Burg skip, the Annex jump or the Seal skip) is needed to complete it.",
+      "observe": {
+        "0": "You wake up in the cell. In the clean game the Peculiar Doll lies on the floor of this cell; here the same pickup holds the Basement Key.",
+        "1": "Pick it up: it is a normal key item named Basement Key (it opens the Undead Burg basement; you will not need it in the Asylum).",
+        "2": "The Peculiar Doll is not in the cell any more: it lies in another place of this world."
+      },
+      "afterwards": {
+        "0": "Nothing else is to be checked in this world. It exists to show that Race Mode + makes a different world from Race Mode: at least one key lies where only a skip reaches it (the spoiler log names every key). Whether the skips work in the game is not part of this test."
+      }
+    },
+    "quick-fair": {
+      "title": "Item difficulty Fair - what lies in your cell",
+      "purpose": "Item difficulty \"Fair\": items have an equal chance anywhere. In this world the first cell, an easy place, holds a weapon, the Mace, where the clean game has the Peculiar Doll (one sample of what Fair does; Unfair and Very Unfair have their own tests with the same master seed).",
+      "observe": {
+        "0": "You wake up in the cell. In the clean game the Peculiar Doll lies on the floor of this cell; here the same pickup holds a Mace (a weapon).",
+        "1": "Pick it up: it is a normal weapon item named Mace. (You can equip it; it needs only modest strength.)",
+        "2": "The Peculiar Doll is not in the cell any more: it is an ordinary item of the pool and lies in another place of this world."
+      },
+      "afterwards": {
+        "0": "This is one sample. With the same master seed, Unfair and Very Unfair put a Soul of a Lost Undead in this cell instead: an easy place gets an easy item. See the tests quick-unfair and quick-very-unfair."
+      }
+    },
+    "quick-unfair": {
+      "title": "Item difficulty Unfair - what lies in your cell",
+      "purpose": "Item difficulty \"Unfair\": desirable items are not placed in plain view. The same master seed as the Fair test: the first cell, an easy place, now holds a Soul of a Lost Undead instead of the Mace (one sample of the bias).",
+      "observe": {
+        "0": "You wake up in the cell. In the clean game the Peculiar Doll lies on the floor of this cell; here the same pickup holds a Soul of a Lost Undead.",
+        "1": "Pick it up: it is a normal consumable item named Soul of a Lost Undead.",
+        "2": "The Peculiar Doll is not in the cell any more: it lies in another place of this world."
+      },
+      "afterwards": {
+        "0": "This is one sample of an easy place: the Mace of the Fair test is not here. A single world proves nothing about the distribution; the distribution is measured by the automated sweeps."
+      }
+    },
+    "quick-very-unfair": {
+      "title": "Item difficulty Very Unfair - what lies in your cell",
+      "purpose": "Item difficulty \"Very Unfair\": desirable items are hidden and rarely in early areas. The same master seed as the Fair test: the first cell, the easiest place of the world, holds a Soul of a Lost Undead.",
+      "observe": {
+        "0": "You wake up in the cell. In the clean game the Peculiar Doll lies on the floor of this cell; here the same pickup holds a Soul of a Lost Undead.",
+        "1": "Pick it up: it is a normal consumable item named Soul of a Lost Undead.",
+        "2": "The Peculiar Doll is not in the cell any more: it lies in another place of this world."
+      },
+      "afterwards": {
+        "0": "This is one sample of an easy place. Very Unfair keeps desirable items (good weapons, keys, big souls) out of early places like this one; the early game of this world is poorer than a Fair world of the same master seed."
+      }
+    },
+    "quick-boss-asylum-demon": {
+      "title": "Boss sampling - the first boss",
+      "purpose": "The first boss of the game is replaced by another boss: model, health bar, AI, death and the way on.",
+      "gameplayNote": "The Asylum Demon encounter completed with the replacement boss. The respawn fix leaves this world's package byte-identical.",
+      "observe": {
+        "0": "Go to the arena where the Asylum Demon normally appears: a Taurus Demon appears instead, and the boss health bar names it.",
+        "1": "It fights (moves, attacks, no T-pose), can be killed and its death ends the encounter.",
+        "2": "The way on opens as it does after the Asylum Demon (progression: you can leave the Asylum)."
+      },
+      "afterwards": {
+        "0": "The time above is for seeing the replacement when the encounter starts. The engine holds this boss back while the side gate is closed and wakes it after the upper boss fog; the whole fight therefore takes longer, and that part is not estimated."
+      }
+    },
+    "classic-triple": {
+      "title": "Classic full Triple",
+      "purpose": "Everything on with the default classic placement: items, enemies, bosses and the fog randomizer together.",
+      "observe": {
+        "0": "Start a new game and walk through the first areas.",
+        "1": "Check the fog gates and warps you meet, and the first boss you reach."
+      }
+    },
+    "sampling-regular": {
+      "title": "Regular enemies, sampling (Asylum to Parish)",
+      "purpose": "Regular enemies drawn per slot (legacy-style sampling), no bosses, no items, no fog randomizer.",
+      "observe": {
+        "0": "Walk through the Undead Asylum, Undead Burg and Undead Parish.",
+        "1": "Look for enemies that stand in the wrong place or do not attack."
+      }
+    },
+    "second-gargoyle": {
+      "title": "Second Bell Gargoyle",
+      "purpose": "The second Bell Gargoyle is replaced by another boss (the first one also changes).",
+      "observe": {
+        "0": "Go up to the rooftop of the Undead Parish church: the Bell Gargoyles boss fight.",
+        "1": "The first body starts the fight; the second body joins when the first drops to about 60% health."
+      }
+    },
+    "parish-models": {
+      "title": "Undead Parish with many enemy types",
+      "purpose": "The Undead Parish map holding one of the highest numbers of different enemy models the sampler produces.",
+      "observe": {
+        "0": "Walk the whole Undead Parish, including the Sunlight Altar side and the church.",
+        "1": "Look for missing or invisible enemies, textures that do not load, frame drops and crashes."
+      }
+    },
+    "boss-sampling": {
+      "title": "Boss sampling (every arena)",
+      "purpose": "Every single-body boss slot draws its own replacement (bosses can repeat).",
+      "observe": {
+        "0": "Enter the boss arena.",
+        "1": "Defeat the boss and take the fog exit."
+      }
+    },
+    "boss-repeat": {
+      "title": "The same boss in several places",
+      "purpose": "A boss that appears in more than one arena in the same world (boss sampling draws with repeats).",
+      "observe": {
+        "0": "Enter the boss arena.",
+        "1": "Defeat the boss and take the fog exit."
+      }
+    },
+    "boss-unique": {
+      "title": "Unique bosses",
+      "purpose": "Boss sampling where a boss is not used a second time before every boss was used once.",
+      "observe": {
+        "0": "Enter the boss arena.",
+        "1": "Defeat the boss and take the fog exit."
+      }
+    },
+    "boss-partial": {
+      "title": "Some bosses stay as they are",
+      "purpose": "Boss sampling with a 50% replacement chance: about half of the boss slots keep their own boss.",
+      "observe": {
+        "0": "Enter the boss arena.",
+        "1": "Defeat the boss and take the fog exit.",
+        "2": "Also visit a boss that stayed vanilla: its fog gate and fight must still be normal."
+      }
+    },
+    "roaming-repeat": {
+      "title": "Type replacement + roaming bosses (Undead Burg and later)",
+      "purpose": "With Type replacement, every enemy of one kind in a map is replaced by the same boss, so one boss stands in several places of an area.",
+      "observe": {
+        "0": "Find a boss among the regular enemies: the list below names the area and the enemy it replaced.",
+        "1": "It should wake up when you come close, fight like the boss it is (no boss health bar, no fog gate) and be killable; the souls and drops should look sane."
+      }
+    },
+    "roaming-gargoyle": {
+      "title": "Roaming bosses with the second Bell Gargoyle",
+      "purpose": "Bosses in regular slots together with a replaced second Bell Gargoyle and boss sampling in the boss arenas.",
+      "observe": {
+        "0": "Go up to the rooftop of the Undead Parish church: the Bell Gargoyles boss fight and the roaming bosses around it.",
+        "1": "Find a boss among the regular enemies: the list below names the area and the enemy it replaced.",
+        "2": "It should wake up when you come close, fight like the boss it is (no boss health bar, no fog gate) and be killable; the souls and drops should look sane."
+      }
+    },
+    "roaming-fog": {
+      "title": "Roaming bosses with the fog randomizer",
+      "purpose": "Bosses in regular slots with the fog randomizer on (fog gates, warps and boss fogs are moved too).",
+      "observe": {
+        "0": "Find a boss among the regular enemies: the list below names the area and the enemy it replaced.",
+        "1": "It should wake up when you come close, fight like the boss it is (no boss health bar, no fog gate) and be killable; the souls and drops should look sane.",
+        "2": "Check that fog gates and warps still lead where the fog randomizer says, and that no roaming boss blocks a gate."
+      }
+    },
+    "roaming-parish": {
+      "title": "Undead Parish full of bosses",
+      "purpose": "Every regular slot that can take a boss gets one (at most ten per map): the highest load of different models a roaming world can put on one map.",
+      "observe": {
+        "0": "Walk the whole Undead Parish, including the church and the Sunlight Altar side.",
+        "1": "Find a boss among the regular enemies: the list below names the area and the enemy it replaced.",
+        "2": "It should wake up when you come close, fight like the boss it is (no boss health bar, no fog gate) and be killable; the souls and drops should look sane."
+      }
+    },
+    "body-burg-fights": {
+      "title": "A normal enemy in the Taurus Demon and Capra Demon fights",
+      "purpose": "The second and third early boss fights with a normal enemy as the body: the Taurus Demon bridge and the Capra Demon room in the Undead Burg.",
+      "gameplayNote": "The Taurus Demon fight with a normal enemy as its body was played and worked. The Capra Demon fight was not played yet.",
+      "observe": {
+        "0": "Fight the Taurus Demon on the bridge of the Undead Burg and the Capra Demon below: the bodies of this world are listed in docs/SMOKE_TESTS.md, the health bars keep the boss names, each fight ends when its body dies and its fog gate opens.",
+        "1": "Both fights must not start again after a reload."
+      }
+    },
+    "body-fog": {
+      "title": "A normal enemy as a boss body with the fog randomizer",
+      "purpose": "Boss bodies together with the fog randomizer: the boss fog gates, the warps and the boss events are rearranged by the fog randomizer and must still complete.",
+      "observe": {
+        "0": "Find the Asylum Demon, Taurus Demon and Capra Demon fights wherever the fog randomizer put them: each must start, show its health bar, end when the body dies and open its fog gate."
+      }
+    },
+    "body-roaming": {
+      "title": "Boss bodies and roaming bosses together",
+      "purpose": "Normal enemies in the early boss fights and bosses in regular enemy slots in the same world (the two directions of replacement).",
+      "observe": {
+        "0": "The first boss fight has a normal enemy as its body, and some regular enemies of the world are bosses.",
+        "1": "Neither kind interferes with the other: each boss fight completes, each roaming boss fights on its own."
+      }
+    },
+    "body-both": {
+      "title": "Bosses or normal enemies in the boss fights",
+      "purpose": "Boss sampling together with normal-enemy bodies: some fights get a boss, the three early ones may get a normal enemy (Boss replacement: Bosses or normal enemies).",
+      "observe": {
+        "0": "Visit the boss fights: the three early ones may have a normal enemy as the body (listed in docs/SMOKE_TESTS.md), every other fight has a boss."
+      }
+    },
+    "body-gargoyle": {
+      "title": "Boss bodies with the second Bell Gargoyle",
+      "purpose": "Normal enemies in the early boss fights together with the second Bell Gargoyle replaced by a boss (the Gargoyles are never given a normal enemy).",
+      "observe": {
+        "0": "Go up to the rooftop of the Undead Parish church: the Bell Gargoyles fight is the one listed in docs/SMOKE_TESTS.md (the classic shuffle still moves the multi-body bosses around), with its second body replaced by a boss as in the Second Bell Gargoyle test. The Gargoyles never get a normal enemy.",
+        "1": "The Asylum Demon, Taurus Demon and Capra Demon fights have normal enemies as bodies (listed in docs/SMOKE_TESTS.md)."
+      }
+    },
+    "npc-world": {
+      "title": "Hostile NPCs across the world",
+      "purpose": "Hostile Merchants, Andre and Vamos among the regular enemies of the whole game (at most twelve per map), with the real NPCs left alone.",
+      "observe": {
+        "0": "Walk the Undead Burg and Parish and the Depths: the hostile NPCs listed in docs/SMOKE_TESTS.md are enemies; they wake up, fight and die like regular enemies.",
+        "1": "The real Undead Merchant, Andre of Astora and the other friendly characters are where they always are and still talk and sell.",
+        "2": "No more than twelve hostile NPCs stand in one map."
+      }
+    },
+    "npc-fog": {
+      "title": "Hostile NPCs with the fog randomizer",
+      "purpose": "Hostile NPCs together with the fog randomizer: the friendly NPCs, their dialogue and the fog gates must all keep working.",
+      "observe": {
+        "0": "Play the first area: hostile NPCs are enemies, the fog gates and warps work as in any fog world.",
+        "1": "Talk to the real Andre and the real Undead Merchant if the fog randomizer lets you reach them: dialogue and shops are unchanged."
+      }
+    },
+    "npc-roaming": {
+      "title": "Hostile NPCs and roaming bosses together",
+      "purpose": "Both kinds of crossing in one world: bosses in regular slots and hostile NPCs in regular slots.",
+      "observe": {
+        "0": "Some regular slots hold a roaming boss, others a hostile NPC; neither interferes with the other and both wake up and fight."
+      }
+    },
+    "npc-type": {
+      "title": "Hostile NPCs with Type replacement",
+      "purpose": "Type replacement turns every enemy of one kind in a map into one replacement: a hostile NPC may take a whole group (at most twelve per map).",
+      "observe": {
+        "0": "Where a whole kind of enemy became one hostile NPC, each of them wakes up and fights; none is passive or stuck.",
+        "1": "Every one of them gives the drops of its own slot: a kind that was one NPC does not drop one NPC reward per body."
+      }
+    },
+    "npc-bosses": {
+      "title": "Hostile NPCs with boss bodies and boss sampling",
+      "purpose": "Hostile NPCs next to boss sampling and normal enemies as bodies of the early boss fights.",
+      "observe": {
+        "0": "The boss fights work as in the boss tests; the hostile NPCs around them are ordinary enemies and do not take part in any boss fight."
+      }
+    },
+    "laundromat-npcs": {
+      "title": "Laundromat Mixup - NPCs in other armor",
+      "purpose": "The NPC characters wear armor pieces other NPCs wear (only their look and armor stats change); nothing you can pick up changes.",
+      "observe": {
+        "0": "Play the first areas as usual and look at every NPC you meet: each wears armor that some other NPC wears in the normal game, not its own set.",
+        "1": "Nothing breaks: the armor shows on the NPC model, the NPC talks, trades and fights as always (a hostile NPC fights in its new armor).",
+        "2": "Hollowed NPCs (the undead versions) keep their normal look."
+      },
+      "afterwards": {
+        "0": "The exact armor of every NPC row is listed by the static check (SmokeVerify laundromat); what is judged here is only how it looks in the game."
+      }
+    }
+  },
+  "checklist": {
+    "0": "The area loads and the enemy or boss model appears (no invisible body, no T-pose).",
+    "1": "The enemy/boss AI wakes up: it notices you, moves and attacks.",
+    "2": "Navigation works: it follows you and does not get stuck on walls or stairs.",
+    "3": "It stands on the floor: nothing falls through the ground, floats or leaves the arena.",
+    "4": "Health behaves: a boss shows its health bar, a normal enemy does not; the amount looks reasonable for the area.",
+    "5": "It can be killed, and the death finishes the fight (no invulnerable phase that never ends).",
+    "6": "Boss rooms: the fog gate opens afterwards and the encounter does not start a second time.",
+    "7": "Progression still works: boss flag, bonfire, doors and key items that depend on this fight.",
+    "8": "Rewards are sane: souls, drops and the boss reward are neither missing nor duplicated.",
+    "9": "Respawn behaves as expected after resting at a bonfire (regular enemies come back, defeated bosses stay defeated).",
+    "10": "The game does not crash when you enter or leave the area, and the map streams in normally."
+  },
+  "template": {
+    "where": {
+      "same": ", on the same floor as the start",
+      "higher": ", {{count}} m higher than the start",
+      "lower": ", {{count}} m lower than the start"
+    },
+    "target": {
+      "default": "{{map}}: the {{replaced}} at slot {{slot}}, {{meters}} m from where you wake up{{where}}",
+      "itemLot": "{{map}}: the pickup where the {{replaced}} lies in the clean game (item lot {{lot}}), {{meters}} m from where you wake up{{where}}"
+    },
+    "category": {
+      "weapon": "weapon",
+      "item": "item"
+    },
+    "expected": {
+      "itemLot": "{{name}} ({{category}} id {{id}}) lies where the {{replaced}} lay{{soul}}{{key}}",
+      "fromSoul": ": a weapon made from the {{soul}}, which no longer exists as a soul anywhere in this world",
+      "movedKey": ": a key that the clean game puts {{from}}",
+      "encounterBody": "{{name}} ({{model}}) takes the place of {{replaced}} as the body of the boss encounter; the health bar and the name on it stay {{replaced}}'s, and the fight completes when {{name}} dies",
+      "hostileNpc": "{{name}} ({{model}}) stands in place of the {{replaced}} at slot {{slot}} as a hostile fighter: no dialogue, no shop, the drops and rewards of that slot",
+      "boss": "{{name}} ({{model}}) takes the place of {{replaced}}, the first boss",
+      "default": "{{name}} ({{model}}) replaces the {{replaced}} at slot {{slot}}{{extra}}",
+      "extraSouls": "; it carries {{souls}} souls",
+      "extraSoulsDead": "; it carries {{souls}} souls and stays dead"
+    }
+  }
 }

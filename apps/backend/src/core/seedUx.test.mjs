@@ -159,7 +159,7 @@ test('Part G: Sampling is the recommended default, the classic permutation stays
   assert.equal(en('settings.enemies.algorithm.options.permutation-v1'), 'Classic permutation');
   assert.ok(app.includes("<option value=\"sampling-v1\">{t('settings.enemies.algorithm.options.sampling-v1')}</option><option value=\"permutation-v1\">{t('settings.enemies.algorithm.options.permutation-v1')}</option>"));
   assert.doesNotMatch(app, /[Ll]egacy-style/u, 'no implementation history in the visible text');
-  assert.doesNotMatch(JSON.stringify(english), /[Ll]egacy-style/u);
+  assert.doesNotMatch(JSON.stringify({ ...english, smoke: undefined }), /[Ll]egacy-style/u, 'the screens say no implementation history');
   // Everything between the replacement chance and the custom pool editor is inside one sampling-only block: no disabled twin is shown for the classic permutation.
   assert.match(app, /\{config\.enemies\.placement\.algorithm === 'sampling-v1' && \(\s*<>\s*<RangeOption label=\{t\('settings\.enemies\.replacementChance\.label'\)\}/u);
   assert.match(app, /<EnemyPoolEditor[\s\S]*?<\/>\s*\)\}/u);

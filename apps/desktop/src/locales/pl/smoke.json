@@ -29,5 +29,452 @@
   "inThisWorld": "W tym świecie",
   "checkInGame": "Sprawdź w grze",
   "seedCode": "Kod seeda",
-  "create": "Utwórz ten świat testowy"
+  "create": "Utwórz ten świat testowy",
+  "template": {
+    "where": {
+      "same": ", na tym samym piętrze co start",
+      "higher": ", {{count}} m wyżej niż start",
+      "lower": ", {{count}} m niżej niż start"
+    },
+    "target": {
+      "default": "{{map}}: {{replaced}} w slocie {{slot}}, {{meters}} m od miejsca, w którym się budzisz{{where}}",
+      "itemLot": "{{map}}: miejsce, w którym w czystej grze leży {{replaced}} (item lot {{lot}}), {{meters}} m od miejsca, w którym się budzisz{{where}}"
+    },
+    "category": {
+      "weapon": "broń",
+      "item": "przedmiot"
+    },
+    "expected": {
+      "itemLot": "{{name}} ({{category}}, id {{id}}) leży tam, gdzie leżał {{replaced}}{{soul}}{{key}}",
+      "fromSoul": ": broń wykonana z duszy {{soul}}, która nie istnieje już nigdzie w tym świecie jako dusza",
+      "movedKey": ": klucz, który czysta gra umieszcza {{from}}",
+      "encounterBody": "{{name}} ({{model}}) zajmuje miejsce {{replaced}} jako ciało walki z bossem; pasek zdrowia i widniejąca na nim nazwa pozostają „{{replaced}}”, a walka kończy się, gdy {{name}} zginie",
+      "hostileNpc": "{{name}} ({{model}}) stoi w miejscu {{replaced}} w slocie {{slot}} jako wrogi przeciwnik: bez dialogów, bez sklepu, z łupami i nagrodami tego slotu",
+      "boss": "{{name}} ({{model}}) zajmuje miejsce {{replaced}}, pierwszego bossa",
+      "default": "{{name}} ({{model}}) zastępuje {{replaced}} w slocie {{slot}}{{extra}}",
+      "extraSouls": "; niesie {{souls}} dusz",
+      "extraSoulsDead": "; niesie {{souls}} dusz i pozostaje martwy"
+    }
+  },
+  "worlds": {
+    "quick-roaming-basic": {
+      "title": "Wędrujący boss - podstawy",
+      "purpose": "Boss stoi tam, gdzie stał zwykły wróg: najmniejszy test, czy boss działa poza swoją areną.",
+      "gameplayNote": "Zastępnik się pojawił, wyrenderował, obudził, walczył i zginął, nie miał paska bossa, a dusze były zgodne z oczekiwaniami. Grane przed poprawką odradzania (backend 0.35.1). Ta poprawka zmieniła paczkę tego świata w jednej komórce: wiersze wędrujących bossów mają teraz disableRespawn = 0 tam, gdzie wcześniej miały odziedziczone 1. Świata nie grano ponownie.",
+      "observe": {
+        "0": "Capra Demon tam jest, w pełni oteksturowany (bez T-pozy, bez niewidzialnego ciała) - to nie jest Hollow.",
+        "1": "Budzi się, gdy się zbliżysz, idzie do Ciebie i atakuje.",
+        "2": "Nie ma paska zdrowia bossa i nie ma bramy mgły.",
+        "3": "Możesz go zabić. Jego dusze to 3000 (50% z 6000, które DS1TR podaje dla tej walki).",
+        "4": "Nic się nie zawiesza ani nie wywala, gdy się pojawia, walczy lub ginie."
+      }
+    },
+    "quick-roaming-souls": {
+      "title": "Wędrujący boss - dusze i odradzanie",
+      "purpose": "Wędrujący boss ze 100% dusz, który pozostaje martwy: nagroda i ustawienie „nie wraca” w jednej krótkiej pętli.",
+      "gameplayNote": "Dusze były zgodne z oczekiwaniami, a boss pozostał martwy po resecie. Poprawka odradzania zostawia paczkę tego świata bez zmian co do bajta.",
+      "observe": {
+        "0": "Taurus Demon stoi tam, gdzie byłby pierwszy Hollow; budzi się, rusza i atakuje (bez paska zdrowia bossa, bez bramy mgły).",
+        "1": "Zapamiętaj liczbę dusz, potem zabij Taurus Demona: dostajesz dokładnie 3000 dusz (100% z 3000, które DS1TR podaje dla tej walki).",
+        "2": "Kontrola: pozostałe Hollowy w bloku cel (sloty c2500_0007, 11,4 m, i c2500_0005, 33,2 m od startu) to zwykłe Hollowy."
+      },
+      "afterwards": {
+        "0": "Zresetuj obszar: w Asylum nie ma ogniska (nie ma go w danych mapy), więc zgiń raz (w dowolny sposób). Wszystko, co się odradza, wróci, gdy znów się obudzisz.",
+        "1": "Wróć w to samo miejsce: Hollowy wróciły, Taurus Demon NIE (ustawienie „pozostaje martwy”; jeszcze niepotwierdzone w grze)."
+      }
+    },
+    "quick-encounter-body": {
+      "title": "Pierwsza walka z bossem - zwykły wróg",
+      "purpose": "Zwykły wróg zajmuje miejsce pierwszego bossa: walka nadal musi się zacząć, pokazać pasek zdrowia, skończyć się jego śmiercią i otworzyć drogę dalej.",
+      "gameplayNote": "Zgłoszone przez osobę, która grała: walka z Asylum Demonem ze zwykłym wrogiem jako ciałem zadziałała w prawdziwej grze.",
+      "observe": {
+        "0": "Balder Knight stoi na arenie, na której normalnie pojawia się Asylum Demon; Asylum Demona tam nie ma.",
+        "1": "Walka zaczyna się tak jak walka z Asylum Demonem: Balder Knight budzi się, rusza i atakuje (bez T-pozy, bez zamrożonego bezruchu).",
+        "2": "Pojawia się pasek zdrowia bossa z napisem „Asylum Demon” (walka celowo zachowuje nazwę bossa). Rycerz ma zdrowie Asylum Demona (skalowanie według obszaru), więc powinien przyjąć wyraźnie więcej ciosów niż zwykły Balder Knight.",
+        "3": "Zabij go: pasek znika, walka się kończy, a droga dalej otwiera się jak po Asylum Demonie (możesz opuścić Asylum). Nagrody za walkę są nagrodami bossa (łupy samego rycerza się nie pojawiają).",
+        "4": "Nic się nie zawiesza ani nie wywala, gdy walka się zaczyna, trwa lub kończy."
+      },
+      "afterwards": {
+        "0": "Wyjdź do menu głównego i kontynuuj: arena pozostaje pusta, a walka nie zaczyna się od nowa.",
+        "1": "Podany czas dotyczy dojścia do areny i zobaczenia zastępnika; sama walka nie jest szacowana."
+      }
+    },
+    "quick-roaming-respawn": {
+      "title": "Wędrujący boss - odradzanie",
+      "purpose": "Wędrujący boss z WYŁĄCZONYM „pozostaje martwy”: po resecie obszaru musi wrócić. Odpowiednik testu dusz, w którym musi pozostać martwy.",
+      "observe": {
+        "0": "Capra Demon stoi tam, gdzie byłby Hollow; budzi się, rusza i atakuje (bez paska zdrowia bossa, bez bramy mgły).",
+        "1": "Zabij go: dostajesz 3000 dusz (50% z 6000, które DS1TR podaje dla tej walki).",
+        "2": "Kontrola: pozostałe Hollowy w bloku cel (sloty c2500_0006, 8,7 m, i c2500_0005, 33,2 m od startu) to zwykłe Hollowy."
+      },
+      "afterwards": {
+        "0": "Zresetuj obszar: w Asylum nie ma ogniska (nie ma go w danych mapy), więc zgiń raz (w dowolny sposób). Wszystko, co się odradza, wróci, gdy znów się obudzisz.",
+        "1": "Wróć w to samo miejsce. Po resecie obszaru ten boss powinien się odrodzić: Capra Demon MUSI znów żyć, razem z Hollowami."
+      }
+    },
+    "quick-roaming-repeated": {
+      "title": "Wędrujący boss - trzech naraz",
+      "purpose": "Ten sam boss w trzech sąsiednich slotach: osobne ciała, osobne walki, nic wspólnego między nimi.",
+      "gameplayNote": "Trzech niezależnych bossów. Grane przed poprawką odradzania (backend 0.35.1). Ta poprawka zmieniła paczkę tego świata w jednej komórce: wiersze wędrujących bossów mają teraz disableRespawn = 0 tam, gdzie wcześniej miały odziedziczone 1. Świata nie grano ponownie.",
+      "observe": {
+        "0": "Trzech Executioner Smoughów stoi w bloku cel, 8,7, 11,4 i 33,2 m od startu.",
+        "1": "Każdy budzi się, rusza i atakuje na własną rękę; zabicie jednego nie wpływa na pozostałych.",
+        "2": "Każdy daje własne 5000 dusz (50% z 10000) i żaden nie ma paska bossa.",
+        "3": "Nic innego w Asylum nie jest bossem podczas tej pierwszej wizyty (pozostali wędrujący bossowie tego świata są w części, do której dojdziesz dopiero za drugim razem)."
+      }
+    },
+    "quick-sampling-asylum": {
+      "title": "Zwykli wrogowie - pierwszych trzech się zmienia",
+      "purpose": "Losowanie na slotach w czasie gry: pierwsze Hollowy to inni wrogowie i zachowują się jak wrogowie.",
+      "gameplayNote": "Trzej zastępcy pojawili się, wyrenderowali, obudzili i walczyli. Poprawka odradzania zostawia paczkę tego świata bez zmian co do bajta.",
+      "observe": {
+        "0": "Tam, gdzie stały pierwsze trzy Hollowy, są Balder Knight, Undead Soldier i Undead Assassin.",
+        "1": "Żaden nie jest w T-pozie ani niewidzialny; każdy budzi się, rusza i atakuje; żaden nie lewituje ani nie zapada się w podłogę.",
+        "2": "Ich rozmiar wygląda dobrze w bloku cel (to ustawienie dopuszcza tylko wrogów, którzy się mieszczą)."
+      }
+    },
+    "quick-hostile-npc": {
+      "title": "Wrogie NPC - Andre jako przeciwnik",
+      "purpose": "Wrogi bojownik NPC stoi tam, gdzie stał zwykły wróg: prawdziwe NPC pozostają nietknięte, ten tylko pożycza ciało i sposób walki.",
+      "observe": {
+        "0": "Andre of Astora (model kowala z młotem) stoi tam, gdzie stoi pierwszy Hollow bloku cel; nie jest przy kuźni i nie rozmawia.",
+        "1": "Atakuje, gdy tylko się zbliżysz (to wrogi przeciwnik; nie ma opcji rozmowy ani sklepu) i walczy własnymi ruchami: bez T-pozy, bez zamrożonego bezruchu.",
+        "2": "Jego zdrowie jest takie jak u Hollowa z tego obszaru, a nie jak u prawdziwego Andre; ginie jak zwykły wróg.",
+        "3": "Daje to, co daje Hollow z tego slotu (trochę dusz, może łup); nie pojawiają się przedmioty kowala ani unikalne nagrody.",
+        "4": "Zgiń raz albo odpocznij i wróć: znów tam jest, jak każdy zwykły wróg (to nie jest NPC, który pozostaje martwy)."
+      },
+      "afterwards": {
+        "0": "Prawdziwy Andre of Astora w Undead Parish nie jest częścią tego testu i pozostaje nietknięty: nadal tam sprzedaje i ulepsza.",
+        "1": "Pozostałe Hollowy z pierwszej wizyty to zwykli wrogowie tego świata."
+      }
+    },
+    "quick-transposed-soul": {
+      "title": "Przedmioty z dusz: Przekształcone - broń bossa w Twojej celi",
+      "purpose": "Przedmioty z dusz „Przekształcone”: dusze bossów trafiają do puli przedmiotów, a niektóre stają się bronią, w którą można je zamienić; tutaj broń wykonana z Soul of Smough leży w pierwszej celi.",
+      "observe": {
+        "0": "Budzisz się w celi. W czystej grze Peculiar Doll leży na podłodze tej celi; tutaj ten sam przedmiot to Smough's Hammer (wzmocniona kopia: id broni to 856400).",
+        "1": "Podnieś go: to zwykła broń o nazwie Smough's Hammer, a nie dusza ani Doll. (Nie zakładaj jej: wymaga znacznie więcej siły niż ma nowa postać.)",
+        "2": "Peculiar Doll nie leży już w celi: to zwykły przedmiot puli i leży w innym miejscu tego świata."
+      },
+      "afterwards": {
+        "0": "W tym świecie nie ma nic więcej do sprawdzania. Tam, gdzie leżałaby sama Soul of Smough, leży teraz broń (albo inny przedmiot z puli): dusza z tego seeda już nie istnieje.",
+        "1": "Aby zobaczyć cały obraz, włącz log spoilerów: sekcja BOSS REWARDS wymienia każdą duszę bossa i to, co leży na jej miejscu."
+      }
+    },
+    "quick-key-placement": {
+      "title": "Rozmieszczenie kluczy - klucz w Twojej celi",
+      "purpose": "Rozmieszczenie kluczy „Przetasowane”: klucze świata trafiają do innych miejsc, ze sprawdzeniem, że każdy obszar pozostaje osiągalny; tutaj Cage Key leży w pierwszej celi, tam gdzie czysta gra ma Peculiar Doll.",
+      "observe": {
+        "0": "Budzisz się w celi. W czystej grze Peculiar Doll leży na podłodze tej celi; tutaj ten sam przedmiot to Cage Key.",
+        "1": "Podnieś go: to zwykły przedmiot kluczowy o nazwie Cage Key (otwiera klatkę w Sen's Fortress; w Asylum nie będzie Ci potrzebny).",
+        "2": "Peculiar Doll nie leży już w celi: leży w innym miejscu tego świata, osiągalnym przed wszystkim, co go wymaga."
+      },
+      "afterwards": {
+        "0": "W tym świecie nie ma nic więcej do sprawdzania. Pozostałe klucze też się przesunęły, a rozmieszczenie gwarantuje, że do każdego obszaru da się dojść; aby zobaczyć, gdzie leży każdy klucz, włącz log spoilerów: sekcja KEY PLACEMENT wymienia każdy klucz i miejsce, w którym leży.",
+        "1": "Pełnym sprawdzeniem jest przejście gry z kluczami tam, gdzie mówi spoiler: ten świat pokazuje tylko, że przesunięty klucz można podnieść i użyć."
+      }
+    },
+    "quick-lordvessel": {
+      "title": "Rozmieszczenie Lordvessel - Lordvessel w Twojej celi",
+      "purpose": "Rozmieszczenie kluczy „Przetasowane” z włączonym rozmieszczeniem Lordvessel: Lordvessel dołącza do tasowania kluczy; tutaj leży w pierwszej celi, tam gdzie czysta gra ma Peculiar Doll.",
+      "observe": {
+        "0": "Budzisz się w celi. W czystej grze Peculiar Doll leży na podłodze tej celi; tutaj ten sam przedmiot to Lordvessel.",
+        "1": "Podnieś go: to zwykły przedmiot kluczowy o nazwie Lordvessel. (Używa się go przy Firelink Altar; tutaj tego nie zrobisz, a ten test tego nie wymaga.)",
+        "2": "Peculiar Doll nie leży już w celi: leży w innym miejscu tego świata."
+      },
+      "afterwards": {
+        "0": "W tym świecie nie ma nic więcej do sprawdzania. W Anor Londo Gwynevere wręcza inny przedmiot z puli zamiast Lordvessel; ta część świata jest daleko od startu i nie należy do tego testu.",
+        "1": "Aby zobaczyć każdy klucz, włącz log spoilerów: sekcja KEY PLACEMENT wymienia każdy klucz i miejsce, w którym leży."
+      }
+    },
+    "quick-lord-soul": {
+      "title": "Rozmieszczenie Lord Souls - Lord Soul w Twojej celi",
+      "purpose": "Rozmieszczenie kluczy „Przetasowane” z włączonym rozmieszczeniem Lord Souls: cztery Lord Souls dołączają do tasowania kluczy; tutaj Lord Soul, którą nosi Gravelord Nito, leży w pierwszej celi, tam gdzie czysta gra ma Peculiar Doll.",
+      "observe": {
+        "0": "Budzisz się w celi. W czystej grze Peculiar Doll leży na podłodze tej celi; tutaj ten sam przedmiot to Lord Soul.",
+        "1": "Podnieś ją: to zwykły przedmiot o nazwie Lord Soul. (Nie używaj jej, zanim będzie potrzebna w Kiln.)",
+        "2": "Peculiar Doll nie leży już w celi: leży w innym miejscu tego świata."
+      },
+      "afterwards": {
+        "0": "W tym świecie nie ma nic więcej do sprawdzania. Gravelord Nito, gdy do niego dojdziesz, upuszcza inny przedmiot z puli zamiast Lord Soul: sama Lord Soul istnieje w tym świecie raz, w Twojej celi.",
+        "1": "Aby zobaczyć każdy klucz, włącz log spoilerów: sekcja KEY PLACEMENT wymienia każdy klucz i miejsce, w którym leży."
+      }
+    },
+    "quick-race": {
+      "title": "Tryb wyścigu - klucz w Twojej celi",
+      "purpose": "Rozmieszczenie kluczy „Tryb wyścigu”: klucze i żary leżą tylko w nagrodach za bossów, w skrzyniach i tam, gdzie zwykle są klucze; tutaj Blighttown Key leży w pierwszej celi, tam gdzie czysta gra ma Peculiar Doll (Doll jest jednym z takich miejsc kluczy).",
+      "observe": {
+        "0": "Budzisz się w celi. W czystej grze Peculiar Doll leży na podłodze tej celi; tutaj ten sam przedmiot to Blighttown Key.",
+        "1": "Podnieś go: to zwykły przedmiot kluczowy o nazwie Blighttown Key (otwiera drogę z Depths do Blighttown; w Asylum nie będzie Ci potrzebny).",
+        "2": "Peculiar Doll nie leży już w celi: leży w innym miejscu tego świata, w jednym z miejsc Trybu wyścigu."
+      },
+      "afterwards": {
+        "0": "W tym świecie nie ma nic więcej do sprawdzania. W Trybie wyścigu każdy klucz i każdy żar leży w nagrodzie za bossa, w skrzyni lub w miejscu, gdzie zwykle leży klucz; aby zobaczyć gdzie, włącz log spoilerów: sekcja KEY PLACEMENT wymienia każdy z nich."
+      }
+    },
+    "quick-race-plus": {
+      "title": "Tryb wyścigu + - klucz w Twojej celi, świat wymagający skipa",
+      "purpose": "Rozmieszczenie kluczy „Tryb wyścigu +”: jak Tryb wyścigu, ale świat może wymagać skipów i glitchy; tutaj Basement Key leży w pierwszej celi, a klucze tego świata są rozmieszczone tak, że do ukończenia potrzebny jest skip z listy (skip Capry, skip Lower Burg, skok Annex albo skip Seal).",
+      "observe": {
+        "0": "Budzisz się w celi. W czystej grze Peculiar Doll leży na podłodze tej celi; tutaj ten sam przedmiot to Basement Key.",
+        "1": "Podnieś go: to zwykły przedmiot kluczowy o nazwie Basement Key (otwiera piwnicę Undead Burg; w Asylum nie będzie Ci potrzebny).",
+        "2": "Peculiar Doll nie leży już w celi: leży w innym miejscu tego świata."
+      },
+      "afterwards": {
+        "0": "W tym świecie nie ma nic więcej do sprawdzania. Istnieje, aby pokazać, że Tryb wyścigu + tworzy inny świat niż Tryb wyścigu: co najmniej jeden klucz leży tam, gdzie dosięga go tylko skip (log spoilerów wymienia każdy klucz). To, czy skipy działają w grze, nie należy do tego testu."
+      }
+    },
+    "quick-fair": {
+      "title": "Trudność przedmiotów: Uczciwy - co leży w Twojej celi",
+      "purpose": "Trudność przedmiotów „Uczciwy”: przedmioty mają równe szanse gdziekolwiek. W tym świecie pierwsza cela, łatwe miejsce, zawiera broń, Mace, tam gdzie czysta gra ma Peculiar Doll (jedna próbka tego, co robi Uczciwy; Nieuczciwy i Bardzo nieuczciwy mają własne testy z tym samym master seedem).",
+      "observe": {
+        "0": "Budzisz się w celi. W czystej grze Peculiar Doll leży na podłodze tej celi; tutaj ten sam przedmiot to Mace (broń).",
+        "1": "Podnieś go: to zwykła broń o nazwie Mace. (Możesz ją założyć; wymaga tylko skromnej siły.)",
+        "2": "Peculiar Doll nie leży już w celi: to zwykły przedmiot puli i leży w innym miejscu tego świata."
+      },
+      "afterwards": {
+        "0": "To jedna próbka. Przy tym samym master seedzie Nieuczciwy i Bardzo nieuczciwy kładą w tej celi Soul of a Lost Undead: łatwe miejsce dostaje łatwy przedmiot. Zobacz testy quick-unfair i quick-very-unfair."
+      }
+    },
+    "quick-unfair": {
+      "title": "Trudność przedmiotów: Nieuczciwy - co leży w Twojej celi",
+      "purpose": "Trudność przedmiotów „Nieuczciwy”: pożądane przedmioty nie leżą na widoku. Ten sam master seed co w teście Uczciwy: pierwsza cela, łatwe miejsce, zawiera teraz Soul of a Lost Undead zamiast Mace (jedna próbka tego nastawienia).",
+      "observe": {
+        "0": "Budzisz się w celi. W czystej grze Peculiar Doll leży na podłodze tej celi; tutaj ten sam przedmiot to Soul of a Lost Undead.",
+        "1": "Podnieś go: to zwykły przedmiot jednorazowy o nazwie Soul of a Lost Undead.",
+        "2": "Peculiar Doll nie leży już w celi: leży w innym miejscu tego świata."
+      },
+      "afterwards": {
+        "0": "To jedna próbka łatwego miejsca: Mace z testu Uczciwy tu nie ma. Pojedynczy świat niczego nie dowodzi o rozkładzie; rozkład mierzą zautomatyzowane przeglądy."
+      }
+    },
+    "quick-very-unfair": {
+      "title": "Trudność przedmiotów: Bardzo nieuczciwy - co leży w Twojej celi",
+      "purpose": "Trudność przedmiotów „Bardzo nieuczciwy”: pożądane przedmioty są ukryte i rzadko trafiają do wczesnych obszarów. Ten sam master seed co w teście Uczciwy: pierwsza cela, najłatwiejsze miejsce świata, zawiera Soul of a Lost Undead.",
+      "observe": {
+        "0": "Budzisz się w celi. W czystej grze Peculiar Doll leży na podłodze tej celi; tutaj ten sam przedmiot to Soul of a Lost Undead.",
+        "1": "Podnieś go: to zwykły przedmiot jednorazowy o nazwie Soul of a Lost Undead.",
+        "2": "Peculiar Doll nie leży już w celi: leży w innym miejscu tego świata."
+      },
+      "afterwards": {
+        "0": "To jedna próbka łatwego miejsca. Bardzo nieuczciwy trzyma pożądane przedmioty (dobre bronie, klucze, duże dusze) z dala od wczesnych miejsc takich jak to; wczesna gra w tym świecie jest uboższa niż w świecie Uczciwym z tym samym master seedem."
+      }
+    },
+    "quick-boss-asylum-demon": {
+      "title": "Losowanie bossów - pierwszy boss",
+      "purpose": "Pierwszy boss gry zostaje zastąpiony innym bossem: model, pasek zdrowia, AI, śmierć i droga dalej.",
+      "gameplayNote": "Walka z Asylum Demonem zakończyła się z bossem-zastępnikiem. Poprawka odradzania zostawia paczkę tego świata bez zmian co do bajta.",
+      "observe": {
+        "0": "Idź na arenę, na której normalnie pojawia się Asylum Demon: zamiast niego pojawia się Taurus Demon, a pasek zdrowia bossa podaje jego nazwę.",
+        "1": "Walczy (rusza się, atakuje, bez T-pozy), można go zabić, a jego śmierć kończy walkę.",
+        "2": "Droga dalej otwiera się tak jak po Asylum Demonie (postęp: możesz opuścić Asylum)."
+      },
+      "afterwards": {
+        "0": "Podany czas dotyczy zobaczenia zastępnika, gdy zaczyna się walka. Silnik wstrzymuje tego bossa, dopóki boczna brama jest zamknięta, i budzi go po górnej mgle bossa; cała walka trwa więc dłużej i ta część nie jest szacowana."
+      }
+    },
+    "classic-triple": {
+      "title": "Klasyczny pełny Triple",
+      "purpose": "Wszystko włączone z domyślnym klasycznym rozmieszczeniem: przedmioty, wrogowie, bossowie i randomizer mgieł razem.",
+      "observe": {
+        "0": "Zacznij nową grę i przejdź przez pierwsze obszary.",
+        "1": "Sprawdź napotkane bramy mgły i teleporty oraz pierwszego bossa, do którego dojdziesz."
+      }
+    },
+    "sampling-regular": {
+      "title": "Zwykli wrogowie, losowanie na slotach (od Asylum do Parish)",
+      "purpose": "Zwykli wrogowie losowani dla każdego slotu (losowanie na slotach), bez bossów, bez przedmiotów, bez randomizera mgieł.",
+      "observe": {
+        "0": "Przejdź przez Undead Asylum, Undead Burg i Undead Parish.",
+        "1": "Szukaj wrogów, którzy stoją w złym miejscu albo nie atakują."
+      }
+    },
+    "second-gargoyle": {
+      "title": "Drugi Bell Gargoyle",
+      "purpose": "Drugi Bell Gargoyle zostaje zastąpiony innym bossem (pierwszy też się zmienia).",
+      "observe": {
+        "0": "Wejdź na dach kościoła w Undead Parish: walka z bossem Bell Gargoyles.",
+        "1": "Pierwsze ciało zaczyna walkę; drugie dołącza, gdy pierwsze spadnie do około 60% zdrowia."
+      }
+    },
+    "parish-models": {
+      "title": "Undead Parish z wieloma typami wrogów",
+      "purpose": "Mapa Undead Parish z jedną z największych liczb różnych modeli wrogów, jakie wytwarza losowanie.",
+      "observe": {
+        "0": "Przejdź całe Undead Parish, razem ze stroną Sunlight Altar i kościołem.",
+        "1": "Szukaj brakujących lub niewidzialnych wrogów, tekstur, które się nie wczytują, spadków klatek i wywaleń."
+      }
+    },
+    "boss-sampling": {
+      "title": "Losowanie bossów (każda arena)",
+      "purpose": "Każdy slot jednociałowego bossa losuje własnego zastępnika (bossowie mogą się powtarzać).",
+      "observe": {
+        "0": "Wejdź na arenę bossa.",
+        "1": "Pokonaj bossa i wyjdź przez bramę mgły."
+      }
+    },
+    "boss-repeat": {
+      "title": "Ten sam boss w kilku miejscach",
+      "purpose": "Boss, który pojawia się na więcej niż jednej arenie w tym samym świecie (losowanie bossów dopuszcza powtórzenia).",
+      "observe": {
+        "0": "Wejdź na arenę bossa.",
+        "1": "Pokonaj bossa i wyjdź przez bramę mgły."
+      }
+    },
+    "boss-unique": {
+      "title": "Unikalni bossowie",
+      "purpose": "Losowanie bossów, w którym boss nie jest użyty po raz drugi, zanim każdy boss nie został użyty raz.",
+      "observe": {
+        "0": "Wejdź na arenę bossa.",
+        "1": "Pokonaj bossa i wyjdź przez bramę mgły."
+      }
+    },
+    "boss-partial": {
+      "title": "Niektórzy bossowie zostają, jak byli",
+      "purpose": "Losowanie bossów z 50% szansą zamiany: około połowa slotów bossów zachowuje własnego bossa.",
+      "observe": {
+        "0": "Wejdź na arenę bossa.",
+        "1": "Pokonaj bossa i wyjdź przez bramę mgły.",
+        "2": "Odwiedź też bossa, który został oryginalny: jego brama mgły i walka nadal muszą być normalne."
+      }
+    },
+    "roaming-repeat": {
+      "title": "Zamiana według typu + wędrujący bossowie (Undead Burg i dalej)",
+      "purpose": "Przy zamianie według typu każdy wróg jednego rodzaju na mapie zostaje zastąpiony tym samym bossem, więc jeden boss stoi w kilku miejscach obszaru.",
+      "observe": {
+        "0": "Znajdź bossa wśród zwykłych wrogów: lista poniżej podaje obszar i wroga, którego zastąpił.",
+        "1": "Powinien się obudzić, gdy się zbliżysz, walczyć jak boss, którym jest (bez paska zdrowia bossa, bez bramy mgły) i dać się zabić; dusze i łupy powinny wyglądać rozsądnie."
+      }
+    },
+    "roaming-gargoyle": {
+      "title": "Wędrujący bossowie z drugim Bell Gargoyle",
+      "purpose": "Bossowie w zwykłych slotach razem z zastąpionym drugim Bell Gargoyle i losowaniem bossów na arenach bossów.",
+      "observe": {
+        "0": "Wejdź na dach kościoła w Undead Parish: walka z bossem Bell Gargoyles i wędrujący bossowie wokół niej.",
+        "1": "Znajdź bossa wśród zwykłych wrogów: lista poniżej podaje obszar i wroga, którego zastąpił.",
+        "2": "Powinien się obudzić, gdy się zbliżysz, walczyć jak boss, którym jest (bez paska zdrowia bossa, bez bramy mgły) i dać się zabić; dusze i łupy powinny wyglądać rozsądnie."
+      }
+    },
+    "roaming-fog": {
+      "title": "Wędrujący bossowie z randomizerem mgieł",
+      "purpose": "Bossowie w zwykłych slotach przy włączonym randomizerze mgieł (bramy mgły, teleporty i mgły bossów też są przesunięte).",
+      "observe": {
+        "0": "Znajdź bossa wśród zwykłych wrogów: lista poniżej podaje obszar i wroga, którego zastąpił.",
+        "1": "Powinien się obudzić, gdy się zbliżysz, walczyć jak boss, którym jest (bez paska zdrowia bossa, bez bramy mgły) i dać się zabić; dusze i łupy powinny wyglądać rozsądnie.",
+        "2": "Sprawdź, czy bramy mgły i teleporty nadal prowadzą tam, gdzie mówi randomizer mgieł, i czy żaden wędrujący boss nie blokuje bramy."
+      }
+    },
+    "roaming-parish": {
+      "title": "Undead Parish pełne bossów",
+      "purpose": "Każdy zwykły slot, który może przyjąć bossa, go dostaje (najwyżej dziesięciu na mapę): największe obciążenie różnymi modelami, jakie świat z wędrującymi bossami może włożyć na jedną mapę.",
+      "observe": {
+        "0": "Przejdź całe Undead Parish, razem z kościołem i stroną Sunlight Altar.",
+        "1": "Znajdź bossa wśród zwykłych wrogów: lista poniżej podaje obszar i wroga, którego zastąpił.",
+        "2": "Powinien się obudzić, gdy się zbliżysz, walczyć jak boss, którym jest (bez paska zdrowia bossa, bez bramy mgły) i dać się zabić; dusze i łupy powinny wyglądać rozsądnie."
+      }
+    },
+    "body-burg-fights": {
+      "title": "Zwykły wróg w walkach z Taurus Demonem i Capra Demonem",
+      "purpose": "Druga i trzecia wczesna walka z bossem ze zwykłym wrogiem jako ciałem: most Taurus Demona i pokój Capra Demona w Undead Burg.",
+      "gameplayNote": "Walka z Taurus Demonem ze zwykłym wrogiem jako ciałem została rozegrana i zadziałała. Walki z Capra Demonem jeszcze nie grano.",
+      "observe": {
+        "0": "Walcz z Taurus Demonem na moście Undead Burg i z Capra Demonem poniżej: ciała tego świata są wymienione w docs/SMOKE_TESTS.md, paski zdrowia zachowują nazwy bossów, każda walka kończy się śmiercią swojego ciała, a jej brama mgły się otwiera.",
+        "1": "Żadna z walk nie może zacząć się od nowa po ponownym wczytaniu."
+      }
+    },
+    "body-fog": {
+      "title": "Zwykły wróg jako ciało bossa z randomizerem mgieł",
+      "purpose": "Ciała bossów razem z randomizerem mgieł: bramy mgły bossów, teleporty i zdarzenia bossów są poprzestawiane przez randomizer mgieł i nadal muszą się kończyć.",
+      "observe": {
+        "0": "Znajdź walki z Asylum Demonem, Taurus Demonem i Capra Demonem tam, gdzie umieścił je randomizer mgieł: każda musi się zacząć, pokazać pasek zdrowia, skończyć się śmiercią ciała i otworzyć swoją bramę mgły."
+      }
+    },
+    "body-roaming": {
+      "title": "Ciała bossów i wędrujący bossowie razem",
+      "purpose": "Zwykli wrogowie we wczesnych walkach z bossami i bossowie w slotach zwykłych wrogów w tym samym świecie (oba kierunki zamiany).",
+      "observe": {
+        "0": "Pierwsza walka z bossem ma zwykłego wroga jako ciało, a niektórzy zwykli wrogowie świata są bossami.",
+        "1": "Żaden rodzaj nie przeszkadza drugiemu: każda walka z bossem się kończy, każdy wędrujący boss walczy na własną rękę."
+      }
+    },
+    "body-both": {
+      "title": "Bossowie lub zwykli wrogowie w walkach z bossami",
+      "purpose": "Losowanie bossów razem z ciałami zwykłych wrogów: część walk dostaje bossa, trzy wczesne mogą dostać zwykłego wroga (Zamiana bossów: Bossowie lub zwykli wrogowie).",
+      "observe": {
+        "0": "Odwiedź walki z bossami: trzy wczesne mogą mieć zwykłego wroga jako ciało (wymienieni w docs/SMOKE_TESTS.md), każda inna walka ma bossa."
+      }
+    },
+    "body-gargoyle": {
+      "title": "Ciała bossów z drugim Bell Gargoyle",
+      "purpose": "Zwykli wrogowie we wczesnych walkach z bossami razem z drugim Bell Gargoyle zastąpionym bossem (Gargoyle nigdy nie dostają zwykłego wroga).",
+      "observe": {
+        "0": "Wejdź na dach kościoła w Undead Parish: walka z Bell Gargoyles to ta wymieniona w docs/SMOKE_TESTS.md (klasyczne tasowanie nadal przestawia bossów wielociałowych), z drugim ciałem zastąpionym bossem jak w teście Drugi Bell Gargoyle. Gargoyle nigdy nie dostają zwykłego wroga.",
+        "1": "Walki z Asylum Demonem, Taurus Demonem i Capra Demonem mają zwykłych wrogów jako ciała (wymienieni w docs/SMOKE_TESTS.md)."
+      }
+    },
+    "npc-world": {
+      "title": "Wrogie NPC w całym świecie",
+      "purpose": "Wrodzy Merchanci, Andre i Vamos wśród zwykłych wrogów całej gry (najwyżej dwunastu na mapę), z prawdziwymi NPC pozostawionymi w spokoju.",
+      "observe": {
+        "0": "Przejdź Undead Burg, Parish i Depths: wrogie NPC wymienieni w docs/SMOKE_TESTS.md są przeciwnikami; budzą się, walczą i giną jak zwykli wrogowie.",
+        "1": "Prawdziwy Undead Merchant, Andre of Astora i pozostałe przyjazne postacie są tam, gdzie zawsze, i nadal rozmawiają oraz sprzedają.",
+        "2": "Na jednej mapie nie stoi więcej niż dwunastu wrogich NPC."
+      }
+    },
+    "npc-fog": {
+      "title": "Wrogie NPC z randomizerem mgieł",
+      "purpose": "Wrogie NPC razem z randomizerem mgieł: przyjazne NPC, ich dialogi i bramy mgły muszą nadal działać.",
+      "observe": {
+        "0": "Zagraj w pierwszy obszar: wrogie NPC są przeciwnikami, a bramy mgły i teleporty działają jak w każdym świecie z mgłami.",
+        "1": "Porozmawiaj z prawdziwym Andre i prawdziwym Undead Merchantem, jeśli randomizer mgieł pozwoli Ci do nich dojść: dialogi i sklepy są bez zmian."
+      }
+    },
+    "npc-roaming": {
+      "title": "Wrogie NPC i wędrujący bossowie razem",
+      "purpose": "Oba rodzaje zamiany w jednym świecie: bossowie w zwykłych slotach i wrogie NPC w zwykłych slotach.",
+      "observe": {
+        "0": "Niektóre zwykłe sloty zajmuje wędrujący boss, inne wrogi NPC; żaden rodzaj nie przeszkadza drugiemu i oba budzą się i walczą."
+      }
+    },
+    "npc-type": {
+      "title": "Wrogie NPC z zamianą według typu",
+      "purpose": "Zamiana według typu zmienia każdego wroga jednego rodzaju na mapie w jednego zastępcę: wrogi NPC może zająć całą grupę (najwyżej dwunastu na mapę).",
+      "observe": {
+        "0": "Tam, gdzie cały rodzaj wrogów stał się jednym wrogim NPC, każdy z nich budzi się i walczy; żaden nie jest bierny ani zablokowany.",
+        "1": "Każdy z nich daje łupy własnego slotu: rodzaj, który stał się jednym NPC, nie upuszcza jednej nagrody NPC na każde ciało."
+      }
+    },
+    "npc-bosses": {
+      "title": "Wrogie NPC z ciałami bossów i losowaniem bossów",
+      "purpose": "Wrogie NPC obok losowania bossów i zwykłych wrogów jako ciał wczesnych walk z bossami.",
+      "observe": {
+        "0": "Walki z bossami działają jak w testach bossów; wrogie NPC wokół nich to zwykli wrogowie i nie biorą udziału w żadnej walce z bossem."
+      }
+    },
+    "laundromat-npcs": {
+      "title": "Laundromat Mixup - NPC w cudzych zbrojach",
+      "purpose": "Postacie NPC noszą elementy zbroi, które nosią inne NPC (zmienia się tylko ich wygląd i statystyki zbroi); nic, co możesz podnieść, się nie zmienia.",
+      "observe": {
+        "0": "Zagraj w pierwsze obszary jak zwykle i przyjrzyj się każdemu napotkanemu NPC: każdy nosi zbroję, którą w normalnej grze nosi jakiś inny NPC, a nie swój własny zestaw.",
+        "1": "Nic się nie psuje: zbroja widać na modelu NPC, NPC rozmawia, handluje i walczy jak zawsze (wrogi NPC walczy w nowej zbroi).",
+        "2": "Wydrążeni NPC (nieumarłe wersje) zachowują normalny wygląd."
+      },
+      "afterwards": {
+        "0": "Dokładna zbroja każdego wiersza NPC jest wymieniona przez kontrolę statyczną (SmokeVerify laundromat); tutaj ocenia się tylko to, jak to wygląda w grze."
+      }
+    }
+  },
+  "checklist": {
+    "0": "Obszar się wczytuje i pojawia się model wroga lub bossa (bez niewidzialnego ciała, bez T-pozy).",
+    "1": "AI wroga/bossa się budzi: zauważa Cię, rusza się i atakuje.",
+    "2": "Nawigacja działa: podąża za Tobą i nie utyka na ścianach ani schodach.",
+    "3": "Stoi na podłodze: nic nie przepada przez ziemię, nie lewituje ani nie opuszcza areny.",
+    "4": "Zdrowie zachowuje się poprawnie: boss pokazuje pasek zdrowia, zwykły wróg nie; wartość wygląda rozsądnie dla obszaru.",
+    "5": "Można go zabić, a jego śmierć kończy walkę (bez nieśmiertelnej fazy, która się nie kończy).",
+    "6": "Pokoje bossów: brama mgły otwiera się potem, a starcie nie zaczyna się po raz drugi.",
+    "7": "Postęp nadal działa: flaga bossa, ognisko, drzwi i przedmioty kluczowe zależne od tej walki.",
+    "8": "Nagrody są rozsądne: dusze, łupy i nagroda za bossa nie znikają ani się nie dublują.",
+    "9": "Odradzanie działa zgodnie z oczekiwaniami po odpoczynku przy ognisku (zwykli wrogowie wracają, pokonani bossowie pozostają pokonani).",
+    "10": "Gra nie wywala się przy wejściu do obszaru ani wyjściu z niego, a mapa wczytuje się normalnie."
+  }
 }

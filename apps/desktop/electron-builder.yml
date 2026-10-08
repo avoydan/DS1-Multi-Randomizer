@@ -36,6 +36,11 @@ win:
     signingHashAlgorithms:
       - sha256
 nsis:
+  # English and Polish, like the application. The installer picks the language from the Windows display language (no language dialog: displayLanguageSelector
+  # stays off); any other Windows language gets English, the first in the list. The product name is not translated (docs/I18N.md, "Installer").
+  installerLanguages:
+    - en_US
+    - pl_PL
   # A normal wizard installer for the current user: no administrator, no per-machine files, a choice of folder, the uninstaller removes the
   # program and the shortcuts and keeps what the person generated (settings, history and runs live in the user data folder).
   oneClick: false
