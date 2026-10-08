@@ -1,6 +1,5 @@
 {
   "header": {
-    "eyebrow": "DARK SOULS REMASTERED",
     "title": "Triple Randomizer",
     "tagline": "Losuj przedmioty, wrogów i bramy mgły w Dark Souls Remastered."
   },
@@ -16,26 +15,14 @@
   "sections": {
     "game": "Twoja gra"
   },
-  "options": {
-    "includeDlc": {
-      "label": "Zawartość DLC",
-      "hint": "Uwzględniaj obszary, przeciwników, bossów i przedmioty z DLC w losowaniu. Wyłącz, aby zawartość Artorias of the Abyss nie brała udziału w losowaniu.",
-      "fogHint": "Randomizer mgieł zawsze obejmuje obszary DLC, więc ta opcja zostaje włączona, dopóki działa.",
-      "onNote": "Zawartość DLC jest uwzględniona w losowaniu.",
-      "offNote": "Obszary, przeciwnicy, bossowie i przedmioty z DLC nie biorą udziału w losowaniu. Samo DLC zostaje w grze bez zmian; po prostu nie jest losowane.",
-      "fogNote": "Zawartość DLC jest uwzględniona: randomizer mgieł zawsze obejmuje obszary DLC."
-    },
-    "spoilerLog": "Generuj log spoilerów"
-  },
   "preset": {
-    "summary": "Preset ustawień (import / eksport)",
     "aria": "Preset ustawień",
     "placeholder": "Wklej tutaj preset DS1TR albo wyeksportuj bieżące ustawienia.",
     "export": "Eksportuj bieżące ustawienia",
     "apply": "Zastosuj preset",
     "reset": "Przywróć ustawienia domyślne",
     "exported": "Preset wyeksportowany. Skopiuj tekst, aby udostępnić te ustawienia.",
-    "applied": "Preset zastosowany. Sprawdź ustawienia, a potem kliknij Losuj świat.",
+    "applied": "Preset zastosowany. Sprawdź ustawienia, a potem kliknij Generuj świat.",
     "resetDone": "Przywrócono ustawienia domyślne.",
     "problemsLead": "Nie udało się zastosować presetu. Szczegóły techniczne (po angielsku):"
   },
@@ -71,13 +58,13 @@
   },
   "progressAria": "Postęp",
   "run": {
-    "randomize": "Losuj świat",
-    "chooseSettings": "Wybierz ustawienia, a potem kliknij Losuj świat.",
+    "randomize": "Generuj świat",
+    "chooseSettings": "Wybierz ustawienia, a potem kliknij Generuj świat.",
     "readyTitle": "Twoja zrandomizowana gra jest gotowa",
     "seedAria": "Kod seeda",
-    "stale": "Zmieniono ustawienia po utworzeniu tego świata. Zastosuj instaluje świat pokazany powyżej; Losuj świat tworzy nowy.",
+    "stale": "Zmieniono ustawienia po utworzeniu tego świata. Zastosuj instaluje świat pokazany powyżej; Generuj świat tworzy nowy.",
     "apply": "Zastosuj do gry",
-    "randomizeAgain": "Losuj ponownie",
+    "randomizeAgain": "Generuj ponownie",
     "restore": "Przywróć oryginalne pliki",
     "restoreShared": "Przywróć i utwórz nowy świat",
     "copySeedShort": "Kopiuj seed {{seed}}",
@@ -134,5 +121,103 @@
     "copyright": "Copyright © 2026 współtwórcy DS1 Triple Randomizer. Program jest udostępniany bez jakiejkolwiek gwarancji. Możesz go rozpowszechniać i modyfikować na warunkach GNU GPL w wersji 3. Odpowiadający kod źródłowy i pełny tekst licencji towarzyszą każdemu wydaniu.",
     "disclaimer": "Ten nieoficjalny projekt nie jest powiązany z FromSoftware ani Bandai Namco Entertainment. Używaj go wyłącznie z własną instalacją gry i graj na zmodyfikowanych danych gry offline.",
     "readLicense": "Przeczytaj licencję GNU GPL v3"
+  },
+  "nav": {
+    "label": "Nawigacja",
+    "game": "Twoja gra",
+    "presets": "Presety",
+    "seed": "Seed Code",
+    "transfer": "Import / Eksport",
+    "settings": "Ustawienia aplikacji",
+    "about": "O programie",
+    "version": "Wersja {{version}}"
+  },
+  "mode": {
+    "label": "Widok ustawień",
+    "basic": {
+      "title": "Tryb podstawowy",
+      "note": "Zalecany dla większości graczy"
+    },
+    "advanced": {
+      "title": "Tryb zaawansowany",
+      "note": "Pełna kontrola nad wszystkimi opcjami"
+    }
+  },
+  "basic": {
+    "customActive": "Aktywne są niestandardowe ustawienia zaawansowane.",
+    "showAdvanced": "Pokaż je w trybie zaawansowanym",
+    "main": {
+      "title": "Główne opcje",
+      "note": "Najważniejsze ustawienia randomizera."
+    },
+    "common": {
+      "title": "Dodatkowe opcje",
+      "note": "Udogodnienia i popularne funkcje."
+    },
+    "dlc": {
+      "title": "Zawartość DLC",
+      "note": "Włącza lub wyłącza losowanie zawartości Artorias of the Abyss."
+    },
+    "output": {
+      "title": "Plik z wynikiem",
+      "note": "Plik tekstowy z listą tego, co wylosowano.",
+      "warning": "Plik może ujawnić lokalizacje ważnych przedmiotów, bossów i przejść. Otwieraj go tylko, jeśli chcesz znać wynik losowania."
+    }
+  },
+  "advancedView": {
+    "title": "Tryb zaawansowany",
+    "note": "Wszystkie opcje z pełnymi opisami. Kliknij ? przy opcji, aby zobaczyć szczegółowe wyjaśnienie.",
+    "back": "Powrót do trybu podstawowego",
+    "options_one": "{{count}} opcja",
+    "options_few": "{{count}} opcje",
+    "options_many": "{{count}} opcji",
+    "options_other": "{{count}} opcji",
+    "changed_one": "{{count}} zmieniona",
+    "changed_few": "{{count}} zmienione",
+    "changed_many": "{{count}} zmienionych",
+    "changed_other": "{{count}} zmienionych"
+  },
+  "views": {
+    "game": {
+      "note": "Losuj przedmioty, wrogów i przejścia w Dark Souls Remastered."
+    },
+    "presets": {
+      "title": "Presety",
+      "note": "Twoje ustawienia, gotowe do zapisania, udostępnienia lub przywrócenia.",
+      "currentTitle": "Bieżące ustawienia",
+      "explain": "Ustawienia widoczne w widoku Twoja gra to bieżący preset. Wyeksportuj je jako tekst w sekcji Import / Eksport albo wróć tutaj do zalecanych ustawień.",
+      "reset": "Przywróć zalecane ustawienia",
+      "back": "Wróć do swojej gry",
+      "differenceTitle": "Preset czy Seed Code?",
+      "presetTerm": "Preset",
+      "presetText": "Same ustawienia. Zastosowanie presetu zmienia tylko opcje i niczego nie tworzy; każde kolejne generowanie robi nowy świat z nowym losowym ziarnem.",
+      "seedTerm": "Seed Code",
+      "seedText": "Jeden dokładny świat: ustawienia i ziarno razem. Wczytanie Seed Code ustawia jego opcje i od razu generuje ten sam świat."
+    },
+    "transfer": {
+      "title": "Import / Eksport",
+      "note": "Przenoś ustawienia między komputerami jako tekst.",
+      "noSeed": "Preset nigdy nie zawiera ziarna, więc nie odtwarza konkretnego świata. Do tego służy Seed Code."
+    },
+    "seed": {
+      "title": "Seed Code",
+      "note": "Udostępnij dokładny świat lub odtwórz go.",
+      "currentTitle": "Bieżący świat",
+      "none": "Nie wygenerowano jeszcze żadnego świata. Po wygenerowaniu jego Seed Code pojawi się tutaj.",
+      "loadTitle": "Wczytaj Seed Code",
+      "loadExplain": "Wklej kod. Jego ustawienia trafiają do opcji Twojej gry, a świat jest generowany automatycznie (w razie potrzeby najpierw przywracana jest oryginalna gra).",
+      "whatTitle": "Co zawiera Seed Code",
+      "whatText": "Profil generowania, główne ziarno i każde ustawienie, które decyduje o świecie. Nie zawiera Twojego języka, widoku podstawowego lub zaawansowanego ani folderu gry. Ten sam kod tworzy ten sam świat przy tym samym profilu generowania."
+    },
+    "settings": {
+      "title": "Ustawienia aplikacji",
+      "note": "Język i narzędzia.",
+      "languageTitle": "Język",
+      "languageNote": "Język tej aplikacji. Nigdy nie zmienia świata i nie jest częścią Seed Code."
+    },
+    "about": {
+      "title": "O programie",
+      "version": "Wersja {{version}}"
+    }
   }
 }

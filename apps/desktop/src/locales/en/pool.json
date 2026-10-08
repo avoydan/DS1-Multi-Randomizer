@@ -1,6 +1,4 @@
 {
-  "label": "Custom enemy pool",
-  "hint": "Restricts which enemies may be placed; enemies you leave out stay where they are in the game.",
   "fullPool": "Full pool: every regular enemy of the game. Boss and NPC entries of the original tool are not available yet.",
   "reading": "Reading the enemy list from the clean game data…",
   "loadList": "Load enemy list",

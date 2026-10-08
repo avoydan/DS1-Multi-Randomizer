@@ -1,0 +1,484 @@
+{
+  "ui": {
+    "helpFor": "Wyjaśnienie: {{name}}",
+    "panelTitle": "O tej opcji",
+    "panelEmpty": "Wybierz znak ? przy opcji, aby przeczytać, co robi.",
+    "close": "Zamknij",
+    "what": "Co robi?",
+    "affects": "Czego dotyczy?",
+    "limits": "Ograniczenia i zależności",
+    "example": "Przykład",
+    "choices": "Możliwe wybory",
+    "recommended": "Zalecane",
+    "evidencePartial": "Opis oparty na tym, jak kod randomizera mgieł traktuje tę opcję; dokładny skutek w grze nie był tu obserwowany.",
+    "selected": "Wybrane",
+    "unavailable": "Niedostępne"
+  },
+  "reasons": {
+    "itemsOff": "Włącz losowanie przedmiotów, aby zmienić tę opcję.",
+    "enemiesOff": "Włącz losowanie wrogów, aby zmienić tę opcję.",
+    "regularEnemiesOff": "Włącz zwykłych wrogów, aby zmienić tę opcję.",
+    "bossesOff": "Włącz losowanie bossów, aby zmienić tę opcję.",
+    "fogOff": "Włącz losowanie przejść i mgieł, aby zmienić tę opcję.",
+    "needsWorldItems": "Włącz „Przedmioty leżące w świecie”, aby zmienić tę opcję.",
+    "needsSoulPool": "Wymaga co najmniej jednej z opcji: Przedmioty leżące w świecie, Dary od NPC, Łupy z wrogów.",
+    "needsStartingEquipment": "Włącz „Wyposażenie startowe”, aby zmienić tę opcję.",
+    "needsKeyPlacement": "Wybierz rozmieszczenie kluczy inne niż Oryginalne, aby zmienić tę opcję.",
+    "racePlusFair": "Tryb wyścigu + jest zawsze Uczciwy.",
+    "samplingOnly": "Używane tylko przy metodzie „Wybierz zamiennik dla każdego miejsca”.",
+    "needsCurve": "Używane tylko wtedy, gdy dopasowanie trudności to jeden z trybów z krzywą trudności.",
+    "needsRoamingMode": "Wymaga ustawienia „Zwykłych wrogów zastępuj” na „Tylko bossami” lub „Bossami lub zwykłymi wrogami”.",
+    "needsBothNormalMode": "Wymaga ustawienia „Zwykłych wrogów zastępuj” na „Bossami lub zwykłymi wrogami”.",
+    "needsBossDraw": "Wymaga ustawienia „Zamiana bossów” na „Losowi bossowie” lub „Bossowie lub zwykli wrogowie”.",
+    "needsBossBothMode": "Wymaga ustawienia „Zamiana bossów” na „Bossowie lub zwykli wrogowie”.",
+    "needsNormalEnemiesMode": "Wymaga ustawienia „Zwykłych wrogów zastępuj” na „Tylko zwykłymi wrogami” lub „Bossami lub zwykłymi wrogami”.",
+    "customPoolActive": "Niedostępne razem z własną pulą wrogów.",
+    "dlcWithFog": "Randomizer mgieł zawsze obejmuje obszary DLC, więc ta opcja zostaje włączona, dopóki on jest włączony.",
+    "warnKeysNeedWorldItems": "Rozmieszczenie kluczy wymaga „Przedmiotów leżących w świecie”: włącz je, bo inaczej nie da się utworzyć świata.",
+    "warnRandomStart": "Losowy start wymaga losowania zwykłych bram mgły lub bram mgły bossów."
+  },
+  "settings": {
+    "items": {
+      "enabled": {
+        "short": "Przenosi przedmioty: to, co leży w świecie, oraz (jeśli włączysz) dary, łupy i towary sklepów.",
+        "what": "Główny przełącznik wszystkiego, co dotyczy przedmiotów. Gdy jest wyłączony, żaden przedmiot się nie przenosi, a opcje przedmiotów nic nie robią.",
+        "affects": "Przedmioty w świecie, dary od NPC, łupy z wrogów, sklepy, klasy i wyposażenie startowe, stroje NPC, rozmieszczenie kluczy i trudność przedmiotów.",
+        "limits": "Działa dopiero razem z co najmniej jedną z opcji poniżej. Rozmieszczenie kluczy wymaga także „Przedmiotów leżących w świecie”."
+      },
+      "worldItems": {
+        "short": "Tasuje to, co leży na ziemi, w skrzyniach i przy zwłokach.",
+        "what": "Zawartość przedmiotów rozmieszczonych na mapach (to, co podnosisz z ziemi, ze skrzyń i ze zwłok) jest tasowana między tymi miejscami, więc przedmiot znaleziony w danym miejscu zwykle nie jest tym, który umieszcza tam oryginalna gra.",
+        "affects": "Każde znalezisko w świecie z wyjątkiem tych, od których zależy fabuła (te zostają, chyba że włączone jest rozmieszczenie kluczy). Nie zmienia tego, co dają NPC, co wypadają z wrogów ani co sprzedają sklepy: to mają osobne opcje.",
+        "limits": "Rozmieszczenie kluczy, rozdzielanie zestawów zbroi i opcje dusz potrzebują tej opcji.",
+        "example": "Alluring Skulls, które leżą w Undead Parish, mogą zamiast tego znaleźć się w Duke's Archives."
+      },
+      "progressionLogic": {
+        "short": "Zostawia dar Lordvessel, dar Key to the Seal i towary sklepowe związane z fabułą tam, gdzie umieszcza je gra.",
+        "what": "Gdy tasowane są dary od NPC lub sklepy, dwa dary, od których zależy fabuła (Lordvessel od Gwynevere i Key to the Seal), nie trafiają do puli przedmiotów, a towary sklepowe odblokowywane zdarzeniem fabularnym zostają na miejscu. Ustalona lista bezpiecznych towarów, takich jak Humanity, jest nadal tasowana.",
+        "affects": "Tylko pule darów od NPC i sklepów.",
+        "limits": "Nic nie robi, gdy dary od NPC i sklepy są wyłączone. Nie to chroni klucze leżące w świecie: robią to zasady dla znalezisk w świecie i rozmieszczenie kluczy."
+      },
+      "npcGifts": {
+        "short": "Dodaje przedmioty, które dają NPC, do puli przedmiotów.",
+        "what": "Przedmioty wręczane przez NPC (około dwudziestu darów) trafiają do puli przedmiotów: NPC może dać inny przedmiot, a pierwotny dar może pojawić się gdzie indziej.",
+        "affects": "Dary wręczane przez NPC w rozmowie lub w zdarzeniach.",
+        "limits": "Lordvessel i Key to the Seal zostają bez zmian, dopóki włączona jest opcja „Chroń dary i towary sklepowe ważne dla postępu”."
+      },
+      "enemyDrops": {
+        "short": "Dodaje to, co wypadają wrogowie po śmierci, do puli przedmiotów.",
+        "what": "Przedmioty, które mogą wypaść z wrogów, trafiają do puli przedmiotów: zabicie wroga może dać inny przedmiot, a pierwotny łup może pojawić się gdzie indziej.",
+        "affects": "Przedmioty wypadające z wrogów (nie dusze, które dają).",
+        "limits": "Ta opcja nie zmienia szansy na wypadnięcie przedmiotu. Do tego służy „Gwarantowane łupy z wrogów”."
+      },
+      "guaranteedDrops": {
+        "short": "Sprawia, że wróg mający łup zawsze upuszcza któryś ze swoich przedmiotów.",
+        "what": "Szanse przedmiotów w każdej tabeli łupów wrogów w grze są podnoszone do łącznie 100%, więc wróg z tabelą łupów nigdy nie upuszcza „niczego”.",
+        "affects": "Każda tabela łupów wrogów, niezależnie od tego, czy „Łupy z wrogów” są włączone. Nie zmienia tego, jakie przedmioty są w tabelach.",
+        "limits": "Wymaga włączonego losowania przedmiotów."
+      },
+      "shops": {
+        "short": "Dodaje towary sklepów NPC do puli przedmiotów.",
+        "what": "Towary i ekwipunek sprzedawane przez kupców NPC trafiają do puli przedmiotów: sklep może sprzedawać inne rzeczy, a to, co sprzedawał, może pojawić się gdzie indziej. Strzały, bełty i przedmioty do rzucania zostają w sklepach.",
+        "affects": "Asortyment kupców.",
+        "limits": "Towary odblokowywane zdarzeniami fabularnymi zostają na miejscu, dopóki włączona jest opcja „Chroń dary i towary sklepowe ważne dla postępu”. Przy wyłączonej zawartości DLC kupcy z DLC są pomijani."
+      },
+      "startingClass": {
+        "short": "Daje każdej klasie startowe statystyki innej klasy.",
+        "what": "Startowe statystyki (poziom i atrybuty) klas są tasowane między klasami, więc żadna klasa nie zachowuje własnych.",
+        "affects": "Statystyki, z którymi zaczynasz po wybraniu klasy. Ich wyposażenie to osobna opcja.",
+        "limits": "Wymaga włączonego losowania przedmiotów.",
+        "example": "Wojownik (Warrior) może zacząć z atrybutami Czarodzieja (Sorcerer)."
+      },
+      "startingEquipment": {
+        "short": "Daje każdej klasie losową startową broń i zbroję.",
+        "what": "Każda klasa dostaje inną broń (broń główną i przedmiot do lewej ręki; Hunter, Sorcerer, Pyromancer i Cleric także przedmiot specjalny) oraz cztery inne elementy zbroi. Broń dobierana jest tak, by klasa mogła jej używać przy swoich statystykach, a zbroje nie powtarzają się między klasami.",
+        "affects": "Startowy ekwipunek wszystkich klas (podnoszony w Undead Asylum).",
+        "limits": "Rodzaj broni zależy od opcji „Rodzaje broni startowej”. Działa z „Statystykami klasy startowej” i bez nich.",
+        "example": "Wojownik może zacząć z inną bronią i inną zbroją niż zwykle."
+      },
+      "startingItems": {
+        "short": "Wybiera, jakie bronie i tarcze może zawierać wyposażenie startowe.",
+        "what": "Używane tylko, gdy włączone jest wyposażenie startowe. Decyduje, jak wymagająca może być broń główna (co klasa udźwignie jedną lub dwiema rękami przy własnej Sile) oraz czy w lewej ręce jest tarcza, czy może być też broń.",
+        "affects": "Bronie i tarcze wybierane do wyposażenia startowego klas.",
+        "limits": "Niedostępne, dopóki „Wyposażenie startowe” jest wyłączone: samo w sobie nic nie zmienia.",
+        "choices": {
+          "shield-1h": "Broń główna do użycia jedną ręką przy Sile klasy i tarcza w lewej ręce.",
+          "shield-2h": "Broń główna może wymagać dwóch rąk (do 1,5 Siły klasy) i tarcza w lewej ręce.",
+          "mixed-pool": "Jak wyżej, ale w lewej ręce może być dowolna broń, której klasa może użyć, nie tylko tarcza."
+        }
+      },
+      "keyPlacement": {
+        "short": "Decyduje, czy klucze otwierające świat są przenoszone.",
+        "what": "Klucze to przedmioty potrzebne do postępu w świecie (na przykład Basement Key, Master Key, Crest of Artorias i klucze dzwonów). Tryby przenoszą je do innych znalezisk w świecie i sprawdzają wynik, aby każdy obszar pozostał osiągalny i można było dojść do Firelink Altar.",
+        "affects": "Rozmieszczenie przedmiotów kluczowych. Na nim opierają się trudność przedmiotów, rozmieszczenie Lordvessel i Lord Souls.",
+        "limits": "Wymaga „Przedmiotów leżących w świecie”. Tryb wyścigu + jest zawsze Uczciwy. Przy włączonym randomizerze mgieł Tryb wyścigu + jest tworzony jako Tryb wyścigu.",
+        "choices": {
+          "vanilla": "Każdy klucz zostaje tam, gdzie umieszcza go gra.",
+          "shuffled": "Klucze trafiają do innych znalezisk; kontrola bezpieczeństwa sprawia, że świat da się ukończyć.",
+          "race": "Jak Przetasowane, ale klucze i żary leżą tylko w nagrodach za bossów, w skrzyniach i tam, gdzie zwykle są klucze. Dobre do wyścigów.",
+          "race-plus": "Jak Tryb wyścigu, ale świat może wymagać skipów i glitchy (skip Capry, skip Seal...); bez nich można utknąć."
+        }
+      },
+      "lordvessel": {
+        "short": "Przenosi Lordvessel do innego znaleziska.",
+        "what": "Lordvessel dołącza do tasowania kluczy: leży w innym miejscu świata, a Gwynevere wręcza zamiast niego inny przedmiot z puli. Firelink Altar nadal wymaga Lordvessel w ekwipunku.",
+        "affects": "Lordvessel i dar Gwynevere.",
+        "limits": "Wymaga rozmieszczenia kluczy innego niż Oryginalne. Nie dotyczy złotych bram mgły randomizera mgieł."
+      },
+      "lordSouls": {
+        "short": "Przenosi cztery Lord Souls do innych znalezisk.",
+        "what": "Cztery Lord Souls (Bed of Chaos, Nito, Seath i Four Kings) dołączają do tasowania kluczy i można je znaleźć gdzie indziej. To nagrody za bossów, więc same walki z bossami zostają na miejscu.",
+        "affects": "Miejsca, w których leżą Lord Souls, i przedmioty, które leżą tam zamiast nich.",
+        "limits": "Wymaga rozmieszczenia kluczy innego niż Oryginalne. Nie dotyczy opcji „Wymagaj Lord Souls” w randomizerze mgieł."
+      },
+      "difficulty": {
+        "short": "Jak mocno dobre przedmioty są trzymane z dala od łatwych miejsc.",
+        "what": "Decyduje tylko, które z dozwolonych miejsc dany przedmiot woli; nigdy nie sprawia, że świata nie da się ukończyć. Uczciwy umieszcza przedmioty gdziekolwiek z równą szansą. Nieuczciwy trzyma pożądane przedmioty z dala od miejsc na widoku. Bardzo nieuczciwy je ukrywa i rzadko umieszcza we wczesnych obszarach. DS1TR ocenia przedmioty i miejsca własnymi regułami na podstawie danych gry, więc przybliża oryginalne narzędzie.",
+        "affects": "Gdzie leżą przedmioty w pulach, które włączyłeś (świat, dary, łupy, sklepy).",
+        "limits": "Tryb wyścigu + jest zawsze Uczciwy.",
+        "choices": {
+          "fair": "Przedmioty mają równe szanse znaleźć się gdziekolwiek.",
+          "unfair": "Pożądane przedmioty nie leżą na widoku.",
+          "very-unfair": "Pożądane przedmioty są ukryte i rzadko leżą we wczesnych obszarach."
+        }
+      },
+      "soulItems": {
+        "short": "Co dzieje się z duszami i duszami bossów jako przedmiotami.",
+        "what": "Dusze, które można podnieść (Soul of a Lost Undead i inne), oraz dusze bossów też są przedmiotami. Zwykle są tasowane jak każdy inny przedmiot.",
+        "affects": "Przedmioty-dusze w pulach, które włączyłeś (świat, dary, łupy).",
+        "limits": "Wymaga co najmniej jednej z opcji: Przedmioty leżące w świecie, Dary od NPC, Łupy z wrogów.",
+        "choices": {
+          "shuffled": "Dusze są tasowane jak każdy inny przedmiot.",
+          "replaced": "Mniejsze dusze (od Soul of a Lost Undead do Soul of a Great Hero) przed tasowaniem zamieniają się w inne przedmioty jednorazowe.",
+          "transposed": "Dusze bossów dołączają do puli, a każda ma 75% szans stać się bronią wykonaną z tej duszy."
+        }
+      },
+      "fashionSouls": {
+        "short": "Włączone: elementy zbroi znajdujesz osobno. Wyłączone: całe zestawy zbroi zostają razem.",
+        "what": "Włączone: każdy element zbroi jest tasowany osobno, więc jeden zestaw może być rozrzucony po wielu miejscach. Wyłączone: zwykłe zestawy zbroi znalezione w świecie są wymieniane jako kompletne zestawy między miejscami, w których leży zestaw.",
+        "affects": "Zbroje znajdowane w świecie.",
+        "limits": "Wymaga „Przedmiotów leżących w świecie”. Zmienia też sposób mieszania strojów NPC, gdy włączone są „Stroje NPC”.",
+        "example": "Wyłączone: Antiquated Dress, Gloves i Skirt, które leżą razem w Darkroot, zostają razem jako jeden zestaw w innym miejscu."
+      },
+      "laundromat": {
+        "short": "NPC noszą elementy zbroi, które noszą inni NPC.",
+        "what": "Postacie NPC noszą elementy zbroi, które nosili już inni NPC, zamiast swoich zwykłych zestawów. Zmienia się tylko ich wygląd i statystyki zbroi. Przy wyłączonym rozdzielaniu zestawów zbroi każdy NPC nosi jeden kompletny zestaw; przy włączonym elementy są mieszane. Wrogie wersje zachowują swój wygląd.",
+        "affects": "Wygląd NPC. Nic, co można podnieść, się nie zmienia.",
+        "limits": "Wymaga włączonego losowania przedmiotów."
+      }
+    },
+    "enemies": {
+      "enabled": {
+        "short": "Zastępuje wrogów w świecie innymi wrogami i bossami.",
+        "what": "Główny przełącznik wszystkiego, co dotyczy wrogów i bossów. Gdy jest wyłączony, żaden wróg ani boss nie jest zmieniany.",
+        "affects": "Zwykli wrogowie, bossowie i wszystkie ich opcje.",
+        "limits": "Losowanie bossów to osobny przełącznik poniżej."
+      },
+      "regular": {
+        "short": "Zastępuje zwykłych wrogów innymi wrogami.",
+        "what": "Zwykli wrogowie (nie bossowie) są zastępowani zgodnie z metodą rozmieszczenia i opcjami poniżej.",
+        "affects": "Każdy zwykły wróg w grze.",
+        "limits": "Wymaga włączonego losowania wrogów."
+      },
+      "scaling": {
+        "short": "Jak silny jest zastąpiony wróg.",
+        "what": "Gdy wróg jest zastępowany, ta opcja decyduje, czy nowy wróg zachowuje własne zdrowie i obrażenia, czy przejmuje je od wroga, którego zastąpił.",
+        "affects": "Mnożniki zdrowia i obrażeń zastąpionych wrogów.",
+        "limits": "Wymaga włączonego losowania wrogów.",
+        "choices": {
+          "vanilla": "Nowy wróg zachowuje własną siłę, więc silny wróg może stanąć we wczesnym obszarze.",
+          "area": "Nowy wróg przejmuje siłę wroga, który stał tam wcześniej.",
+          "progressive": "W tej wersji identyczne z „Według obszaru” (wygenerowane pliki gry są bajt w bajt takie same)."
+        }
+      },
+      "algorithm": {
+        "short": "Jak wybierane są zamienniki.",
+        "what": "Wybierz zamiennik dla każdego miejsca: każde miejsce wroga niezależnie wybiera zgodny zamiennik, co włącza szansę zamiany, dopasowanie, trudność, zamianę według rodzaju, własną pulę oraz opcje bossów; rodzaj może się powtarzać. Przetasuj istniejących wrogów: metoda klasyczna, tasuje istniejących wrogów między miejscami, zachowując ich liczebność; odtwarza stare seedy.",
+        "affects": "Wszystkie opcje sekcji wrogów i bossów, które potrzebują tej metody.",
+        "limits": "Zmiana metody przywraca opcje zależne od niej do zwykłych wartości dla tej metody.",
+        "choices": {
+          "sampling-v1": "Każde miejsce niezależnie wybiera zgodny zamiennik (zalecane). Włącza opcje poniżej.",
+          "permutation-v1": "Tasuje istniejących wrogów między miejscami, zachowując ich liczebność. Odtwarza stare seedy."
+        }
+      },
+      "replacementChance": {
+        "short": "Jak prawdopodobne jest, że dane miejsce wroga w ogóle zostanie zastąpione.",
+        "what": "Szansa, że miejsce zwykłego wroga zostanie zastąpione; przy „Zamianie według rodzaju” szansa dotyczy całego rodzaju wrogów na mapie. 100% zastępuje każdego wroga.",
+        "affects": "Ilu zwykłych wrogów zostaje takich jak w oryginalnej grze.",
+        "limits": "Używane tylko przy metodzie „Wybierz zamiennik dla każdego miejsca”. Limit 30 modeli wrogów na mapę nigdy się nie pogarsza."
+      },
+      "normalReplacement": {
+        "short": "Co dostają miejsca zwykłych wrogów.",
+        "what": "Decyduje, czy miejsce zwykłego wroga dostaje tylko zwykłych wrogów, tylko bossów, czy jednych i drugich. Boss stojący w miejscu zwykłego wroga wędruje po świecie jak zwykły wróg (wędrujący boss). Bossowie, którzy potrzebują własnej areny (Bed of Chaos, Ceaseless Discharge, Dark Sun Gwyndolin, Lord Gwyn), i bossowie wielociałowi nigdy się tam nie pojawiają.",
+        "affects": "Miejsca zwykłych wrogów. Od tej opcji zależą opcje wędrujących bossów.",
+        "limits": "Używane tylko przy metodzie „Wybierz zamiennik dla każdego miejsca”.",
+        "choices": {
+          "none": "Miejsca zwykłych wrogów nie są zastępowane.",
+          "normals": "Biorą udział tylko zwykli wrogowie (zwykła zamiana).",
+          "bosses": "Bossowie stają w miejscach, które biorą udział, jako wędrujący bossowie.",
+          "both": "Każde miejsce, które bierze udział, dostaje bossa z szansą ustawioną w sekcji bossów, a w przeciwnym razie zwykłego wroga."
+        }
+      },
+      "fit": {
+        "short": "Czy zamiennik może być większy niż miejsce, w którym stoi.",
+        "what": "„Tylko tam, gdzie pasują” nigdy nie stawia wroga w miejscu mniejszym od niego. „Gdziekolwiek” dopuszcza każdy rozmiar, z większym ryzykiem, że wrogowie wejdą w ściany lub utkną.",
+        "affects": "Jakie zamienniki może przyjąć miejsce.",
+        "limits": "Używane tylko przy metodzie „Wybierz zamiennik dla każdego miejsca”.",
+        "choices": {
+          "fits": "Zamiennik nigdy nie jest większy od miejsca.",
+          "anywhere": "Każdy rozmiar może stanąć gdziekolwiek.",
+          "anywhere-except-npcs": "Dla zwykłych wrogów to samo co Gdziekolwiek (różni się tylko dla miejsc NPC, które nigdy nie są zastępowane)."
+        }
+      },
+      "difficultyMode": {
+        "short": "Czy zamienniki mają podążać za trudnością miejsca.",
+        "what": "Krzywa trudności: zwykły wróg jest zastępowany przez wroga o porównywalnej trudności (jak bardzo może się różnić, ustala ścisłość). Losowo: dowolny wróg gdziekolwiek. Łatwy Asylum: Undead Asylum dostaje tylko najłatwiejszych wrogów. DS1TR wylicza klasy trudności z obszarów i zdrowia wrogów, więc przybliżają one oryginalne.",
+        "affects": "Który wróg może stanąć gdzie.",
+        "limits": "Używane tylko przy metodzie „Wybierz zamiennik dla każdego miejsca”.",
+        "choices": {
+          "curve-easy-asylum": "Porównywalna trudność, a w Asylum tylko najłatwiejsi wrogowie.",
+          "curve": "Porównywalna trudność wszędzie.",
+          "random-easy-asylum": "Dowolny wróg gdziekolwiek, z tym że Asylum dostaje tylko najłatwiejszych.",
+          "random": "Dowolny wróg gdziekolwiek, także w Asylum."
+        }
+      },
+      "strictness": {
+        "short": "Jak bardzo zamiennik może odbiegać od oryginalnej trudności.",
+        "what": "Używane przez tryby z krzywą trudności. Ścisła: głównie ta sama klasa trudności, trudniejsi wrogowie są rzadcy. Trochę luźna: trudniejsi wrogowie pojawiają się częściej. Bardzo luźna: dowolna trudność może pojawić się gdziekolwiek.",
+        "affects": "Trudność wrogów w każdym obszarze.",
+        "limits": "Używane tylko w trybie z krzywą trudności.",
+        "choices": {
+          "strict": "Głównie ta sama trudność; trudniejsi są rzadcy.",
+          "loose": "Trudniejsi wrogowie pojawiają się częściej.",
+          "very-loose": "Dowolna trudność może pojawić się gdziekolwiek."
+        }
+      },
+      "typeReplacement": {
+        "short": "Zastępuje wszystkich wrogów jednego rodzaju na mapie tym samym nowym rodzajem.",
+        "what": "Włączona: każdy wróg jednego rodzaju na mapie (każdy Hollow w Undead Parish) staje się tym samym nowym rodzajem, a dwa rodzaje na jednej mapie nigdy nie dostają tego samego zamiennika. Szansa zamiany dotyczy wtedy rodzaju. Gdy bossowie stoją w zwykłych miejscach, Włączona daje każdemu wrogowi jednego rodzaju tego samego bossa; wyjątek pozwala każdemu miejscu wylosować własnego bossa.",
+        "affects": "Jak jednolici wyglądają wrogowie na mapie.",
+        "limits": "Używane tylko przy metodzie „Wybierz zamiennik dla każdego miejsca”.",
+        "example": "Wszyscy Hollowowie w Parish stają się Balder Knightami.",
+        "choices": {
+          "enabled": "Wszyscy wrogowie jednego rodzaju na mapie dostają ten sam zamiennik.",
+          "enabled-except-roaming-bosses": "Jak Włączona, ale każde miejsce, które dostaje wędrującego bossa, losuje własnego bossa.",
+          "disabled": "Każde miejsce jest zastępowane niezależnie."
+        }
+      },
+      "customPool": {
+        "short": "Ogranicza, których wrogów można użyć jako zamienników.",
+        "what": "Wybierz zwykłych wrogów, których może użyć losowanie. Wrogowie, których nie wybierzesz, nigdy nie są usuwani ze swoich miejsc; po prostu nie są używani jako zamienniki gdzie indziej.",
+        "affects": "Pula kandydatów na zamienniki zwykłych wrogów.",
+        "limits": "Używane tylko przy metodzie „Wybierz zamiennik dla każdego miejsca”. Wybór własnej puli wyłącza Wrogich NPC."
+      },
+      "bosses": {
+        "short": "Zastępuje bossów innymi bossami.",
+        "what": "Bossowie są zastępowani zgodnie z ustawieniem „Zamiana bossów”. Niektóre walki z bossami (smoki, bossowie wielociałowi) są wymieniane tylko całymi grupami.",
+        "affects": "Każda walka z bossem.",
+        "limits": "Wymaga włączonego losowania wrogów."
+      },
+      "bossReplacement": {
+        "short": "Jak wypełniane są areny bossów.",
+        "what": "Klasyczne tasowanie wymienia bossów między arenami. Losowi bossowie pozwalają każdej arenie jednociałowego bossa wylosować własny zamiennik, więc boss może pojawić się więcej niż raz. Dwie opcje ze zwykłymi wrogami pozwalają zwykłemu wrogowi stanąć jako ciało bossa w trzech wczesnych walkach (Asylum Demon, Taurus Demon, Capra Demon): walka pozostaje walką bossa (jego pasek zdrowia i nazwa, jego mgła, to, co odblokowuje, i jego nagrody), a zwykły wróg nigdy nie wraca.",
+        "affects": "Który boss lub wróg pojawia się na każdej arenie bossa. Smoki, Seath, Priscilla, Sanctuary Guardian, Bell Gargoyles i Centipede Demon zostają przy klasycznym tasowaniu.",
+        "limits": "Wymaga losowania bossów i metody „Wybierz zamiennik dla każdego miejsca”. Lord Gwyn podlega ustawieniu „Lord Gwyn jako boss zamiennik”.",
+        "choices": {
+          "classic": "Bossowie są tasowani między arenami, jak we wcześniejszych wersjach.",
+          "bosses": "Każda arena losuje własnego bossa; boss może pojawić się więcej niż raz.",
+          "normals": "Trzy wczesne walki dostają zwykłego wroga jako ciało; każdy inny boss zostaje sobą.",
+          "both": "Te trzy walki mogą dostać zwykłego wroga; każda inna arena dostaje losowego bossa."
+        }
+      },
+      "bossChanceBoss": {
+        "short": "Jak często arena, która może przyjąć zwykłego wroga, dostaje bossa.",
+        "what": "Z aren bossów, które biorą udział i mogą przyjąć zwykłego wroga, ten odsetek dostaje bossa; reszta dostaje zwykłego wroga.",
+        "affects": "Trzy wczesne walki, w których zwykły wróg może być ciałem bossa.",
+        "limits": "Wymaga ustawienia „Zamiana bossów” na „Bossowie lub zwykli wrogowie”."
+      },
+      "uniqueBosses": {
+        "short": "Każdy boss zostaje użyty raz, zanim jakikolwiek pojawi się po raz drugi.",
+        "what": "Każdy boss z puli jest umieszczony raz, zanim któryś zostanie użyty ponownie.",
+        "affects": "Bossowie losowani dla aren bossów.",
+        "limits": "Wymaga ustawienia „Zamiana bossów” na „Losowi bossowie” lub „Bossowie lub zwykli wrogowie”."
+      },
+      "bossChanceNormal": {
+        "short": "Jak często miejsce zwykłego wroga dostaje bossa.",
+        "what": "Z miejsc zwykłych wrogów, które biorą udział, ten odsetek dostaje bossa (wędrującego bossa) zamiast zwykłego wroga.",
+        "affects": "Miejsca zwykłych wrogów.",
+        "limits": "Wymaga ustawienia „Zwykłych wrogów zastępuj” na „Bossami lub zwykłymi wrogami”."
+      },
+      "roamingSouls": {
+        "short": "Ile dusz daje wędrujący boss.",
+        "what": "Jaką część dusz, które boss daje na własnej arenie, upuszcza, gdy stoi w miejscu zwykłego wroga.",
+        "affects": "Dusze upuszczane przez wędrujących bossów.",
+        "limits": "Wymaga ustawienia „Zwykłych wrogów zastępuj” na „Tylko bossami” lub „Bossami lub zwykłymi wrogami”.",
+        "example": "50%: boss, który na swojej arenie daje 10 000 dusz, jako wędrujący daje 5 000."
+      },
+      "roamingDead": {
+        "short": "Pokonany wędrujący boss już nie wraca.",
+        "what": "Włączone: boss w miejscu zwykłego wroga nie wraca po odpoczynku lub zresetowaniu obszaru (sprawdzone w grze: pozostał martwy). Wyłączone: wraca jak zwykły wróg.",
+        "affects": "Czy wędrujący bossowie się odradzają.",
+        "limits": "Wymaga ustawienia „Zwykłych wrogów zastępuj” na „Tylko bossami” lub „Bossami lub zwykłymi wrogami”."
+      },
+      "mimics": {
+        "short": "Wyłączone: Mimiki zostają na miejscu i nie są używane gdzie indziej.",
+        "what": "Włączone: Mimiki są zastępowane jak inni wrogowie i mogą pojawić się gdzie indziej. Wyłączone: dziewięć miejsc z Mimikami zachowuje Mimika i nigdzie indziej nie pojawia się żaden Mimik.",
+        "affects": "Dziewięć miejsc z Mimikami.",
+        "limits": "Wymaga włączonych zwykłych wrogów."
+      },
+      "hostileNpcs": {
+        "short": "Undead Merchant, Andre i Vamos mogą pojawić się jako wrogowie.",
+        "what": "Undead Merchant, Andre of Astora i Vamos mogą stanąć w miejscu zwykłych wrogów jako wrogowie. Prawdziwi NPC nigdy nie są ruszani, a to, co sprzedają lub czego uczą, się nie zmienia.",
+        "affects": "Miejsca zwykłych wrogów (najwyżej dwunastu wrogich NPC na mapę).",
+        "limits": "Wymaga metody „Wybierz zamiennik dla każdego miejsca” i ustawienia „Zwykłych wrogów zastępuj” na „Tylko zwykłymi wrogami” lub „Bossami lub zwykłymi wrogami”. Niedostępne z własną pulą wrogów."
+      },
+      "mosquitoes": {
+        "short": "Wyłączone: sześć odradzających się komarów z bagna zostaje na miejscu.",
+        "what": "Włączone: sześć odradzających się komarów z bagna w Blighttown jest zastępowanych jak inni wrogowie. Wyłączone: zostają, gdzie są, i nie są używane gdzie indziej.",
+        "affects": "Tylko te sześć komarów.",
+        "limits": "Wymaga włączonych zwykłych wrogów."
+      },
+      "sameEnemy": {
+        "short": "Żaden zwykły wróg nie jest zastępowany wrogiem własnego rodzaju.",
+        "what": "Zwykły wróg nigdy nie jest zastępowany wrogiem własnego rodzaju. Bossowie i tak nigdy nie są zastępowani tym samym bossem.",
+        "affects": "Miejsca zwykłych wrogów.",
+        "limits": "Wymaga włączonych zwykłych wrogów.",
+        "example": "Hollow nigdy nie zostaje Hollowem."
+      },
+      "pinwheel": {
+        "short": "Boss Pinwheel zostaje, a jego klony są zastępowane.",
+        "what": "Włączone: główny Pinwheel w Catacombs nie jest zastępowany i nie jest używany jako boss gdzie indziej; jego czternaście klonów, które giną od jednego trafienia, zastępują zwykli wrogowie z normalnym zdrowiem. Wyłączone: główny Pinwheel jest zastępowany jak każdy boss, a jego klony są pomijane.",
+        "affects": "Walka z Pinwheel w Catacombs.",
+        "limits": "Wymaga włączonych zwykłych wrogów."
+      },
+      "gargoyle": {
+        "short": "Co dzieje się z drugim Bell Gargoyle.",
+        "what": "Drugi Bell Gargoyle dołącza do walki, gdy pierwszy ma 60% zdrowia.",
+        "affects": "Walka z Bell Gargoyles na dachu Undead Parish.",
+        "limits": "Wymaga włączonego losowania bossów.",
+        "choices": {
+          "replace": "Drugi Bell Gargoyle staje się niezależnie wylosowanym bossem.",
+          "keep": "Drugi Bell Gargoyle zostaje Bell Gargoyle.",
+          "single-boss": "Wcześniejsze zachowanie DS1TR: dodatkowy Gargoyle jest usuwany, więc walka ma jednego bossa."
+        }
+      },
+      "gwyn": {
+        "short": "Jak rzadko Lord Gwyn pojawia się jako boss zamiennik.",
+        "what": "Szansa, że Lord Gwyn zostanie odrzucony przy losowaniu bossa zamiennika (także w Kiln): Mocne 85%, Średnie 60%. Nie zmienia nic w samym Gwynie, tylko to, jak często jest wybierany.",
+        "affects": "Losowania bossów.",
+        "limits": "Wymaga włączonego losowania bossów.",
+        "choices": {
+          "strong": "Gwyn jest odrzucany w 85% przypadków.",
+          "medium": "Gwyn jest odrzucany w 60% przypadków.",
+          "none": "Gwyn nigdy nie jest odrzucany."
+        }
+      }
+    },
+    "fog": {
+      "enabled": {
+        "short": "Miesza połączenia między obszarami.",
+        "what": "Losuje, dokąd prowadzi każda brama mgły, teleport i przejście, więc świat jest połączony na nowo. Świat jest tworzony tak, aby dało się go ukończyć.",
+        "affects": "Bramy mgły, teleporty i kolejność, w jakiej dochodzi się do obszarów.",
+        "limits": "Zawsze obejmuje obszary DLC, więc zawartości DLC nie można wyłączyć, dopóki ta opcja jest włączona."
+      },
+      "traversable": {
+        "short": "Zwykłe bramy mgły między obszarami prowadzą gdzie indziej.",
+        "what": "Bramy mgły, przez które przechodzisz między obszarami (nie te przy arenach bossów), są losowane: przejście przez jedną może prowadzić do innego miejsca.",
+        "affects": "Zwykłe bramy mgły.",
+        "limits": "Wymaga włączonego losowania przejść i mgieł."
+      },
+      "bossFogs": {
+        "short": "Bramy mgły aren bossów prowadzą gdzie indziej.",
+        "what": "Bramy mgły przy wejściu i wyjściu z aren bossów są losowane: do areny bossa można dojść z innych miejsc i może ona prowadzić do innych miejsc.",
+        "affects": "Bramy mgły walk z bossami.",
+        "limits": "Wymaga włączonego losowania przejść i mgieł."
+      },
+      "warps": {
+        "short": "Teleporty między lokacjami prowadzą gdzie indziej.",
+        "what": "Istniejące teleporty między lokacjami (jak transport przez kruki) są losowane. Przy wyłączonych „Rozłączonych bramach mgły” teleporty są łączone w pary tak, aby dało się ich używać w obie strony.",
+        "affects": "Teleporty między lokacjami.",
+        "limits": "Wymaga włączonego losowania przejść i mgieł."
+      },
+      "majorPvp": {
+        "short": "Główne bramy mgły w miejscach, które randomizer mgieł oznacza jako PvP.",
+        "what": "W danych randomizera mgieł niektóre bramy mgły są oznaczone jako bramy PvP, a część z nich jako główne (na przykład między Firelink Shrine a Undead Burg). Wyłączone: te bramy zostają na miejscu i nie są mieszane; włączone: biorą udział w losowaniu jak inne bramy.",
+        "affects": "Bramy mgły oznaczone w danych randomizera mgieł jako główne PvP.",
+        "limits": "Wymaga włączonego losowania przejść i mgieł."
+      },
+      "minorPvp": {
+        "short": "Poboczne bramy mgły w miejscach, które randomizer mgieł oznacza jako PvP.",
+        "what": "Pozostałe bramy mgły oznaczone w danych randomizera mgieł jako bramy PvP. Wyłączone: zostają na miejscu i nie są mieszane; włączone: biorą udział w losowaniu.",
+        "affects": "Bramy mgły oznaczone w danych randomizera mgieł jako poboczne PvP.",
+        "limits": "Wymaga włączonego losowania przejść i mgieł."
+      },
+      "lordvesselGates": {
+        "short": "Złote bramy mgły wymagające Lordvessel też są mieszane.",
+        "what": "Złote bramy mgły, które otwiera Lordvessel (na przykład w Tomb of the Giants, Demon Ruins i Duke's Archives). Wyłączone: zostają na miejscu i nadal wymagają Lordvessel. Włączone: biorą udział w losowaniu jak inne bramy.",
+        "affects": "Złote bramy mgły.",
+        "limits": "Wymaga włączonego losowania przejść i mgieł. Nie dotyczy rozmieszczenia Lordvessel."
+      },
+      "randomStart": {
+        "short": "Nowa gra zaczyna się gdzie indziej niż w Undead Asylum.",
+        "what": "Nowa gra zaczyna się w jednym z szesnastu punktów startowych (na przykład Firelink Shrine, Undead Parish, Darkroot Garden, Anor Londo, Painted World) zamiast w Undead Asylum.",
+        "affects": "Gdzie zaczyna się nowa gra.",
+        "limits": "Wymaga włączonego losowania przejść i mgieł oraz losowania zwykłych bram mgły lub bram mgły bossów."
+      },
+      "disconnected": {
+        "short": "Przejście przez bramę i powrót nie odprowadza cię tam, skąd przyszedłeś.",
+        "what": "Zwykle dwie strony bramy mgły są sparowane, więc powrót prowadzi do miejsca, z którego przyszedłeś. Przy tej opcji obie strony są losowane niezależnie, więc brama, przez którą przeszedłeś, może po odwróceniu się prowadzić gdzie indziej.",
+        "affects": "Jak łączą się bramy mgły.",
+        "limits": "Wymaga włączonego losowania przejść i mgieł."
+      },
+      "noFall": {
+        "short": "Zmienia zdarzenia podłogi na arenie Bed of Chaos.",
+        "what": "Randomizer mgieł zastępuje dwa zdarzenia podłogi mapy Bed of Chaos własnymi wersjami, tak aby gracz nie spadał (nazwa opcji w randomizerze mgieł to No-Fall Bed of Chaos).",
+        "affects": "Arena Bed of Chaos.",
+        "limits": "Wymaga włączonego losowania przejść i mgieł."
+      },
+      "scaling": {
+        "short": "Siła wrogów i bossów zależy od tego, jak daleko od startu jest obszar.",
+        "what": "Zdrowie i obrażenia wrogów i bossów w obszarze są dostosowywane do tego, jak daleko od startu ten obszar wypada w porównaniu z oryginalną grą, więc obszar, do którego dochodzi się wcześniej, jest łatwiejszy, a późniejszy trudniejszy. Obszary, do których w oryginalnej grze dochodzi się wcześnie, nie są ułatwiane.",
+        "affects": "Siła wrogów i bossów w każdym obszarze.",
+        "limits": "Wymaga włączonego losowania przejść i mgieł. Niezależne od „Skalowania siły wrogów” randomizera wrogów."
+      },
+      "glitched": {
+        "short": "Ukończenie świata może wymagać skipów i glitchy.",
+        "what": "Połączenia, które randomizer mgieł oznacza jako „trudne” (skipy i glitche), są uznawane za możliwe do użycia przy sprawdzaniu, czy świat da się ukończyć, więc świat może dać się ukończyć tylko z nimi.",
+        "affects": "Jak randomizer mgieł ocenia, czy świat da się ukończyć.",
+        "limits": "Wymaga włączonego losowania przejść i mgieł. Bez tej opcji nie zakłada się żadnych skipów."
+      },
+      "requireLordSouls": {
+        "short": "Kiln of the First Flame zostaje na końcu i wymaga Lord Souls.",
+        "what": "Włączone: wejścia do Kiln of the First Flame nie są losowane, więc Kiln zostaje na końcu świata. Wyłączone: jego wejścia też są losowane. (W logice świata wejście do Lorda Gwyna wymaga Lordvessel i czterech Lord Souls: Bed of Chaos, Nito, Seath i Four Kings.)",
+        "affects": "Koniec gry.",
+        "limits": "Wymaga włączonego losowania przejść i mgieł. Nie dotyczy rozmieszczenia Lord Souls."
+      },
+      "pacifist": {
+        "short": "Usuwa warunek „boss pokonany” z wyjścia z areny bossa.",
+        "what": "W teleportach, które randomizer mgieł tworzy dla wyjść z aren bossów, dwie flagi wiążące wyjście z pokonaniem bossa są czyszczone. Celem opcji jest umożliwienie opuszczenia areny bossa bez wygrania walki.",
+        "affects": "Wyjścia z aren bossów.",
+        "limits": "Wymaga włączonego losowania przejść i mgieł."
+      },
+      "gameLanguage": {
+        "short": "Folder językowy, do którego zapisywane są dodatkowe komunikaty randomizera mgieł.",
+        "what": "Randomizer mgieł dodaje do gry kilka komunikatów zdarzeń. Są zapisywane do folderu języka, który tu wybierzesz, więc wybierz język, w którym działa Twoja gra. To część świata i jego Seed Code, niezależna od języka tej aplikacji.",
+        "affects": "Tylko komunikaty dodane przez randomizer mgieł.",
+        "limits": "Wymaga włączonego losowania przejść i mgieł."
+      }
+    },
+    "output": {
+      "dlc": {
+        "short": "Uwzględnia obszary, wrogów, bossów i przedmioty z DLC w losowaniu.",
+        "what": "Włączone: zawartość Artorias of the Abyss bierze udział w losowaniu. Wyłączone: jej obszary, wrogowie, bossowie, przedmioty, kupcy i dary NPC są pomijane; samo DLC zostaje w grze dokładnie takie, jakie jest, i po prostu nie jest losowane.",
+        "affects": "Wszystko, co należy do mapy DLC.",
+        "limits": "Nie można wyłączyć, gdy włączony jest randomizer mgieł: zawsze obejmuje obszary DLC."
+      },
+      "spoiler": {
+        "short": "Zapisuje plik tekstowy z pełną listą tego, co wylosowano.",
+        "what": "Zapisuje plik tekstowy z każdym przedmiotem, wrogiem, bossem, darem, łupem i sklepem, które zostały zmienione, wraz z tym, co było przed i po. Arkusz podpowiedzi działa bez niego. Plik można przeczytać w Historii uruchomień.",
+        "affects": "Tylko to, czy ten plik jest zapisywany. Zdradza świat: otwieraj go tylko, jeśli chcesz wiedzieć.",
+        "limits": "Nie zawiera połączeń randomizera mgieł."
+      }
+    }
+  }
+}

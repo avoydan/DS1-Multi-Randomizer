@@ -1,6 +1,4 @@
 {
-  "label": "Własna pula wrogów",
-  "hint": "Ogranicza, którzy wrogowie mogą być umieszczani; wrogowie, których pominiesz, zostają w grze na swoich miejscach.",
   "fullPool": "Pełna pula: każdy zwykły wróg w grze. Wpisy bossów i NPC z oryginalnego narzędzia nie są jeszcze dostępne.",
   "reading": "Wczytywanie listy wrogów z czystych danych gry…",
   "loadList": "Wczytaj listę wrogów",

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { EnemyPoolDescription, PlacementFitMode } from '@ds1tr/contracts';
 import { api } from './api';
@@ -11,6 +11,10 @@ interface Props {
   fit: PlacementFitMode;
   customPool: string[] | null;
   onChange: (pool: string[] | null) => void;
+  /** The name of the option, the `?` that explains it and the reason it is unavailable (the option is drawn by the settings registry). */
+  label: string;
+  help: ReactNode;
+  reason: string | null;
 }
 
 /**
@@ -18,8 +22,9 @@ interface Props {
  * data), the selection is stored by model id. The pool restricts replacements only; enemies that are not selected stay
  * in the game where they are. Boss and NPC entries of the original tool are not offered yet.
  */
-export function EnemyPoolEditor({ gamePath, active, fit, customPool, onChange }: Props) {
+export function EnemyPoolEditor({ gamePath, active, fit, customPool, onChange, label, help, reason }: Props) {
   const { t } = useTranslation();
+  const switchId = useId();
   const [description, setDescription] = useState<EnemyPoolDescription | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<ErrorInfo | null>(null);
@@ -81,10 +86,11 @@ export function EnemyPoolEditor({ gamePath, active, fit, customPool, onChange }:
 
   return (
     <div className="pool-editor">
-      <label className="toggle-row" title={t('pool.hint')}>
-        <span>{t('pool.label')}</span>
-        <input type="checkbox" checked={enabled} disabled={!active || loading} onChange={(event) => { void toggleUse(event.target.checked); }} />
-      </label>
+      <div className="setting-line">
+        <span className="setting-name"><label htmlFor={switchId}>{label}</label>{help}</span>
+        <input id={switchId} type="checkbox" role="switch" className="switch" checked={enabled} disabled={!active || loading} onChange={(event) => { void toggleUse(event.target.checked); }} />
+      </div>
+      {reason && <p className="setting-reason" role="note">{reason}</p>}
       {!enabled && <small className="field-note">{t('pool.fullPool')}</small>}
       {error && <ErrorNotice error={error} />}
       {loading && <small className="field-note">{t('pool.reading')}</small>}

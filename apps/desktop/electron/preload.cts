@@ -7,5 +7,11 @@ contextBridge.exposeInMainWorld('desktop', {
   language: (): Promise<{ setting: 'auto' | 'en' | 'pl'; resolved: 'en' | 'pl' }> => ipcRenderer.invoke('language:get'),
   setLanguage: (setting: 'auto' | 'en' | 'pl'): Promise<{ setting: 'auto' | 'en' | 'pl'; resolved: 'en' | 'pl' }> => ipcRenderer.invoke('language:set', setting),
   saveFile: (request: { kind: 'html' | 'txt' | 'json' | 'zip'; defaultName: string; content: string }): Promise<{ ok: boolean; canceled: boolean; name?: string; code?: string }> => ipcRenderer.invoke('file:save', request),
+  devTools: (): Promise<boolean> => ipcRenderer.invoke('app:dev-tools'),
+  onDevTools: (listener: (shown: boolean) => void): (() => void) => {
+    const handler = (_event: unknown, shown: boolean) => listener(shown === true);
+    ipcRenderer.on('dev-tools:changed', handler);
+    return () => { ipcRenderer.removeListener('dev-tools:changed', handler); };
+  },
   connection: (): Promise<{ apiBase: string | null; token: string; error: string | null; gamePath: string }> => ipcRenderer.invoke('runtime:connection'),
 });

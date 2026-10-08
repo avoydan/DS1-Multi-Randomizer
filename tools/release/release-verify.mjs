@@ -96,6 +96,11 @@ const worldDataCommit = /worldDataSourceCommit = '([0-9a-f]{40})'/u.exec(worldDa
 if (!pinCommit || pinCommit !== worldDataCommit) fail('provenance', `the Fog pin (${pinCommit}) and the world data commit (${worldDataCommit}) differ`);
 const shippedPin = lower.get('resources/runtime/licenses/foghost-upstream-pin.md');
 if (shippedPin && (await readFile(path.join(unpacked, shippedPin), 'utf8')).replace(/\r\n/gu, '\n') !== pin.replace(/\r\n/gu, '\n')) fail('provenance', 'the pin file shipped in the package is not the pin file of the repository');
+// The channel (docs/RELEASE_TRUST.md): a public release must be a public-channel build (the internal test worlds hidden); development builds report theirs.
+const buildInfoFile = path.join(unpacked, 'resources', 'runtime', 'build-info.json');
+let channel = null;
+if (await exists(buildInfoFile)) { try { channel = JSON.parse(await readFile(buildInfoFile, 'utf8')).channel ?? null; } catch { channel = null; } }
+if (requireSignature && channel !== 'public') fail('channel', `a public release must be a public-channel build; build-info.json says ${channel ?? 'nothing'}`);
 // The packaged application has no menu bar and no telemetry: checked in the source it was built from.
 const main = await readFile(path.join(repositoryRoot, 'apps', 'desktop', 'electron', 'main.ts'), 'utf8');
 if (!/setApplicationMenu\(null\)|removeMenu\(\)|autoHideMenuBar/u.test(main)) fail('ui', 'the Electron menu is no longer removed in the packaged application (main.ts)');
@@ -152,6 +157,7 @@ const manifest = {
   version,
   generationProfile: /CURRENT_GENERATION_PROFILE\s*=\s*([A-Z0-9_]+)/u.test(await readFile(path.join(repositoryRoot, 'packages', 'contracts', 'src', 'generation.ts'), 'utf8')) ? 'ds1tr-gen-v1 (the profile of every Seed Code made so far; later profiles stay runnable)' : 'unknown',
   mode: requireSignature ? 'public' : 'development',
+  channel,
   signatureState: overall,
   expectedPublisher: expectedPublisher || null,
   versions: { desktop: version, backend: (await readJson(path.join(repositoryRoot, 'apps', 'backend', 'package.json'))).version, contracts: (await readJson(path.join(repositoryRoot, 'packages', 'contracts', 'package.json'))).version, foghost: fogVersion, randomizer: randomizerVersion },

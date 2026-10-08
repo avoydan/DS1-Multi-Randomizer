@@ -10,6 +10,12 @@ import { fileURLToPath } from 'node:url';
 //                                                          Windows store such as a hardware token, or DS1TR_ARTIFACT_SIGNING=1 with the Azure variables); without
 //                                                          them the build stops before it starts. Nothing is ever read from the repository.
 const releaseMode = process.argv.includes('--release');
+// The CHANNEL decides what the interface shows (docs/RELEASE_TRUST.md): `public` hides the internal test worlds, `internal` shows them. It is independent of signing: a --release build is always
+// public; without --release a build is internal unless --channel=public asks for the public interface (to look at what a player will see). The channel never reaches a world.
+const channelFlag = process.argv.find((argument) => argument.startsWith('--channel='))?.slice('--channel='.length);
+if (channelFlag !== undefined && channelFlag !== 'public' && channelFlag !== 'internal') throw new Error('--channel must be public or internal.');
+if (releaseMode && channelFlag === 'internal') throw new Error('A --release build is a public build: it cannot use the internal channel.');
+const channel = releaseMode ? 'public' : (channelFlag ?? 'internal');
 const appVersion = JSON.parse(await readFile(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'package.json'), 'utf8')).version;
 const desktop = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const root = path.resolve(desktop, '../..');
@@ -106,7 +112,7 @@ const fogHostProject = /<Version>([^<]+)<\/Version>/u.exec(await readFile(path.j
 let commit = null;
 try { commit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, windowsHide: true }).toString().trim(); } catch { commit = null; }
 await writeFile(path.join(runtime, 'build-info.json'), `${JSON.stringify({
-  schema: 'ds1tr-build-info-1', version: appVersion, commit, mode: releaseMode ? 'public' : 'development',
+  schema: 'ds1tr-build-info-1', version: appVersion, commit, mode: releaseMode ? 'public' : 'development', channel,
   versions: { desktop: appVersion, backend: await readVersion('apps/backend/package.json'), contracts: await readVersion('packages/contracts/package.json'), foghostProject: fogHostProject },
   builtAt: new Date().toISOString(),
 }, null, 2)}\n`);

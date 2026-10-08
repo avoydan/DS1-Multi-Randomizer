@@ -1,22 +1,43 @@
 {
+  "sections": {
+    "items": {
+      "title": "Items",
+      "note": "What is found in the world, given, dropped and sold."
+    },
+    "enemies": {
+      "title": "Enemies",
+      "note": "Which regular enemy stands where."
+    },
+    "bosses": {
+      "title": "Bosses",
+      "note": "Which boss fills which arena, and roaming bosses."
+    },
+    "transitions": {
+      "title": "Transitions and fog",
+      "note": "Where fog gates and warps lead."
+    },
+    "keys": {
+      "title": "Keys and progression",
+      "note": "Where the items that open the world lie."
+    },
+    "classic": {
+      "title": "Classic options",
+      "note": "Options carried over from the earlier randomizers."
+    },
+    "other": {
+      "title": "World and output",
+      "note": "DLC and the spoiler file."
+    }
+  },
   "items": {
+    "enabled": {
+      "label": "Item randomization"
+    },
     "worldItems": {
-      "label": "World items"
+      "label": "Items lying in the world"
     },
     "progressionLogic": {
-      "label": "Protect selected gift/shop progression entries"
-    },
-    "earlyWeapon": {
-      "label": "Guarantee early weapon"
-    },
-    "balancedEarlyLoot": {
-      "label": "Balanced early loot"
-    },
-    "startingClass": {
-      "label": "Starting class"
-    },
-    "startingEquipment": {
-      "label": "Starting equipment"
+      "label": "Protect progression gifts and shop goods"
     },
     "npcGifts": {
       "label": "NPC gifts"
@@ -30,152 +51,111 @@
     "shops": {
       "label": "Shops"
     },
-    "fashionSouls": {
-      "label": "Fashion Souls",
-      "hint": "On: armor pieces are shuffled individually. Off: complete armor sets stay together and are exchanged between set locations."
+    "startingClass": {
+      "label": "Starting class stats"
     },
-    "soulItems": {
-      "label": "Soul items",
-      "hint": "Replaced: the lesser souls (Soul of a Lost Undead through Soul of a Great Hero) become other consumables before shuffling. Transposed: the boss souls join the item pool and each has a 75% chance to become a weapon made from that soul.",
-      "options": {
-        "shuffled": "Shuffled",
-        "replaced": "Replaced",
-        "transposed": "Transposed"
-      }
+    "startingEquipment": {
+      "label": "Starting equipment"
     },
     "startingItems": {
-      "label": "Starting items",
-      "hint": "Needs Starting equipment. Shield modes give the left hand a shield; mixed pool also allows weapons.",
+      "label": "Starting weapon types",
       "options": {
-        "shield-1h": "Shield + 1H weapon",
-        "shield-2h": "Shield + 1H/2H weapon",
-        "mixed-pool": "Shield/weapon + weapon"
+        "shield-1h": "Shield and a one-handed weapon",
+        "shield-2h": "Shield and a one- or two-handed weapon",
+        "mixed-pool": "Any weapon in the left hand"
       }
-    },
-    "laundromat": {
-      "label": "Laundromat Mixup",
-      "hint": "NPC characters wear armor pieces other NPCs wear instead of their usual sets (only a cosmetic change and the armor stats of the NPC; nothing you can pick up changes). With Fashion Souls off each NPC wears one complete set; on, the pieces are mixed. Hollowed NPC variants keep their look."
     },
     "keyPlacement": {
       "label": "Key placement",
-      "hint": "Vanilla: every key stays where the game puts it. Shuffled: the keys of the world graph (Basement Key, Master Key, Crest of Artorias, the bell keys and the like) move to other world pickups, and the placement is checked so every area stays reachable and Firelink Altar can be reached. Race Mode: like Shuffled, but the keys and the embers lie only in boss rewards, chests and the places where keys normally are (good for races). Race Mode +: like Race Mode, but the world may need skips and glitches (the Capra skip, the Seal skip and the like); softlocking is possible without them. Needs World items.",
       "options": {
-        "vanilla": "Vanilla",
+        "vanilla": "Original",
         "shuffled": "Shuffled",
         "race": "Race Mode",
         "race-plus": "Race Mode +"
       }
     },
     "lordvessel": {
-      "label": "Lordvessel placement",
-      "hint": "The Lordvessel joins the key shuffle: it lies at another world pickup, and Gwynevere hands over another item of the pool instead. The Firelink Altar still needs the Lordvessel in your inventory. Needs a Key placement other than Vanilla. (The fog option Lordvessel gates is separate.)"
+      "label": "Lordvessel placement"
     },
     "lordSouls": {
-      "label": "Lord Soul placement",
-      "hint": "The four Lord Souls join the key shuffle (the Bed of Chaos, Nito, Quelaag and Seath pickups). Needs a Key placement other than Vanilla. (The fog option Require Lord Souls is separate.)"
+      "label": "Lord Soul placement"
     },
     "difficulty": {
-      "label": "Difficulty",
-      "hint": "Fair: items have an equal chance to be placed anywhere. Unfair: desirable items are not placed in plain view. Very Unfair: desirable items are hidden and rarely in early areas. This is about where items lie, never about whether the world can be completed. Race Mode + is always Fair.",
+      "label": "Item difficulty",
       "options": {
         "fair": "Fair",
         "unfair": "Unfair",
         "very-unfair": "Very Unfair"
       }
     },
-    "index": "ITEMS",
-    "title": "Item settings",
-    "groups": {
-      "main": "Main options",
-      "legacy": "Legacy options",
-      "keyItems": "Key items",
-      "difficulty": "Item difficulty"
+    "soulItems": {
+      "label": "Soul items",
+      "options": {
+        "shuffled": "Shuffled like other items",
+        "replaced": "Smaller souls become other items",
+        "transposed": "Boss souls may become weapons"
+      }
     },
-    "keyNotes": {
-      "vanilla": "Every key stays where the game puts it.",
-      "needsWorld": "Key placement needs World items: turn on World items, or set Key placement to Vanilla.",
-      "shuffled": "Keys are placed by a safety-checked fill over the world graph.",
-      "race": "Keys and embers lie only in boss rewards, chests and where keys normally are. The same safety check applies.",
-      "racePlus": "Like Race Mode, but a world may need skips and glitches to be completed. Item difficulty is Fair. With the fog randomizer on, the world is made as Race Mode."
+    "fashionSouls": {
+      "label": "Split armor sets"
     },
-    "difficultyNotes": {
-      "racePlus": "Race Mode + is always Fair.",
-      "fair": "Items have an equal chance to be placed anywhere.",
-      "unfair": "Desirable items are not placed in plain view.",
-      "veryUnfair": "Desirable items are hidden and rarely in early areas."
+    "laundromat": {
+      "label": "NPC outfits"
     }
   },
   "enemies": {
+    "enabled": {
+      "label": "Enemy randomization"
+    },
     "regular": {
       "label": "Regular enemies"
     },
-    "bosses": {
-      "label": "Bosses"
-    },
     "scaling": {
-      "label": "Scaling",
+      "label": "Enemy strength scaling",
       "options": {
-        "vanilla": "Vanilla",
-        "area": "Area",
+        "vanilla": "Own strength",
+        "area": "By area",
         "progressive": "Progressive"
       }
     },
     "algorithm": {
-      "label": "Placement algorithm",
-      "hint": "Sampling: each enemy slot independently chooses a compatible replacement, which enables replacement chance, placement fit, difficulty, type replacement, a custom enemy pool and the boss and NPC options. It may repeat a type. Classic permutation: shuffles the existing enemy population between locations while preserving overall counts; it reproduces old seeds.",
+      "label": "Placement method",
       "options": {
-        "sampling-v1": "Sampling (recommended)",
-        "permutation-v1": "Classic permutation"
+        "sampling-v1": "Pick a replacement for every spot",
+        "permutation-v1": "Shuffle existing enemies"
       }
     },
     "replacementChance": {
-      "label": "Replacement chance",
-      "hint": "Chance that each regular enemy slot is replaced at all. The 30-model map limit never gets worse: maps that bosses and dragons already push above 30 (Undead Parish) stay at or below their current count."
+      "label": "Replacement chance"
     },
     "normalReplacement": {
-      "label": "Normal enemy replacement",
-      "hint": "Only normal enemies: the usual replacement. Only bosses: bosses stand in the regular enemy slots that take part (a boss that wanders the world, with a share of its souls). Bosses or normal enemies: each slot that takes part gets a boss with the chance set below, otherwise a normal enemy. Bosses that need their own arena (Bed of Chaos, Ceaseless Discharge, Dark Sun Gwyndolin, Lord Gwyn) and the multi-body bosses never appear in a regular slot.",
+      "label": "Replace regular enemies with",
       "options": {
-        "none": "Disabled",
-        "normals": "Only normal enemies",
+        "none": "Nothing (they stay)",
+        "normals": "Only regular enemies",
         "bosses": "Only bosses",
-        "both": "Bosses or normal enemies"
+        "both": "Bosses or regular enemies"
       }
     },
-    "bossChanceNormal": {
-      "label": "Boss chance in normal slots",
-      "hint": "Of the regular enemy slots that take part, the share that get a boss instead of a normal enemy."
-    },
-    "roamingSouls": {
-      "label": "Roaming boss souls",
-      "hint": "How many of its fight souls a boss drops when it stands in a regular enemy slot (percent of the souls the boss gives in its own arena)."
-    },
-    "roamingDead": {
-      "label": "Roaming bosses stay dead",
-      "hint": "On: a boss in a regular slot does not come back once the area is reset (played in the game: it stayed dead). Off: it respawns like a normal enemy (written to the game's data; not yet confirmed in a playthrough)."
-    },
     "fit": {
-      "label": "Placement",
-      "hint": "Only where they fit: a replacement is never larger than the slot. Anywhere: any size. For regular enemies the last option equals Anywhere (it differs only for NPC slots).",
+      "label": "Size of replacements",
       "options": {
         "fits": "Only where they fit",
         "anywhere": "Anywhere",
-        "anywhere-except-npcs": "Anywhere, fit NPCs"
+        "anywhere-except-npcs": "Anywhere, NPC spots excepted"
       }
     },
     "difficultyMode": {
-      "label": "Difficulty mode",
-      "hint": "Difficulty curve: a regular enemy is replaced by one of comparable difficulty (strictness decides how far it may differ). Fully random: any enemy anywhere. Easy Asylum: the Asylum only receives the easiest enemies. Difficulty classes are derived by DS1TR from the enemies' areas and HP, so they approximate the original ones.",
+      "label": "Difficulty matching",
       "options": {
-        "curve-easy-asylum": "Curve + easy Asylum",
-        "curve": "Difficulty curve",
-        "random-easy-asylum": "Random + easy Asylum",
+        "curve-easy-asylum": "Comparable difficulty, easy Asylum",
+        "curve": "Comparable difficulty",
+        "random-easy-asylum": "Random, easy Asylum",
         "random": "Fully random"
       }
     },
     "strictness": {
-      "label": "Difficulty strictness",
-      "hint": "Only used by the difficulty-curve modes. Strict: mostly the same difficulty class, harder ones are rare. A bit loose: harder enemies appear more often. Very loose: any difficulty can appear anywhere.",
+      "label": "Matching strictness",
       "options": {
         "strict": "Strict",
         "loose": "A bit loose",
@@ -183,91 +163,87 @@
       }
     },
     "typeReplacement": {
-      "label": "Type replacement",
-      "hint": "Enabled: all enemies of one kind in a map (every Hollow in the Parish) are replaced by the same new kind, and two kinds in one map never get the same replacement. The replacement chance then applies to the kind, not to each enemy. With bosses in regular slots, Enabled gives every enemy of one kind the same boss; the exception lets each slot draw its own boss instead.",
+      "label": "Replace by kind",
       "options": {
-        "enabled": "Enabled",
-        "enabled-except-roaming-bosses": "Enabled, except roaming bosses",
-        "disabled": "Disabled"
+        "enabled": "Same replacement for each kind",
+        "enabled-except-roaming-bosses": "Same, except roaming bosses",
+        "disabled": "Each spot on its own"
       }
+    },
+    "customPool": {
+      "label": "Custom enemy pool"
+    },
+    "bosses": {
+      "label": "Boss randomization"
     },
     "bossReplacement": {
       "label": "Boss replacement",
-      "hint": "Classic shuffle: the bosses are shuffled among the boss slots as before. Random bosses: every single-body boss slot draws its own replacement from the boss pool, so a boss can appear more than once. Only normal enemies / Bosses or normal enemies: a normal enemy takes the place of the boss in three early fights (Asylum Demon, Taurus Demon, Capra Demon); the fight stays the boss's (its health bar and its name, its fog gate, what it unlocks and its rewards) and the normal enemy never comes back. With Area or Progressive scaling it takes the boss's health and strength, with Vanilla scaling its own. Every other boss keeps its own boss in Only normal enemies and gets a random boss in Bosses or normal enemies. The dragons, Seath, Priscilla, the Sanctuary Guardian, the Bell Gargoyles and the Centipede Demon keep the classic shuffle. Lord Gwyn follows the Gwyn spawn nerf.",
       "options": {
-        "classic": "Classic shuffle",
+        "classic": "Shuffle between arenas",
         "bosses": "Random bosses",
-        "normals": "Only normal enemies (early fights)",
-        "both": "Bosses or normal enemies"
+        "normals": "Regular enemy in early fights",
+        "both": "Bosses or regular enemies"
       }
     },
     "bossChanceBoss": {
-      "label": "Boss chance in boss slots",
-      "hint": "Of the boss slots that take part and can take a normal enemy, the share that get a boss; the rest get a normal enemy."
+      "label": "Boss chance where a regular enemy may stand"
     },
     "uniqueBosses": {
-      "label": "Unique bosses",
-      "hint": "Needs Random bosses or Bosses or normal enemies. Every boss of the pool is used once before any boss appears a second time."
+      "label": "Use every boss once first"
+    },
+    "bossChanceNormal": {
+      "label": "Boss chance in regular enemy spots"
+    },
+    "roamingSouls": {
+      "label": "Roaming boss souls"
+    },
+    "roamingDead": {
+      "label": "Roaming bosses stay dead"
     },
     "mimics": {
-      "label": "Replace mimics",
-      "hint": "Off: Mimics stay in place and are kept out of the enemy pool."
+      "label": "Replace Mimics"
     },
     "hostileNpcs": {
-      "label": "Hostile NPCs",
-      "hint": "Randomizes hostile NPC combatants: the Undead Merchant, Andre of Astora and Vamos can appear as enemies in place of regular enemies. Quest and service NPCs are kept safe: the real ones are never touched and nothing they sell or teach changes. Not used together with a custom enemy pool."
+      "label": "Hostile NPCs"
     },
     "mosquitoes": {
-      "label": "Replace respawning mosquitoes",
-      "hint": "Off: the six respawning Blighttown swamp mosquitoes stay in place."
+      "label": "Replace respawning mosquitoes"
     },
     "sameEnemy": {
-      "label": "Prevent same enemy",
-      "hint": "On: no regular enemy is replaced by an enemy of its own kind (a Hollow never becomes a Hollow). Bosses are never replaced by the same boss."
+      "label": "No replacement by the same kind"
     },
     "pinwheel": {
-      "label": "Pinwheel Chaos",
-      "hint": "On: the main Pinwheel is not replaced; its clones are replaced by regular enemies with their own stats."
+      "label": "Keep Pinwheel, replace its clones"
     },
     "gargoyle": {
-      "label": "Replace second Gargoyle",
-      "hint": "Needs boss randomization. Replace: the second Bell Gargoyle becomes an independently drawn boss. Do not replace: it stays a Bell Gargoyle. Single boss: the earlier DS1TR behavior (the extra Gargoyle is removed).",
+      "label": "Second Bell Gargoyle",
       "options": {
-        "replace": "Replace",
-        "keep": "Do not replace",
-        "single-boss": "Single boss (earlier DS1TR behavior)"
+        "replace": "Replace with another boss",
+        "keep": "Keep",
+        "single-boss": "Remove (earlier DS1TR behavior)"
       }
     },
     "gwyn": {
-      "label": "Gwyn spawn nerf",
-      "hint": "Chance that Lord Gwyn is rejected as a boss replacement: strong 85%, medium 60%.",
+      "label": "Lord Gwyn as a replacement boss",
       "options": {
-        "strong": "Strong",
-        "medium": "Medium",
-        "none": "None"
+        "strong": "Rare (rejected 85%)",
+        "medium": "Less rare (rejected 60%)",
+        "none": "No limit"
       }
-    },
-    "index": "ENEMIES",
-    "title": "Enemy settings",
-    "groups": {
-      "main": "Main options",
-      "placement": "Enemy placement",
-      "legacy": "Legacy options"
-    },
-    "algorithmNotes": {
-      "sampling": "Each enemy slot independently chooses a compatible replacement. The options below apply.",
-      "permutation": "Shuffles the existing enemy population between locations while preserving overall counts. Reproduces old seeds; the sampling options are not shown."
     }
   },
   "fog": {
+    "enabled": {
+      "label": "Transition and fog randomization"
+    },
     "traversable": {
-      "label": "Traversable non-boss fogs"
+      "label": "Ordinary fog gates"
     },
     "bossFogs": {
       "label": "Boss fog gates"
     },
     "warps": {
-      "label": "Warps between areas"
+      "label": "Warps between locations"
     },
     "majorPvp": {
       "label": "Major PvP fog gates"
@@ -276,10 +252,10 @@
       "label": "Minor PvP fog gates"
     },
     "lordvesselGates": {
-      "label": "Lordvessel gates"
+      "label": "Golden Lordvessel fog gates"
     },
     "randomStart": {
-      "label": "Random start outside Asylum"
+      "label": "Random start"
     },
     "disconnected": {
       "label": "Disconnected fog gates"
@@ -288,19 +264,19 @@
       "label": "No-Fall Bed of Chaos"
     },
     "scaling": {
-      "label": "Scale enemies and bosses"
+      "label": "Strength by distance from the start"
     },
     "glitched": {
-      "label": "Glitched logic"
+      "label": "Allow skips and glitches"
     },
     "requireLordSouls": {
       "label": "Require Lord Souls"
     },
     "pacifist": {
-      "label": "Pacifist Mode"
+      "label": "Pacifist mode"
     },
     "gameLanguage": {
-      "label": "In-game text language",
+      "label": "Language of fog messages",
       "options": {
         "ENGLISH": "English",
         "FRENCH": "French",
@@ -315,15 +291,15 @@
         "SCHINESE": "Simplified Chinese",
         "SPANISH": "Spanish",
         "TCHINESE": "Traditional Chinese"
-      },
-      "hint": "The language of the game's own text (menus, item and boss names) in the generated files. It is part of the world and of its Seed Code, and it is separate from the language of this app."
+      }
+    }
+  },
+  "output": {
+    "dlc": {
+      "label": "Include DLC content"
     },
-    "index": "FOG",
-    "title": "Fog randomizer settings",
-    "note": "Randomizes fog gates, warps and world progression.",
-    "groups": {
-      "entrances": "Entrances",
-      "logic": "Logic & gameplay"
+    "spoiler": {
+      "label": "Save the spoiler file"
     }
   }
 }

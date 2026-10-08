@@ -1,0 +1,3312 @@
+{
+  "schema": "ds1tr-settings-inventory-1",
+  "generationProfile": "ds1tr-gen-v1",
+  "counts": {
+    "total": 62,
+    "drawn": 59,
+    "hidden": 3,
+    "basic": 8
+  },
+  "sections": [
+    "items",
+    "enemies",
+    "bosses",
+    "transitions",
+    "keys",
+    "classic",
+    "other"
+  ],
+  "entries": [
+    {
+      "id": "items.enabled",
+      "configKey": "items.enabled",
+      "kind": "toggle",
+      "serializedValues": [
+        true,
+        false
+      ],
+      "default": true,
+      "neutralValueOfAnOldRecord": null,
+      "section": "items",
+      "view": "Basic (main) and Advanced",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": {
+        "en": "Item randomization",
+        "pl": "Losowanie przedmiotów"
+      },
+      "help": {
+        "en": {
+          "short": "Moves items around: what lies in the world and, if you turn them on, gifts, drops and shop stock.",
+          "what": "The master switch of everything about items. When it is off, no item is moved and none of the item options do anything.",
+          "affects": "Items in the world, NPC gifts, enemy drops, shops, starting classes and equipment, NPC outfits, key placement and item difficulty.",
+          "limits": "It only has an effect together with at least one of the options below it. Key placement also needs \"Items lying in the world\".",
+          "example": null
+        },
+        "pl": {
+          "short": "Przenosi przedmioty: to, co leży w świecie, oraz (jeśli włączysz) dary, łupy i towary sklepów."
+        }
+      },
+      "choiceExplanations": null,
+      "dependencies": [],
+      "evidence": "verified",
+      "hidden": null,
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "apps/backend/src/adapters/combinedRandomizerBridge.ts",
+          "apps/backend/src/server.ts",
+          "engines/combined/vendor/src/core/generator.js"
+        ]
+      }
+    },
+    {
+      "id": "items.worldItems",
+      "configKey": "items.randomizeWorldItems",
+      "kind": "toggle",
+      "serializedValues": [
+        true,
+        false
+      ],
+      "default": true,
+      "neutralValueOfAnOldRecord": null,
+      "section": "items",
+      "view": "Advanced",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": {
+        "en": "Items lying in the world",
+        "pl": "Przedmioty leżące w świecie"
+      },
+      "help": {
+        "en": {
+          "short": "Shuffles what lies on the ground, in chests and on corpses.",
+          "what": "The contents of the item pickups placed in the maps (things you pick up from the ground, from chests and from corpses) are shuffled between those places, so the item you find somewhere is usually not the one the original game puts there.",
+          "affects": "Every pickup in the world except the ones the story depends on (those stay unless Key placement is on). It does not change what NPCs give, what enemies drop or what shops sell: those have their own options.",
+          "limits": "Key placement, Split armor sets and the soul options need this one.",
+          "example": "The Alluring Skulls that lie in the Undead Parish may turn up in the Duke's Archives instead."
+        },
+        "pl": {
+          "short": "Tasuje to, co leży na ziemi, w skrzyniach i przy zwłokach."
+        }
+      },
+      "choiceExplanations": null,
+      "dependencies": [
+        {
+          "reason": "itemsOff",
+          "text": "Turn on Item randomization to change this option."
+        }
+      ],
+      "evidence": "verified",
+      "hidden": null,
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "apps/backend/src/adapters/combinedRandomizerConfig.ts",
+          "apps/backend/src/core/configValidation.ts",
+          "apps/backend/src/core/generationPipeline.ts"
+        ]
+      }
+    },
+    {
+      "id": "items.progressionLogic",
+      "configKey": "items.progressionLogic",
+      "kind": "toggle",
+      "serializedValues": [
+        true,
+        false
+      ],
+      "default": true,
+      "neutralValueOfAnOldRecord": null,
+      "section": "items",
+      "view": "Advanced",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": {
+        "en": "Protect progression gifts and shop goods",
+        "pl": "Chroń dary i towary sklepowe ważne dla postępu"
+      },
+      "help": {
+        "en": {
+          "short": "Keeps the Lordvessel gift, the Key to the Seal gift and story-bound shop goods where the game puts them.",
+          "what": "While NPC gifts or Shops are shuffled, the two gifts the story depends on (the Lordvessel from Gwynevere and the Key to the Seal) are not added to the item pool, and shop goods that a story event unlocks stay where they are. A fixed list of safe goods, such as Humanity, is still shuffled.",
+          "affects": "Only the NPC gifts and Shops pools.",
+          "limits": "Does nothing when both NPC gifts and Shops are off. It is not what keeps keys in the world safe: that is done by the world pickup rules and by Key placement.",
+          "example": null
+        },
+        "pl": {
+          "short": "Zostawia dar Lordvessel, dar Key to the Seal i towary sklepowe związane z fabułą tam, gdzie umieszcza je gra."
+        }
+      },
+      "choiceExplanations": null,
+      "dependencies": [
+        {
+          "reason": "itemsOff",
+          "text": "Turn on Item randomization to change this option."
+        }
+      ],
+      "evidence": "verified",
+      "hidden": null,
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "engines/combined/vendor/src/core/config.js",
+          "engines/combined/vendor/src/core/generator.js"
+        ]
+      }
+    },
+    {
+      "id": "items.npcGifts",
+      "configKey": "items.randomizeGifts",
+      "kind": "toggle",
+      "serializedValues": [
+        true,
+        false
+      ],
+      "default": false,
+      "neutralValueOfAnOldRecord": null,
+      "section": "items",
+      "view": "Basic (common) and Advanced",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": {
+        "en": "NPC gifts",
+        "pl": "Dary od NPC"
+      },
+      "help": {
+        "en": {
+          "short": "Mixes the items NPCs give you into the item pool.",
+          "what": "The items NPCs hand over (about twenty gifts) join the item pool: an NPC can give a different item, and the original gift can turn up somewhere else.",
+          "affects": "Gifts given by NPCs through conversation or events.",
+          "limits": "The Lordvessel and the Key to the Seal stay as they are while \"Protect progression gifts and shop goods\" is on.",
+          "example": null
+        },
+        "pl": {
+          "short": "Dodaje przedmioty, które dają NPC, do puli przedmiotów."
+        }
+      },
+      "choiceExplanations": null,
+      "dependencies": [
+        {
+          "reason": "itemsOff",
+          "text": "Turn on Item randomization to change this option."
+        }
+      ],
+      "evidence": "verified",
+      "hidden": null,
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "engines/combined/vendor/src/core/config.js",
+          "engines/combined/vendor/src/core/generator.js"
+        ]
+      }
+    },
+    {
+      "id": "items.enemyDrops",
+      "configKey": "items.randomizeEnemyDrops",
+      "kind": "toggle",
+      "serializedValues": [
+        true,
+        false
+      ],
+      "default": false,
+      "neutralValueOfAnOldRecord": null,
+      "section": "items",
+      "view": "Advanced",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": {
+        "en": "Enemy drops",
+        "pl": "Łupy z wrogów"
+      },
+      "help": {
+        "en": {
+          "short": "Mixes what enemies drop when they die into the item pool.",
+          "what": "The items enemies can drop join the item pool: killing an enemy can give a different item, and the original drop can turn up somewhere else.",
+          "affects": "Item drops of enemies (not the souls they give).",
+          "limits": "This option does not change how likely a drop is. Use \"Guaranteed enemy drops\" for that.",
+          "example": null
+        },
+        "pl": {
+          "short": "Dodaje to, co wypadają wrogowie po śmierci, do puli przedmiotów."
+        }
+      },
+      "choiceExplanations": null,
+      "dependencies": [
+        {
+          "reason": "itemsOff",
+          "text": "Turn on Item randomization to change this option."
+        }
+      ],
+      "evidence": "verified",
+      "hidden": null,
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "engines/combined/vendor/src/core/config.js",
+          "engines/combined/vendor/src/core/generator.js"
+        ]
+      }
+    },
+    {
+      "id": "items.guaranteedDrops",
+      "configKey": "items.guaranteedEnemyDrops",
+      "kind": "toggle",
+      "serializedValues": [
+        true,
+        false
+      ],
+      "default": false,
+      "neutralValueOfAnOldRecord": null,
+      "section": "items",
+      "view": "Advanced",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": {
+        "en": "Guaranteed enemy drops",
+        "pl": "Gwarantowane łupy z wrogów"
+      },
+      "help": {
+        "en": {
+          "short": "Makes enemies that have a drop always drop one of its items.",
+          "what": "The item chances of every enemy drop in the game are scaled up to a total of 100%, so an enemy with a drop table never drops nothing.",
+          "affects": "Every enemy drop table, whether or not Enemy drops is on. It does not change which items are in the tables.",
+          "limits": "Needs Item randomization turned on.",
+          "example": null
+        },
+        "pl": {
+          "short": "Sprawia, że wróg mający łup zawsze upuszcza któryś ze swoich przedmiotów."
+        }
+      },
+      "choiceExplanations": null,
+      "dependencies": [
+        {
+          "reason": "itemsOff",
+          "text": "Turn on Item randomization to change this option."
+        }
+      ],
+      "evidence": "verified",
+      "hidden": null,
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "apps/backend/src/adapters/combinedRandomizerBridge.ts",
+          "engines/combined/vendor/src/core/config.js",
+          "engines/combined/vendor/src/core/generator.js"
+        ]
+      }
+    },
+    {
+      "id": "items.shops",
+      "configKey": "items.randomizeShops",
+      "kind": "toggle",
+      "serializedValues": [
+        true,
+        false
+      ],
+      "default": false,
+      "neutralValueOfAnOldRecord": null,
+      "section": "items",
+      "view": "Basic (common) and Advanced",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": {
+        "en": "Shops",
+        "pl": "Sklepy"
+      },
+      "help": {
+        "en": {
+          "short": "Mixes the stock of NPC shops into the item pool.",
+          "what": "The goods and equipment sold by NPC merchants join the item pool: a shop can sell other things, and what it sold can turn up somewhere else. Arrows, bolts and throwables stay as shop stock.",
+          "affects": "Merchant inventories.",
+          "limits": "Goods unlocked by story events stay while \"Protect progression gifts and shop goods\" is on. With DLC content turned off, the DLC merchants are left alone.",
+          "example": null
+        },
+        "pl": {
+          "short": "Dodaje towary sklepów NPC do puli przedmiotów."
+        }
+      },
+      "choiceExplanations": null,
+      "dependencies": [
+        {
+          "reason": "itemsOff",
+          "text": "Turn on Item randomization to change this option."
+        }
+      ],
+      "evidence": "verified",
+      "hidden": null,
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "engines/combined/vendor/src/core/config.js",
+          "engines/combined/vendor/src/core/generator.js"
+        ]
+      }
+    },
+    {
+      "id": "items.startingClass",
+      "configKey": "items.randomizeStartingClass",
+      "kind": "toggle",
+      "serializedValues": [
+        true,
+        false
+      ],
+      "default": false,
+      "neutralValueOfAnOldRecord": null,
+      "section": "items",
+      "view": "Advanced",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": {
+        "en": "Starting class stats",
+        "pl": "Statystyki klasy startowej"
+      },
+      "help": {
+        "en": {
+          "short": "Gives each class the starting stats of another class.",
+          "what": "The starting stats (level and attributes) of the classes are shuffled between the classes, so no class keeps its own.",
+          "affects": "The stats you start with when you pick a class. Their equipment is a separate option.",
+          "limits": "Needs Item randomization turned on.",
+          "example": "The Warrior may start with the attributes of the Sorcerer."
+        },
+        "pl": {
+          "short": "Daje każdej klasie startowe statystyki innej klasy."
+        }
+      },
+      "choiceExplanations": null,
+      "dependencies": [
+        {
+          "reason": "itemsOff",
+          "text": "Turn on Item randomization to change this option."
+        }
+      ],
+      "evidence": "verified",
+      "hidden": null,
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "engines/combined/vendor/src/core/config.js",
+          "engines/combined/vendor/src/core/generator.js"
+        ]
+      }
+    },
+    {
+      "id": "items.startingEquipment",
+      "configKey": "items.randomizeStartingEquipment",
+      "kind": "toggle",
+      "serializedValues": [
+        true,
+        false
+      ],
+      "default": false,
+      "neutralValueOfAnOldRecord": null,
+      "section": "items",
+      "view": "Advanced",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": {
+        "en": "Starting equipment",
+        "pl": "Wyposażenie startowe"
+      },
+      "help": {
+        "en": {
+          "short": "Gives each class random starting weapons and armor.",
+          "what": "Each class gets other weapons (a main-hand weapon and a left-hand item; Hunters, Sorcerers, Pyromancers and Clerics also a special item) and four other armor pieces. Weapons are chosen so the class can use them with the stats it ends up with, and armor is never repeated between classes.",
+          "affects": "The starting gear of all classes (picked up in the Undead Asylum).",
+          "limits": "The kind of weapons depends on \"Starting weapon types\". It works with or without \"Starting class stats\".",
+          "example": "The Warrior may start with other weapons and other armor than the usual ones."
+        },
+        "pl": {
+          "short": "Daje każdej klasie losową startową broń i zbroję."
+        }
+      },
+      "choiceExplanations": null,
+      "dependencies": [
+        {
+          "reason": "itemsOff",
+          "text": "Turn on Item randomization to change this option."
+        }
+      ],
+      "evidence": "verified",
+      "hidden": null,
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "engines/combined/vendor/src/core/config.js",
+          "engines/combined/vendor/src/core/generator.js"
+        ]
+      }
+    },
+    {
+      "id": "items.startingItems",
+      "configKey": "items.startingItems",
+      "kind": "select",
+      "serializedValues": [
+        "shield-1h",
+        "shield-2h",
+        "mixed-pool"
+      ],
+      "default": "shield-2h",
+      "neutralValueOfAnOldRecord": null,
+      "section": "items",
+      "view": "Advanced",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": {
+        "en": "Starting weapon types",
+        "pl": "Rodzaje broni startowej"
+      },
+      "help": {
+        "en": {
+          "short": "Chooses which weapons and shields the starting gear may contain.",
+          "what": "Only used when Starting equipment is on. It decides how demanding the main-hand weapon may be (what the class can wield one-handed or two-handed with its own Strength) and whether the left hand holds a shield or may hold a weapon.",
+          "affects": "The weapons and shields chosen for the classes' starting equipment.",
+          "limits": "Disabled until \"Starting equipment\" is on: on its own it changes nothing.",
+          "example": null
+        },
+        "pl": {
+          "short": "Wybiera, jakie bronie i tarcze może zawierać wyposażenie startowe."
+        }
+      },
+      "choiceExplanations": {
+        "shield-1h": {
+          "label": "Shield and a one-handed weapon",
+          "explanation": "Main weapon usable one-handed with the class's Strength, and a shield in the left hand."
+        },
+        "shield-2h": {
+          "label": "Shield and a one- or two-handed weapon",
+          "explanation": "Main weapon may need two hands (up to 1.5 times the class's Strength) and a shield in the left hand."
+        },
+        "mixed-pool": {
+          "label": "Any weapon in the left hand",
+          "explanation": "As above, but the left hand may hold any weapon the class can use, not only a shield."
+        }
+      },
+      "dependencies": [
+        {
+          "reason": "itemsOff",
+          "text": "Turn on Item randomization to change this option."
+        },
+        {
+          "reason": "needsStartingEquipment",
+          "text": "Turn on Starting equipment to change this option."
+        }
+      ],
+      "evidence": "verified",
+      "hidden": null,
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "engines/combined/vendor/src/core/config.js",
+          "engines/combined/vendor/src/core/generator.js"
+        ]
+      }
+    },
+    {
+      "id": "items.earlyWeapon",
+      "configKey": "items.guaranteeEarlyWeapon",
+      "kind": "toggle",
+      "serializedValues": [
+        true,
+        false
+      ],
+      "default": true,
+      "neutralValueOfAnOldRecord": null,
+      "section": "items",
+      "view": "not drawn",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": null,
+      "help": null,
+      "choiceExplanations": null,
+      "dependencies": [],
+      "evidence": "verified",
+      "hidden": "no-effect",
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "engines/combined/vendor/src/core/config.js",
+          "engines/combined/vendor/src/core/generator.js"
+        ]
+      }
+    },
+    {
+      "id": "items.balancedEarlyLoot",
+      "configKey": "items.balancedEarlyLoot",
+      "kind": "toggle",
+      "serializedValues": [
+        true,
+        false
+      ],
+      "default": true,
+      "neutralValueOfAnOldRecord": null,
+      "section": "items",
+      "view": "not drawn",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": null,
+      "help": null,
+      "choiceExplanations": null,
+      "dependencies": [],
+      "evidence": "verified",
+      "hidden": "no-effect",
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "engines/combined/vendor/src/core/config.js",
+          "engines/combined/vendor/src/core/generator.js"
+        ]
+      }
+    },
+    {
+      "id": "items.protectedItems",
+      "configKey": "items.randomizeProtectedItems",
+      "kind": "toggle",
+      "serializedValues": [
+        true,
+        false
+      ],
+      "default": false,
+      "neutralValueOfAnOldRecord": null,
+      "section": "items",
+      "view": "not drawn",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": null,
+      "help": null,
+      "choiceExplanations": null,
+      "dependencies": [],
+      "evidence": "verified",
+      "hidden": "refused",
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "engines/combined/vendor/src/core/config.js",
+          "engines/combined/vendor/src/core/generator.js"
+        ]
+      }
+    },
+    {
+      "id": "items.keyPlacement",
+      "configKey": "items.keyPlacement",
+      "kind": "select",
+      "serializedValues": [
+        "vanilla",
+        "shuffled",
+        "race",
+        "race-plus"
+      ],
+      "default": "vanilla",
+      "neutralValueOfAnOldRecord": "vanilla",
+      "section": "keys",
+      "view": "Advanced",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": {
+        "en": "Key placement",
+        "pl": "Rozmieszczenie kluczy"
+      },
+      "help": {
+        "en": {
+          "short": "Decides whether the keys that open the world are moved.",
+          "what": "Keys are the items the world needs to progress (for example the Basement Key, the Master Key, the Crest of Artorias and the bell keys). The modes move them to other world pickups and check the result so every area stays reachable and the Firelink Altar can be reached.",
+          "affects": "The placement of key items. Item difficulty, Lordvessel placement and Lord Soul placement build on it.",
+          "limits": "Needs \"Items lying in the world\". Race Mode + is always Fair. With the fog randomizer on, Race Mode + is made as Race Mode.",
+          "example": null
+        },
+        "pl": {
+          "short": "Decyduje, czy klucze otwierające świat są przenoszone."
+        }
+      },
+      "choiceExplanations": {
+        "vanilla": {
+          "label": "Original",
+          "explanation": "Every key stays where the game puts it."
+        },
+        "shuffled": {
+          "label": "Shuffled",
+          "explanation": "Keys move to other pickups; a safety check keeps the world completable."
+        },
+        "race": {
+          "label": "Race Mode",
+          "explanation": "Like Shuffled, but keys and embers lie only in boss rewards, chests and the places where keys normally are. Good for races."
+        },
+        "race-plus": {
+          "label": "Race Mode +",
+          "explanation": "Like Race Mode, but the world may need skips and glitches (the Capra skip, the Seal skip...); you can get stuck without them."
+        }
+      },
+      "dependencies": [
+        {
+          "reason": "itemsOff",
+          "text": "Turn on Item randomization to change this option."
+        },
+        {
+          "reason": "warnKeysNeedWorldItems",
+          "text": "Key placement needs \"Items lying in the world\": turn it on, or the world cannot be made."
+        }
+      ],
+      "evidence": "verified",
+      "hidden": null,
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "apps/backend/src/adapters/combinedRandomizerBridge.ts",
+          "apps/backend/src/core/support.ts",
+          "engines/combined/vendor/src/core/config.js"
+        ]
+      }
+    },
+    {
+      "id": "items.lordvessel",
+      "configKey": "items.randomizeLordvessel",
+      "kind": "toggle",
+      "serializedValues": [
+        true,
+        false
+      ],
+      "default": false,
+      "neutralValueOfAnOldRecord": false,
+      "section": "keys",
+      "view": "Advanced",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": {
+        "en": "Lordvessel placement",
+        "pl": "Rozmieszczenie Lordvessel"
+      },
+      "help": {
+        "en": {
+          "short": "Moves the Lordvessel to another pickup.",
+          "what": "The Lordvessel joins the key shuffle: it lies at another pickup in the world, and Gwynevere hands over another item from the pool instead. The Firelink Altar still needs the Lordvessel in your inventory.",
+          "affects": "The Lordvessel and Gwynevere's gift.",
+          "limits": "Needs a Key placement other than Original. Not related to the golden fog gates of the fog randomizer.",
+          "example": null
+        },
+        "pl": {
+          "short": "Przenosi Lordvessel do innego znaleziska."
+        }
+      },
+      "choiceExplanations": null,
+      "dependencies": [
+        {
+          "reason": "itemsOff",
+          "text": "Turn on Item randomization to change this option."
+        },
+        {
+          "reason": "needsKeyPlacement",
+          "text": "Choose a Key placement other than Original to change this option."
+        }
+      ],
+      "evidence": "verified",
+      "hidden": null,
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "apps/backend/src/adapters/combinedRandomizerConfig.ts",
+          "apps/backend/src/core/configValidation.ts",
+          "apps/backend/src/core/generationPipeline.ts"
+        ]
+      }
+    },
+    {
+      "id": "items.lordSouls",
+      "configKey": "items.randomizeLordSouls",
+      "kind": "toggle",
+      "serializedValues": [
+        true,
+        false
+      ],
+      "default": false,
+      "neutralValueOfAnOldRecord": false,
+      "section": "keys",
+      "view": "Advanced",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": {
+        "en": "Lord Soul placement",
+        "pl": "Rozmieszczenie Lord Souls"
+      },
+      "help": {
+        "en": {
+          "short": "Moves the four Lord Souls to other pickups.",
+          "what": "The four Lord Souls (Bed of Chaos, Nito, Seath and the Four Kings) join the key shuffle and can be found elsewhere. They are boss rewards, so the boss fights themselves stay where they are.",
+          "affects": "The pickups of the Lord Souls and the items that lie there instead.",
+          "limits": "Needs a Key placement other than Original. Not related to \"Require Lord Souls\" in the fog randomizer.",
+          "example": null
+        },
+        "pl": {
+          "short": "Przenosi cztery Lord Souls do innych znalezisk."
+        }
+      },
+      "choiceExplanations": null,
+      "dependencies": [
+        {
+          "reason": "itemsOff",
+          "text": "Turn on Item randomization to change this option."
+        },
+        {
+          "reason": "needsKeyPlacement",
+          "text": "Choose a Key placement other than Original to change this option."
+        }
+      ],
+      "evidence": "verified",
+      "hidden": null,
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "apps/backend/src/adapters/combinedRandomizerConfig.ts",
+          "apps/backend/src/core/configValidation.ts",
+          "apps/backend/src/core/generationPipeline.ts"
+        ]
+      }
+    },
+    {
+      "id": "items.difficulty",
+      "configKey": "items.itemDifficulty",
+      "kind": "select",
+      "serializedValues": [
+        "fair",
+        "unfair",
+        "very-unfair"
+      ],
+      "default": "fair",
+      "neutralValueOfAnOldRecord": "fair",
+      "section": "keys",
+      "view": "Advanced",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": {
+        "en": "Item difficulty",
+        "pl": "Trudność przedmiotów"
+      },
+      "help": {
+        "en": {
+          "short": "How strongly good items are kept out of easy places.",
+          "what": "It only decides which of the allowed places an item prefers; it can never make a world impossible to finish. Fair puts items anywhere with equal chance. Unfair keeps desirable items out of plain view. Very Unfair hides them and rarely puts them in early areas. DS1TR rates items and places by its own rules from game data, so this approximates the original tool.",
+          "affects": "Where items are placed in the pools you turned on (world, gifts, drops, shops).",
+          "limits": "Race Mode + is always Fair.",
+          "example": null
+        },
+        "pl": {
+          "short": "Jak mocno dobre przedmioty są trzymane z dala od łatwych miejsc."
+        }
+      },
+      "choiceExplanations": {
+        "fair": {
+          "label": "Fair",
+          "explanation": "Items have an equal chance to be placed anywhere."
+        },
+        "unfair": {
+          "label": "Unfair",
+          "explanation": "Desirable items are not placed in plain view."
+        },
+        "very-unfair": {
+          "label": "Very Unfair",
+          "explanation": "Desirable items are hidden and rarely lie in early areas."
+        }
+      },
+      "dependencies": [
+        {
+          "reason": "itemsOff",
+          "text": "Turn on Item randomization to change this option."
+        },
+        {
+          "reason": "racePlusFair",
+          "text": "Race Mode + is always Fair."
+        }
+      ],
+      "evidence": "verified",
+      "hidden": null,
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "engines/combined/vendor/src/core/config.js",
+          "engines/combined/vendor/src/core/generator.js"
+        ]
+      }
+    },
+    {
+      "id": "items.soulItems",
+      "configKey": "items.soulItems",
+      "kind": "select",
+      "serializedValues": [
+        "shuffled",
+        "replaced",
+        "transposed"
+      ],
+      "default": "shuffled",
+      "neutralValueOfAnOldRecord": null,
+      "section": "classic",
+      "view": "Advanced",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": {
+        "en": "Soul items",
+        "pl": "Przedmioty-dusze"
+      },
+      "help": {
+        "en": {
+          "short": "What happens to souls and boss souls as items.",
+          "what": "Souls you can pick up (Soul of a Lost Undead and so on) and boss souls are items too. Normally they are shuffled like any other item.",
+          "affects": "Soul items in the pools you turned on (world, gifts, drops).",
+          "limits": "Needs at least one of: Items lying in the world, NPC gifts, Enemy drops.",
+          "example": null
+        },
+        "pl": {
+          "short": "Co dzieje się z duszami i duszami bossów jako przedmiotami."
+        }
+      },
+      "choiceExplanations": {
+        "shuffled": {
+          "label": "Shuffled like other items",
+          "explanation": "Souls are shuffled like any other item."
+        },
+        "replaced": {
+          "label": "Smaller souls become other items",
+          "explanation": "The smaller souls (Soul of a Lost Undead to Soul of a Great Hero) become other consumables before shuffling."
+        },
+        "transposed": {
+          "label": "Boss souls may become weapons",
+          "explanation": "Boss souls join the pool, and each has a 75% chance to become a weapon made from that soul."
+        }
+      },
+      "dependencies": [
+        {
+          "reason": "itemsOff",
+          "text": "Turn on Item randomization to change this option."
+        },
+        {
+          "reason": "needsSoulPool",
+          "text": "Needs at least one of: Items lying in the world, NPC gifts, Enemy drops."
+        }
+      ],
+      "evidence": "verified",
+      "hidden": null,
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "engines/combined/vendor/src/core/config.js",
+          "engines/combined/vendor/src/core/generator.js"
+        ]
+      }
+    },
+    {
+      "id": "items.fashionSouls",
+      "configKey": "items.fashionSouls",
+      "kind": "toggle",
+      "serializedValues": [
+        true,
+        false
+      ],
+      "default": true,
+      "neutralValueOfAnOldRecord": null,
+      "section": "classic",
+      "view": "Advanced",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": {
+        "en": "Split armor sets",
+        "pl": "Rozdzielaj zestawy zbroi"
+      },
+      "help": {
+        "en": {
+          "short": "On: armor pieces are found separately. Off: whole armor sets stay together.",
+          "what": "On, every armor piece is shuffled on its own, so one set can be spread over many places. Off, the regular armor sets found in the world are exchanged as complete sets between places that hold a set.",
+          "affects": "Armor found in the world.",
+          "limits": "Needs \"Items lying in the world\". Also changes how NPC outfits are mixed when \"NPC outfits\" is on.",
+          "example": "Off: the Antiquated Dress, Gloves and Skirt, which lie together in Darkroot, stay together as one set at another place."
+        },
+        "pl": {
+          "short": "Włączone: elementy zbroi znajdujesz osobno. Wyłączone: całe zestawy zbroi zostają razem."
+        }
+      },
+      "choiceExplanations": null,
+      "dependencies": [
+        {
+          "reason": "itemsOff",
+          "text": "Turn on Item randomization to change this option."
+        },
+        {
+          "reason": "needsWorldItems",
+          "text": "Turn on Items lying in the world to change this option."
+        }
+      ],
+      "evidence": "verified",
+      "hidden": null,
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "engines/combined/vendor/src/core/config.js",
+          "engines/combined/vendor/src/core/generator.js",
+          "engines/combined/vendor/src/core/laundromat.js"
+        ]
+      }
+    },
+    {
+      "id": "items.laundromat",
+      "configKey": "items.laundromat",
+      "kind": "toggle",
+      "serializedValues": [
+        true,
+        false
+      ],
+      "default": false,
+      "neutralValueOfAnOldRecord": false,
+      "section": "classic",
+      "view": "Advanced",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": {
+        "en": "NPC outfits",
+        "pl": "Stroje NPC"
+      },
+      "help": {
+        "en": {
+          "short": "NPCs wear armor pieces that other NPCs wear.",
+          "what": "NPC characters wear armor pieces other NPCs already wear instead of their usual sets. Only their look and their armor stats change. With Split armor sets turned off each NPC wears one complete set; turned on, the pieces are mixed. Hollowed versions keep their look.",
+          "affects": "How NPCs look. Nothing you can pick up changes.",
+          "limits": "Needs Item randomization turned on.",
+          "example": null
+        },
+        "pl": {
+          "short": "NPC noszą elementy zbroi, które noszą inni NPC."
+        }
+      },
+      "choiceExplanations": null,
+      "dependencies": [
+        {
+          "reason": "itemsOff",
+          "text": "Turn on Item randomization to change this option."
+        }
+      ],
+      "evidence": "verified",
+      "hidden": null,
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "engines/combined/vendor/src/core/config.js",
+          "engines/combined/vendor/src/core/generator.js",
+          "engines/combined/vendor/src/core/laundromat.js"
+        ]
+      }
+    },
+    {
+      "id": "enemies.enabled",
+      "configKey": "enemies.enabled",
+      "kind": "toggle",
+      "serializedValues": [
+        true,
+        false
+      ],
+      "default": true,
+      "neutralValueOfAnOldRecord": null,
+      "section": "enemies",
+      "view": "Basic (main) and Advanced",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": {
+        "en": "Enemy randomization",
+        "pl": "Losowanie wrogów"
+      },
+      "help": {
+        "en": {
+          "short": "Replaces enemies in the world with other enemies and bosses.",
+          "what": "The master switch of everything about enemies and bosses. When it is off, no enemy or boss is changed.",
+          "affects": "Regular enemies, bosses and all their options.",
+          "limits": "Boss randomization is a separate switch below it.",
+          "example": null
+        },
+        "pl": {
+          "short": "Zastępuje wrogów w świecie innymi wrogami i bossami."
+        }
+      },
+      "choiceExplanations": null,
+      "dependencies": [],
+      "evidence": "verified",
+      "hidden": null,
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "apps/backend/src/adapters/combinedRandomizerBridge.ts",
+          "apps/backend/src/server.ts",
+          "engines/combined/vendor/src/core/generator.js"
+        ]
+      }
+    },
+    {
+      "id": "enemies.regular",
+      "configKey": "enemies.randomizeRegularEnemies",
+      "kind": "toggle",
+      "serializedValues": [
+        true,
+        false
+      ],
+      "default": true,
+      "neutralValueOfAnOldRecord": null,
+      "section": "enemies",
+      "view": "Advanced",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": {
+        "en": "Regular enemies",
+        "pl": "Zwykli wrogowie"
+      },
+      "help": {
+        "en": {
+          "short": "Replaces regular enemies with other enemies.",
+          "what": "Regular (non-boss) enemies are replaced according to the placement method and the options below it.",
+          "affects": "Every regular enemy in the game.",
+          "limits": "Needs Enemy randomization turned on.",
+          "example": null
+        },
+        "pl": {
+          "short": "Zastępuje zwykłych wrogów innymi wrogami."
+        }
+      },
+      "choiceExplanations": null,
+      "dependencies": [
+        {
+          "reason": "enemiesOff",
+          "text": "Turn on Enemy randomization to change this option."
+        }
+      ],
+      "evidence": "verified",
+      "hidden": null,
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "apps/backend/src/adapters/combinedRandomizerConfig.ts",
+          "apps/backend/src/core/configValidation.ts",
+          "apps/backend/src/core/seedCode.ts"
+        ]
+      }
+    },
+    {
+      "id": "enemies.scaling",
+      "configKey": "enemies.scaling",
+      "kind": "select",
+      "serializedValues": [
+        "vanilla",
+        "area",
+        "progressive"
+      ],
+      "default": "area",
+      "neutralValueOfAnOldRecord": null,
+      "section": "enemies",
+      "view": "Advanced",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": {
+        "en": "Enemy strength scaling",
+        "pl": "Skalowanie siły wrogów"
+      },
+      "help": {
+        "en": {
+          "short": "How strong a replaced enemy is.",
+          "what": "When an enemy is replaced, this decides whether the new enemy keeps its own health and damage or takes those of the enemy it replaced.",
+          "affects": "Health and damage multipliers of replaced enemies.",
+          "limits": "Needs Enemy randomization turned on.",
+          "example": null
+        },
+        "pl": {
+          "short": "Jak silny jest zastąpiony wróg."
+        }
+      },
+      "choiceExplanations": {
+        "vanilla": {
+          "label": "Own strength",
+          "explanation": "The new enemy keeps its own strength, so a strong enemy can stand in an early area."
+        },
+        "area": {
+          "label": "By area",
+          "explanation": "The new enemy takes the strength of the enemy that stood there before."
+        },
+        "progressive": {
+          "label": "Progressive",
+          "explanation": "In this version identical to \"By area\" (the generated game files are byte for byte the same)."
+        }
+      },
+      "dependencies": [
+        {
+          "reason": "enemiesOff",
+          "text": "Turn on Enemy randomization to change this option."
+        }
+      ],
+      "evidence": "verified",
+      "hidden": null,
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "engines/combined/vendor/src/core/generator.js",
+          "engines/combined/vendor/src/core/placement.js",
+          "engines/combined/vendor/tools/DsrDataTool/Program.cs"
+        ]
+      }
+    },
+    {
+      "id": "enemies.algorithm",
+      "configKey": "enemies.placement.algorithm",
+      "kind": "select",
+      "serializedValues": [
+        "sampling-v1",
+        "permutation-v1"
+      ],
+      "default": "sampling-v1",
+      "neutralValueOfAnOldRecord": null,
+      "section": "enemies",
+      "view": "Advanced",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": {
+        "en": "Placement method",
+        "pl": "Metoda rozmieszczenia"
+      },
+      "help": {
+        "en": {
+          "short": "How replacements are chosen.",
+          "what": "Pick a replacement for every spot: each enemy spot independently chooses a compatible replacement, which turns on the replacement chance, matching, difficulty, kind replacement, custom pool and the boss options; a kind may repeat. Shuffle existing enemies: the classic method, it shuffles the enemies that exist between places while keeping their numbers; it reproduces old seeds.",
+          "affects": "All options of the enemy and boss sections that need the placement method.",
+          "limits": "Changing it puts the options that depend on it back to their usual values for that method.",
+          "example": null
+        },
+        "pl": {
+          "short": "Jak wybierane są zamienniki."
+        }
+      },
+      "choiceExplanations": {
+        "sampling-v1": {
+          "label": "Pick a replacement for every spot",
+          "explanation": "Each spot independently picks a compatible replacement (recommended). Turns on the options below."
+        },
+        "permutation-v1": {
+          "label": "Shuffle existing enemies",
+          "explanation": "Shuffles the existing enemies between places, keeping their numbers. Reproduces old seeds."
+        }
+      },
+      "dependencies": [
+        {
+          "reason": "enemiesOff",
+          "text": "Turn on Enemy randomization to change this option."
+        },
+        {
+          "reason": "regularEnemiesOff",
+          "text": "Turn on Regular enemies to change this option."
+        }
+      ],
+      "evidence": "verified",
+      "hidden": null,
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "apps/backend/src/adapters/combinedRandomizerBridge.ts",
+          "apps/backend/src/core/enemyPlacement.ts",
+          "engines/combined/vendor/src/core/generator.js"
+        ]
+      }
+    },
+    {
+      "id": "enemies.replacementChance",
+      "configKey": "enemies.placement.replacementChance",
+      "kind": "range",
+      "serializedValues": "0..100 (integer percent)",
+      "default": 100,
+      "neutralValueOfAnOldRecord": 100,
+      "section": "enemies",
+      "view": "Advanced",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": {
+        "en": "Replacement chance",
+        "pl": "Szansa zamiany"
+      },
+      "help": {
+        "en": {
+          "short": "How likely each enemy spot is to be replaced at all.",
+          "what": "The chance that a regular enemy spot is replaced; with \"Replace by kind\" the chance applies to a whole kind of enemy in a map. 100% replaces every enemy.",
+          "affects": "How many regular enemies stay as in the original game.",
+          "limits": "Only used with the placement method \"Pick a replacement for every spot\". The limit of 30 enemy models per map never gets worse.",
+          "example": null
+        },
+        "pl": {
+          "short": "Jak prawdopodobne jest, że dane miejsce wroga w ogóle zostanie zastąpione."
+        }
+      },
+      "choiceExplanations": null,
+      "dependencies": [
+        {
+          "reason": "enemiesOff",
+          "text": "Turn on Enemy randomization to change this option."
+        },
+        {
+          "reason": "regularEnemiesOff",
+          "text": "Turn on Regular enemies to change this option."
+        },
+        {
+          "reason": "samplingOnly",
+          "text": "Only used with the placement method \"Pick a replacement for every spot\"."
+        }
+      ],
+      "evidence": "verified",
+      "hidden": null,
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "apps/backend/src/core/enemyPlacement.ts",
+          "engines/combined/vendor/src/core/placement.js",
+          "engines/combined/vendor/src/core/sampling.js"
+        ]
+      }
+    },
+    {
+      "id": "enemies.normalReplacement",
+      "configKey": "enemies.placement.normalReplacement",
+      "kind": "select",
+      "serializedValues": [
+        "none",
+        "normals",
+        "bosses",
+        "both"
+      ],
+      "default": "normals",
+      "neutralValueOfAnOldRecord": "normals",
+      "section": "enemies",
+      "view": "Advanced",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": {
+        "en": "Replace regular enemies with",
+        "pl": "Zwykłych wrogów zastępuj"
+      },
+      "help": {
+        "en": {
+          "short": "What regular enemy spots receive.",
+          "what": "Decides whether a regular enemy spot receives only regular enemies, only bosses, or either. A boss that stands in a regular spot walks the world like an ordinary enemy (a roaming boss). Bosses that need their own arena (Bed of Chaos, Ceaseless Discharge, Dark Sun Gwyndolin, Lord Gwyn) and multi-body bosses never appear there.",
+          "affects": "Regular enemy spots. The options for roaming bosses depend on it.",
+          "limits": "Only used with the placement method \"Pick a replacement for every spot\".",
+          "example": null
+        },
+        "pl": {
+          "short": "Co dostają miejsca zwykłych wrogów."
+        }
+      },
+      "choiceExplanations": {
+        "none": {
+          "label": "Nothing (they stay)",
+          "explanation": "Regular enemy spots are not replaced."
+        },
+        "normals": {
+          "label": "Only regular enemies",
+          "explanation": "Only regular enemies take part (the usual replacement)."
+        },
+        "bosses": {
+          "label": "Only bosses",
+          "explanation": "Bosses stand in the spots that take part, as roaming bosses."
+        },
+        "both": {
+          "label": "Bosses or regular enemies",
+          "explanation": "Each spot that takes part gets a boss with the chance set in the boss section, otherwise a regular enemy."
+        }
+      },
+      "dependencies": [
+        {
+          "reason": "enemiesOff",
+          "text": "Turn on Enemy randomization to change this option."
+        },
+        {
+          "reason": "regularEnemiesOff",
+          "text": "Turn on Regular enemies to change this option."
+        },
+        {
+          "reason": "samplingOnly",
+          "text": "Only used with the placement method \"Pick a replacement for every spot\"."
+        }
+      ],
+      "evidence": "verified",
+      "hidden": null,
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "apps/backend/src/core/enemyPlacement.ts",
+          "engines/combined/vendor/src/core/generator.js",
+          "engines/combined/vendor/src/core/placement.js"
+        ]
+      }
+    },
+    {
+      "id": "enemies.fit",
+      "configKey": "enemies.placement.fit",
+      "kind": "select",
+      "serializedValues": [
+        "fits",
+        "anywhere",
+        "anywhere-except-npcs"
+      ],
+      "default": "fits",
+      "neutralValueOfAnOldRecord": "anywhere",
+      "section": "enemies",
+      "view": "Advanced",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": {
+        "en": "Size of replacements",
+        "pl": "Rozmiar zamienników"
+      },
+      "help": {
+        "en": {
+          "short": "Whether a replacement may be larger than the spot it stands in.",
+          "what": "\"Only where they fit\" never puts an enemy into a spot smaller than the enemy. \"Anywhere\" allows any size, with a higher risk of enemies clipping into walls or getting stuck.",
+          "affects": "Which replacements a spot can take.",
+          "limits": "Only used with the placement method \"Pick a replacement for every spot\".",
+          "example": null
+        },
+        "pl": {
+          "short": "Czy zamiennik może być większy niż miejsce, w którym stoi."
+        }
+      },
+      "choiceExplanations": {
+        "fits": {
+          "label": "Only where they fit",
+          "explanation": "A replacement is never larger than the spot."
+        },
+        "anywhere": {
+          "label": "Anywhere",
+          "explanation": "Any size can stand anywhere."
+        },
+        "anywhere-except-npcs": {
+          "label": "Anywhere, NPC spots excepted",
+          "explanation": "For regular enemies the same as Anywhere (it only differs for NPC spots, which are never replaced)."
+        }
+      },
+      "dependencies": [
+        {
+          "reason": "enemiesOff",
+          "text": "Turn on Enemy randomization to change this option."
+        },
+        {
+          "reason": "regularEnemiesOff",
+          "text": "Turn on Regular enemies to change this option."
+        },
+        {
+          "reason": "samplingOnly",
+          "text": "Only used with the placement method \"Pick a replacement for every spot\"."
+        }
+      ],
+      "evidence": "verified",
+      "hidden": null,
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "apps/backend/src/core/enemyPlacement.ts",
+          "engines/combined/vendor/src/core/generator.js",
+          "engines/combined/vendor/src/core/placement.js"
+        ]
+      }
+    },
+    {
+      "id": "enemies.difficultyMode",
+      "configKey": "enemies.placement.difficultyMode",
+      "kind": "select",
+      "serializedValues": [
+        "curve-easy-asylum",
+        "curve",
+        "random-easy-asylum",
+        "random"
+      ],
+      "default": "random-easy-asylum",
+      "neutralValueOfAnOldRecord": "random",
+      "section": "enemies",
+      "view": "Advanced",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": {
+        "en": "Difficulty matching",
+        "pl": "Dopasowanie trudności"
+      },
+      "help": {
+        "en": {
+          "short": "Whether replacements follow the difficulty of the place.",
+          "what": "Difficulty curve: a regular enemy is replaced by one of comparable difficulty (how far it may differ is set by strictness). Random: any enemy anywhere. Easy Asylum: the Undead Asylum only receives the easiest enemies. DS1TR derives the difficulty classes from the enemies' areas and health, so they approximate the original ones.",
+          "affects": "Which enemy can stand where.",
+          "limits": "Only used with the placement method \"Pick a replacement for every spot\".",
+          "example": null
+        },
+        "pl": {
+          "short": "Czy zamienniki mają podążać za trudnością miejsca."
+        }
+      },
+      "choiceExplanations": {
+        "curve-easy-asylum": {
+          "label": "Comparable difficulty, easy Asylum",
+          "explanation": "Comparable difficulty, and only the easiest enemies in the Asylum."
+        },
+        "curve": {
+          "label": "Comparable difficulty",
+          "explanation": "Comparable difficulty everywhere."
+        },
+        "random-easy-asylum": {
+          "label": "Random, easy Asylum",
+          "explanation": "Any enemy anywhere, except that the Asylum gets only the easiest."
+        },
+        "random": {
+          "label": "Fully random",
+          "explanation": "Any enemy anywhere, also in the Asylum."
+        }
+      },
+      "dependencies": [
+        {
+          "reason": "enemiesOff",
+          "text": "Turn on Enemy randomization to change this option."
+        },
+        {
+          "reason": "regularEnemiesOff",
+          "text": "Turn on Regular enemies to change this option."
+        },
+        {
+          "reason": "samplingOnly",
+          "text": "Only used with the placement method \"Pick a replacement for every spot\"."
+        }
+      ],
+      "evidence": "verified",
+      "hidden": null,
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "apps/backend/src/core/enemyPlacement.ts",
+          "engines/combined/vendor/src/core/placement.js",
+          "engines/combined/vendor/src/core/sampling.js"
+        ]
+      }
+    },
+    {
+      "id": "enemies.strictness",
+      "configKey": "enemies.placement.difficultyStrictness",
+      "kind": "select",
+      "serializedValues": [
+        "strict",
+        "loose",
+        "very-loose"
+      ],
+      "default": "loose",
+      "neutralValueOfAnOldRecord": "loose",
+      "section": "enemies",
+      "view": "Advanced",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": {
+        "en": "Matching strictness",
+        "pl": "Ścisłość dopasowania"
+      },
+      "help": {
+        "en": {
+          "short": "How far from the original difficulty a replacement may be.",
+          "what": "Used by the difficulty curve modes. Strict: mostly the same difficulty class, harder enemies are rare. A bit loose: harder enemies appear more often. Very loose: any difficulty can appear anywhere.",
+          "affects": "Enemy difficulty in each area.",
+          "limits": "Only used with a difficulty curve mode.",
+          "example": null
+        },
+        "pl": {
+          "short": "Jak bardzo zamiennik może odbiegać od oryginalnej trudności."
+        }
+      },
+      "choiceExplanations": {
+        "strict": {
+          "label": "Strict",
+          "explanation": "Mostly the same difficulty; harder ones are rare."
+        },
+        "loose": {
+          "label": "A bit loose",
+          "explanation": "Harder enemies appear more often."
+        },
+        "very-loose": {
+          "label": "Very loose",
+          "explanation": "Any difficulty can appear anywhere."
+        }
+      },
+      "dependencies": [
+        {
+          "reason": "enemiesOff",
+          "text": "Turn on Enemy randomization to change this option."
+        },
+        {
+          "reason": "needsCurve",
+          "text": "Only used when Difficulty matching is one of the difficulty curve modes."
+        },
+        {
+          "reason": "regularEnemiesOff",
+          "text": "Turn on Regular enemies to change this option."
+        },
+        {
+          "reason": "samplingOnly",
+          "text": "Only used with the placement method \"Pick a replacement for every spot\"."
+        }
+      ],
+      "evidence": "verified",
+      "hidden": null,
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "apps/backend/src/core/enemyPlacement.ts",
+          "engines/combined/vendor/src/core/placement.js",
+          "engines/combined/vendor/src/core/sampling.js"
+        ]
+      }
+    },
+    {
+      "id": "enemies.typeReplacement",
+      "configKey": "enemies.placement.typeReplacement",
+      "kind": "select",
+      "serializedValues": [
+        "enabled",
+        "enabled-except-roaming-bosses",
+        "disabled"
+      ],
+      "default": "disabled",
+      "neutralValueOfAnOldRecord": "disabled",
+      "section": "enemies",
+      "view": "Advanced",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": {
+        "en": "Replace by kind",
+        "pl": "Zamiana według rodzaju"
+      },
+      "help": {
+        "en": {
+          "short": "Replaces all enemies of one kind in a map with the same new kind.",
+          "what": "Enabled: every enemy of one kind in a map (every Hollow in the Undead Parish) becomes the same new kind, and two kinds in one map never get the same replacement. The replacement chance then applies to the kind. With bosses in regular spots, Enabled gives every enemy of one kind the same boss; the exception lets each spot draw its own boss.",
+          "affects": "How uniform the enemies of a map look.",
+          "limits": "Only used with the placement method \"Pick a replacement for every spot\".",
+          "example": "All Hollows in the Parish become Balder Knights."
+        },
+        "pl": {
+          "short": "Zastępuje wszystkich wrogów jednego rodzaju na mapie tym samym nowym rodzajem."
+        }
+      },
+      "choiceExplanations": {
+        "enabled": {
+          "label": "Same replacement for each kind",
+          "explanation": "All enemies of one kind in a map get the same replacement."
+        },
+        "enabled-except-roaming-bosses": {
+          "label": "Same, except roaming bosses",
+          "explanation": "As Enabled, but every spot that receives a roaming boss draws its own boss."
+        },
+        "disabled": {
+          "label": "Each spot on its own",
+          "explanation": "Every spot is replaced independently."
+        }
+      },
+      "dependencies": [
+        {
+          "reason": "enemiesOff",
+          "text": "Turn on Enemy randomization to change this option."
+        },
+        {
+          "reason": "regularEnemiesOff",
+          "text": "Turn on Regular enemies to change this option."
+        },
+        {
+          "reason": "samplingOnly",
+          "text": "Only used with the placement method \"Pick a replacement for every spot\"."
+        }
+      ],
+      "evidence": "verified",
+      "hidden": null,
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "apps/backend/src/core/enemyPlacement.ts",
+          "engines/combined/vendor/src/core/placement.js",
+          "engines/combined/vendor/src/core/sampling.js"
+        ]
+      }
+    },
+    {
+      "id": "enemies.customPool",
+      "configKey": "enemies.placement.customPool",
+      "kind": "pool",
+      "serializedValues": "null, or a list of model ids",
+      "default": null,
+      "neutralValueOfAnOldRecord": null,
+      "section": "enemies",
+      "view": "Advanced",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": {
+        "en": "Custom enemy pool",
+        "pl": "Własna pula wrogów"
+      },
+      "help": {
+        "en": {
+          "short": "Limits which enemies may be used as replacements.",
+          "what": "Choose the regular enemies the sampler may place. Enemies you do not select are never removed from their places; they are only not used as replacements elsewhere.",
+          "affects": "The pool of replacement candidates for regular enemies.",
+          "limits": "Only used with the placement method \"Pick a replacement for every spot\". Choosing a custom pool turns Hostile NPCs off.",
+          "example": null
+        },
+        "pl": {
+          "short": "Ogranicza, których wrogów można użyć jako zamienników."
+        }
+      },
+      "choiceExplanations": null,
+      "dependencies": [
+        {
+          "reason": "enemiesOff",
+          "text": "Turn on Enemy randomization to change this option."
+        },
+        {
+          "reason": "regularEnemiesOff",
+          "text": "Turn on Regular enemies to change this option."
+        },
+        {
+          "reason": "samplingOnly",
+          "text": "Only used with the placement method \"Pick a replacement for every spot\"."
+        }
+      ],
+      "evidence": "verified",
+      "hidden": null,
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "apps/backend/src/core/enemyPlacement.ts",
+          "engines/combined/vendor/src/core/generator.js",
+          "engines/combined/vendor/src/core/placement.js"
+        ]
+      }
+    },
+    {
+      "id": "enemies.bosses",
+      "configKey": "enemies.randomizeBosses",
+      "kind": "toggle",
+      "serializedValues": [
+        true,
+        false
+      ],
+      "default": true,
+      "neutralValueOfAnOldRecord": null,
+      "section": "bosses",
+      "view": "Basic (main) and Advanced",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": {
+        "en": "Boss randomization",
+        "pl": "Losowanie bossów"
+      },
+      "help": {
+        "en": {
+          "short": "Replaces bosses with other bosses.",
+          "what": "Bosses are replaced according to Boss replacement. Some boss fights (the dragons, the multi-body bosses) are exchanged only as whole groups.",
+          "affects": "Every boss fight.",
+          "limits": "Needs Enemy randomization turned on.",
+          "example": null
+        },
+        "pl": {
+          "short": "Zastępuje bossów innymi bossami."
+        }
+      },
+      "choiceExplanations": null,
+      "dependencies": [
+        {
+          "reason": "enemiesOff",
+          "text": "Turn on Enemy randomization to change this option."
+        }
+      ],
+      "evidence": "verified",
+      "hidden": null,
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "engines/combined/vendor/src/core/config.js",
+          "engines/combined/vendor/src/core/generator.js"
+        ]
+      }
+    },
+    {
+      "id": "enemies.bossReplacement",
+      "configKey": "enemies.placement.bossReplacement",
+      "kind": "select",
+      "serializedValues": [
+        "classic",
+        "bosses",
+        "normals",
+        "both"
+      ],
+      "default": "classic",
+      "neutralValueOfAnOldRecord": "classic",
+      "section": "bosses",
+      "view": "Advanced",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": {
+        "en": "Boss replacement",
+        "pl": "Zamiana bossów"
+      },
+      "help": {
+        "en": {
+          "short": "How boss arenas are filled.",
+          "what": "Classic shuffle exchanges the bosses between the boss arenas. Random bosses lets every single-body boss arena draw its own replacement, so a boss can appear more than once. The two options with regular enemies let a regular enemy stand in as the body of three early fights (Asylum Demon, Taurus Demon, Capra Demon): the fight stays the boss's (its health bar and name, its fog gate, what it unlocks and its rewards) and the regular enemy never comes back.",
+          "affects": "Which boss or enemy appears in each boss arena. The dragons, Seath, Priscilla, the Sanctuary Guardian, the Bell Gargoyles and the Centipede Demon keep the classic shuffle.",
+          "limits": "Needs Boss randomization and the placement method \"Pick a replacement for every spot\". Lord Gwyn follows \"Lord Gwyn as a replacement boss\".",
+          "example": null
+        },
+        "pl": {
+          "short": "Jak wypełniane są areny bossów."
+        }
+      },
+      "choiceExplanations": {
+        "classic": {
+          "label": "Shuffle between arenas",
+          "explanation": "Bosses are shuffled between the arenas, as in earlier versions."
+        },
+        "bosses": {
+          "label": "Random bosses",
+          "explanation": "Every arena draws its own boss; a boss can appear more than once."
+        },
+        "normals": {
+          "label": "Regular enemy in early fights",
+          "explanation": "The three early fights get a regular enemy as their body; every other boss stays its own."
+        },
+        "both": {
+          "label": "Bosses or regular enemies",
+          "explanation": "Those three fights may get a regular enemy; every other arena gets a random boss."
+        }
+      },
+      "dependencies": [
+        {
+          "reason": "bossesOff",
+          "text": "Turn on Boss randomization to change this option."
+        },
+        {
+          "reason": "enemiesOff",
+          "text": "Turn on Enemy randomization to change this option."
+        },
+        {
+          "reason": "samplingOnly",
+          "text": "Only used with the placement method \"Pick a replacement for every spot\"."
+        }
+      ],
+      "evidence": "verified",
+      "hidden": null,
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "apps/backend/src/core/enemyPlacement.ts",
+          "engines/combined/vendor/src/core/generator.js",
+          "engines/combined/vendor/src/core/placement.js"
+        ]
+      }
+    },
+    {
+      "id": "enemies.bossChanceBoss",
+      "configKey": "enemies.placement.bossChanceInBossSlots",
+      "kind": "range",
+      "serializedValues": "0..100 (integer percent)",
+      "default": 90,
+      "neutralValueOfAnOldRecord": 90,
+      "section": "bosses",
+      "view": "Advanced",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": {
+        "en": "Boss chance where a regular enemy may stand",
+        "pl": "Szansa na bossa tam, gdzie może stanąć zwykły wróg"
+      },
+      "help": {
+        "en": {
+          "short": "How often a boss arena that can take a regular enemy gets a boss.",
+          "what": "Of the boss arenas that take part and can take a regular enemy, this share gets a boss; the rest get a regular enemy.",
+          "affects": "The three early fights that can have a regular enemy as their body.",
+          "limits": "Needs \"Boss replacement\" set to \"Bosses or regular enemies\".",
+          "example": null
+        },
+        "pl": {
+          "short": "Jak często arena, która może przyjąć zwykłego wroga, dostaje bossa."
+        }
+      },
+      "choiceExplanations": null,
+      "dependencies": [
+        {
+          "reason": "bossesOff",
+          "text": "Turn on Boss randomization to change this option."
+        },
+        {
+          "reason": "enemiesOff",
+          "text": "Turn on Enemy randomization to change this option."
+        },
+        {
+          "reason": "needsBossBothMode",
+          "text": "Needs \"Boss replacement\" set to \"Bosses or regular enemies\"."
+        },
+        {
+          "reason": "samplingOnly",
+          "text": "Only used with the placement method \"Pick a replacement for every spot\"."
+        }
+      ],
+      "evidence": "verified",
+      "hidden": null,
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "apps/backend/src/core/enemyPlacement.ts",
+          "engines/combined/vendor/src/core/placement.js",
+          "engines/combined/vendor/src/core/sampling.js"
+        ]
+      }
+    },
+    {
+      "id": "enemies.uniqueBosses",
+      "configKey": "enemies.placement.uniqueBosses",
+      "kind": "toggle",
+      "serializedValues": [
+        true,
+        false
+      ],
+      "default": false,
+      "neutralValueOfAnOldRecord": false,
+      "section": "bosses",
+      "view": "Advanced",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": {
+        "en": "Use every boss once first",
+        "pl": "Najpierw użyj każdego bossa raz"
+      },
+      "help": {
+        "en": {
+          "short": "Every boss is used once before any boss appears a second time.",
+          "what": "Every boss of the pool is placed once before any boss is used again.",
+          "affects": "The bosses drawn for boss arenas.",
+          "limits": "Needs \"Boss replacement\" set to \"Random bosses\" or \"Bosses or regular enemies\".",
+          "example": null
+        },
+        "pl": {
+          "short": "Każdy boss zostaje użyty raz, zanim jakikolwiek pojawi się po raz drugi."
+        }
+      },
+      "choiceExplanations": null,
+      "dependencies": [
+        {
+          "reason": "bossesOff",
+          "text": "Turn on Boss randomization to change this option."
+        },
+        {
+          "reason": "enemiesOff",
+          "text": "Turn on Enemy randomization to change this option."
+        },
+        {
+          "reason": "needsBossDraw",
+          "text": "Needs \"Boss replacement\" set to \"Random bosses\" or \"Bosses or regular enemies\"."
+        },
+        {
+          "reason": "samplingOnly",
+          "text": "Only used with the placement method \"Pick a replacement for every spot\"."
+        }
+      ],
+      "evidence": "verified",
+      "hidden": null,
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "apps/backend/src/core/enemyPlacement.ts",
+          "engines/combined/vendor/src/core/placement.js",
+          "engines/combined/vendor/src/core/sampling.js"
+        ]
+      }
+    },
+    {
+      "id": "enemies.bossChanceNormal",
+      "configKey": "enemies.placement.bossChanceInNormalSlots",
+      "kind": "range",
+      "serializedValues": "0..100 (integer percent)",
+      "default": 10,
+      "neutralValueOfAnOldRecord": 10,
+      "section": "bosses",
+      "view": "Advanced",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": {
+        "en": "Boss chance in regular enemy spots",
+        "pl": "Szansa na bossa w miejscach zwykłych wrogów"
+      },
+      "help": {
+        "en": {
+          "short": "How often a regular enemy spot gets a boss.",
+          "what": "Of the regular enemy spots that take part, this share receives a boss (a roaming boss) instead of a regular enemy.",
+          "affects": "Regular enemy spots.",
+          "limits": "Needs \"Replace regular enemies with\" set to \"Bosses or regular enemies\".",
+          "example": null
+        },
+        "pl": {
+          "short": "Jak często miejsce zwykłego wroga dostaje bossa."
+        }
+      },
+      "choiceExplanations": null,
+      "dependencies": [
+        {
+          "reason": "enemiesOff",
+          "text": "Turn on Enemy randomization to change this option."
+        },
+        {
+          "reason": "needsBothNormalMode",
+          "text": "Needs \"Replace regular enemies with\" set to \"Bosses or regular enemies\"."
+        },
+        {
+          "reason": "regularEnemiesOff",
+          "text": "Turn on Regular enemies to change this option."
+        },
+        {
+          "reason": "samplingOnly",
+          "text": "Only used with the placement method \"Pick a replacement for every spot\"."
+        }
+      ],
+      "evidence": "verified",
+      "hidden": null,
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "apps/backend/src/core/enemyPlacement.ts",
+          "engines/combined/vendor/src/core/generator.js",
+          "engines/combined/vendor/src/core/placement.js"
+        ]
+      }
+    },
+    {
+      "id": "enemies.roamingSouls",
+      "configKey": "enemies.placement.roamingBossSouls",
+      "kind": "range",
+      "serializedValues": "0..100 (integer percent)",
+      "default": 50,
+      "neutralValueOfAnOldRecord": 50,
+      "section": "bosses",
+      "view": "Advanced",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": {
+        "en": "Roaming boss souls",
+        "pl": "Dusze wędrujących bossów"
+      },
+      "help": {
+        "en": {
+          "short": "How many souls a roaming boss gives.",
+          "what": "The share of the souls a boss gives in its own arena that it drops when it stands in a regular enemy spot.",
+          "affects": "The souls dropped by roaming bosses.",
+          "limits": "Needs \"Replace regular enemies with\" set to \"Only bosses\" or \"Bosses or regular enemies\".",
+          "example": "50%: a boss that gives 10,000 souls in its arena gives 5,000 as a roaming boss."
+        },
+        "pl": {
+          "short": "Ile dusz daje wędrujący boss."
+        }
+      },
+      "choiceExplanations": null,
+      "dependencies": [
+        {
+          "reason": "enemiesOff",
+          "text": "Turn on Enemy randomization to change this option."
+        },
+        {
+          "reason": "needsRoamingMode",
+          "text": "Needs \"Replace regular enemies with\" set to \"Only bosses\" or \"Bosses or regular enemies\"."
+        },
+        {
+          "reason": "regularEnemiesOff",
+          "text": "Turn on Regular enemies to change this option."
+        },
+        {
+          "reason": "samplingOnly",
+          "text": "Only used with the placement method \"Pick a replacement for every spot\"."
+        }
+      ],
+      "evidence": "verified",
+      "hidden": null,
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "apps/backend/src/core/enemyPlacement.ts",
+          "engines/combined/vendor/src/core/generator.js",
+          "engines/combined/vendor/src/core/placement.js"
+        ]
+      }
+    },
+    {
+      "id": "enemies.roamingDead",
+      "configKey": "enemies.placement.roamingBossesStayDead",
+      "kind": "toggle",
+      "serializedValues": [
+        true,
+        false
+      ],
+      "default": false,
+      "neutralValueOfAnOldRecord": false,
+      "section": "bosses",
+      "view": "Advanced",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": {
+        "en": "Roaming bosses stay dead",
+        "pl": "Wędrujący bossowie zostają martwi"
+      },
+      "help": {
+        "en": {
+          "short": "A roaming boss does not come back once defeated.",
+          "what": "On: a boss in a regular spot does not come back after you rest or the area resets (played in the game: it stayed dead). Off: it comes back like a regular enemy.",
+          "affects": "Whether roaming bosses respawn.",
+          "limits": "Needs \"Replace regular enemies with\" set to \"Only bosses\" or \"Bosses or regular enemies\".",
+          "example": null
+        },
+        "pl": {
+          "short": "Pokonany wędrujący boss już nie wraca."
+        }
+      },
+      "choiceExplanations": null,
+      "dependencies": [
+        {
+          "reason": "enemiesOff",
+          "text": "Turn on Enemy randomization to change this option."
+        },
+        {
+          "reason": "needsRoamingMode",
+          "text": "Needs \"Replace regular enemies with\" set to \"Only bosses\" or \"Bosses or regular enemies\"."
+        },
+        {
+          "reason": "regularEnemiesOff",
+          "text": "Turn on Regular enemies to change this option."
+        },
+        {
+          "reason": "samplingOnly",
+          "text": "Only used with the placement method \"Pick a replacement for every spot\"."
+        }
+      ],
+      "evidence": "verified",
+      "hidden": null,
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "apps/backend/src/core/enemyPlacement.ts",
+          "engines/combined/vendor/src/core/generator.js",
+          "engines/combined/vendor/src/core/placement.js"
+        ]
+      }
+    },
+    {
+      "id": "enemies.mimics",
+      "configKey": "enemies.replaceMimics",
+      "kind": "toggle",
+      "serializedValues": [
+        true,
+        false
+      ],
+      "default": true,
+      "neutralValueOfAnOldRecord": null,
+      "section": "classic",
+      "view": "Advanced",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": {
+        "en": "Replace Mimics",
+        "pl": "Zastępuj Mimiki"
+      },
+      "help": {
+        "en": {
+          "short": "Off: Mimics stay where they are and are not used elsewhere.",
+          "what": "On, Mimics are replaced like other enemies and can turn up elsewhere. Off, the nine Mimic spots keep their Mimic and no Mimic is placed anywhere else.",
+          "affects": "The nine Mimic spots.",
+          "limits": "Needs Regular enemies turned on.",
+          "example": null
+        },
+        "pl": {
+          "short": "Wyłączone: Mimiki zostają na miejscu i nie są używane gdzie indziej."
+        }
+      },
+      "choiceExplanations": null,
+      "dependencies": [
+        {
+          "reason": "enemiesOff",
+          "text": "Turn on Enemy randomization to change this option."
+        },
+        {
+          "reason": "regularEnemiesOff",
+          "text": "Turn on Regular enemies to change this option."
+        }
+      ],
+      "evidence": "verified",
+      "hidden": null,
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "engines/combined/vendor/src/core/config.js",
+          "engines/combined/vendor/src/core/generator.js"
+        ]
+      }
+    },
+    {
+      "id": "enemies.hostileNpcs",
+      "configKey": "enemies.placement.hostileNpcs",
+      "kind": "toggle",
+      "serializedValues": [
+        true,
+        false
+      ],
+      "default": false,
+      "neutralValueOfAnOldRecord": false,
+      "section": "classic",
+      "view": "Advanced",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": {
+        "en": "Hostile NPCs",
+        "pl": "Wrogie NPC"
+      },
+      "help": {
+        "en": {
+          "short": "The Undead Merchant, Andre and Vamos can appear as enemies.",
+          "what": "The Undead Merchant, Andre of Astora and Vamos can stand in place of regular enemies as hostile fighters. The real NPCs are never touched and nothing they sell or teach changes.",
+          "affects": "Regular enemy spots (at most twelve hostile NPCs per map).",
+          "limits": "Needs the placement method \"Pick a replacement for every spot\" with \"Replace regular enemies with\" set to \"Only regular enemies\" or \"Bosses or regular enemies\". Not available with a custom enemy pool.",
+          "example": null
+        },
+        "pl": {
+          "short": "Undead Merchant, Andre i Vamos mogą pojawić się jako wrogowie."
+        }
+      },
+      "choiceExplanations": null,
+      "dependencies": [
+        {
+          "reason": "customPoolActive",
+          "text": "Not available together with a custom enemy pool."
+        },
+        {
+          "reason": "enemiesOff",
+          "text": "Turn on Enemy randomization to change this option."
+        },
+        {
+          "reason": "needsNormalEnemiesMode",
+          "text": "Needs \"Replace regular enemies with\" set to \"Only regular enemies\" or \"Bosses or regular enemies\"."
+        },
+        {
+          "reason": "regularEnemiesOff",
+          "text": "Turn on Regular enemies to change this option."
+        },
+        {
+          "reason": "samplingOnly",
+          "text": "Only used with the placement method \"Pick a replacement for every spot\"."
+        }
+      ],
+      "evidence": "verified",
+      "hidden": null,
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "apps/backend/src/core/enemyPlacement.ts",
+          "engines/combined/vendor/src/core/generator.js",
+          "engines/combined/vendor/src/core/placement.js"
+        ]
+      }
+    },
+    {
+      "id": "enemies.mosquitoes",
+      "configKey": "enemies.replaceRespawningMosquitoes",
+      "kind": "toggle",
+      "serializedValues": [
+        true,
+        false
+      ],
+      "default": true,
+      "neutralValueOfAnOldRecord": null,
+      "section": "classic",
+      "view": "Advanced",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": {
+        "en": "Replace respawning mosquitoes",
+        "pl": "Zastępuj odradzające się komary"
+      },
+      "help": {
+        "en": {
+          "short": "Off: the six respawning swamp mosquitoes stay in place.",
+          "what": "On, the six respawning mosquitoes of the Blighttown swamp are replaced like other enemies. Off, they stay where they are and are not used elsewhere.",
+          "affects": "Those six mosquitoes only.",
+          "limits": "Needs Regular enemies turned on.",
+          "example": null
+        },
+        "pl": {
+          "short": "Wyłączone: sześć odradzających się komarów z bagna zostaje na miejscu."
+        }
+      },
+      "choiceExplanations": null,
+      "dependencies": [
+        {
+          "reason": "enemiesOff",
+          "text": "Turn on Enemy randomization to change this option."
+        },
+        {
+          "reason": "regularEnemiesOff",
+          "text": "Turn on Regular enemies to change this option."
+        }
+      ],
+      "evidence": "verified",
+      "hidden": null,
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "engines/combined/vendor/src/core/config.js",
+          "engines/combined/vendor/src/core/generator.js"
+        ]
+      }
+    },
+    {
+      "id": "enemies.sameEnemy",
+      "configKey": "enemies.preventSameEnemy",
+      "kind": "toggle",
+      "serializedValues": [
+        true,
+        false
+      ],
+      "default": false,
+      "neutralValueOfAnOldRecord": null,
+      "section": "classic",
+      "view": "Advanced",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": {
+        "en": "No replacement by the same kind",
+        "pl": "Bez zamiany na ten sam rodzaj"
+      },
+      "help": {
+        "en": {
+          "short": "No regular enemy is replaced by an enemy of its own kind.",
+          "what": "A regular enemy is never replaced by an enemy of its own kind. Bosses are never replaced by the same boss anyway.",
+          "affects": "Regular enemy spots.",
+          "limits": "Needs Regular enemies turned on.",
+          "example": "A Hollow never becomes a Hollow."
+        },
+        "pl": {
+          "short": "Żaden zwykły wróg nie jest zastępowany wrogiem własnego rodzaju."
+        }
+      },
+      "choiceExplanations": null,
+      "dependencies": [
+        {
+          "reason": "enemiesOff",
+          "text": "Turn on Enemy randomization to change this option."
+        },
+        {
+          "reason": "regularEnemiesOff",
+          "text": "Turn on Regular enemies to change this option."
+        }
+      ],
+      "evidence": "verified",
+      "hidden": null,
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "engines/combined/vendor/src/core/config.js",
+          "engines/combined/vendor/src/core/generator.js"
+        ]
+      }
+    },
+    {
+      "id": "enemies.pinwheel",
+      "configKey": "enemies.pinwheelChaos",
+      "kind": "toggle",
+      "serializedValues": [
+        true,
+        false
+      ],
+      "default": false,
+      "neutralValueOfAnOldRecord": null,
+      "section": "classic",
+      "view": "Advanced",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": {
+        "en": "Keep Pinwheel, replace its clones",
+        "pl": "Zostaw Pinwheel, zastąp jego klony"
+      },
+      "help": {
+        "en": {
+          "short": "The Pinwheel boss stays and its clones are replaced.",
+          "what": "On: the main Pinwheel in the Catacombs is not replaced and is not used as a boss elsewhere; its fourteen one-hit clones are replaced by regular enemies that have their normal health. Off: the main Pinwheel is replaced like any boss and its clones are left out.",
+          "affects": "The Pinwheel fight in the Catacombs.",
+          "limits": "Needs Regular enemies turned on.",
+          "example": null
+        },
+        "pl": {
+          "short": "Boss Pinwheel zostaje, a jego klony są zastępowane."
+        }
+      },
+      "choiceExplanations": null,
+      "dependencies": [
+        {
+          "reason": "enemiesOff",
+          "text": "Turn on Enemy randomization to change this option."
+        },
+        {
+          "reason": "regularEnemiesOff",
+          "text": "Turn on Regular enemies to change this option."
+        }
+      ],
+      "evidence": "verified",
+      "hidden": null,
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "engines/combined/vendor/src/core/config.js",
+          "engines/combined/vendor/src/core/generator.js"
+        ]
+      }
+    },
+    {
+      "id": "enemies.gargoyle",
+      "configKey": "enemies.secondGargoyle",
+      "kind": "select",
+      "serializedValues": [
+        "replace",
+        "keep",
+        "single-boss"
+      ],
+      "default": "replace",
+      "neutralValueOfAnOldRecord": null,
+      "section": "classic",
+      "view": "Advanced",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": {
+        "en": "Second Bell Gargoyle",
+        "pl": "Drugi Bell Gargoyle"
+      },
+      "help": {
+        "en": {
+          "short": "What happens to the second Bell Gargoyle.",
+          "what": "The second Bell Gargoyle joins the fight when the first one is at 60% health.",
+          "affects": "The Bell Gargoyles fight on the Undead Parish rooftop.",
+          "limits": "Needs Boss randomization turned on.",
+          "example": null
+        },
+        "pl": {
+          "short": "Co dzieje się z drugim Bell Gargoyle."
+        }
+      },
+      "choiceExplanations": {
+        "replace": {
+          "label": "Replace with another boss",
+          "explanation": "The second Bell Gargoyle becomes an independently drawn boss."
+        },
+        "keep": {
+          "label": "Keep",
+          "explanation": "The second Bell Gargoyle stays a Bell Gargoyle."
+        },
+        "single-boss": {
+          "label": "Remove (earlier DS1TR behavior)",
+          "explanation": "The earlier DS1TR behavior: the extra Gargoyle is removed, so the fight has one boss."
+        }
+      },
+      "dependencies": [
+        {
+          "reason": "bossesOff",
+          "text": "Turn on Boss randomization to change this option."
+        },
+        {
+          "reason": "enemiesOff",
+          "text": "Turn on Enemy randomization to change this option."
+        }
+      ],
+      "evidence": "verified",
+      "hidden": null,
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "engines/combined/vendor/src/core/config.js",
+          "engines/combined/vendor/src/core/generator.js"
+        ]
+      }
+    },
+    {
+      "id": "enemies.gwyn",
+      "configKey": "enemies.gwynNerf",
+      "kind": "select",
+      "serializedValues": [
+        "strong",
+        "medium",
+        "none"
+      ],
+      "default": "medium",
+      "neutralValueOfAnOldRecord": null,
+      "section": "classic",
+      "view": "Advanced",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": {
+        "en": "Lord Gwyn as a replacement boss",
+        "pl": "Lord Gwyn jako boss zamiennik"
+      },
+      "help": {
+        "en": {
+          "short": "How rarely Lord Gwyn turns up as a replacement boss.",
+          "what": "The chance that Lord Gwyn is rejected when a boss is drawn as a replacement (also at the Kiln): Strong 85%, Medium 60%. It changes nothing about Gwyn himself, only how often he is chosen.",
+          "affects": "Boss draws.",
+          "limits": "Needs Boss randomization turned on.",
+          "example": null
+        },
+        "pl": {
+          "short": "Jak rzadko Lord Gwyn pojawia się jako boss zamiennik."
+        }
+      },
+      "choiceExplanations": {
+        "strong": {
+          "label": "Rare (rejected 85%)",
+          "explanation": "Gwyn is rejected 85% of the time."
+        },
+        "medium": {
+          "label": "Less rare (rejected 60%)",
+          "explanation": "Gwyn is rejected 60% of the time."
+        },
+        "none": {
+          "label": "No limit",
+          "explanation": "Gwyn is never rejected."
+        }
+      },
+      "dependencies": [
+        {
+          "reason": "bossesOff",
+          "text": "Turn on Boss randomization to change this option."
+        },
+        {
+          "reason": "enemiesOff",
+          "text": "Turn on Enemy randomization to change this option."
+        }
+      ],
+      "evidence": "verified",
+      "hidden": null,
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "engines/combined/vendor/src/core/config.js",
+          "engines/combined/vendor/src/core/generator.js"
+        ]
+      }
+    },
+    {
+      "id": "fog.enabled",
+      "configKey": "fog.enabled",
+      "kind": "toggle",
+      "serializedValues": [
+        true,
+        false
+      ],
+      "default": true,
+      "neutralValueOfAnOldRecord": null,
+      "section": "transitions",
+      "view": "Basic (main) and Advanced",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": {
+        "en": "Transition and fog randomization",
+        "pl": "Losowanie przejść i mgieł"
+      },
+      "help": {
+        "en": {
+          "short": "Mixes the connections between areas.",
+          "what": "Randomizes which fog gate, warp and passage leads where, so the world is connected in a new way. The world is generated so that it can still be completed.",
+          "affects": "Fog gates, warps and the order in which areas are reached.",
+          "limits": "Always includes the DLC areas, so DLC content cannot be turned off while it is on.",
+          "example": null
+        },
+        "pl": {
+          "short": "Miesza połączenia między obszarami."
+        }
+      },
+      "choiceExplanations": null,
+      "dependencies": [],
+      "evidence": "verified",
+      "hidden": null,
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "apps/backend/src/adapters/combinedRandomizerBridge.ts",
+          "apps/backend/src/server.ts",
+          "engines/combined/vendor/src/core/generator.js"
+        ]
+      }
+    },
+    {
+      "id": "fog.traversable",
+      "configKey": "fog.traversableFogs",
+      "kind": "toggle",
+      "serializedValues": [
+        true,
+        false
+      ],
+      "default": true,
+      "neutralValueOfAnOldRecord": null,
+      "section": "transitions",
+      "view": "Advanced",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": {
+        "en": "Ordinary fog gates",
+        "pl": "Zwykłe bramy mgły"
+      },
+      "help": {
+        "en": {
+          "short": "Ordinary fog gates between areas lead somewhere else.",
+          "what": "The fog gates you walk through between areas (not the ones at boss arenas) are randomized: stepping through one can lead to a different place.",
+          "affects": "Ordinary fog gates.",
+          "limits": "Needs Transition and fog randomization turned on.",
+          "example": null
+        },
+        "pl": {
+          "short": "Zwykłe bramy mgły między obszarami prowadzą gdzie indziej."
+        }
+      },
+      "choiceExplanations": null,
+      "dependencies": [
+        {
+          "reason": "fogOff",
+          "text": "Turn on Transition and fog randomization to change this option."
+        }
+      ],
+      "evidence": "verified",
+      "hidden": null,
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "apps/backend/src/adapters/fogHostProcess.ts",
+          "apps/backend/src/core/configValidation.ts",
+          "apps/backend/src/core/seedCode.ts"
+        ]
+      }
+    },
+    {
+      "id": "fog.bossFogs",
+      "configKey": "fog.bossFogs",
+      "kind": "toggle",
+      "serializedValues": [
+        true,
+        false
+      ],
+      "default": true,
+      "neutralValueOfAnOldRecord": null,
+      "section": "transitions",
+      "view": "Advanced",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": {
+        "en": "Boss fog gates",
+        "pl": "Bramy mgły bossów"
+      },
+      "help": {
+        "en": {
+          "short": "The fog gates of boss arenas lead somewhere else.",
+          "what": "The fog gates at the entrance and exit of boss arenas are randomized: a boss arena can be reached from, and lead to, other places.",
+          "affects": "The fog gates of boss fights.",
+          "limits": "Needs Transition and fog randomization turned on.",
+          "example": null
+        },
+        "pl": {
+          "short": "Bramy mgły aren bossów prowadzą gdzie indziej."
+        }
+      },
+      "choiceExplanations": null,
+      "dependencies": [
+        {
+          "reason": "fogOff",
+          "text": "Turn on Transition and fog randomization to change this option."
+        }
+      ],
+      "evidence": "verified",
+      "hidden": null,
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "apps/backend/src/adapters/fogHostProcess.ts",
+          "apps/backend/src/core/configValidation.ts",
+          "apps/backend/src/core/seedCode.ts"
+        ]
+      }
+    },
+    {
+      "id": "fog.warps",
+      "configKey": "fog.areaWarps",
+      "kind": "toggle",
+      "serializedValues": [
+        true,
+        false
+      ],
+      "default": true,
+      "neutralValueOfAnOldRecord": null,
+      "section": "transitions",
+      "view": "Advanced",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": {
+        "en": "Warps between locations",
+        "pl": "Teleporty między lokacjami"
+      },
+      "help": {
+        "en": {
+          "short": "Warps between locations lead somewhere else.",
+          "what": "Existing warps between locations (such as the crow transports) are randomized. With \"Disconnected fog gates\" off, warps are paired so that they can be used in both directions.",
+          "affects": "Warps between locations.",
+          "limits": "Needs Transition and fog randomization turned on.",
+          "example": null
+        },
+        "pl": {
+          "short": "Teleporty między lokacjami prowadzą gdzie indziej."
+        }
+      },
+      "choiceExplanations": null,
+      "dependencies": [
+        {
+          "reason": "fogOff",
+          "text": "Turn on Transition and fog randomization to change this option."
+        }
+      ],
+      "evidence": "verified",
+      "hidden": null,
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "apps/backend/src/adapters/fogHostProcess.ts",
+          "apps/backend/src/core/configValidation.ts",
+          "apps/backend/src/core/seedCode.ts"
+        ]
+      }
+    },
+    {
+      "id": "fog.majorPvp",
+      "configKey": "fog.majorPvpFogs",
+      "kind": "toggle",
+      "serializedValues": [
+        true,
+        false
+      ],
+      "default": false,
+      "neutralValueOfAnOldRecord": null,
+      "section": "transitions",
+      "view": "Advanced",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": {
+        "en": "Major PvP fog gates",
+        "pl": "Główne bramy mgły PvP"
+      },
+      "help": {
+        "en": {
+          "short": "Major fog gates in places the fog randomizer marks as PvP.",
+          "what": "In the data of the fog randomizer some fog gates are tagged as PvP gates, and some of them as major ones (for example between Firelink Shrine and the Undead Burg). Off, those gates stay where they are and are not mixed; on, they take part in the randomization like other gates.",
+          "affects": "Fog gates tagged major PvP in the fog randomizer data.",
+          "limits": "Needs Transition and fog randomization turned on.",
+          "example": null
+        },
+        "pl": {
+          "short": "Główne bramy mgły w miejscach, które randomizer mgieł oznacza jako PvP."
+        }
+      },
+      "choiceExplanations": null,
+      "dependencies": [
+        {
+          "reason": "fogOff",
+          "text": "Turn on Transition and fog randomization to change this option."
+        }
+      ],
+      "evidence": "partial",
+      "hidden": null,
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "apps/backend/src/adapters/fogHostProcess.ts",
+          "apps/backend/src/core/configValidation.ts",
+          "apps/backend/src/core/seedCode.ts"
+        ]
+      }
+    },
+    {
+      "id": "fog.minorPvp",
+      "configKey": "fog.minorPvpFogs",
+      "kind": "toggle",
+      "serializedValues": [
+        true,
+        false
+      ],
+      "default": false,
+      "neutralValueOfAnOldRecord": null,
+      "section": "transitions",
+      "view": "Advanced",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": {
+        "en": "Minor PvP fog gates",
+        "pl": "Poboczne bramy mgły PvP"
+      },
+      "help": {
+        "en": {
+          "short": "Minor fog gates in places the fog randomizer marks as PvP.",
+          "what": "The other fog gates tagged as PvP gates in the data of the fog randomizer. Off, they stay where they are and are not mixed; on, they take part in the randomization.",
+          "affects": "Fog gates tagged minor PvP in the fog randomizer data.",
+          "limits": "Needs Transition and fog randomization turned on.",
+          "example": null
+        },
+        "pl": {
+          "short": "Poboczne bramy mgły w miejscach, które randomizer mgieł oznacza jako PvP."
+        }
+      },
+      "choiceExplanations": null,
+      "dependencies": [
+        {
+          "reason": "fogOff",
+          "text": "Turn on Transition and fog randomization to change this option."
+        }
+      ],
+      "evidence": "partial",
+      "hidden": null,
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "apps/backend/src/adapters/fogHostProcess.ts",
+          "apps/backend/src/core/configValidation.ts",
+          "apps/backend/src/core/seedCode.ts"
+        ]
+      }
+    },
+    {
+      "id": "fog.lordvesselGates",
+      "configKey": "fog.lordvesselGates",
+      "kind": "toggle",
+      "serializedValues": [
+        true,
+        false
+      ],
+      "default": false,
+      "neutralValueOfAnOldRecord": null,
+      "section": "transitions",
+      "view": "Advanced",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": {
+        "en": "Golden Lordvessel fog gates",
+        "pl": "Złote bramy mgły Lordvessel"
+      },
+      "help": {
+        "en": {
+          "short": "The golden fog gates that need the Lordvessel are mixed too.",
+          "what": "The golden fog gates that the Lordvessel opens (for example in Tomb of the Giants, Demon Ruins and the Duke's Archives). Off, they stay where they are and still need the Lordvessel. On, they take part in the randomization like other gates.",
+          "affects": "The golden fog gates.",
+          "limits": "Needs Transition and fog randomization turned on. Not related to Lordvessel placement.",
+          "example": null
+        },
+        "pl": {
+          "short": "Złote bramy mgły wymagające Lordvessel też są mieszane."
+        }
+      },
+      "choiceExplanations": null,
+      "dependencies": [
+        {
+          "reason": "fogOff",
+          "text": "Turn on Transition and fog randomization to change this option."
+        }
+      ],
+      "evidence": "verified",
+      "hidden": null,
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "apps/backend/src/adapters/fogHostProcess.ts",
+          "apps/backend/src/core/configValidation.ts",
+          "apps/backend/src/core/seedCode.ts"
+        ]
+      }
+    },
+    {
+      "id": "fog.randomStart",
+      "configKey": "fog.randomStart",
+      "kind": "toggle",
+      "serializedValues": [
+        true,
+        false
+      ],
+      "default": false,
+      "neutralValueOfAnOldRecord": null,
+      "section": "transitions",
+      "view": "Advanced",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": {
+        "en": "Random start",
+        "pl": "Losowy start"
+      },
+      "help": {
+        "en": {
+          "short": "A new game starts somewhere other than the Undead Asylum.",
+          "what": "A new game starts at one of sixteen start points (for example Firelink Shrine, the Undead Parish, Darkroot Garden, Anor Londo, the Painted World) instead of the Undead Asylum.",
+          "affects": "Where a new game begins.",
+          "limits": "Needs Transition and fog randomization turned on, and ordinary fog gates or boss fog gates randomized.",
+          "example": null
+        },
+        "pl": {
+          "short": "Nowa gra zaczyna się gdzie indziej niż w Undead Asylum."
+        }
+      },
+      "choiceExplanations": null,
+      "dependencies": [
+        {
+          "reason": "fogOff",
+          "text": "Turn on Transition and fog randomization to change this option."
+        },
+        {
+          "reason": "warnRandomStart",
+          "text": "A random start needs ordinary fog gates or boss fog gates to be randomized."
+        }
+      ],
+      "evidence": "verified",
+      "hidden": null,
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "apps/backend/src/adapters/fogHostProcess.ts",
+          "apps/backend/src/core/configValidation.ts",
+          "apps/backend/src/core/seedCode.ts"
+        ]
+      }
+    },
+    {
+      "id": "fog.disconnected",
+      "configKey": "fog.disconnectedFogs",
+      "kind": "toggle",
+      "serializedValues": [
+        true,
+        false
+      ],
+      "default": false,
+      "neutralValueOfAnOldRecord": null,
+      "section": "transitions",
+      "view": "Advanced",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": {
+        "en": "Disconnected fog gates",
+        "pl": "Rozłączone bramy mgły"
+      },
+      "help": {
+        "en": {
+          "short": "Going through a gate and back does not return you to where you were.",
+          "what": "Normally the two sides of a fog gate are paired, so going back leads to the place you came from. Off that, the two sides are randomized independently, so a gate you came through may lead somewhere else when you turn around.",
+          "affects": "How fog gates connect.",
+          "limits": "Needs Transition and fog randomization turned on.",
+          "example": null
+        },
+        "pl": {
+          "short": "Przejście przez bramę i powrót nie odprowadza cię tam, skąd przyszedłeś."
+        }
+      },
+      "choiceExplanations": null,
+      "dependencies": [
+        {
+          "reason": "fogOff",
+          "text": "Turn on Transition and fog randomization to change this option."
+        }
+      ],
+      "evidence": "verified",
+      "hidden": null,
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "apps/backend/src/adapters/fogHostProcess.ts",
+          "apps/backend/src/core/configValidation.ts",
+          "apps/backend/src/core/seedCode.ts"
+        ]
+      }
+    },
+    {
+      "id": "fog.noFall",
+      "configKey": "fog.noFallBedOfChaos",
+      "kind": "toggle",
+      "serializedValues": [
+        true,
+        false
+      ],
+      "default": false,
+      "neutralValueOfAnOldRecord": null,
+      "section": "transitions",
+      "view": "Advanced",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": {
+        "en": "No-Fall Bed of Chaos",
+        "pl": "Bed of Chaos bez upadku"
+      },
+      "help": {
+        "en": {
+          "short": "Changes the floor events of the Bed of Chaos arena.",
+          "what": "The fog randomizer replaces two floor events of the Bed of Chaos map with its own versions, so the player does not fall (the name of the option in the fog randomizer is No-Fall Bed of Chaos).",
+          "affects": "The Bed of Chaos arena.",
+          "limits": "Needs Transition and fog randomization turned on.",
+          "example": null
+        },
+        "pl": {
+          "short": "Zmienia zdarzenia podłogi na arenie Bed of Chaos."
+        }
+      },
+      "choiceExplanations": null,
+      "dependencies": [
+        {
+          "reason": "fogOff",
+          "text": "Turn on Transition and fog randomization to change this option."
+        }
+      ],
+      "evidence": "partial",
+      "hidden": null,
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "apps/backend/src/adapters/fogHostProcess.ts",
+          "apps/backend/src/core/configValidation.ts",
+          "apps/backend/src/core/seedCode.ts"
+        ]
+      }
+    },
+    {
+      "id": "fog.scaling",
+      "configKey": "fog.scaling",
+      "kind": "toggle",
+      "serializedValues": [
+        true,
+        false
+      ],
+      "default": true,
+      "neutralValueOfAnOldRecord": null,
+      "section": "transitions",
+      "view": "Advanced",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": {
+        "en": "Strength by distance from the start",
+        "pl": "Siła według odległości od startu"
+      },
+      "help": {
+        "en": {
+          "short": "Enemy and boss strength follows how far an area is from the start.",
+          "what": "The health and damage of enemies and bosses in an area are adjusted by how far that area ends up from the start compared with the original game, so an area that comes earlier is easier and one that comes later is harder. Areas that come early in the original game are not made easier.",
+          "affects": "Enemy and boss strength in every area.",
+          "limits": "Needs Transition and fog randomization turned on. Separate from \"Enemy strength scaling\" of the enemy randomizer.",
+          "example": null
+        },
+        "pl": {
+          "short": "Siła wrogów i bossów zależy od tego, jak daleko od startu jest obszar."
+        }
+      },
+      "choiceExplanations": null,
+      "dependencies": [
+        {
+          "reason": "fogOff",
+          "text": "Turn on Transition and fog randomization to change this option."
+        }
+      ],
+      "evidence": "verified",
+      "hidden": null,
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "engines/combined/vendor/src/core/generator.js",
+          "engines/combined/vendor/src/core/placement.js",
+          "engines/combined/vendor/tools/DsrDataTool/Program.cs"
+        ]
+      }
+    },
+    {
+      "id": "fog.glitched",
+      "configKey": "fog.glitchedLogic",
+      "kind": "toggle",
+      "serializedValues": [
+        true,
+        false
+      ],
+      "default": false,
+      "neutralValueOfAnOldRecord": null,
+      "section": "transitions",
+      "view": "Advanced",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": {
+        "en": "Allow skips and glitches",
+        "pl": "Dopuść skipy i glitche"
+      },
+      "help": {
+        "en": {
+          "short": "The world may need skips and glitches to be completed.",
+          "what": "Connections that the fog randomizer marks as \"hard\" (skips and glitches) count as usable when it checks that the world can be completed, so a world may only be completable with them.",
+          "affects": "How the fog randomizer decides a world is completable.",
+          "limits": "Needs Transition and fog randomization turned on. Without it, no skips are assumed.",
+          "example": null
+        },
+        "pl": {
+          "short": "Ukończenie świata może wymagać skipów i glitchy."
+        }
+      },
+      "choiceExplanations": null,
+      "dependencies": [
+        {
+          "reason": "fogOff",
+          "text": "Turn on Transition and fog randomization to change this option."
+        }
+      ],
+      "evidence": "verified",
+      "hidden": null,
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "apps/backend/src/adapters/fogHostProcess.ts",
+          "apps/backend/src/core/configValidation.ts",
+          "apps/backend/src/core/seedCode.ts"
+        ]
+      }
+    },
+    {
+      "id": "fog.requireLordSouls",
+      "configKey": "fog.requireLordSouls",
+      "kind": "toggle",
+      "serializedValues": [
+        true,
+        false
+      ],
+      "default": true,
+      "neutralValueOfAnOldRecord": null,
+      "section": "transitions",
+      "view": "Advanced",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": {
+        "en": "Require Lord Souls",
+        "pl": "Wymagaj Lord Souls"
+      },
+      "help": {
+        "en": {
+          "short": "The Kiln of the First Flame stays at the end and needs the Lord Souls.",
+          "what": "On: the entrances of the Kiln of the First Flame are not randomized, so the Kiln stays at the end of the world. Off: its entrances are randomized too. (In the logic of the world the climb to Lord Gwyn needs the Lordvessel and the four Lord Souls: Bed of Chaos, Nito, Seath and the Four Kings.)",
+          "affects": "The end of the game.",
+          "limits": "Needs Transition and fog randomization turned on. Not related to Lord Soul placement.",
+          "example": null
+        },
+        "pl": {
+          "short": "Kiln of the First Flame zostaje na końcu i wymaga Lord Souls."
+        }
+      },
+      "choiceExplanations": null,
+      "dependencies": [
+        {
+          "reason": "fogOff",
+          "text": "Turn on Transition and fog randomization to change this option."
+        }
+      ],
+      "evidence": "verified",
+      "hidden": null,
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "apps/backend/src/adapters/fogHostProcess.ts",
+          "apps/backend/src/core/configValidation.ts",
+          "apps/backend/src/core/seedCode.ts"
+        ]
+      }
+    },
+    {
+      "id": "fog.pacifist",
+      "configKey": "fog.pacifistMode",
+      "kind": "toggle",
+      "serializedValues": [
+        true,
+        false
+      ],
+      "default": false,
+      "neutralValueOfAnOldRecord": null,
+      "section": "transitions",
+      "view": "Advanced",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": {
+        "en": "Pacifist mode",
+        "pl": "Tryb pacyfisty"
+      },
+      "help": {
+        "en": {
+          "short": "Removes the \"boss defeated\" condition from leaving a boss arena.",
+          "what": "In the warps the fog randomizer creates for the exits of boss arenas, the two flags that tie leaving to defeating the boss are cleared. The aim of the option is to allow leaving a boss arena without winning the fight.",
+          "affects": "Boss arena exits.",
+          "limits": "Needs Transition and fog randomization turned on.",
+          "example": null
+        },
+        "pl": {
+          "short": "Usuwa warunek „boss pokonany” z wyjścia z areny bossa."
+        }
+      },
+      "choiceExplanations": null,
+      "dependencies": [
+        {
+          "reason": "fogOff",
+          "text": "Turn on Transition and fog randomization to change this option."
+        }
+      ],
+      "evidence": "partial",
+      "hidden": null,
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "apps/backend/src/adapters/fogHostProcess.ts",
+          "apps/backend/src/core/configValidation.ts",
+          "apps/backend/src/core/seedCode.ts"
+        ]
+      }
+    },
+    {
+      "id": "fog.gameLanguage",
+      "configKey": "fog.language",
+      "kind": "select",
+      "serializedValues": [
+        "ENGLISH",
+        "FRENCH",
+        "GERMAN",
+        "ITALIAN",
+        "JAPANESE",
+        "KOREAN",
+        "NSPANISH",
+        "POLISH",
+        "PORTUGUESE",
+        "RUSSIAN",
+        "SCHINESE",
+        "SPANISH",
+        "TCHINESE"
+      ],
+      "default": "ENGLISH",
+      "neutralValueOfAnOldRecord": null,
+      "section": "transitions",
+      "view": "Advanced",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": {
+        "en": "Language of fog messages",
+        "pl": "Język komunikatów mgieł"
+      },
+      "help": {
+        "en": {
+          "short": "The language folder the extra messages of the fog randomizer are written to.",
+          "what": "The fog randomizer adds some event messages to the game. They are written to the language folder you choose here, so choose the language your game runs in. It is part of the world and of its Seed Code, and separate from the language of this app.",
+          "affects": "Only the messages added by the fog randomizer.",
+          "limits": "Needs Transition and fog randomization turned on.",
+          "example": null
+        },
+        "pl": {
+          "short": "Folder językowy, do którego zapisywane są dodatkowe komunikaty randomizera mgieł."
+        }
+      },
+      "choiceExplanations": null,
+      "dependencies": [
+        {
+          "reason": "fogOff",
+          "text": "Turn on Transition and fog randomization to change this option."
+        }
+      ],
+      "evidence": "verified",
+      "hidden": null,
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "apps/backend/src/adapters/fogCompatibility.ts",
+          "apps/backend/src/adapters/fogPrerequisites.ts",
+          "apps/backend/src/adapters/worldData.ts"
+        ]
+      }
+    },
+    {
+      "id": "output.dlc",
+      "configKey": "output.includeDlc",
+      "kind": "toggle",
+      "serializedValues": [
+        true,
+        false
+      ],
+      "default": true,
+      "neutralValueOfAnOldRecord": null,
+      "section": "other",
+      "view": "Basic (world) and Advanced",
+      "seedCode": "part of the world (Seed Code, preset, history)",
+      "preset": "exported and imported",
+      "labels": {
+        "en": "Include DLC content",
+        "pl": "Uwzględnij zawartość DLC"
+      },
+      "help": {
+        "en": {
+          "short": "Includes DLC areas, enemies, bosses and items in randomization.",
+          "what": "On: the Artorias of the Abyss content takes part in randomization. Off: its areas, enemies, bosses, items, merchants and NPC gifts are left out; the DLC itself stays in your game exactly as it is and is only not randomized.",
+          "affects": "Everything that belongs to the DLC map.",
+          "limits": "Cannot be turned off while the fog randomizer is on: it always includes the DLC areas.",
+          "example": null
+        },
+        "pl": {
+          "short": "Uwzględnia obszary, wrogów, bossów i przedmioty z DLC w losowaniu."
+        }
+      },
+      "choiceExplanations": null,
+      "dependencies": [
+        {
+          "reason": "dlcWithFog",
+          "text": "The fog randomizer always includes the DLC areas, so this stays on while it is on."
+        }
+      ],
+      "evidence": "verified",
+      "hidden": null,
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "apps/backend/src/adapters/combinedRandomizerAdapter.ts",
+          "apps/backend/src/adapters/combinedRandomizerBridge.ts",
+          "engines/combined/vendor/src/core/config.js"
+        ]
+      }
+    },
+    {
+      "id": "output.spoiler",
+      "configKey": "output.generateSpoilerLog",
+      "kind": "toggle",
+      "serializedValues": [
+        true,
+        false
+      ],
+      "default": true,
+      "neutralValueOfAnOldRecord": null,
+      "section": "other",
+      "view": "Basic (world) and Advanced",
+      "seedCode": "not part of a world (output preference)",
+      "preset": "exported as a preference, never part of a Seed Code",
+      "labels": {
+        "en": "Save the spoiler file",
+        "pl": "Zapisz plik ze spoilerami"
+      },
+      "help": {
+        "en": {
+          "short": "Saves a text file with the full list of what was randomized.",
+          "what": "Writes a text file with every item, enemy, boss, gift, drop and shop that was changed, and where it was before and after. The Hint Sheet works without it. You can read the file in the Run history.",
+          "affects": "Only whether this file is saved. It reveals the world: open it only if you want to know.",
+          "limits": "It does not list the connections of the fog randomizer.",
+          "example": null
+        },
+        "pl": {
+          "short": "Zapisuje plik tekstowy z pełną listą tego, co wylosowano."
+        }
+      },
+      "choiceExplanations": null,
+      "dependencies": [],
+      "evidence": "verified",
+      "hidden": null,
+      "implementation": {
+        "validatedIn": "apps/backend/src/core/configValidation.ts",
+        "effect": [
+          "apps/backend/src/adapters/combinedRandomizerAdapter.ts",
+          "apps/backend/src/adapters/combinedRandomizerBridge.ts",
+          "apps/backend/src/core/seededRun.ts"
+        ]
+      }
+    }
+  ]
+}

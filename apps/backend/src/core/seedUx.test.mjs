@@ -39,7 +39,7 @@ test('the master seed is not made at startup: the form starts empty and only Ran
   assert.match(app, /joinConfig\(structuredClone\(DEFAULT_GENERATION_SETTINGS\), '', '', true\)/u);
   assert.doesNotMatch(app, /randomSeed|Math\.random\(\)/u, 'the renderer never invents a master seed; the backend makes it when a run starts');
   assert.ok(used(app, 'app.run.randomize') && used(app, 'common.loadSeed'));
-  assert.equal(en('app.run.randomize'), 'Randomize');
+  assert.equal(en('app.run.randomize'), 'Generate world');
   assert.equal(en('common.loadSeed'), 'Load seed');
   assert.doesNotMatch(await read('SeedPanel.tsx'), /Master seed/iu);
   for (const text of [english.seed, english.common]) assert.doesNotMatch(JSON.stringify(text), /master seed/iu);
@@ -88,51 +88,52 @@ test('Run history is collapsed by default, regenerating does not add history, an
   assert.match(app, /const regenerate = async \(entry: RunHistoryEntry\) => \{\s*await generateRun\(entry\.seedCode\);/u);
 });
 
-test('the user-facing wording says Fog, and the LUDOS artwork is a small decorative accent in the header', async () => {
+test('the user-facing wording says Fog, and no withdrawn brand mark is on any screen', async () => {
   const app = await read('App.tsx');
-  assert.equal(en('settings.fog.title'), 'Fog randomizer settings');
-  assert.ok(used(app, 'settings.fog.title'));
+  assert.equal(en('settings.sections.transitions.title'), 'Transitions and fog');
+  assert.equal(en('settings.fog.enabled.label'), 'Transition and fog randomization');
   assert.doesNotMatch(app, /World settings|WORLD<\/span>/u);
   assert.doesNotMatch(JSON.stringify(english.settings), /World settings/u);
-  assert.match(app, /import ludos from '\.\/assets\/branding\/ludos\.png'/u);
-  assert.match(app, /className="hero-ludos" src=\{ludos\} alt="" aria-hidden="true"/u);
-  const css = await read('styles.css');
-  assert.match(css, /\.hero-ludos \{[^}]*width: clamp\(110px, 11vw, 150px\)/u);
+  for (const name of ['App.tsx', 'styles.css', 'ui/Sidebar.tsx']) assert.doesNotMatch(await read(name), /ludos/iu, `${name} does not carry the withdrawn mark`);
+  assert.match(app, /import logo from '\.\/assets\/branding\/app-mark\.png'/u);
 });
 
 test('Boss replacement and Unique bosses are real controls (not planned placeholders) and are reset with the algorithm', async () => {
-  const app = await read('App.tsx');
+  const { SETTINGS, applySetting, DEFAULT_GENERATION_SETTINGS, joinConfig } = await import('@ds1tr/contracts');
   assert.equal(en('settings.enemies.bossReplacement.label'), 'Boss replacement');
   assert.equal(en('settings.enemies.bossReplacement.options.bosses'), 'Random bosses');
-  assert.ok(app.includes("<label className=\"field-label\">{t('settings.enemies.bossReplacement.label')}</label>"));
-  assert.ok(app.includes("<option value=\"bosses\">{t('settings.enemies.bossReplacement.options.bosses')}</option>"));
-  assert.ok(app.includes("label={t('settings.enemies.uniqueBosses.label')}"));
-  assert.equal(en('settings.enemies.uniqueBosses.label'), 'Unique bosses');
-  assert.doesNotMatch(app, /\['Boss replacement', 'NPC replacement'\]/u);
-  assert.doesNotMatch(app, /'Allow T-pose behavior', 'Unique bosses'/u);
-  assert.match(app, /bossReplacement: 'classic', uniqueBosses: false/u);
+  assert.equal(en('settings.enemies.uniqueBosses.label'), 'Use every boss once first');
+  assert.deepEqual(SETTINGS.find((setting) => setting.id === 'enemies.bossReplacement').choices, ['classic', 'bosses', 'normals', 'both']);
+  assert.ok(SETTINGS.some((setting) => setting.id === 'enemies.uniqueBosses' && !setting.hidden));
+  const config = joinConfig(structuredClone(DEFAULT_GENERATION_SETTINGS), '', 'seed', true);
+  const set = applySetting(applySetting(config, 'enemies.bossReplacement', 'bosses'), 'enemies.uniqueBosses', true);
+  assert.equal(set.enemies.placement.uniqueBosses, true);
+  assert.equal(applySetting(set, 'enemies.bossReplacement', 'classic').enemies.placement.uniqueBosses, false, 'leaving the draw modes puts Unique bosses back');
+  assert.equal(applySetting(set, 'enemies.algorithm', 'permutation-v1').enemies.placement.bossReplacement, 'classic');
+  assert.doesNotMatch(await read('App.tsx'), /\['Boss replacement', 'NPC replacement'\]|'Allow T-pose behavior', 'Unique bosses'/u);
 });
 
-test('bosses in regular slots (Part E1): the options are real, appear only when they apply, and are reset when they stop applying', async () => {
-  const app = await read('App.tsx');
+test('bosses in regular slots (Part E1): the options are real, are available only when they apply (and say why not), and are reset when they stop applying', async () => {
+  const { applySetting, settingState, DEFAULT_GENERATION_SETTINGS, joinConfig } = await import('@ds1tr/contracts');
   const modes = JSON.stringify(english.settings.enemies.normalReplacement.options);
   assert.doesNotMatch(modes + JSON.stringify(english.settings.enemies.bossReplacement.options), /\(planned\)/u, 'the two modes are no longer placeholders');
   assert.equal(en('settings.enemies.normalReplacement.options.bosses'), 'Only bosses');
-  assert.equal(en('settings.enemies.normalReplacement.options.both'), 'Bosses or normal enemies');
-  assert.ok(app.includes("<option value=\"bosses\">{t('settings.enemies.normalReplacement.options.bosses')}</option><option value=\"both\">{t('settings.enemies.normalReplacement.options.both')}</option>"));
-  // Progressive disclosure: the boss chance only with "both", souls and respawn with either boss mode; nothing is shown as a dead control.
-  assert.match(app, /normalReplacement === 'both' && \(\s*<RangeOption label=\{t\('settings\.enemies\.bossChanceNormal\.label'\)\}/u);
-  assert.match(app, /\(config\.enemies\.placement\.normalReplacement === 'bosses' \|\| config\.enemies\.placement\.normalReplacement === 'both'\) && \(/u);
-  assert.ok(app.includes("label={t('settings.enemies.roamingSouls.label')}"));
-  assert.ok(app.includes("label={t('settings.enemies.roamingDead.label')}"));
+  assert.equal(en('settings.enemies.normalReplacement.options.both'), 'Bosses or regular enemies');
+  const base = joinConfig(structuredClone(DEFAULT_GENERATION_SETTINGS), '', 'seed', true);
+  // The boss chance only with "both", souls and respawn with either boss mode; otherwise the control is disabled and names the mode it needs.
+  const reason = (config, id) => settingState(config, id).reason;
+  assert.equal(reason(base, 'enemies.bossChanceNormal'), 'needsBothNormalMode');
+  assert.equal(reason(base, 'enemies.roamingSouls'), 'needsRoamingMode');
+  assert.equal(reason(base, 'enemies.roamingDead'), 'needsRoamingMode');
+  const both = applySetting(base, 'enemies.normalReplacement', 'both');
+  for (const id of ['enemies.bossChanceNormal', 'enemies.roamingSouls', 'enemies.roamingDead']) assert.equal(settingState(both, id).enabled, true, id);
+  const bossesOnly = applySetting(base, 'enemies.normalReplacement', 'bosses');
+  assert.equal(settingState(bossesOnly, 'enemies.bossChanceNormal').enabled, false);
+  assert.equal(settingState(bossesOnly, 'enemies.roamingSouls').enabled, true);
   // Leaving a mode puts the settings that only it needed back to their defaults (a hidden setting never stays in the world).
-  assert.match(app, /if \(mode !== 'both'\) placement\.bossChanceInNormalSlots = 10;/u);
-  assert.match(app, /if \(!roaming\) \{ placement\.roamingBossSouls = 50; placement\.roamingBossesStayDead = false; \}/u);
-  // No dead twin of a real control is left behind in the planned group (a disabled "Roaming boss souls", "Boss chance: ..." or "Respawning roaming bosses").
-  assert.doesNotMatch(app, /<RangeOption disabled label="(Boss chance: normal slots|Boss chance: boss slots|Roaming boss souls)"/u);
-  assert.doesNotMatch(app, /'Respawning roaming bosses'/u);
-  assert.equal((app.match(/settings\.enemies\.roamingSouls\.label/gu) ?? []).length, 1, 'one Roaming boss souls control');
-  // Plain language: no engine vocabulary in the visible labels.
+  const tuned = applySetting(applySetting(applySetting(both, 'enemies.bossChanceNormal', 70), 'enemies.roamingSouls', 20), 'enemies.roamingDead', true);
+  const left = applySetting(tuned, 'enemies.normalReplacement', 'normals');
+  assert.deepEqual([left.enemies.placement.bossChanceInNormalSlots, left.enemies.placement.roamingBossSouls, left.enemies.placement.roamingBossesStayDead], [10, 50, false]);
   for (const key of ['bossChanceNormal', 'roamingSouls', 'roamingDead']) assert.doesNotMatch(en(`settings.enemies.${key}.label`), /NpcParam|getSoul|entity|EMEVD/u);
 });
 
@@ -147,24 +148,28 @@ test('the test worlds panel separates quick smoke tests from extended gameplay t
   }
   assert.match(en('smoke.estimateAfter'), /estimated from the distance, not timed in the game/u, 'the estimate is labelled as an estimate');
   const app = await read('App.tsx');
-  // It stays inside Advanced: the normal screen does not mention test worlds.
-  const advancedAt = app.indexOf("<summary>{t('app.advanced.title')}</summary>");
-  assert.ok(advancedAt > 0 && app.slice(advancedAt).includes('<SmokeTestPanel'), 'the panel lives in Advanced');
-  assert.equal(app.slice(0, advancedAt).includes('<SmokeTestPanel'), false);
+  // It is an internal tool: it lives in the tools of the app settings and only on a development build; the normal screen does not mention test worlds.
+  assert.ok(app.includes('{devTools && <SmokeTestPanel'), 'the panel is shown only when the internal tools are on');
+  assert.equal(app.slice(0, app.indexOf('const toolsCard')).includes('<SmokeTestPanel'), false);
 });
 
-test('Part G: Sampling is the recommended default, the classic permutation stays selectable, and the sampling controls exist only where they apply', async () => {
+test('Part G: Sampling is the recommended default, the classic permutation stays selectable, and the sampling controls are unavailable (with the reason) where they do not apply', async () => {
+  const { SETTINGS, applySetting, settingState, DEFAULT_GENERATION_SETTINGS, joinConfig } = await import('@ds1tr/contracts');
   const app = await read('App.tsx');
-  assert.equal(en('settings.enemies.algorithm.options.sampling-v1'), 'Sampling (recommended)');
-  assert.equal(en('settings.enemies.algorithm.options.permutation-v1'), 'Classic permutation');
-  assert.ok(app.includes("<option value=\"sampling-v1\">{t('settings.enemies.algorithm.options.sampling-v1')}</option><option value=\"permutation-v1\">{t('settings.enemies.algorithm.options.permutation-v1')}</option>"));
+  assert.equal(en('settings.enemies.algorithm.options.sampling-v1'), 'Pick a replacement for every spot');
+  assert.equal(en('settings.enemies.algorithm.options.permutation-v1'), 'Shuffle existing enemies');
+  assert.deepEqual(SETTINGS.find((setting) => setting.id === 'enemies.algorithm').choices, ['sampling-v1', 'permutation-v1']);
+  assert.match(en('help.settings.enemies.algorithm.choices.sampling-v1'), /\(recommended\)/u);
   assert.doesNotMatch(app, /[Ll]egacy-style/u, 'no implementation history in the visible text');
   assert.doesNotMatch(JSON.stringify({ ...english, smoke: undefined }), /[Ll]egacy-style/u, 'the screens say no implementation history');
-  // Everything between the replacement chance and the custom pool editor is inside one sampling-only block: no disabled twin is shown for the classic permutation.
-  assert.match(app, /\{config\.enemies\.placement\.algorithm === 'sampling-v1' && \(\s*<>\s*<RangeOption label=\{t\('settings\.enemies\.replacementChance\.label'\)\}/u);
-  assert.match(app, /<EnemyPoolEditor[\s\S]*?<\/>\s*\)\}/u);
+  const base = joinConfig(structuredClone(DEFAULT_GENERATION_SETTINGS), '', 'seed', true);
+  assert.equal(base.enemies.placement.algorithm, 'sampling-v1', 'a fresh screen starts from the contracts default');
+  const classic = applySetting(base, 'enemies.algorithm', 'permutation-v1');
+  for (const id of ['enemies.replacementChance', 'enemies.normalReplacement', 'enemies.fit', 'enemies.difficultyMode', 'enemies.typeReplacement', 'enemies.customPool', 'enemies.bossReplacement']) {
+    assert.deepEqual([id, settingState(classic, id).enabled, settingState(classic, id).reason], [id, false, 'samplingOnly'], 'no control is left that looks usable but is not');
+  }
   // No planned placeholder is left in the enemy section (the T-pose and NPC replacement controls did nothing).
   assert.doesNotMatch(app, /Allow T-pose behavior|NPC replacement/u);
-  // A fresh screen starts from the contracts default (sampling); Restore default settings returns to it, a loaded Seed Code keeps its own algorithm.
+  // Restore default settings returns to the contracts defaults; a loaded Seed Code keeps its own algorithm.
   assert.match(app, /const resetSettings = \(\) => \{\s*setConfig\(\(current\) => \(\{ \.\.\.initialConfig, gamePath: current\.gamePath \}\)\);/u);
 });

@@ -35,7 +35,7 @@ export type ProgressionModelResult =
 
 const expectedAnnotationSha256 = worldDataManifest.find((entry) => entry.path === 'dist/fog.txt')?.sha256;
 
-export const KEY_PLACEMENT_MODEL_MESSAGE = 'Key placement needs the world data of the fog randomizer, which could not be prepared. Click Randomize again, or turn Key placement off.';
+export const KEY_PLACEMENT_MODEL_MESSAGE = 'Key placement needs the world data of the fog randomizer, which could not be prepared. Click Generate world again, or turn Key placement off.';
 
 function isModel(value: unknown, variant: ProgressionModelVariant): value is ProgressionModel {
   if (!value || typeof value !== 'object') return false;

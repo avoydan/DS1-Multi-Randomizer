@@ -17,6 +17,8 @@ export interface BuildInfo {
   version: string;
   commit: string | null;
   mode: 'development' | 'public';
+  /** What the interface shows: `public` hides the internal test worlds. Builds made before the channel existed have none and are read as public. */
+  channel?: 'public' | 'internal';
   versions: { desktop: string; backend: string; contracts: string; foghostProject: string | null };
   builtAt: string;
 }

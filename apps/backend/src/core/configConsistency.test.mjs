@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import {
   CANONICAL_ITEM_EXTENSION_KEYS, CANONICAL_PLACEMENT_EXTENSION_KEYS, DEFAULT_GENERATION_SETTINGS, GENERATION_FIELD_POLICY, NEUTRAL_ENEMY_PLACEMENT_OPTIONS, NEUTRAL_KEY_OPTIONS,
-  joinConfig,
+  SETTINGS, joinConfig,
 } from '@ds1tr/contracts';
 import { canonicalSettingsJson } from '../../dist/core/canonicalSettings.js';
 import { exportPreset } from '../../dist/core/preset.js';
@@ -14,8 +14,6 @@ import { prepareRun } from '../../dist/core/seededRun.js';
 
 const desktop = new URL('../../../desktop/src/', import.meta.url);
 const read = (relative) => readFileSync(new URL(relative, desktop), 'utf8');
-const uiSource = ['App.tsx', 'EnemyPoolEditor.tsx'].map(read).join('\n');
-const englishSettings = JSON.parse(read('locales/en/settings.json'));
 
 const resolve = (object, path) => path.split('.').reduce((value, key) => (value === undefined || value === null ? undefined : value[key]), object);
 const seedFields = Object.entries(GENERATION_FIELD_POLICY).filter(([, policy]) => policy === 'seed').map(([path]) => path);
@@ -24,10 +22,9 @@ const defaultConfig = joinConfig(defaults, 'C:/Games/DSR', 'audit-seed', false);
 
 /** Settings that the interface offers through a control that is not a plain `config.<path>` read (a group of buttons, a pool editor, a derived switch). */
 const UI_NOTES = {
-  'enemies.placement.customPool': 'EnemyPoolEditor',
-  'enemies.placement.algorithm': 'the algorithm choice sets the legacy and the classic option groups',
+  'items.guaranteeEarlyWeapon': 'no effect in this version (the extracted-data path never reads it): the control is not drawn, the field stays in presets and Seed Codes',
+  'items.balancedEarlyLoot': 'no effect in this version (the extracted-data path never reads it): the control is not drawn, the field stays in presets and Seed Codes',
   'items.randomizeProtectedItems': 'blocked until progression safety is proven: validation refuses it, so the interface offers no control (a disabled placeholder was removed in 0.34.1)',
-  'output.includeDlc': 'the DLC switch (locked on while the fog randomizer is on)',
 };
 
 test('every setting of a world has a default, is exported in a preset and survives a Seed Code', () => {
@@ -45,19 +42,25 @@ test('every setting of a world has a default, is exported in a preset and surviv
   assert.ok(seedFields.length > 50, 'the audit covers the whole configuration');
 });
 
-test('every setting of a world has a control in the interface, and the control has a name in both languages', () => {
+test('every setting of a world has a control in the interface (the settings registry), and the control has a name and an explanation in both languages', () => {
+  // The interface draws every option from the registry (packages/contracts/src/settingsRegistry.ts); a field of a world without a registry entry has no control.
+  const registered = new Map(SETTINGS.map((setting) => [setting.path, setting]));
   const problems = [];
   for (const path of seedFields) {
-    const leaf = path.split('.').at(-1);
-    const [section] = path.split('.');
-    const patterns = [`config.${path}`, `config.${section}.${leaf}`, `placement.${leaf}`, `'${leaf}'`, `${leaf}:`];
-    if (!UI_NOTES[path] && !patterns.some((pattern) => uiSource.includes(pattern))) problems.push(`${path}: no control found in the interface`);
+    const setting = registered.get(path);
+    if (!setting && !UI_NOTES[path]) problems.push(`${path}: no control in the registry`);
+    if (setting?.hidden && !UI_NOTES[path]) problems.push(`${path}: hidden without a documented reason`);
   }
   assert.deepEqual(problems, []);
-  // The names of the controls exist in the English and Polish resources with the same keys (the key-by-key check is src/i18n/locales.test.mjs).
-  const polish = JSON.parse(read('locales/pl/settings.json'));
-  const keys = (object, prefix = '') => Object.entries(object).flatMap(([key, value]) => (value && typeof value === 'object' ? keys(value, `${prefix}${key}.`) : [`${prefix}${key}`]));
-  assert.deepEqual(keys(polish).sort(), keys(englishSettings).sort());
+  // The names and the help of the controls exist in the English and Polish resources with the same keys (the key-by-key check is src/i18n/locales.test.mjs).
+  for (const language of ['en', 'pl']) {
+    const settings = JSON.parse(read(`locales/${language}/settings.json`));
+    const help = JSON.parse(read(`locales/${language}/help.json`));
+    for (const setting of SETTINGS.filter((entry) => !entry.hidden)) {
+      assert.ok(resolve(settings, `${setting.id}.label`), `${language}: ${setting.id} has a name`);
+      assert.ok(resolve(help.settings, `${setting.id}.short`), `${language}: ${setting.id} has an explanation`);
+    }
+  }
 });
 
 test('the policy of every setting is explicit: a setting is in the Seed Code, in the envelope, or documented as not deciding a world', () => {

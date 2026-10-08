@@ -148,15 +148,15 @@ test('every code the backend turns into its own plain message is translated, and
 });
 
 test('the DLC switch has its words in both languages and does not claim to be unimplemented', () => {
-  for (const [language, app] of [['en', en.app], ['pl', pl.app]]) {
-    const texts = app.options.includeDlc;
-    for (const key of ['label', 'hint', 'fogHint', 'onNote', 'offNote', 'fogNote']) assert.ok(texts[key] && texts[key].length > 10, `${language}: ${key}`);
+  for (const [language, resources] of [['en', en], ['pl', pl]]) {
+    const texts = { ...resources.help.settings.output.dlc, label: resources.settings.output.dlc.label, reason: resources.help.reasons.dlcWithFog };
+    for (const key of ['label', 'short', 'what', 'affects', 'limits', 'reason']) assert.ok(texts[key] && texts[key].length > 10, `${language}: ${key}`);
     assert.doesNotMatch(Object.values(texts).join(' '), /not implemented|nie jest zaimplementowane/iu);
   }
-  assert.equal(en.app.options.includeDlc.label, 'DLC content');
-  assert.equal(pl.app.options.includeDlc.label, 'Zawartość DLC');
-  assert.match(en.app.options.includeDlc.hint, /^Include DLC areas, enemies, bosses and items in randomization/u);
-  assert.match(pl.app.options.includeDlc.hint, /^Uwzględniaj obszary, przeciwników, bossów i przedmioty z DLC w losowaniu/u);
+  assert.equal(en.settings.output.dlc.label, 'Include DLC content');
+  assert.equal(pl.settings.output.dlc.label, 'Uwzględnij zawartość DLC');
+  assert.match(en.help.settings.output.dlc.short, /^Includes DLC areas, enemies, bosses and items in randomization/u);
+  assert.match(pl.help.settings.output.dlc.short, /^Uwzględnia obszary, wrogów, bossów i przedmioty z DLC w losowaniu/u);
   assert.ok(en.common.chips.dlc && pl.common.chips.dlc && en.hints.summary.dlc && pl.hints.summary.dlc);
 });
 

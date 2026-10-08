@@ -1,6 +1,5 @@
 {
   "header": {
-    "eyebrow": "DARK SOULS REMASTERED",
     "title": "Triple Randomizer",
     "tagline": "Randomize items, enemies and fog gates of Dark Souls Remastered."
   },
@@ -16,26 +15,14 @@
   "sections": {
     "game": "Your game"
   },
-  "options": {
-    "includeDlc": {
-      "label": "DLC content",
-      "hint": "Include DLC areas, enemies, bosses and items in randomization. Turn it off to keep the Artorias of the Abyss content out of the randomization.",
-      "fogHint": "The fog randomizer always includes the DLC areas, so this stays on while it is on.",
-      "onNote": "DLC content is included in the randomization.",
-      "offNote": "DLC areas, enemies, bosses and items are left out of the randomization. The DLC itself stays in your game exactly as it is; it is only not randomized.",
-      "fogNote": "DLC content is included: the fog randomizer always contains the DLC areas."
-    },
-    "spoilerLog": "Generate spoiler log"
-  },
   "preset": {
-    "summary": "Settings preset (import / export)",
     "aria": "Settings preset",
     "placeholder": "Paste a DS1TR preset here, or export the current settings.",
     "export": "Export current settings",
     "apply": "Apply preset",
     "reset": "Restore default settings",
     "exported": "Preset exported. Copy the text to share these settings.",
-    "applied": "Preset applied. Review the settings, then click Randomize.",
+    "applied": "Preset applied. Review the settings, then click Generate world.",
     "resetDone": "Settings restored to the defaults.",
     "problemsLead": "The preset could not be applied. Technical details (in English):"
   },
@@ -55,7 +42,7 @@
     "repair": "Repair needed",
     "blocked": "Your game",
     "working": "Working",
-    "ready": "Randomize"
+    "ready": "Generate world"
   },
   "progress": {
     "checking": "Checking your game",
@@ -71,13 +58,13 @@
   },
   "progressAria": "Progress",
   "run": {
-    "randomize": "Randomize",
-    "chooseSettings": "Choose your settings, then click Randomize.",
+    "randomize": "Generate world",
+    "chooseSettings": "Choose your settings, then click Generate world.",
     "readyTitle": "Your randomized game is ready",
     "seedAria": "Seed code",
-    "stale": "You changed the settings after this world was created. Apply installs the world shown above; Randomize creates a new one.",
+    "stale": "You changed the settings after this world was created. Apply installs the world shown above; Generate world creates a new one.",
     "apply": "Apply to game",
-    "randomizeAgain": "Randomize again",
+    "randomizeAgain": "Generate again",
     "restore": "Restore original game",
     "restoreShared": "Restore and create shared world",
     "copySeedShort": "Copy seed {{seed}}",
@@ -134,5 +121,99 @@
     "copyright": "Copyright © 2026 DS1 Triple Randomizer contributors. This program comes with absolutely no warranty. You may redistribute and modify it under GNU GPL version 3. Corresponding source and the full license accompany every release.",
     "disclaimer": "This unofficial project is not affiliated with FromSoftware or Bandai Namco Entertainment. Use only with your own game installation and play modified game data offline.",
     "readLicense": "Read the GNU GPL v3 license"
+  },
+  "nav": {
+    "label": "Navigation",
+    "game": "Your game",
+    "presets": "Presets",
+    "seed": "Seed Code",
+    "transfer": "Import / Export",
+    "settings": "App settings",
+    "about": "About",
+    "version": "Version {{version}}"
+  },
+  "mode": {
+    "label": "Settings view",
+    "basic": {
+      "title": "Basic mode",
+      "note": "Recommended for most players"
+    },
+    "advanced": {
+      "title": "Advanced mode",
+      "note": "Full control over every option"
+    }
+  },
+  "basic": {
+    "customActive": "Custom advanced settings are active.",
+    "showAdvanced": "Show them in Advanced mode",
+    "main": {
+      "title": "Main options",
+      "note": "The most important settings of the randomizer."
+    },
+    "common": {
+      "title": "Additional options",
+      "note": "Handy and popular features."
+    },
+    "dlc": {
+      "title": "DLC content",
+      "note": "Turns the randomization of the Artorias of the Abyss content on or off."
+    },
+    "output": {
+      "title": "Result file",
+      "note": "A text file that lists what was randomized.",
+      "warning": "The file can reveal the locations of important items, bosses and passages. Open it only if you want to know the result."
+    }
+  },
+  "advancedView": {
+    "title": "Advanced mode",
+    "note": "All options with full descriptions. Select ? next to an option for a detailed explanation.",
+    "back": "Back to Basic mode",
+    "options_one": "{{count}} option",
+    "options_other": "{{count}} options",
+    "changed_one": "{{count}} changed",
+    "changed_other": "{{count}} changed"
+  },
+  "views": {
+    "game": {
+      "note": "Randomize items, enemies and transitions in Dark Souls Remastered."
+    },
+    "presets": {
+      "title": "Presets",
+      "note": "Your settings, ready to save, share or restore.",
+      "currentTitle": "Current settings",
+      "explain": "The settings you see in Your game are the current preset. Export them as text in Import / Export, or return to the recommended settings here.",
+      "reset": "Restore recommended settings",
+      "back": "Back to your game",
+      "differenceTitle": "Preset or Seed Code?",
+      "presetTerm": "Preset",
+      "presetText": "Only settings. Applying a preset changes the options and creates nothing; every generation afterwards makes a new world with a new random seed.",
+      "seedTerm": "Seed Code",
+      "seedText": "One exact world: the settings and the seed together. Loading a Seed Code puts its settings in the options and generates that same world straight away."
+    },
+    "transfer": {
+      "title": "Import / Export",
+      "note": "Move settings between computers as text.",
+      "noSeed": "A preset never contains a seed, so it never recreates a particular world. Use a Seed Code for that."
+    },
+    "seed": {
+      "title": "Seed Code",
+      "note": "Share an exact world or recreate one.",
+      "currentTitle": "Current world",
+      "none": "No world has been generated yet. After you generate one, its Seed Code appears here.",
+      "loadTitle": "Load a Seed Code",
+      "loadExplain": "Paste a code. Its settings are put in the options of your game, and the world is generated automatically (the original game is restored first when needed).",
+      "whatTitle": "What a Seed Code contains",
+      "whatText": "The generation profile, the master seed and every setting that decides a world. It does not contain your language, the Basic or Advanced view or your game folder. The same code makes the same world with the same generation profile."
+    },
+    "settings": {
+      "title": "App settings",
+      "note": "Language and tools.",
+      "languageTitle": "Language",
+      "languageNote": "The language of this app. It never changes a world and is not part of a Seed Code."
+    },
+    "about": {
+      "title": "About",
+      "version": "Version {{version}}"
+    }
   }
 }

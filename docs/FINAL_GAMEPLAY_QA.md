@@ -7,13 +7,13 @@ Play **offline**. Use a copy of the game or a save you do not mind losing; the a
 ## How to start any world
 
 1. Open DS1 Triple Randomizer. Nothing needs to be changed in the settings for these tests.
-2. **Test worlds**: open **Advanced** -> **Test worlds for playtesting**, open the **Test world** list, choose the title written in the tables below *exactly*, scroll down and press **Create this test world**. The app creates that world (it uses the same Load seed path as a shared Seed Code).
+2. **Test worlds**: open **App settings** (left, below the menu) -> **Advanced** -> **Test worlds for playtesting** (these internal test worlds are shown only in an INTERNAL build, or in a public build after the shortcut **Ctrl+Shift+Alt+F12**; a normal public build hides them), open the **Test world** list, choose the title written in the tables below *exactly*, scroll down and press **Create this test world**. The app creates that world (it uses the same Load seed path as a shared Seed Code).
 3. **Full playthrough worlds** (section 4): press **Load seed** (when a world is already applied it is under **...** next to **Copy seed**, and the button there becomes **Restore and create shared world**), paste the Seed Code into **Shared seed code** and press **Load**.
 4. Press **Apply to game**, wait for "Randomized game applied successfully.", press **Launch game** (or start the game from Steam).
 5. Afterwards press **Restore original game** (or **Restore and create shared world** to go straight to the next world).
-6. If something is wrong: **Advanced** -> **Diagnostics and support** -> **Export support bundle**, and note the Seed Code of the world (shown above the buttons).
+6. If something is wrong: **App settings** -> **Advanced** -> **Diagnostics and support**, or the **...** menu of the world in the **Run history** -> **Export support bundle**, and note the Seed Code of the world (shown above the buttons).
 
-Polish interface: **Losuj świat**, **Zastosuj do gry**, **Przywróć oryginalne pliki**, **Przywróć i utwórz nowy świat**, **Wczytaj**, **Uruchom grę**; the test worlds are in **Światy testowe do grania** -> **Świat testowy** (their titles are translated there; the English titles below are the ones in the English interface).
+Polish interface: **Generuj świat**, **Zastosuj do gry**, **Przywróć oryginalne pliki**, **Przywróć i utwórz nowy świat**, **Wczytaj**, **Uruchom grę**; the test worlds are in **Ustawienia aplikacji** -> **Zaawansowane** -> **Światy testowe do grania** -> **Świat testowy** (their titles are translated there; the English titles below are the ones in the English interface).
 
 ## 1. Quick smoke tests (about 5 minutes each)
 

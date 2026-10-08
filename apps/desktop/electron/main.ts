@@ -8,6 +8,7 @@ import { migrateSettings, normalizeGamePath, type StoredSettings } from './setti
 import { launchGame } from './launchGame.js';
 import { DesktopLog, installModeOf } from './appLog.js';
 import { MAX_SAVE_BYTES, SAVE_KINDS, parseSaveRequest, saveBytes } from './saveFile.js';
+import { isDevToolsShortcut, parseBuildChannel, type BuildChannel } from './channel.js';
 import { mainMessage, normalizeLanguageSetting, resolveLanguage, type AppLanguage, type LanguageSetting, type MainMessageKey } from './language.js';
 
 const currentDirectory = path.dirname(fileURLToPath(import.meta.url));
@@ -19,6 +20,9 @@ let backendError: string | null = null;
 let sessionToken = '';
 let settings: StoredSettings = {};
 let quitting = false;
+/** Whether the internal test tools are shown: always in an internal or development build, and in a public build only after the optional shortcut (this session only). */
+let buildChannel: BuildChannel = 'public';
+let devToolsShown = false;
 /** The application's own log (userData/logs/app.log); the backend and the support bundle read it. */
 const desktopLog = new DesktopLog(path.join(app.getPath('userData'), 'logs', 'app.log'));
 
@@ -33,6 +37,12 @@ async function saveSettings(): Promise<void> {
     await mkdir(app.getPath('userData'), { recursive: true });
     await writeFile(settingsPath(), JSON.stringify(settings, null, 2));
   } catch { /* settings are a convenience; the app works without them */ }
+}
+
+async function loadBuildChannel(): Promise<void> {
+  if (!app.isPackaged) { buildChannel = 'internal'; devToolsShown = true; return; }
+  try { buildChannel = parseBuildChannel(await readFile(path.join(runtimeRoot, 'build-info.json'), 'utf8')); } catch { buildChannel = parseBuildChannel(null); }
+  devToolsShown = buildChannel === 'internal';
 }
 
 async function loadSettings(): Promise<void> {
@@ -141,6 +151,12 @@ async function createWindow(): Promise<void> {
       sandbox: true,
     },
   });
+  win.webContents.on('before-input-event', (event, input) => {
+    if (!isDevToolsShortcut(input)) return;
+    event.preventDefault();
+    devToolsShown = !devToolsShown;
+    win.webContents.send('dev-tools:changed', devToolsShown);
+  });
   if (!app.isPackaged) await win.loadURL(process.env.VITE_DEV_SERVER_URL ?? 'http://127.0.0.1:5173');
   else await win.loadFile(path.join(currentDirectory, '..', 'dist', 'index.html'));
 }
@@ -187,6 +203,7 @@ ipcMain.handle('game:remember-path', async (_event, gamePath: unknown) => {
   await saveSettings();
   return true;
 });
+ipcMain.handle('app:dev-tools', () => devToolsShown);
 ipcMain.handle('runtime:connection', () => ({
   apiBase: app.isPackaged ? backendUrl : 'http://127.0.0.1:43177/api',
   token: app.isPackaged ? sessionToken : '',
@@ -204,7 +221,7 @@ ipcMain.handle('game:launch', (_event, gamePath: string) => launchGame(typeof ga
 
 app.whenReady().then(async () => {
   await loadSettings();
-  desktopLog.write('info', `DS1 Triple Randomizer ${app.getVersion()} started (${installModeOf(app.isPackaged, process.env)}), language ${currentLanguage()}`);
+  desktopLog.write('info', `DS1 Triple Randomizer ${app.getVersion()} started (${installModeOf(app.isPackaged, process.env)}, ${buildChannel} channel), language ${currentLanguage()}`);
   await startBackend();
   await createWindow();
 }).catch((error) => { dialog.showErrorBox(say('startupFailedTitle'), String(error)); app.quit(); });
