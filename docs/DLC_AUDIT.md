@@ -60,6 +60,14 @@ Engine level (`dlcSweep.mjs`, real extracted catalog, **810 DLC-off worlds** in 
 * The ON path is untouched: all 47 golden fixtures are byte-identical (see the golden section of `docs/IMPLEMENTATION_STATUS.md`).
 * New golden fixtures cover DLC OFF only (`goldenCompatibility`, case names starting `dlc-off`).
 
+## Drop rates of the DLC enemies (found after the 0.45.2 audit; backend 0.45.3)
+
+"Guaranteed enemy drops" (`items.guaranteedEnemyDrops`) raises the item chances of every drop table to a total of 100% in `ItemLotParam`. With the DLC off the data tool still did that for the DLC's own drop lots and for the reward rows of DLC bosses, so the DLC's enemies dropped differently although the DLC was meant to be left alone. The first two audits missed it for the same reason as the shops: `dlc-untouched` compared the item ids of the lot rows and skipped the `lotItemBasePoint` cells (the chances), copied from the verifier of the ordinary lots. Found by running the verifier against a DLC-off world made WITH guaranteed drops (`dlcVerifierControl.mjs`, `CONTROL_DLC_OFF=1`: 16 problems).
+
+Fix: `excludeDlcFromCatalog` returns `excludedDropLots` (the DLC-only lots and the reward rows of DLC bosses), the bridge passes them as `dlcExcludedDropLots`, and `DsrDataTool` leaves exactly those rows alone when it scales the chances (fork-side tool patch 0026). `dlc-untouched` now compares the `lotItemBasePoint` cells as well. Worlds with the DLC on are unchanged (47 of 47 fixtures byte for byte), as are DLC-off worlds without guaranteed drops.
+
+Evidence (real pipeline, real data tool, `placementMatrix`): **365 DLC-off worlds with guaranteed enemy drops on (95 + 70 in `dlc-off`, 100 + 100 in `final-rc`): 0 failures, 0 retries, 0 non-deterministic reruns, every DLC row (enemies, lots incl. chances, shops) identical to the clean game.**
+
 ## Deferred / unsupported
 
 * Fog randomizer with the DLC off (FogMod has no such option; a separate fog graph would be a FogMod change).

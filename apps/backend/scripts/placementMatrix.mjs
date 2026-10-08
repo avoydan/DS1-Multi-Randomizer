@@ -158,7 +158,8 @@ export const sets = {
    */
   'dlc-off': (() => {
     const off = { output: { includeDlc: false } };
-    const allPools = { randomizeGifts: true, randomizeEnemyDrops: true, randomizeShops: true };
+    // Guaranteed enemy drops rewrites drop rates in the data tool: with the DLC off it must leave the DLC's lots alone (patch 0026), so every DLC-off case has it on.
+    const allPools = { randomizeGifts: true, randomizeEnemyDrops: true, randomizeShops: true, guaranteedEnemyDrops: true };
     const heavy = sampling({ normalReplacement: 'both', bossReplacement: 'both', hostileNpcs: true, typeReplacement: 'enabled-except-roaming-bosses', fit: 'anywhere', replacementChance: 70 });
     return [
       { name: 'items-only', patch: merge2({ enemies: { enabled: false } }, noFog, off, { items: { ...allPools, soulItems: 'transposed' } }), seeds: 20 },
@@ -197,8 +198,8 @@ export const sets = {
       { name: 'e2-normals-in-boss-slots', patch: merge2(noItems, noFog, sampling({ bossReplacement: 'both', bossChanceInBossSlots: 60, fit: 'anywhere' }, { secondGargoyle: 'replace' })), seeds: 100 },
       { name: 'hostile-npcs', patch: merge2(noItems, noFog, sampling({ normalReplacement: 'normals', hostileNpcs: true, fit: 'fits', replacementChance: 100 })), seeds: 100 },
       { name: 'boss-sampling', patch: merge2(noItems, noFog, sampling({ bossReplacement: 'bosses', fit: 'anywhere' }, { gwynNerf: 'strong' })), seeds: 100 },
-      { name: 'dlc-off-triple', patch: merge2(structuredClone(DEFAULT_GENERATION_SETTINGS), noFog, off, chaos, { items: { ...allPools, soulItems: 'transposed' } }), seeds: 100 },
-      { name: 'dlc-off-keys-race', patch: merge2({ enemies: { enabled: false } }, noFog, off, { items: { keyPlacement: 'race', randomizeLordvessel: true, randomizeLordSouls: true, ...allPools, soulItems: 'transposed' } }), seeds: 100 },
+      { name: 'dlc-off-triple', patch: merge2(structuredClone(DEFAULT_GENERATION_SETTINGS), noFog, off, chaos, { items: { ...allPools, guaranteedEnemyDrops: true, soulItems: 'transposed' } }), seeds: 100 },
+      { name: 'dlc-off-keys-race', patch: merge2({ enemies: { enabled: false } }, noFog, off, { items: { keyPlacement: 'race', randomizeLordvessel: true, randomizeLordSouls: true, ...allPools, guaranteedEnemyDrops: true, soulItems: 'transposed' } }), seeds: 100 },
     ];
   })(),
   /** Part F1: hostile NPCs through the real data tool (Fog is covered by the fogHostE2e sweeps): events, rows and AI bundles of every placed NPC. */

@@ -441,12 +441,17 @@ export async function executeCombinedGeneration(
   let result;
   try {
     let engineCatalog = catalog;
+    let leftOutDropLots: number[] = [];
     if (request.includeDlc === false) {
       const excluded = excludeDlcFromCatalog(catalog);
       engineCatalog = excluded.catalog;
+      leftOutDropLots = excluded.excludedDropLots;
       log('info', describeDlcExclusion(excluded.summary));
     }
     result = core.generate(config, { gameCatalog: engineCatalog });
+    // The data tool normalizes the rates of every enemy drop lot it knows when Guaranteed enemy drops is on: with the DLC off it must leave the DLC's lots alone (patch 0026).
+    // The field exists only in such worlds, so every other plan keeps its exact text.
+    if (leftOutDropLots.length > 0 && config.guaranteedEnemyDrops) (result as Record<string, unknown>).dlcExcludedDropLots = leftOutDropLots;
   } catch (error) {
     // The engine refuses an algorithm that is not implemented. Another seed cannot fix that.
     const errorCode = typeof error === 'object' && error !== null ? (error as { code?: unknown }).code : undefined;

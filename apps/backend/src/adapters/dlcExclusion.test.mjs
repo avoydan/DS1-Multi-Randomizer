@@ -40,7 +40,8 @@ function catalog() {
 
 test('the DLC map, its enemies, bosses, pickups, rewards and drops are left out; everything else is kept', () => {
   const original = catalog();
-  const { catalog: filtered, summary } = excludeDlcFromCatalog(original);
+  const { catalog: filtered, summary, excludedDropLots } = excludeDlcFromCatalog(original);
+  assert.deepEqual(excludedDropLots, [5, 6], 'the data tool is told which drop lots to leave alone (the DLC-only lot and the reward row of a DLC boss)');
   assert.deepEqual(filtered.maps.map((map) => map.id), ['m10_00_00_00']);
   assert.equal(filtered.enemySlots.length, 2);
   assert.equal(filtered.bossSlots.length, 1);

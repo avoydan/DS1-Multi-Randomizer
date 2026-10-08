@@ -122,7 +122,7 @@ export function dlcContentRows(catalog: CatalogLike): { shopRows: number[]; gift
 }
 
 /** Returns a copy of the catalog without any DLC content, and what was left out. The input is not changed. */
-export function excludeDlcFromCatalog<T extends CatalogLike>(catalog: T): { catalog: T; summary: DlcExclusionSummary } {
+export function excludeDlcFromCatalog<T extends CatalogLike>(catalog: T): { catalog: T; summary: DlcExclusionSummary; excludedDropLots: number[] } {
   const rewards = catalog.bossRewards ?? [];
   const dlcRewardRows = new Set<number>();
   const dlcRewardSouls = new Set<number>();
@@ -195,6 +195,8 @@ export function excludeDlcFromCatalog<T extends CatalogLike>(catalog: T): { cata
   } as T;
   return {
     catalog: filtered,
+    /** The enemy drop lots that were left out: the data tool must not change their rates either (Guaranteed enemy drops). */
+    excludedDropLots: dropLots.filter((lot) => lot.dlcOnly || dlcRewardRows.has(lot.rowId)).map((lot) => lot.rowId).sort((a, b) => a - b),
     summary: {
       enemySlots: (catalog.enemySlots ?? []).length - keptEnemySlots.length,
       bossSlots: (catalog.bossSlots ?? []).length - (filtered.bossSlots ?? []).length,

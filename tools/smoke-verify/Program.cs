@@ -246,7 +246,7 @@ if (args.Length > 0 && args[0] == "dlc-untouched")
             if (!now.TryGetValue(id, out var row)) { problems.Add($"{label} row {id} is missing from the package"); continue; }
             foreach (var cell in row.Cells)
             {
-                if (!cell.Def.InternalName.StartsWith("lotItemBasePoint", StringComparison.Ordinal) && Text(cell.Value) != Text(original[cell.Def.InternalName].Value))
+                if (Text(cell.Value) != Text(original[cell.Def.InternalName].Value))
                 { problems.Add($"{label} row {id} cell {cell.Def.InternalName} was changed"); break; }
             }
         }

@@ -1,6 +1,6 @@
 {
   "profile": "ds1tr-gen-v1",
-  "recordedAt": "2026-10-08T10:51:42.226Z",
+  "recordedAt": "2026-10-08T15:33:49.258Z",
   "cases": [
     {
       "name": "dlc-off-items",
@@ -70,11 +70,11 @@
       },
       "expected": {
         "fileCount": 4,
-        "digest": "7ff684c3fc12f3efee4b3206a26058a5d72846f7f82ed2e8884b05c9c3443df6",
+        "digest": "57f82a111a73ce333cfdb6088d9dd74f6f048a6f2db35923950fd3b3ba264bcd",
         "files": {
           "README.txt": "b240aafb06a818df97625bbb8703058b5f2d281056a760479329b2ebbbb5440f",
           "cheat-locations.txt": "fc49292d1d3487fbd5537b1c4f625f5d1fcaea57b0c31c4a80fd4153db80be69",
-          "mod/param/GameParam/GameParam.parambnd.dcx": "6e92b8ec28cbdb3940eff31c6d76cd4a06ed22b1c522d7fe61247e2e1f25c5bd",
+          "mod/param/GameParam/GameParam.parambnd.dcx": "186bf0da4db9e38c91bd9cd734b0de8dda60de1b42db9e0ffc603361467c980a",
           "randomizer.json": "f38be3a0ad3cc0ae7cc528fa2680df83391fe98f68c6bd14d9986f9196d8d7f8"
         },
         "modelGraceMaps": 0,
@@ -285,7 +285,7 @@
       },
       "expected": {
         "fileCount": 54,
-        "digest": "d633b7629efb11a4a392f3c5a941f97689e649112ac69607e3d11eced8a9b0ab",
+        "digest": "150ffed06926ed5248685d476251feb592db7b5feec9152f25c2576ef927218f",
         "files": {
           "README.txt": "b240aafb06a818df97625bbb8703058b5f2d281056a760479329b2ebbbb5440f",
           "cheat-locations.txt": "950d9fd3219c748105cce2ebbb24b7f7f0f11f2e022dda9066b82b16effe7ec2",
@@ -322,7 +322,7 @@
           "mod/map/MapStudio/m17_00_00_00.msb": "47785f42fb97f838cd6bba26450a3ee5076dc7effb1f51752da7b2264a90c221",
           "mod/map/MapStudio/m18_00_00_00.msb": "bd750891f6b7fa4ece9ba6596df78e5dcee22e4dc1b455d48a66a77b561fd338",
           "mod/map/MapStudio/m18_01_00_00.msb": "088767b4c6b8069fdc599e80e763e318aa56e8d397adce187713f147c0d359cb",
-          "mod/param/GameParam/GameParam.parambnd.dcx": "1288e102bd432eafdd29c89bdf930515f39c956afbf30aff98f7bdfcd6cd30a3",
+          "mod/param/GameParam/GameParam.parambnd.dcx": "e94231b0aea5d577bc0a594b99853a099461490f6a9b58d828cab38771a230a0",
           "mod/script/m10_00_00_00.luabnd.dcx": "d51643892b4fb2d7d02f16e05ee23ceb7a14b85e6727adc18928b3e2a2b5dc4e",
           "mod/script/m10_01_00_00.luabnd.dcx": "02db13815ff4dc9563749a024c2c5daae8283ce8070fe85625c44b66308434f6",
           "mod/script/m10_02_00_00.luabnd.dcx": "4ef0e92ff67058724f6a9410894ff696e5213853fb096d7f205dd43f224e234b",

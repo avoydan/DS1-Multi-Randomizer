@@ -1252,6 +1252,12 @@ static PatchReport PatchEnemies(
         configRoot.TryGetProperty(
             "guaranteedEnemyDrops", out var guaranteedDropsElement) &&
         guaranteedDropsElement.ValueKind == JsonValueKind.True;
+    // Enemy drop lots of the DLC when the world was made without the DLC (docs/DLC_AUDIT.md, patch 0026): their drop rates stay as the game has them.
+    var dlcExcludedDropLots = new HashSet<int>();
+    if (placementDocument.RootElement.TryGetProperty("dlcExcludedDropLots", out var excludedLotsElement) &&
+        excludedLotsElement.ValueKind == JsonValueKind.Array)
+        foreach (var excludedLot in excludedLotsElement.EnumerateArray())
+            dlcExcludedDropLots.Add(excludedLot.GetInt32());
     var placementsRoot = placementDocument.RootElement.GetProperty("placements");
     IEnumerable<PatchPlacement> ReadEnemyPlacements(string propertyName)
     {
@@ -1874,7 +1880,8 @@ static PatchReport PatchEnemies(
             shopPlacements,
             itemAssignments,
             guaranteedEnemyDrops,
-            laundromat)
+            laundromat,
+            dlcExcludedDropLots)
         : null;
 
     var report = new PatchReport(
@@ -4158,7 +4165,8 @@ static PatchedFile? PatchGameParam(
     List<RowPlacement> shopPlacements,
     List<ItemAssignment> itemAssignments,
     bool guaranteedEnemyDrops,
-    List<LaundromatRow>? laundromat = null)
+    List<LaundromatRow>? laundromat = null,
+    HashSet<int>? dlcExcludedDropLots = null)
 {
     if (!enemyPlacements.Any(placement => placement.ScaledNpcParamId.HasValue) &&
         !enemyPlacements.Any(placement => placement.BaseThinkParamId.HasValue) &&
@@ -4470,7 +4478,7 @@ static PatchedFile? PatchGameParam(
     ApplyItemAssignments(itemLotParam, shopParam, itemAssignments);
     ApplyLaundromat(charaParam, catalog, laundromat ?? new List<LaundromatRow>());
     var guaranteedEnemyDropRowIds = guaranteedEnemyDrops
-        ? catalog.EnemyDropLots.Select(lot => lot.RowId).Distinct().ToList()
+        ? catalog.EnemyDropLots.Select(lot => lot.RowId).Where(rowId => dlcExcludedDropLots == null || !dlcExcludedDropLots.Contains(rowId)).Distinct().ToList()
         : new List<int>();
     ApplyGuaranteedEnemyDropRates(itemLotParam, guaranteedEnemyDropRowIds);
 
