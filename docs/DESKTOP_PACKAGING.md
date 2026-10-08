@@ -31,3 +31,9 @@ under Advanced and in the run manifest. A backend startup failure is shown in th
 The build uses a minimal staged Electron app with no runtime npm dependencies: React is bundled by Vite, and the backend is separate in `extraResources`. The full source repository and its pre-existing orchestrator files are not copied into the package.
 
 The backend imports `@ds1tr/contracts` at run time. electron-builder never copies a `node_modules` directory through `extraResources`, so `scripts/stage-runtime-modules.cjs` (`afterPack`) places the staged contracts package into `resources/runtime/node_modules` before the portable target is built. Desktop 0.15.0 lacked it and its backend exited with `ERR_MODULE_NOT_FOUND`; 0.15.1 fixes that.
+
+## Language, build information and the installer (desktop 0.32.x)
+
+* `package-win.mjs` writes `runtime/build-info.json` (version, git commit, `development | public`, component versions, build time). The application reads it for the diagnostics (the signature state is derived from the mode: a public build is only made after the release verification demanded a trusted signature; a development build is unsigned).
+* `electron-builder.yml` -> `nsis.installerLanguages: [en_US, pl_PL]`: the NSIS installer and uninstaller follow the Windows display language (Polish -> Polish, otherwise English); `displayLanguageSelector` stays off. Verified on this Polish Windows: the wizard opens in Polish ("Instalator DS1 Triple Randomizer", "Wybierz opcje instalacji", "Dalej >", "Anuluj"). The English wizard is the NSIS default for any other language and was not shown here (the Windows display language was not changed).
+* The main process starts the backend with `DS1TR_USER_DATA`, `DS1TR_APP_LOG`, `DS1TR_DESKTOP_VERSION` and `DS1TR_INSTALL_MODE` (`installed | portable | development`, from `PORTABLE_EXECUTABLE_DIR`) for the diagnostics; none of them influences generation.

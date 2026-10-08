@@ -160,3 +160,7 @@ touched again: `item-modes` (Race, Race +, Unfair, Very Unfair, Race with Very U
 ## Part G: the default changed, no generation did (desktop 0.26.0)
 
 New configurations start with `sampling-v1`. **This is a default, not a generation change:** a Seed Code carries its algorithm, a record without the key still decodes to the classic permutation, and no package of an existing Seed Code differs because of it. Verified: all 27 golden fixtures regenerate from their Seed Codes (classic and unaffected cases byte-identical; the recorded exception 2 above is the only difference, and it predates this part), `placementDefault.test.mjs`, `seedUx.test.mjs`. The classic quirks that stay frozen (a Basin placement of the classic permutation has no events; Vanilla scaling keeps the replacement's drops) are listed in `docs/ENEMY_PLACEMENT_MODEL.md` 10.10.
+
+## Language, hint sheet, diagnostics: no generation change (desktop 0.32.x, backend 0.44.x, contracts 0.30.x)
+
+None of these touches the generation: the interface language is not an input of any seed, setting or hash; the hint data and the operation records are written outside the package; the correlation id exists only in logs and diagnostics. The pipeline events gained an optional `component` tag for log stages only. The golden regeneration (`goldenCompatibility.mjs verify`) is run on the clean game copy at the end of the phase (result in `docs/IMPLEMENTATION_STATUS.md`); no fixture was re-recorded and no profile was added.

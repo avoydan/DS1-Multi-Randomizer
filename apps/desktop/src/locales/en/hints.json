@@ -50,19 +50,19 @@
     },
     "boss": {
       "broad": "as a boss reward",
-      "exact": "as the reward of {{owner}}"
+      "exact": "as the boss reward that holds {{owner}} in the clean game"
     },
     "gift": {
       "broad": "given by an NPC",
-      "exact": "given by {{owner}}"
+      "exact": "as the NPC gift that is {{owner}} in the clean game"
     },
     "enemy": {
       "broad": "dropped by an enemy",
-      "exact": "dropped by {{owner}}"
+      "exact": "as the enemy drop that holds {{owner}} in the clean game"
     },
     "shop": {
       "broad": "sold in a shop",
-      "exact": "sold by {{owner}}"
+      "exact": "in a shop, in the place of {{owner}} in the clean game"
     }
   },
   "cleanGame": "In the clean game: {{place}}",

@@ -28,7 +28,8 @@ export interface PlacementLike {
   randomizedLocation?: PlacementLocation;
 }
 
-const kinds = ['weapon', 'armor', 'ring', 'goods'] as const;
+// The engine's equip types: 0 weapon, 1 armor, 2 ring, 3 goods, 4 spell (Sorcery / Pyromancy / Miracle).
+const kinds = ['weapon', 'armor', 'ring', 'goods', 'spell'] as const;
 const acquisitionOf = (pool: unknown): HintAcquisition | null => ({
   world: 'world pickup', gift: 'NPC gift', boss: 'boss reward', enemy: 'enemy drop', shop: 'shop',
 } as Record<string, HintAcquisition>)[String(pool)] ?? null;

@@ -151,7 +151,7 @@ test('the text export is human-readable, not a JSON dump', () => {
   assert.match(text, /Seed Code: DS1TR1-06NJDCP6-ABCD-2G/u);
   assert.match(text, /Spoiler level: Progression/u);
   assert.match(text, /\* Basement Key: Depths, at the pickup where the Humanity lies in the clean game/u);
-  assert.match(text, /\* Lordvessel: as the reward of Gaping Dragon/u);
+  assert.match(text, /\* Lordvessel: as the boss reward that holds Gaping Dragon in the clean game/u);
   const polish = buildHintText({ document: document(), level: 'low', language: 'pl', translate: translators.pl });
   assert.match(polish, /Kod seeda: DS1TR1-06NJDCP6-ABCD-2G/u);
   assert.match(polish, /Poziom spoilerów: Mało spoilerów/u);
@@ -178,7 +178,7 @@ test('the JSON export has a schema version, the Seed Code, the generation profil
 });
 
 test('a place reads naturally at both precisions', () => {
-  assert.equal(describePlace({ acquisition: 'shop', owner: 'Andre of Astora' }, translators.en, true), 'sold by Andre of Astora');
+  assert.equal(describePlace({ acquisition: 'shop', owner: 'Andre of Astora' }, translators.en, true), 'in a shop, in the place of Andre of Astora in the clean game');
   assert.equal(describePlace({ acquisition: 'shop' }, translators.en, false), 'sold in a shop');
   assert.equal(describePlace({ acquisition: 'world-pickup', area: 'Depths' }, translators.pl, false), 'w obszarze Depths');
 });

@@ -1188,3 +1188,14 @@ Date: 2026-10-07. Full description: `docs/RACE_MODE.md`, `docs/ITEM_DIFFICULTY_M
 6. **Compatibility.** No new generation profile; every value is an extension (`race`, `race-plus` are new values of an existing enumeration, `itemDifficulty` neutral `fair`, `laundromat` neutral off); presets are version 15; all earlier golden worlds regenerate byte for byte.
 7. **Typed outcomes.** `RACE_LOCATION_INVALID`, `RACE_PLUS_LOCATION_INVALID` (internal guards), `DIFFICULTY_POLICY_UNSATISFIED` (retryable), the existing `KEY_PLACEMENT_*` and `FOG_KEY_CONFLICT`; plain messages in `userMessages.ts`.
 8. **Hint-sheet data** (`core/hintData.ts`): one record per placement (item, kind, importance, original and new location with the acquisition type and the semantic owner), tested for readiness; no hint sheet is built.
+
+## Language, hint sheet, diagnostics and the support bundle (desktop 0.32.x, backend 0.44.x, contracts 0.30.x)
+
+1. **i18next + react-i18next, resources bundled, English canonical.** Reasons: mature plural rules (Polish one/few/many/other), typed keys, runtime switching, no server. Resources are files per area bundled as one namespace so keys are type-checked.
+2. **Language lives in the presentation layer only.** Not in the Seed Code, settings, hashes, run manifest identity or history identity (a stored status enum is rendered at display time). Consequence: the in-game text language of FogMod stays a separate world setting, relabelled *In-game text language*.
+3. **Codes, not sentences.** The backend keeps its English text as fallback/log but every user-visible failure has a stable code; the renderer translates by code; unknown codes show a localized generic message with the technical text expandable. Plan lines carry keys.
+4. **Game content names stay English** (no trustworthy localized source); they are parameters of translated sentences so a later localized lookup is possible.
+5. **Hint data is built once, outside the package.** `hints.json` next to the run; old history entries are rebuilt only from placements that still exist, otherwise the action is disabled (no fabricated data). Spoiler levels are a pure filter in the contracts; the three levels do not invent ambiguity (the engine's area is per map).
+6. **Exports are made in the interface, saved by the main process.** Single source for labels (the interface resources); the renderer cannot choose a path or a file type outside a short list. HTML carries a CSP that allows nothing but inline style and escapes every dynamic value.
+7. **Support bundle by allowlist + redaction + leak scan.** Named entries only; refuse rather than send when a known identifier survives; deflated ZIP written in-house (no archive dependency); size caps documented. Correlation ids are diagnostics-only.
+8. **Installer languages** limited to English and Polish (`nsis.installerLanguages`), chosen by the Windows display language; no language dialog.

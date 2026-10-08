@@ -1381,3 +1381,6 @@ DS1TR1-06NJDCP6-577CVKTE-TMPX1KA9-5K6MPAEA-SX6JSM9N-3JPQP1KH-VM1WN05G-N216CC7C-P
 - Nothing breaks: the armor shows on the NPC model, the NPC talks, trades and fights as always (a hostile NPC fights in its new armor).
 - Hollowed NPCs (the undead versions) keep their normal look.
 
+## Test worlds in Polish
+
+The test-world panel is available in English and Polish. The scenario texts of the contracts remain the English source; `apps/backend/scripts/smokeLocaleSync.mjs` writes the English resource from them and a test keeps it in step; Polish is written per scenario id (`smokeLocale.test.mjs`). The target and expectation of a quick world are built from the structured expectations and the `smoke.template.*` sentences of the interface language (asserted equal to the contracts' English sentences); decimals follow the language (`8,7 m`). Nothing about the worlds, their Seed Codes or their static checks changed.

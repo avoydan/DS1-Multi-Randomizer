@@ -357,3 +357,14 @@ presets migrate to the values that reproduce their old output.
 | FogMod debug flags | not user options | Not in the pinned `MainForm`. |
 | I11 hintsheet | PARTIAL | The format is known, but it reports shuffled key locations, and DS1TR does not shuffle key items. Needs G2 first. |
 | Legacy config string compatibility | not supported | Legacy `/-/` strings are not imported. DS1TR has its own versioned preset. |
+
+## 8. Product features around the randomizer (not original-app options)
+
+| Feature | Status |
+|---|---|
+| Interface in English and Polish, Automatic / English / Polski | AUTOMATED VERIFIED (tests) + packaged UI checked in both languages; **PARTIAL**: preset / validator problem lines and some engine messages stay English technical text under a localized lead |
+| Hint sheet: 3 spoiler levels, viewer, HTML / TXT / JSON export, any world in the history | AUTOMATED VERIFIED; the accuracy of the placements is the generator's contract (**GAMEPLAY UNVERIFIED**) |
+| Diagnostics, structured logging with stages and correlation ids | AUTOMATED VERIFIED + packaged app checked |
+| Support bundle (allowlist, redaction, leak scan) | AUTOMATED VERIFIED + the packaged backend's bundle searched for the user name, the folders and the live token |
+| Installer in English and Polish | Polish wizard seen on a Polish Windows; English by default elsewhere (STATICALLY VERIFIED by configuration) |
+| Localized game-content names, more languages | **DEFERRED** |

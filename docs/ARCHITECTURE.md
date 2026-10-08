@@ -244,3 +244,11 @@ Instead:
 7. live game files remain untouched during generation.
 
 Then integrate FogMod.
+
+## Language, hints, diagnostics and the support bundle (desktop 0.32, backend 0.44, contracts 0.30)
+
+* **Language** (`docs/I18N.md`): the main process resolves the language (saved choice, else the operating system) before the first render; the renderer uses i18next with bundled `locales/en|pl/*.json` (English canonical, type-checked keys); the backend sends stable codes and structured keys, never sentences to be parsed. The language is not part of the Seed Code, the settings, any hash or the history's world identity.
+* **Hint sheet** (`docs/HINT_SHEET.md`): generation writes `hints.json` once next to the run (never into the package); `filterHints` in the contracts is the one pure spoiler filter used by the viewer and the three exports; exports are built with the export language's resources and saved through a main-process dialog.
+* **Diagnostics and logging** (`docs/DIAGNOSTICS.md`): structured JSON logs with stages and a correlation id per operation, operation records that survive failures, one `Diagnostics` model shared by the backend, the interface and the bundle.
+* **Support bundle** (`docs/SUPPORT_BUNDLE.md`): an allowlist of named entries, redaction (known values and patterns), a leak scan over the finished content, size limits and a ZIP read-back; works after failed generation or Apply and with no world.
+* **Data ownership:** the manifest, the placements document, `hints.json`, `diagnostics/last-run.json` and the logs are written once by the backend; the interface only reads them (through the API) and never re-reads game files.

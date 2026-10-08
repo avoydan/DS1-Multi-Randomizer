@@ -52,6 +52,12 @@ test('the importance separates keys, the Lordvessel and Lord Souls, race items, 
   assert.equal(importance({}), 'normal');
 });
 
+test('a spell (equip type 4) is a hintable item of its own kind', () => {
+  const record = toHintRecord(placement({ itemName: 'Sorcery: Remedy', equipType: 4, keyName: undefined, progression: false }));
+  assert.equal(record.itemKind, 'spell');
+  assert.equal(record.importance, 'normal');
+});
+
 test('a placement that lacks what a hint needs is counted, never half-described', () => {
   assert.equal(toHintRecord(placement({ originalLocation: undefined })), null);
   assert.equal(toHintRecord(placement({ targetPool: 'unknown' })), null);

@@ -19,7 +19,7 @@ export interface HintLocation {
   /** The map, or the parameter table for a gift, shop or drop. */
   map: string;
   acquisition: HintLocationAcquisition;
-  /** The semantic owner of the pickup: the area for a world pickup, the NPC / boss / enemy / shop for the rest. */
+  /** A world pickup: the area. A boss reward, gift, drop or shop slot: the engine names the slot by the item that lies there in the clean game (it does not record the boss or the NPC). */
   owner: string;
   /** Diagnostics only: the item lot (or shop) row. Never shown and never exported. */
   lot: number | null;
@@ -29,7 +29,7 @@ export interface HintLocation {
 export interface HintRecord {
   itemId: number;
   itemName: string;
-  itemKind: 'weapon' | 'armor' | 'ring' | 'goods';
+  itemKind: 'weapon' | 'armor' | 'ring' | 'goods' | 'spell';
   importance: HintRecordImportance;
   original: HintLocation;
   randomized: HintLocation;
@@ -75,7 +75,7 @@ export interface HintPlace {
   acquisition: HintAcquisition;
   /** A world pickup: the map-level area ("Depths"). */
   area?: string;
-  /** Every other acquisition: the boss, NPC, enemy or shop. */
+  /** Every other acquisition: the slot, named by the item that lies there in the clean game. */
   owner?: string;
   /** The item that lies there in the clean game, so the pickup can be recognized. */
   formerItem?: string;

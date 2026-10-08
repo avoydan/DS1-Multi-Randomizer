@@ -16,6 +16,12 @@ exactly the same world. Seed Codes include the randomizer settings needed to rep
 later versions of the app. The app also remembers your settings and lists your earlier runs in **History**, where you can apply,
 copy any of them, or create their files again. After **Apply to game** you can start Dark Souls Remastered with **Launch game**.
 
+**Language.** The app speaks **English** and **Polish**. It follows your Windows language by default (*Automatic*); change it any time with **Language** in the header (Automatic / English / Polski). The choice is remembered and never changes a world: the same Seed Code gives the same world in either language. The installer also follows your Windows language.
+
+**Hints.** After a world exists, **… → View hints** opens a read-only **hint sheet** with three spoiler levels (*Low spoilers*, *Progression*, *Full spoilers*); you can switch the level, search, and export it as **HTML**, **TXT** or **JSON** in English or Polish. It works for any world in **Run history** too (the **…** menu of its row) and changes nothing in the game.
+
+**Something went wrong?** Open **Advanced → Diagnostics and support**. **Copy diagnostics** gives a short summary; **Export support bundle** saves one ZIP (summary, diagnostics, manifest, the newest log lines) to a place you choose. It contains **no game files** and no personal folders: your Windows user name, computer name, folders and any password or token are removed before it is saved. Nothing is sent anywhere; you decide who gets the file.
+
 **Builds are not code-signed yet** (`docs/RELEASE_TRUST.md`): Windows SmartScreen and some antivirus products may warn about an unrecognised publisher. Check the SHA-256 of your download against the one published with the release. Nothing is uploaded or collected by the app (`docs/SECURITY_AND_PRIVACY.md`).
 
 You need Windows and your own copy of Dark Souls Remastered on Steam. Nothing else has to be installed or downloaded by

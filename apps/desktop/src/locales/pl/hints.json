@@ -50,19 +50,19 @@
     },
     "boss": {
       "broad": "jako nagroda za bossa",
-      "exact": "jako nagroda za pokonanie: {{owner}}"
+      "exact": "jako nagroda za bossa, w której w czystej grze jest {{owner}}"
     },
     "gift": {
       "broad": "dawany przez NPC",
-      "exact": "dawany przez: {{owner}}"
+      "exact": "jako dar od NPC, którym w czystej grze jest {{owner}}"
     },
     "enemy": {
       "broad": "upuszczany przez wroga",
-      "exact": "upuszczany przez: {{owner}}"
+      "exact": "jako łup z wroga, w którym w czystej grze jest {{owner}}"
     },
     "shop": {
       "broad": "sprzedawany w sklepie",
-      "exact": "sprzedawany przez: {{owner}}"
+      "exact": "w sklepie, na miejscu {{owner}} z czystej gry"
     }
   },
   "cleanGame": "W czystej grze: {{place}}",
