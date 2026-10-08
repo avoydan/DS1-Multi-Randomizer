@@ -10,13 +10,14 @@
 //     node apps/backend/scripts/placementMatrix.mjs <set> [--seeds N] [--cases a,b] [--reruns K]
 //   node apps/backend/scripts/placementMatrix.mjs --list
 
-import { cp, mkdtemp, mkdir, readdir, readFile, rm } from 'node:fs/promises';
+import { cp, mkdtemp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { GameStateAuthority, executableName, managedRoots } from '../dist/core/gameState.js';
+import { dlcContentRows } from '../dist/adapters/dlcExclusion.js';
 import { generateRun } from '../dist/core/generationPipeline.js';
 import { prepareRun } from '../dist/core/seededRun.js';
 import { DEFAULT_GENERATION_SETTINGS } from '@ds1tr/contracts';
@@ -403,7 +404,9 @@ async function main() {
       if (JSON.stringify(document.placements).includes('m12_01_00_00')) problems.push('the plan names the DLC map');
       if (!catalogFile) return { filesChecked: 0, npcRowsChecked: 0, lotRowsChecked: 0, problems: ['the catalog of the run was not found'] };
       const tree = await readdir(path.join(run.result.packagePath, 'param')).then(() => run.result.packagePath, () => path.join(run.result.packagePath, 'mod'));
-      const out = spawnSync(verifier, ['dlc-untouched', tree, path.join(source, 'paramdef', 'paramdef.paramdefbnd.dcx'), catalogFile, source], { encoding: 'utf8' });
+      const rowsFile = path.join(path.dirname(catalogFile), 'dlc-rows.json');
+      await writeFile(rowsFile, JSON.stringify(dlcContentRows(JSON.parse(await readFile(catalogFile, 'utf8')))));
+      const out = spawnSync(verifier, ['dlc-untouched', tree, path.join(source, 'paramdef', 'paramdef.paramdefbnd.dcx'), catalogFile, source, rowsFile], { encoding: 'utf8' });
       try { const result = JSON.parse(out.stdout.trim().split(/\r?\n/u).pop()); return { ...result, problems: [...problems, ...result.problems] }; } catch { return { filesChecked: 0, npcRowsChecked: 0, lotRowsChecked: 0, problems: [...problems, `the DLC verifier did not run: ${String(out.stderr).slice(0, 200)}`] }; }
     };
     const difficultyOf = async (run) => (await placementsOf(run)).validation?.itemDifficulty ?? null;
@@ -427,7 +430,7 @@ async function main() {
 
     for (const spec of caseList.filter((entry) => !args.cases || args.cases.includes(entry.name))) {
       const seeds = args.seeds ?? spec.seeds ?? 12;
-      const stats = { dlcWorlds: 0, dlcFiles: 0, dlcNpcRows: 0, dlcLotRows: 0, dlcFailures: [], case: spec.name, seeds, ok: 0, failed: [], retries: 0, windowOverruns: 0, windowInexact: 0, eventOwnerChecked: 0, eventOwnerFrozen: 0, eventOwnerFailures: [], lotsChecked: 0, raceChecked: 0, raceItems: 0, raceFailures: [], laundromatRows: 0, laundromatFailures: [], difficultyFailures: [], tiers: {}, progressionChecked: 0, placementsChecked: 0, keysPlaced: 0, placementFailures: [], progressionFailures: [], keyAttempts: 0, keysMoved: 0, bossRewardsChecked: 0, lotFailures: [], floorReserved: 0, windowMoved: 0, movedSeeds: [], maxEvents: 0, maxEventsMap: '', nonDeterministic: 0, maxModels: 0, started: Date.now() };
+      const stats = { dlcWorlds: 0, dlcFiles: 0, dlcNpcRows: 0, dlcLotRows: 0, dlcShopRows: 0, dlcFailures: [], case: spec.name, seeds, ok: 0, failed: [], retries: 0, windowOverruns: 0, windowInexact: 0, eventOwnerChecked: 0, eventOwnerFrozen: 0, eventOwnerFailures: [], lotsChecked: 0, raceChecked: 0, raceItems: 0, raceFailures: [], laundromatRows: 0, laundromatFailures: [], difficultyFailures: [], tiers: {}, progressionChecked: 0, placementsChecked: 0, keysPlaced: 0, placementFailures: [], progressionFailures: [], keyAttempts: 0, keysMoved: 0, bossRewardsChecked: 0, lotFailures: [], floorReserved: 0, windowMoved: 0, movedSeeds: [], maxEvents: 0, maxEventsMap: '', nonDeterministic: 0, maxModels: 0, started: Date.now() };
       const indices = args.only ?? Array.from({ length: seeds }, (_, offset) => offset + 1);
       stats.seeds = indices.length;
       for (const index of indices) {
@@ -449,7 +452,7 @@ async function main() {
           const items = run.prepared.config.items;
           if (run.prepared.config.output.includeDlc === false) {
             const dlc = await auditDlc(run);
-            stats.dlcWorlds += 1; stats.dlcFiles += dlc.filesChecked; stats.dlcNpcRows += dlc.npcRowsChecked; stats.dlcLotRows += dlc.lotRowsChecked;
+            stats.dlcWorlds += 1; stats.dlcFiles += dlc.filesChecked; stats.dlcNpcRows += dlc.npcRowsChecked; stats.dlcLotRows += dlc.lotRowsChecked; stats.dlcShopRows += dlc.shopRowsChecked ?? 0;
             if (dlc.problems.length > 0 || dlc.npcRowsChecked === 0 || dlc.lotRowsChecked === 0) stats.dlcFailures.push(`#${index}: ${dlc.problems.slice(0, 2).join(' | ') || 'nothing was compared'}`);
           }
           if (items.laundromat) {

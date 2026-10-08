@@ -73,7 +73,7 @@
     "BUNDLE_EMPTY": "Nie ma jeszcze czego włożyć do paczki wsparcia.",
     "HINTS_UNAVAILABLE": "Arkusz podpowiedzi nie jest dostępny dla tego świata.",
     "DATA_TOOL_MISSING": "Narzędzie danych gry nie mogło się uruchomić. Zainstaluj DS1 Triple Randomizer ponownie; szczegóły są w sekcji Zaawansowane.",
-    "DATA_TOOL_FAILED": "Nie udało się odczytać danych gry. Zweryfikuj pliki gry w Steam i spróbuj ponownie; szczegóły są w sekcji Zaawansowane.",
+    "DATA_TOOL_FAILED": "Nie udało się przetworzyć danych gry. Spróbuj ponownie; jeśli problem się powtarza, zweryfikuj pliki gry w Steam. Szczegóły są w sekcji Zaawansowane.",
     "CATALOG_UNAVAILABLE": "Nie udało się przygotować danych gry. Kliknij Losuj świat jeszcze raz; jeśli problem się powtarza, uruchom aplikację ponownie.",
     "CATALOG_UNREADABLE": "Nie udało się odczytać danych gry. Kliknij Losuj świat jeszcze raz; jeśli problem się powtarza, uruchom aplikację ponownie.",
     "CATALOG_STALE": "Przygotowane dane gry są nieaktualne. Uruchom aplikację ponownie i spróbuj ponownie.",

@@ -11,7 +11,7 @@ Dark Souls Remastered has exactly one DLC map: `m12_01_00_00` (Artorias of the A
 | Setting | Meaning |
 |---|---|
 | **DLC content ON** (default, `output.includeDlc = true`) | Exactly what DS1 Triple Randomizer has always done. Nothing runs differently; every earlier world, Seed Code, preset and golden fixture is unchanged. |
-| **DLC content OFF** (`output.includeDlc = false`) | DS1TR does not randomize or use DLC content: no DLC enemy slot, DLC boss, DLC pickup, DLC boss reward, DLC-only enemy drop or DLC-exclusive starting equipment takes part, as a source or as a destination. **The DLC is never removed or edited in the game**: its map, event, param rows and files stay byte-identical to the clean game (verified by SmokeVerify `dlc-untouched`). |
+| **DLC content OFF** (`output.includeDlc = false`) | DS1TR does not randomize or use DLC content: no DLC enemy slot, DLC boss, DLC pickup, DLC merchant shop, DLC NPC gift, DLC boss reward, DLC-only enemy drop or DLC-exclusive starting equipment takes part, as a source or as a destination. **The DLC is never removed or edited in the game**: its map, event, param rows and files stay byte-identical to the clean game (verified by SmokeVerify `dlc-untouched`). |
 | **Fog randomizer + DLC OFF** | **Not supported.** FogMod has no DLC option: its graph always contains the DLC areas and warps. A world randomizer run cannot leave the DLC out, so the combination is refused by validation (`Excluding DLC content needs the fog randomizer to be off: …`) and the UI keeps the switch on and locked while the fog randomizer is on. There is no fake compatibility. |
 
 ## How it is done
@@ -27,7 +27,9 @@ Questions: (1) is there DLC content in the subsystem; (2) can it be a source; (3
 | Subsystem | DLC content | OFF behavior | Evidence |
 |---|---|---|---|
 | Items, world pickups | 56 world item lots + 38 treasures in the DLC map | not a destination, and their items are not in the pool (they stay where the game puts them) | `dlcSweep`, matrix `items-only`, `dlc-untouched` lot rows |
-| Items, gifts / shops | none (no DLC gifts or shops) | unchanged | catalog |
+| Items, shops | the DLC has merchants: 32 shop rows are sold by DLC merchants (the Artorias set rows 1581-1584, 6410-6426, 6500-6507, 6600-6611; identified by the DLC sell-condition flag area 1121xxxx and by the row ranges the DLC talk script opens) | not a destination and not a source; the rows stay as the game has them | `dlcShopRowIds`, `dlcExclusion.test.mjs`, `dlcSweep`, `SmokeVerify dlc-untouched` (ShopLineupParam rows) |
+| Items, gifts | the gifts of the DLC NPCs Hawkeye Gough (his model c4110 stands only in the DLC map) and Elizabeth: item lots 1510 and 1520 (treated as DLC on the evidence of the NPCs; the safe side) | not a destination and not a source | `DLC_GIFT_LOT_IDS`, the same tests, ItemLotParam rows compared by `dlc-untouched` |
+| Gifts / shops of the base game | every other gift and shop | unchanged | catalog |
 | Items, enemy drops | 16 drop lots only DLC enemies award, plus DLC boss reward rows | not touched | `dlcOnly` tag, `dlc-untouched` |
 | Items, starting equipment | 9 entries of 20 DLC-exclusive items in the starting pools | not offered by Starting Class / Starting Equipment | `dlcExclusion.test.mjs` |
 | Soul items (transposed) | 2 recipes of DLC boss souls, 4 DLC boss rewards | DLC boss souls are not in the pool; the recipes are left out | `dlcSweep` `items-only`, `race` |
@@ -35,13 +37,13 @@ Questions: (1) is there DLC content in the subsystem; (2) can it be a source; (3
 | Bosses | 5 boss slots (Sanctuary Guardian, Artorias, Manus, Kalameet, their phases) | not randomized; the DLC bosses are neither a source nor a target of any boss/enemy placement | matrix `bosses-*` |
 | Progression, keys, Race / Race+ | DLC pickups are removed from the candidate locations | no DLC location is a key destination (checked for every placement of the world) | matrix `keys-lords`, `race`, `race-plus` |
 | Item difficulty (Very Unfair) | DLC pickups are not tiered | not used | matrix `very-unfair-transposed` |
-| Laundromat Mixup | NPC armor only; no DLC | unchanged | matrix `laundromat-equipment` |
+| Laundromat Mixup | NPC armor only; no DLC | unchanged | matrix `laundromat-npc-armor` (the starting-equipment variant trips an unrelated lots-verifier limit: starting-equipment lots are not in the plan lists; starting equipment is covered by the unit test and the engine-level `items-class-equipment` sweep, not by the real pipeline) |
 | Fog randomizer | the whole DLC graph | **refused** with DLC OFF (see above) | validation test, UI lock |
 | Hints | derived from the placement plan | the plan names no DLC content, so no hint names it | hint tests on DLC OFF worlds |
 | Smoke tests (SmokeVerify) | audits read the final package | new `dlc-untouched` command; the other audits are unchanged | matrix `dlc-off` |
 | Seed Code | `output.includeDlc` was already part of the canonical settings | OFF is a different code; a code or preset without the field means ON | `seedCode.test.mjs`, `preset.test.mjs` |
 | Presets | `output.includeDlc` is exported | OFF round-trips; with Fog it is refused | `preset.test.mjs` |
-| Run history | settings are stored with the run | Load Seed / Regenerate files / Restore-and-create-world reproduce the world with its DLC choice | `seedPersistence`, `restoreCreateWorld` tests |
+| Run history | settings are stored with the run | Load Seed / Regenerate files / Restore-and-create-world reproduce the world with its DLC choice | `seedPersistence` test (Recreate, Regenerate files and the persisted settings with DLC off); Load seed and Restore-and-create-world in the packaged app (`FINAL_CONFIG_AUDIT.md`); `restoreCreateWorld.test.mjs` itself was not extended |
 | Renderer | the switch | enabled, default ON; locked ON with a short note when Fog is on; EN + PL | `locales.test.mjs`, UI audit |
 
 ## Results (AUTOMATED VERIFIED)

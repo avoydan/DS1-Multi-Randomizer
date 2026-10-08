@@ -11,7 +11,7 @@ import { readFileSync } from 'node:fs';
 import { buildSettings } from './goldenCompatibility.mjs';
 import { loadCombinedRandomizerCore } from '../dist/adapters/combinedRandomizerCore.js';
 import { mapCombinedRandomizerConfig } from '../dist/adapters/combinedRandomizerConfig.js';
-import { DLC_MAP_ID, excludeDlcFromCatalog } from '../dist/adapters/dlcExclusion.js';
+import { DLC_MAP_ID, dlcContentRows, excludeDlcFromCatalog } from '../dist/adapters/dlcExclusion.js';
 import { hintRecords } from '../dist/core/hintData.js';
 import { currentGenerationProfile } from '../dist/core/generationProfiles.js';
 import { deriveAttemptSeeds } from '../dist/core/seeds.js';
@@ -35,6 +35,9 @@ const dlcModels = new Set();
 const modelMaps = new Map();
 for (const slot of catalog.enemySlots) { if (!modelMaps.has(slot.modelName)) modelMaps.set(slot.modelName, new Set()); modelMaps.get(slot.modelName).add(slot.mapId); }
 for (const [model, maps] of modelMaps) if (maps.size === 1 && maps.has(DLC_MAP_ID)) dlcModels.add(model);
+const contentRows = dlcContentRows(catalog);
+const dlcShopRows = new Set(contentRows.shopRows);
+const dlcGiftRows = new Set(contentRows.giftLotRows);
 const dlcDropRows = new Set(catalog.enemyDropLots.filter((lot) => lot.dlcOnly).map((lot) => lot.rowId));
 const dlcRewardRows = new Set();
 const dlcRewardIds = new Set();
@@ -43,10 +46,11 @@ const keptKeys = new Set(); const excludedKeys = new Set();
 const note = (target, entries) => { for (const entry of entries ?? []) target.add(`${entry.category}:${entry.itemId}`); };
 for (const lot of catalog.worldItemLots) note(lot.mapId === DLC_MAP_ID ? excludedKeys : keptKeys, lot.entries);
 for (const lot of catalog.enemyDropLots) note(lot.dlcOnly ? excludedKeys : keptKeys, lot.entries);
-for (const lot of catalog.gifts) note(keptKeys, lot.entries);
-for (const shop of catalog.shopEntries) keptKeys.add(`${[0, 0x10000000, 0x20000000, 0x40000000, 0x40000000][shop.equipType]}:${shop.equipId}`);
+for (const lot of catalog.gifts) note(dlcGiftRows.has(lot.rowId) ? excludedKeys : keptKeys, lot.entries);
+for (const shop of catalog.shopEntries) (dlcShopRows.has(shop.rowId) ? excludedKeys : keptKeys).add(`${[0, 0x10000000, 0x20000000, 0x40000000, 0x40000000][shop.equipType]}:${shop.equipId}`);
 for (const reward of catalog.bossRewards) for (const lot of reward.lots) for (const row of lot.chain) note(reward.dlc ? excludedKeys : keptKeys, row.entries);
 const exclusive = new Set([...excludedKeys].filter((key) => !keptKeys.has(key)));
+console.log(`DLC shop rows ${dlcShopRows.size}, DLC gift lots ${dlcGiftRows.size}`);
 console.log(`DLC-only models ${dlcModels.size}, DLC-only drop lots ${dlcDropRows.size}, DLC boss reward rows ${dlcRewardRows.size}, exclusive items ${exclusive.size}`);
 
 const noFog = { fog: { enabled: false } };
@@ -85,6 +89,10 @@ const dlcTouches = (plan) => {
   if (text.includes(DLC_MAP_ID)) touches.add('the DLC map id');
   for (const model of dlcModels) if (text.includes(`"${model}"`)) touches.add(`DLC model ${model}`);
   walk(plan.placements, (entry) => {
+    if (entry.targetPool === 'shop' && dlcShopRows.has(entry.rowId)) touches.add(`DLC shop row ${entry.rowId}`);
+    if (entry.sourcePool === 'shop' && dlcShopRows.has(entry.sourceRowId)) touches.add(`DLC shop source row ${entry.sourceRowId}`);
+    if (entry.targetPool === 'gift' && dlcGiftRows.has(entry.rowId)) touches.add(`DLC gift lot ${entry.rowId}`);
+    if (entry.sourcePool === 'gift' && dlcGiftRows.has(entry.sourceRowId)) touches.add(`DLC gift source lot ${entry.sourceRowId}`);
     if (typeof entry.itemId === 'number' && typeof entry.itemCategory === 'number' && exclusive.has(`${entry.itemCategory}:${entry.itemId}`)) touches.add(`DLC-exclusive item ${entry.itemName ?? entry.itemId}`);
     if (typeof entry.rowId === 'number' && (dlcDropRows.has(entry.rowId) || dlcRewardRows.has(entry.rowId))) touches.add(`DLC row ${entry.rowId}`);
     if (typeof entry.sourceRowId === 'number' && (dlcDropRows.has(entry.sourceRowId) || dlcRewardRows.has(entry.sourceRowId))) touches.add(`DLC source row ${entry.sourceRowId}`);

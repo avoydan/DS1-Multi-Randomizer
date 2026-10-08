@@ -7,8 +7,8 @@ Play **offline**. Use a copy of the game or a save you do not mind losing; the a
 ## How to start any world
 
 1. Open DS1 Triple Randomizer. Nothing needs to be changed in the settings for these tests.
-2. **Test worlds** (section "Test worlds for playtesting"): open the **Test world** list, choose the title written in the tables below *exactly*, press the button under it. The app creates that world (it uses the same Load seed path as a shared Seed Code).
-3. **Full playthrough worlds** (section 4): paste the Seed Code into **Shared seed code** and press **Load**.
+2. **Test worlds**: open **Advanced** -> **Test worlds for playtesting**, open the **Test world** list, choose the title written in the tables below *exactly*, scroll down and press **Create this test world**. The app creates that world (it uses the same Load seed path as a shared Seed Code).
+3. **Full playthrough worlds** (section 4): press **Load seed** (when a world is already applied it is under **...** next to **Copy seed**, and the button there becomes **Restore and create shared world**), paste the Seed Code into **Shared seed code** and press **Load**.
 4. Press **Apply to game**, wait for "Randomized game applied successfully.", press **Launch game** (or start the game from Steam).
 5. Afterwards press **Restore original game** (or **Restore and create shared world** to go straight to the next world).
 6. If something is wrong: **Advanced** -> **Diagnostics and support** -> **Export support bundle**, and note the Seed Code of the world (shown above the buttons).
@@ -71,7 +71,7 @@ The other extended worlds (the list under "Extended gameplay tests") are lower p
 
 ## 4. Full playthrough worlds
 
-Paste the Seed Code into **Shared seed code**, press **Load**, then **Apply to game**. Each is meant to be played from a new game as far as the "Stop at" point; a full run to the end is welcome but not required. Times are rough estimates. **Static check (AUTOMATED VERIFIED):** every world below was generated twice through the real pipeline on a copy of the game (`node apps/backend/scripts/qaWorlds.mjs verify`) and the two packages are identical; the recipes are in `apps/backend/scripts/qaWorlds.mjs` and a test fails if a code in this document is not the code of its recipe.
+Press **Load seed**, paste the Seed Code into **Shared seed code**, press **Load**, then **Apply to game**. Each is meant to be played from a new game as far as the "Stop at" point; a full run to the end is welcome but not required. Times are rough estimates. **Static check (AUTOMATED VERIFIED):** every world below was generated twice through the real pipeline on a copy of the game (`node apps/backend/scripts/qaWorlds.mjs verify`) and the two packages are identical; the recipes are in `apps/backend/scripts/qaWorlds.mjs` and a test fails if a code in this document is not the code of its recipe.
 
 ### Recommended Triple
 
@@ -114,7 +114,7 @@ DS1TR1-06NJDCP6-556D8KEB-SH5WSMAD-SD7XFKAE-NMPDCD8W-NNX0CWEN-MEHS97AT-36059AH1-X
 * **World:** **Race Mode** without fog or enemy randomization: keys and embers only in boss rewards, chests and key places.
 * **Time:** About 3-4 h.
 * **Stop at:** The first three keys or the first bell.
-* **Look for:** The hint sheet (**Hint sheet** in the world panel) matches what you find; no key is unreachable.
+* **Look for:** The hint sheet (**...** -> **View hints** on the world, Progression level) matches what you find; no key is unreachable.
 * **Status:** GAMEPLAY UNVERIFIED
 
 ```

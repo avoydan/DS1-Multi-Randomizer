@@ -1,6 +1,6 @@
 {
   "profile": "ds1tr-gen-v1",
-  "recordedAt": "2026-10-08T06:07:04.725Z",
+  "recordedAt": "2026-10-08T10:51:42.226Z",
   "cases": [
     {
       "name": "dlc-off-items",
@@ -70,12 +70,12 @@
       },
       "expected": {
         "fileCount": 4,
-        "digest": "53d16a310126f157071a6bb5d650bd52340257eda6bc21e39d4e394909c59327",
+        "digest": "7ff684c3fc12f3efee4b3206a26058a5d72846f7f82ed2e8884b05c9c3443df6",
         "files": {
           "README.txt": "b240aafb06a818df97625bbb8703058b5f2d281056a760479329b2ebbbb5440f",
-          "cheat-locations.txt": "9f054787c74d8b4f4af2a6019d3586e91712b7c45289135af9b55b492bb5f7ee",
-          "mod/param/GameParam/GameParam.parambnd.dcx": "2a0b6d6dd97ad18200908dbe280d166af1c5912e6f45f0be419ec1dc20d1850b",
-          "randomizer.json": "ef1977320845cba348f09115e7eeab34f0bb4f489c590dd16f12b9565e239a39"
+          "cheat-locations.txt": "fc49292d1d3487fbd5537b1c4f625f5d1fcaea57b0c31c4a80fd4153db80be69",
+          "mod/param/GameParam/GameParam.parambnd.dcx": "6e92b8ec28cbdb3940eff31c6d76cd4a06ed22b1c522d7fe61247e2e1f25c5bd",
+          "randomizer.json": "f38be3a0ad3cc0ae7cc528fa2680df83391fe98f68c6bd14d9986f9196d8d7f8"
         },
         "modelGraceMaps": 0,
         "attempts": [
@@ -285,10 +285,10 @@
       },
       "expected": {
         "fileCount": 54,
-        "digest": "55faf545dd90ccc9458d990679e6c9a3120eaeef723ecf1e1cd5d51422e77117",
+        "digest": "d633b7629efb11a4a392f3c5a941f97689e649112ac69607e3d11eced8a9b0ab",
         "files": {
           "README.txt": "b240aafb06a818df97625bbb8703058b5f2d281056a760479329b2ebbbb5440f",
-          "cheat-locations.txt": "959ef122f56e2478d1111ea431c4aa7c10a5982dee055a2c78ed5521542f0023",
+          "cheat-locations.txt": "950d9fd3219c748105cce2ebbb24b7f7f0f11f2e022dda9066b82b16effe7ec2",
           "mod/event/m10_00_00_00.emevd.dcx": "62df393830733851190550c6a6e11ce5c06855116ce7c235abdee277dbd35f61",
           "mod/event/m10_01_00_00.emevd.dcx": "88ecb851c14a48c45e5bd6980beadbce8c0b5395d35e7ee5792fcb976ab473d4",
           "mod/event/m10_02_00_00.emevd.dcx": "d01831beda2da317b7dcf48d5bfd933ffe2fce16e1c876f7e12151e5bda6bd77",
@@ -322,7 +322,7 @@
           "mod/map/MapStudio/m17_00_00_00.msb": "47785f42fb97f838cd6bba26450a3ee5076dc7effb1f51752da7b2264a90c221",
           "mod/map/MapStudio/m18_00_00_00.msb": "bd750891f6b7fa4ece9ba6596df78e5dcee22e4dc1b455d48a66a77b561fd338",
           "mod/map/MapStudio/m18_01_00_00.msb": "088767b4c6b8069fdc599e80e763e318aa56e8d397adce187713f147c0d359cb",
-          "mod/param/GameParam/GameParam.parambnd.dcx": "2bfea09f820c6b0dd22893967d5e29204dd58dc39192c169fc7cc49b2cf12798",
+          "mod/param/GameParam/GameParam.parambnd.dcx": "1288e102bd432eafdd29c89bdf930515f39c956afbf30aff98f7bdfcd6cd30a3",
           "mod/script/m10_00_00_00.luabnd.dcx": "d51643892b4fb2d7d02f16e05ee23ceb7a14b85e6727adc18928b3e2a2b5dc4e",
           "mod/script/m10_01_00_00.luabnd.dcx": "02db13815ff4dc9563749a024c2c5daae8283ce8070fe85625c44b66308434f6",
           "mod/script/m10_02_00_00.luabnd.dcx": "4ef0e92ff67058724f6a9410894ff696e5213853fb096d7f205dd43f224e234b",
@@ -340,7 +340,7 @@
           "mod/script/m18_00_00_00.luabnd.dcx": "28ec4d1504c2e409a8750f05ff9b5ad01fe73e6826d8ec085aa6df478ada461a",
           "mod/script/m18_01_00_00.luabnd.dcx": "1f9849236d4dc3c6b73ae67b6645326095303f1eee22b0791871503d0e0784e4",
           "mod/sfx/FRPG_SfxBnd_CommonEffects.ffxbnd.dcx": "00962cb85fc15df488a50264f95d6eed82ccabc10e33274ef3362ce9ca45b300",
-          "randomizer.json": "d8a2d27dfc2ff9e485c32c6826e861cf1388e81900716096c16eafc0c43f1bdf"
+          "randomizer.json": "f38805c4356cb594c014ddff09a5998996802563ca5595ee7d1212b95e0a9707"
         },
         "modelGraceMaps": 0,
         "attempts": [

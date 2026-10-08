@@ -204,7 +204,8 @@ if (args.Length > 0 && args[0] == "lots")
     return problems.Count == 0 ? 0 : 1;
 }
 
-// SmokeVerify dlc-untouched <package game tree> <paramdef.paramdefbnd.dcx> <catalog.json> <original game dir>
+// SmokeVerify dlc-untouched <package game tree> <paramdef.paramdefbnd.dcx> <catalog.json> <original game dir> [<rows.json>]
+// rows.json ({"shopRows":[...],"giftLotRows":[...]}) adds the ShopLineupParam rows of the DLC merchants and the item lot rows of the DLC NPCs' gifts.
 // A world made with the DLC left out (docs/DLC_AUDIT.md) must leave the DLC exactly as the clean game has it: the map and event files of the DLC map are absent from
 // the package or byte-identical, every NpcParam row that only DLC enemies use, every item lot row of the DLC (its world lots and the drop lots only DLC enemies award)
 // and every DLC boss reward row are cell for cell the clean game's.
@@ -271,8 +272,16 @@ if (args.Length > 0 && args[0] == "dlc-untouched")
         if (reward.GetProperty("dlc").GetBoolean())
             foreach (var lot in reward.GetProperty("lots").EnumerateArray())
                 foreach (var row in lot.GetProperty("chain").EnumerateArray()) lotIds.Add(row.GetProperty("rowId").GetInt32());
+    // The shops of the DLC merchants and the gift lots of the DLC NPCs: the row lists come from the caller (the same function the exclusion uses), as {"shopRows":[...],"giftLotRows":[...]}.
+    var shopsChecked = 0;
+    if (args.Length > 5)
+    {
+        var rows = JsonDocument.Parse(File.ReadAllText(args[5])).RootElement;
+        foreach (var row in rows.GetProperty("giftLotRows").EnumerateArray()) lotIds.Add(row.GetInt32());
+        shopsChecked = CompareRows("ShopLineupParam.param", rows.GetProperty("shopRows").EnumerateArray().Select(row => row.GetInt32()).ToList(), "ShopLineupParam");
+    }
     var lotsChecked = CompareRows("ItemLotParam.param", lotIds, "ItemLotParam");
-    Console.WriteLine(JsonSerializer.Serialize(new { filesChecked, npcRowsChecked = npcChecked, lotRowsChecked = lotsChecked, problems }));
+    Console.WriteLine(JsonSerializer.Serialize(new { filesChecked, npcRowsChecked = npcChecked, lotRowsChecked = lotsChecked, shopRowsChecked = shopsChecked, problems }));
     return problems.Count == 0 ? 0 : 1;
 }
 

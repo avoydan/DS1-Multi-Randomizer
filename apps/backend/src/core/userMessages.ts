@@ -35,7 +35,7 @@ const exact: Record<string, string> = {
   GENERATION_PROFILE_MISMATCH: 'This copy of the app cannot reproduce that world exactly, so nothing was generated. Update or reinstall DS1 Triple Randomizer.',
   MANIFEST_WRITE_FAILED: 'Your randomized files could not be saved. Check that the disk has free space and try again.',
   DATA_TOOL_MISSING: 'The game data tool of the app could not be started. Reinstall DS1 Triple Randomizer; the details are under Advanced.',
-  DATA_TOOL_FAILED: 'The game data could not be read. Verify the game files in Steam and try again; the details are under Advanced.',
+  DATA_TOOL_FAILED: 'The game data could not be processed. Try again; if it keeps happening, verify the game files in Steam. The details are under Advanced.',
   CATALOG_UNAVAILABLE: 'The game data could not be prepared. Click Randomize again; if it keeps failing, restart the app.',
   CATALOG_UNREADABLE: 'The game data could not be read. Click Randomize again; if it keeps failing, restart the app.',
   CATALOG_STALE: 'The prepared game data is out of date. Restart the app and try again.',
