@@ -58,8 +58,8 @@ test('only the modes "bosses" and "both" place bosses; the rest of the options d
   for (const normalReplacement of ['none', 'normals']) assert.equal(plan('m', { normalReplacement }).roaming.size, 0, normalReplacement);
   assert.equal(plan('m', { normalReplacement: 'bosses', replacementChance: 0 }).roaming.size, 0);
   assert.equal(plan('m', { normalReplacement: 'both', bossChanceInNormalSlots: 0 }).roaming.size, 0);
-  // "bosses" at 100% takes every slot up to the per-map limit.
-  assert.equal(plan('m', { normalReplacement: 'bosses' }).roaming.size, 10);
+  // "bosses" at 100% takes every slot of the map (there is no limit on the number of bosses of a map; backend 0.45.5).
+  assert.equal(plan('m', { normalReplacement: 'bosses' }).roaming.size, 12);
   assert.equal(plan('m', { normalReplacement: 'bosses' }, { slots: slots(6) }).roaming.size, 6);
   assert.equal(plan('m', { normalReplacement: 'both', bossChanceInNormalSlots: 100 }, { slots: slots(6) }).roaming.size, 6);
   // "both" takes about the chance of the slots that take part.
@@ -79,12 +79,34 @@ test('lowering the boss chance or the replacement chance only removes slots; it 
   }
 });
 
-test('at most ten bosses roam in one map, and the limit is per map', () => {
-  const two = [...slots(20, 'm10_00_00_00'), ...slots(20, 'm10_01_00_00')];
-  const { roaming, counters } = plan('cap', { normalReplacement: 'bosses' }, { slots: two });
-  assert.equal(roaming.size, 20);
-  assert.equal([...roaming.keys()].filter((id) => id.startsWith('m10_00')).length, 10);
-  assert.equal(counters.roamingMapLimitReached, 20);
+test('there is no limit on the number of bosses of a map: every slot that takes part gets one, in every map, and the model budget counts distinct models only', () => {
+  const two = [...slots(60, 'm10_00_00_00'), ...slots(40, 'm10_01_00_00')];
+  const { roaming, counters } = plan('nocap', { normalReplacement: 'bosses' }, { slots: two });
+  assert.equal(roaming.size, 100);
+  assert.equal([...roaming.keys()].filter((id) => id.startsWith('m10_00')).length, 60);
+  assert.equal(counters.roamingMapLimitReached, undefined, 'the counter of the removed limit no longer exists');
+  assert.equal(counters.roamingBosses, 100);
+  // Many instances, few distinct models: the 100 bosses use at most the 6 test archetypes.
+  assert.ok(new Set([...roaming.values()].map((source) => source.modelName)).size <= BOSSES.length);
+});
+
+test('the diagnostics explain every ordinary destination of a map: protected by reason, selected, boss, normal draw, unchanged by reason', () => {
+  const regularSlots = slots(20);
+  const excluded = new Set(regularSlots.slice(0, 4).map((slot) => slot.id));
+  const diagnostics = placement.createPlacementDiagnostics({ algorithm: 'sampling-v1' });
+  const table = sampling.deriveRegularClassTable(regularSlots);
+  sampling.planRoamingBosses({
+    seed: 'diag', options: { replacementChance: 50, normalReplacement: 'both', fit: 'anywhere', difficultyMode: 'random', difficultyStrictness: 'loose', typeReplacement: 'disabled', bossChanceInNormalSlots: 50 },
+    slots: regularSlots, allSlots: regularSlots, assignment: new Map(), fixedModelsByMap: new Map(), table, bossTypes: sampling.deriveRoamingBossTypes(BOSSES, table), preventSame: false,
+    excludedSlotIds: excluded, protectedReasons: new Map([...excluded].map((id) => [id, 'passiveSlot'])), diagnostics,
+  });
+  const map = diagnostics.toJSON().summary.roaming[MAP];
+  assert.equal(map.destinations, 20);
+  assert.deepEqual(map.protectedByReason, { passiveSlot: 4 });
+  assert.equal(map.eligible, 16);
+  assert.equal(map.notParticipating + map.selected, 16);
+  assert.equal(map.boss + map.normalDraw + Object.values(map.unchanged).reduce((sum, value) => sum + value, 0), map.selected);
+  assert.ok(map.boss > 0 && map.normalDraw > 0 && map.notParticipating > 0);
 });
 
 test('Prevent same enemy, Placement fit and the excluded slots are honored', () => {
@@ -159,7 +181,7 @@ test('a size-class override replaces the capsule class of a boss whose capsule d
     slots: small, allSlots: small, assignment: new Map(), fixedModelsByMap: new Map(), table: sampling.deriveRegularClassTable(small), bossTypes: types, preventSame: false,
     diagnostics: placement.createPlacementDiagnostics({ algorithm: 'sampling-v1' }),
   });
-  assert.equal(run(plain).size, 10);
+  assert.equal(run(plain).size, 12);
   assert.equal(run(overridden).size, 0);
 });
 
@@ -247,7 +269,6 @@ test('the engine places bosses in regular slots with the boss stats, a share of 
         seen.add(entry.targetModelName);
       }
       assert.ok(roaming.every((entry) => entry.slot.split(':')[0] !== 'm10_01_00_00'), 'boss slots are not regular slots');
-      for (const mapId of new Set(roaming.map((entry) => entry.map))) assert.ok(roaming.filter((entry) => entry.map === mapId).length <= 10);
     }
   }
   assert.deepEqual([...seen].sort(), ['c2240', 'c2250', 'c2320']);

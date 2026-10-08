@@ -153,3 +153,14 @@ For each test write: the title (or the Seed Code), PASS or FAIL, and for a FAIL 
 
 * Nothing here was played by the author of the application; every world is **GAMEPLAY UNVERIFIED** unless the table says otherwise.
 * The installer and the portable build are **UNSIGNED**; Windows SmartScreen may warn.
+
+## "Every enemy is a boss" (Bosses only at 100%): a one-minute check (added with backend 0.45.5)
+
+**GAMEPLAY UNVERIFIED** until the owner has played it. It is not a test world of the internal list (nothing is added to the public build); it is a Seed Code and the exact settings.
+
+* **Seed Code** (paste it into **Seed Code** -> **Load a Seed Code**; it makes the world at once):
+  `DS1TR1-06NJDCP6-556D8K85-FC9N982N-X9K1DTS6-GAYT4TT8-P0344BV8-8YNT18AT-0PGSE5A3-PG744BGD-92NR184S-EX8DAFYG-R0CTV058-A00G2073-EA43C`
+* **Or set it by hand** (Advanced mode): Item randomization OFF, Transition and fog randomization OFF, Enemy randomization ON, Regular enemies ON, Boss randomization OFF, Placement method **Pick a replacement for every spot**, Replacement chance **100%**, Replace regular enemies with **Only bosses**, Size of replacements **Anywhere**, Difficulty matching **Random** (not "Random, easy Asylum"), then Generate world.
+* **What you should see:** start a new game: in the Undead Asylum the Hollows and the other ordinary enemies of the first rooms are bosses (Capra, Taurus, Asylum Demon, Pinwheel, Moonlight Butterfly, Smough, Artorias ... the same boss several times is expected); in Firelink, the Burg, the Parish nearly every ordinary enemy is a boss. Not every single spot changes: the few enemies that are scripted, passive or ghosts stay (about 150 of 1,700 in a whole world). Bosses in ordinary spots have no boss bar and no fog gate, drop 50% of their souls and (stay dead OFF) come back after a rest.
+* **Planned by the engine for this exact Seed Code** (real catalog, checked before it was written down): 1,559 roaming bosses in the world, 26 of them in the Undead Asylum, 0 ordinary-enemy replacements, nothing left unchanged for a counted reason; the first Asylum enemies are bosses such as the Pinwheel, the Asylum Demon variants, Artorias, Smough and the Moonlight Butterfly.
+* **What would be a bug:** a map in which only about one enemy in ten became a boss; an ordinary enemy standing where "Only bosses" should have put a boss (Titanite Demons and Drakes included).

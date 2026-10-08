@@ -75,6 +75,18 @@ export const sets = {
     { name: 'roaming-both-fog', patch: merge2(noItems, sampling({ normalReplacement: 'both', bossChanceInNormalSlots: 25, fit: 'fits' })), seeds: 20 },
     { name: 'roaming-bosses-fog', patch: merge2(noItems, sampling({ normalReplacement: 'bosses', replacementChance: 40, fit: 'anywhere', typeReplacement: 'enabled-except-roaming-bosses' })), seeds: 20 },
   ],
+  /**
+   * "Bosses only" at 100% (docs/ENEMY_PLACEMENT_MODEL.md, "Bosses only audit"): every eligible ordinary destination takes a boss, no cap per map. The owner's gameplay configuration is
+   * "owner-world" (boss randomization on, classic arenas, Random + Easy Asylum, anywhere, stay dead, souls 50%). The "-fog" cases run the world randomizer as well.
+   */
+  'bosses-only': [
+    { name: 'bosses-only-100-asylum-off', patch: merge2(noItems, noFog, sampling({ normalReplacement: 'bosses', replacementChance: 100, fit: 'anywhere', difficultyMode: 'random' })) },
+    { name: 'bosses-only-100-asylum-on', patch: merge2(noItems, noFog, sampling({ normalReplacement: 'bosses', replacementChance: 100, fit: 'anywhere', difficultyMode: 'random-easy-asylum' })) },
+    { name: 'both-boss-chance-100', patch: merge2(noItems, noFog, sampling({ normalReplacement: 'both', bossChanceInNormalSlots: 100, replacementChance: 100, fit: 'anywhere', difficultyMode: 'random' })) },
+    { name: 'owner-world', patch: merge2(noItems, noFog, sampling({ normalReplacement: 'bosses', replacementChance: 100, fit: 'anywhere', difficultyMode: 'random-easy-asylum', bossReplacement: 'classic', roamingBossSouls: 50, roamingBossesStayDead: true })) },
+    { name: 'owner-world-fog', patch: merge2(noItems, sampling({ normalReplacement: 'bosses', replacementChance: 100, fit: 'anywhere', difficultyMode: 'random-easy-asylum', bossReplacement: 'classic', roamingBossSouls: 50, roamingBossesStayDead: true })), seeds: 10 },
+    { name: 'bosses-only-100-fog-stay-alive', patch: merge2(noItems, sampling({ normalReplacement: 'bosses', replacementChance: 100, fit: 'anywhere', difficultyMode: 'random', roamingBossesStayDead: false })), seeds: 10 },
+  ],
   /** Part G: the EXACT product default (what a fresh installation starts with), with the engines switched the way a person would switch them. */
   'product-default': [
     { name: 'default-items-enemies-bosses', patch: merge2(structuredClone(DEFAULT_GENERATION_SETTINGS), noFog), seeds: 100 },
@@ -442,6 +454,19 @@ async function main() {
         } else {
           stats.ok += 1;
           stats.retries += run.result.manifest.attempts.length - 1;
+          // Roaming bosses (Part E1): what happened to the ordinary destinations (the engine's per-map diagnostics, copied into the run manifest).
+          const roaming = run.result.manifest.enemyPlacement?.summary?.roaming;
+          if (roaming) {
+            const maps = Object.values(roaming);
+            stats.roaming ??= { bosses: 0, eligible: 0, selected: 0, normalDraw: 0, maxBossesInAMap: 0, maxDistinctBossModels: 0, unchanged: {}, protectedByReason: {} };
+            for (const entry of maps) {
+              stats.roaming.bosses += entry.boss; stats.roaming.eligible += entry.eligible; stats.roaming.selected += entry.selected; stats.roaming.normalDraw += entry.normalDraw;
+              stats.roaming.maxBossesInAMap = Math.max(stats.roaming.maxBossesInAMap, entry.boss);
+              stats.roaming.maxDistinctBossModels = Math.max(stats.roaming.maxDistinctBossModels, entry.distinctBossModels);
+              for (const [reason, count] of Object.entries(entry.unchanged)) stats.roaming.unchanged[reason] = (stats.roaming.unchanged[reason] ?? 0) + count;
+              for (const [reason, count] of Object.entries(entry.protectedByReason)) stats.roaming.protectedByReason[reason] = (stats.roaming.protectedByReason[reason] ?? 0) + count;
+            }
+          }
           const owners = await auditOwners(run);
           stats.eventOwnerChecked += owners.checkedCount;
           stats.eventOwnerFrozen += owners.frozenWithoutEvents ?? 0;

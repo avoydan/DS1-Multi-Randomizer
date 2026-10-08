@@ -2,7 +2,7 @@
 //
 //   node apps/backend/scripts/roamingSweep.mjs <dsr-catalog.json> [--seeds 100] [--sets name,name]
 //
-// Checks per config x seed: the engine does not throw, the result is deterministic, at most 10 roaming bosses per map, only allowed
+// Checks per config x seed: the engine does not throw, the result is deterministic, no per-map count limit on roaming bosses (removed in 0.45.5), only allowed
 // bosses roam and each one carries the souls/respawn decision, the final model count of every map never exceeds
 // max(30, what the same world has without the roaming pass), roaming bosses never land on protected slots, and a config
 // without roaming is byte-identical to the same config on the previous behavior (normals mode = no roaming keys involved).
@@ -108,7 +108,7 @@ for (const [name, overrides] of Object.entries(sets)) {
     }
     if (bad) { fail(name, index, bad); continue; }
     const maxHere = Math.max(0, ...perMap.values());
-    if (maxHere > 10) { fail(name, index, `${maxHere} roaming bosses in one map`); continue; }
+    // No per-map count limit (removed in 0.45.5): at 100% with Bosses only every eligible ordinary destination takes a boss; the diagnostics count the rest by reason.
     // Non-worsening model budget: compare with the same world without the roaming pass.
     if (roamingMode) {
       const without = generate({ ...config, enemyNormalReplacement: overrides.enemyNormalReplacement === 'both' ? 'normals' : 'none', enemyBossChanceNormalSlots: 10, enemyRoamingBossSouls: 50, enemyRoamingBossesStayDead: false }, { gameCatalog: catalog });

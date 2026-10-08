@@ -1327,8 +1327,8 @@ replacement (Part F) is untouched.
 (`bosses`) or `normals` (`both`); the pass only *overrides* slots, so a slot that gets no boss keeps exactly the placement it had without the pass
 (proved by the sweeps: every slot outside the pass is byte-identical to the same world with `normals`/`none`). Per map, in stable slot order (a Type
 replacement group in `enabled`): (1) participation = the first draw of the slot's / group's existing stream (replacement chance); (2) category: `bosses`
-always, `both` a draw from the named stream `roaming:slot:<id>` / `roaming:type:<map>:<model>` against the boss chance; (3) per-map limit of 10 roaming
-bosses (a group counts all its slots); (4) candidates: fit, Prevent same, the difficulty class(es) of the curve, the Easy Asylum rule, uniform draw with list
+always, `both` a draw from the named stream `roaming:slot:<id>` / `roaming:type:<map>:<model>` against the boss chance; (3) ~~per-map limit of 10 roaming
+bosses~~ (removed in backend 0.45.5: there is no limit on the number of bosses of a map, `docs/BOSSES_ONLY_AUDIT.md`); (4) candidates: fit, Prevent same, the difficulty class(es) of the curve, the Easy Asylum rule, uniform draw with list
 shrink from the same stream; (5) **model budget** admission: the boss is accepted only if the final model set of the map (fixed models and the final model
 of every slot) stays within `max(30, its size before the pass)` - the non-worsening rule, **no** Custom Pool grace. A group with a member that cannot take
 a boss (protected slot) stays whole. New streams are derived under `enemy-placement-v1` with names that did not exist before, so no earlier draw moves.
@@ -1350,7 +1350,7 @@ boss-death event (a regular slot has none).
 
 **Deliberate deviations.** (1) *Respawn is a field, not an event.* (The row is a copy of the boss row, whose `disableRespawn` is already 1; since backend 0.35.1 the bit is written for both values of the option. Before that, "stay dead off" did not clear it: `GENERATION_COMPATIBILITY.md`, "Recorded exception".) The roaming boss that stays dead was played in the real game and stayed dead after the reset; the respawning variant is statically verified and not played yet. The game's `NpcParam.disableRespawn` bit exists in the paramdef; setting it on the
 scaled row needs no custom event (legacy writes an event per entity). It has not been seen working in the game - treat "stay dead" as unverified.
-(2) The per-map limit of 10 is DS1TR's (legacy has none; `bosses` at 100% would otherwise place a boss in every slot). (3) The exclusion list above.
+(2) ~~The per-map limit of 10 is DS1TR's (legacy has none; `bosses` at 100% would otherwise place a boss in every slot).~~ **Removed in backend 0.45.5**: the limit was a conservative guardrail of Part E1, not a game constraint; it made "Bosses only" at 100% change about one ordinary enemy in ten (`docs/BOSSES_ONLY_AUDIT.md`). The limits that remain are the real ones: the model budget (distinct models) and the candidates a destination can take. (3) The exclusion list above.
 (4) Difficulty class of a boss uses the regular formula (map tier and HP rank); a boss's HP is above every regular enemy, so bosses are class 3-7 and the
 curve modes keep them out of the earliest maps and the Easy Asylum rule keeps them out of the Asylum. (5) The budget is the non-worsening rule of 10.3.
 (6) Unique bosses does not apply to roaming bosses (as in the legacy). (7) Placement fit uses an authored size class for the Moonlight Butterfly (class 3, `roamingSizeClassOverrides`) instead of the class of its 0.4 x 0.2 hit capsule: the capsule of a flier does not describe its body, and without the override "only where they fit" would put the Butterfly into almost every slot (27 of 31 roaming bosses in the first smoke world).

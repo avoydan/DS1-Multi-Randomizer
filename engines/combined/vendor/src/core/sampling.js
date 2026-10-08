@@ -947,7 +947,7 @@ export function deriveBodyTypes(sources, table) {
   return types.sort((left, right) => compare(left.key, right.key));
 }
 
-/** Safety limit (DS1TR, not a legacy value): hostile NPCs per map. Every one has a wake-up event, so this bounds the events of a map like ROAMING_BOSS_MAP_CAP does. */
+/** Safety limit (DS1TR, not a legacy value): hostile NPCs per map. Every one has a wake-up event, so this bounds the events of a map. */
 export const HOSTILE_NPC_MAP_CAP = 12;
 
 /**
@@ -998,8 +998,12 @@ export function bossDestinationClass(table, slot) {
  * decided in generator.js; this module only chooses which slot gets which boss, deterministically, inside the model budget.
  */
 
-/** Safety limit (DS1TR, not a legacy value): roaming bosses per map. Bounds the activation events of a map and keeps a map playable. */
-export const ROAMING_BOSS_MAP_CAP = 10;
+/*
+ * There is NO limit on the number of roaming bosses of a map. A fixed per-map cap of 10 existed from Part E1 to backend 0.45.4 as a conservative guardrail (it bounded the
+ * custom event window; docs/ENEMY_PLACEMENT_MODEL.md, 10.7, deviation 2) and it made "Bosses only" at 100% change about one ordinary enemy in ten. The legacy tool has no such cap:
+ * its only limit is the number of DISTINCT replacement models per map (MAX_UNIQUE), after which it reuses models already placed. The limits here are the same kind: the model budget
+ * (distinct models, below) and the event window, which grows with the number of events (docs/EVENT_ALLOCATION.md).
+ */
 
 /**
  * The roaming candidates as typed like the regular models: size class from the capsule, difficulty class from where the boss lives and its
@@ -1036,7 +1040,7 @@ const countOf = (counts, model, delta) => {
  * kind):
  *   1. participation - the same first draw the regular sampler makes for that slot / group (replacement chance);
  *   2. category      - "bosses": always a boss; "both": a boss with `bossChanceInNormalSlots`, otherwise the normal enemy the sampler chose;
- *   3. map limit     - at most ROAMING_BOSS_MAP_CAP roaming bosses per map (a group counts all its slots);
+ *   3. (no limit on the number of bosses of a map; see the note above)
  *   4. candidates    - bosses that fit (Placement fit), are not the slot's own model under Prevent same, and the difficulty class(es) of the
  *                      curve / Easy Asylum rule; drawn uniformly with list shrink;
  *   5. model budget  - the boss is admitted only if the final model set of the map (fixed models and every slot's final model) stays within
@@ -1046,7 +1050,7 @@ const countOf = (counts, model, delta) => {
  * @returns {Map<string, object>} slot id -> the boss catalog slot used as the source
  */
 export function planRoamingBosses({
-  seed, options, slots, allSlots, assignment, fixedModelsByMap, table, bossTypes, preventSame, excludedSlotIds = new Set(), diagnostics, cap = MODEL_BUDGET_CAP,
+  seed, options, slots, allSlots, assignment, fixedModelsByMap, table, bossTypes, preventSame, excludedSlotIds = new Set(), protectedReasons = new Map(), diagnostics, cap = MODEL_BUDGET_CAP,
 }) {
   const roaming = new Map();
   if (!["bosses", "both"].includes(options.normalReplacement) || bossTypes.length === 0) return roaming;
@@ -1066,12 +1070,23 @@ export function planRoamingBosses({
     let used = 0;
 
     const eligible = slots.filter((slot) => slot.mapId === mapId && !excludedSlotIds.has(slot.id)).sort((a, b) => compare(a.id, b.id));
+    // What happened to every ordinary destination of the map, in slots (not subjects): the numbers that explain a plan (docs/ENEMY_PLACEMENT_MODEL.md, 10.7).
+    const stat = {
+      destinations: mapAll.length, protectedByReason: {}, eligible: eligible.length, notParticipating: 0, selected: 0,
+      boss: 0, normalDraw: 0, unchanged: { easyAsylum: 0, fit: 0, preventSame: 0, difficulty: 0, modelBudget: 0, eventLimit: 0, other: 0 }, distinctBossModels: 0,
+    };
+    for (const slot of slots) {
+      if (slot.mapId === mapId && excludedSlotIds.has(slot.id)) {
+        const reason = protectedReasons.get(slot.id) ?? "other";
+        stat.protectedByReason[reason] = (stat.protectedByReason[reason] ?? 0) + 1;
+      }
+    }
     const subjects = [];
     if (grouped) {
       const blocked = new Set(slots.filter((slot) => slot.mapId === mapId && excludedSlotIds.has(slot.id)).map((slot) => slot.modelName));
       const byModel = new Map();
       for (const slot of eligible) {
-        if (blocked.has(slot.modelName)) continue; // a group with a slot that cannot take a boss stays whole
+        if (blocked.has(slot.modelName)) { stat.protectedByReason.groupMemberProtected = (stat.protectedByReason.groupMemberProtected ?? 0) + 1; continue; } // a group with a slot that cannot take a boss stays whole
         if (!byModel.has(slot.modelName)) byModel.set(slot.modelName, []);
         byModel.get(slot.modelName).push(slot);
       }
@@ -1080,17 +1095,24 @@ export function planRoamingBosses({
       for (const slot of eligible) subjects.push({ members: [slot], name: `roaming:slot:${slot.id}`, first: () => createSlotStream(seed, slot).int(100) + 1 });
     }
     subjects.sort((left, right) => compare(left.members[0].id, right.members[0].id));
+    const bossModelsHere = new Set();
 
     for (const subject of subjects) {
-      if (subject.first() > options.replacementChance) { diagnostics.count("roamingNotParticipating"); continue; }
+      const size = subject.members.length;
+      if (subject.first() > options.replacementChance) { diagnostics.count("roamingNotParticipating"); stat.notParticipating += size; continue; }
+      stat.selected += size;
       const rng = new DeterministicRng(deriveSeed(seed, subject.name, SAMPLING_RNG_VERSION));
-      if (options.normalReplacement === "both" && rng.int(100) + 1 > options.bossChanceInNormalSlots) { diagnostics.count("roamingNormalDraw"); continue; }
-      if (used + subject.members.length > ROAMING_BOSS_MAP_CAP) { diagnostics.count("roamingMapLimitReached"); continue; }
+      if (options.normalReplacement === "both" && rng.int(100) + 1 > options.bossChanceInNormalSlots) { diagnostics.count("roamingNormalDraw"); stat.normalDraw += size; continue; }
 
+      // There is no limit on the NUMBER of bosses of a map: the limits are the ones of the game data (the model budget below, which counts distinct models, not instances)
+      // and the candidates the destination can take. A slot that cannot be given a boss stays as it is, and the reason is counted (never a normal enemy in its place).
       const maxSize = options.fit === "fits" ? Math.min(...subject.members.map((slot) => slotSizeClass(table, slot))) : UNKNOWN_SLOT_SIZE;
-      const fitPool = bossTypes.filter((type) => type.size <= maxSize && !(preventSame && subject.members.some((slot) => slot.modelName === type.model)));
+      const sizeOk = bossTypes.filter((type) => type.size <= maxSize);
+      const fitPool = sizeOk.filter((type) => !(preventSame && subject.members.some((slot) => slot.modelName === type.model)));
       const pools = [];
+      let asylumRule = false;
       if (easyAsylumMode && mapId === EASY_ASYLUM_MAP) {
+        asylumRule = true;
         pools.push(fitPool.filter((type) => type.difficulty <= EASY_ASYLUM_MAX_CLASS));
       } else if (curve) {
         const destination = slotDifficultyClass(table, subject.members[0]);
@@ -1115,15 +1137,28 @@ export function planRoamingBosses({
         }
         if (chosen) break;
       }
-      if (!chosen) { diagnostics.count(budgetBlocked ? "roamingBudgetRejected" : "roamingNoCandidate"); continue; }
+      if (!chosen) {
+        // The exact reason, in the order the pools are narrowed: size, Prevent same, the Easy Asylum rule / difficulty class, the model budget.
+        const reason = budgetBlocked ? "modelBudget" : sizeOk.length === 0 ? "fit" : fitPool.length === 0 ? "preventSame" : asylumRule ? "easyAsylum" : pools.every((pool) => pool.length === 0) ? "difficulty" : "other";
+        stat.unchanged[reason] += size;
+        diagnostics.count(budgetBlocked ? "roamingBudgetRejected" : "roamingNoCandidate");
+        diagnostics.count(`roamingUnchanged:${reason}`, size);
+        continue;
+      }
       for (const slot of subject.members) roaming.set(slot.id, chosen.candidate.source);
       counts.clear();
       for (const [model, count] of chosen.trial) counts.set(model, count);
-      used += subject.members.length;
-      diagnostics.count("roamingBosses", subject.members.length);
-      if (subject.members.length > 1) diagnostics.count("roamingGroups");
+      used += size;
+      stat.boss += size;
+      bossModelsHere.add(chosen.candidate.model);
+      diagnostics.count("roamingBosses", size);
+      if (size > 1) diagnostics.count("roamingGroups");
     }
+    stat.distinctBossModels = bossModelsHere.size;
+    stat.finalModels = setSize(counts);
+    stat.modelLimit = limit;
     if (used > 0) diagnostics.count("roamingMaps");
+    diagnostics.setRoamingMap?.(mapId, stat);
   }
   return roaming;
 }

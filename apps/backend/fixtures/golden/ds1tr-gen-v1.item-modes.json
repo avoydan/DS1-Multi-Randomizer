@@ -1,6 +1,6 @@
 {
   "profile": "ds1tr-gen-v1",
-  "recordedAt": "2026-10-07T19:20:45.480Z",
+  "recordedAt": "2026-10-08T20:30:35.623Z",
   "cases": [
     {
       "name": "race-items",
@@ -1056,7 +1056,7 @@
       },
       "expected": {
         "fileCount": 73,
-        "digest": "e429a9afae0ab9fdee0f0d61cdae8cd325376916ff592e59facda3b58e2f9337",
+        "digest": "42f001737bf3a8e66b43cd72a07878d91b49bc7ab4814858134820f5ccb1e3a9",
         "files": {
           "event/common.emevd.dcx": "cc7ce2451e8bcd3ca19a63298725b97e6c3a863bf851a95702747ee67e011479",
           "event/m10_00_00_00.emevd.dcx": "e1ff5e68602f0a6fb1e197a7fa5bddb25a4df187860128c31c5d56c92d4a30c8",
@@ -1071,7 +1071,7 @@
           "event/m14_00_00_00.emevd.dcx": "b081df5a520bb9a2a374bf67e4e7f61f964ce42d1aeaa4262d47e1f0c0fdd7a9",
           "event/m14_01_00_00.emevd.dcx": "8cb0f6054f76d310a3924e0d87e0d33a051ff5bb751eace468cdfc1fe14bc7f4",
           "event/m15_00_00_00.emevd.dcx": "9f7cf62c3d9d1204c02a73f78d2b47b67805eb990e663cfc5746a7e0c0f22b9c",
-          "event/m15_01_00_00.emevd.dcx": "888ff3a9e599bd33c0d92c8ebcf1873f3e8928bd69f1ebe8bd48778ce0846ed9",
+          "event/m15_01_00_00.emevd.dcx": "eb98f358b56728ad7352bb929416fcf365239ff910ede985926d8f51dfaae474",
           "event/m16_00_00_00.emevd.dcx": "c0d91ef3798f958421a9f0d2eabd945a0a2b1716125d7929fe1b3fac6e6d8171",
           "event/m17_00_00_00.emevd.dcx": "5067c83022b7986021e89599ceb8e00b3dadbe3f7ca1d8ae9f8d7e273e923538",
           "event/m18_00_00_00.emevd.dcx": "f140ada233002748ac0de604ae1dd61d579d12222be6c3e37d83bc06b242c646",
@@ -1089,13 +1089,13 @@
           "map/MapStudio/m14_00_00_00.msb": "d98b36a9570452ca8deaf44f4b9eb36706fd128cd942b62a73ae8b92e427dc85",
           "map/MapStudio/m14_01_00_00.msb": "c29d32a202c9b84b2da86882dae9cd62ababc7cf6095163d5196f749775126a3",
           "map/MapStudio/m15_00_00_00.msb": "54a676cd83f632a23f30dac8f226cb53007f126e8fe12264b31e17e5e205ce08",
-          "map/MapStudio/m15_01_00_00.msb": "949eae40c9003fa78dac4cb6ade48d539760c3c11f7fd3acda67072cedf95712",
+          "map/MapStudio/m15_01_00_00.msb": "998bab60cb962782798bf1c15697ffdcb6a3f5d014330cac27b16fe7fd47b95e",
           "map/MapStudio/m16_00_00_00.msb": "d9839a0edeeb7e821ef0fa013d894aa8acd939ad3b9029fadcb0d114204027b7",
           "map/MapStudio/m17_00_00_00.msb": "ea131553baeecb762025aff5aa61d0d08a5c0b3981aa227f2239167d0e298152",
           "map/MapStudio/m18_00_00_00.msb": "9af193ff7356b2b83df352fca5937ac904a541c0a6610024c6048d683b42a922",
           "map/MapStudio/m18_01_00_00.msb": "397bfede819553ef6f1f6df6b90901bf22a4c0d5375397e3d340cd4bbfb3107a",
           "msg/ENGLISH/menu.msgbnd.dcx": "864227749930912f55d0495e1a5c485de1181e0866160434d996b5bb67b58e7d",
-          "param/GameParam/GameParam.parambnd.dcx": "2cfdf7890d4c071fd118ac987367f3c76966de74515be25f07100cdd46dcadc9",
+          "param/GameParam/GameParam.parambnd.dcx": "b482106e1cc56bbeeea08aba24541a675d7572593c2e7255bf3dc22e682a56be",
           "script/m10_00_00_00.luabnd.dcx": "0e6fd6107bdcf32bd85c2d71c626d84298db03b31c84b31f034f18dd8257aa3e",
           "script/m10_01_00_00.luabnd.dcx": "17231773fee124882f43ce5084d737a4eca41ff57b6f62aadf7a7a5ebd30b2a6",
           "script/m10_02_00_00.luabnd.dcx": "ec2121445bf6191b96193943e178f0069cf5275817efb5856e7ea75d5c8b42db",

@@ -1,0 +1,283 @@
+diff --git a/engines/combined/vendor/src/core/generator.js b/engines/combined/vendor/src/core/generator.js
+index b05da5b..13cf6b8 100644
+--- a/engines/combined/vendor/src/core/generator.js
++++ b/engines/combined/vendor/src/core/generator.js
+@@ -441,16 +441,37 @@ function hostileNpcSources(catalog) {
+ 
+ const hostileNpcSourceIds = (catalog) => new Set([...(hostileNpcSources(catalog)?.values() ?? [])].flat().map((slot) => slot.id));
+ 
+-/** Regular slots that keep their own enemy even when bosses may roam (they have special handling that a boss would break). */
++/**
++ * Regular slots that keep their own enemy even when bosses may roam (they have special handling that a boss would break), with the reason of each:
++ * a passive slot (the Asylum, New Londo, the Kiln knight, the Parish bonfire Titanite Demon), a slot whose events lock its model, a tangible ghost, or the Darkroot butterfly path.
++ */
++function roamingProtectedReasons(slots) {
++  const reasons = new Map();
++  for (const slot of slots) {
++    const reason =
++      asylumPassiveSlots.has(slot.id) || newLondoPassiveSlots.has(slot.id) || additionalPassiveSlots.has(slot.id) || parishBonfirePassiveSlots.has(slot.id) ? "passiveSlot"
++        : slot.eventModelLocked === true ? "eventModelLocked"
++          : tangibleGhostModels.has(slot.modelName) ? "tangibleGhost"
++            : ((slot.mapId === "m12_00_00_00" || slot.mapId === "m12_00_00_01") && slot.modelName === "c2330") ? "darkrootButterflyPath"
++              : null;
++    if (reason !== null) reasons.set(slot.id, reason);
++  }
++  return reasons;
++}
++
+ function roamingProtectedSlotIds(slots) {
+-  return new Set(slots.filter((slot) =>
+-    asylumPassiveSlots.has(slot.id) ||
+-    newLondoPassiveSlots.has(slot.id) ||
+-    additionalPassiveSlots.has(slot.id) ||
+-    parishBonfirePassiveSlots.has(slot.id) ||
+-    slot.eventModelLocked === true ||
+-    tangibleGhostModels.has(slot.modelName) ||
+-    ((slot.mapId === "m12_00_00_00" || slot.mapId === "m12_00_00_01") && slot.modelName === "c2330")).map((slot) => slot.id));
++  return new Set(roamingProtectedReasons(slots).keys());
++}
++
++/**
++ * The ordinary dragon-class slots (Titanite Demons, Drakes, the Bounding Demons, the Undead Dragon of the valley) that the dragon plan reserves and permutes among themselves.
++ * With roaming bosses they are ordinary destinations like any other: the roaming pass may give them a boss instead of the dragon the plan chose (the dragon is then simply not placed).
++ * Not these: the bridge Hellkite (a static scripted dragon), the Anor Londo gargoyles and the hydras (linked parts), which stay with the dragon plan.
++ */
++function roamingDragonSlots(dragonPlan) {
++  return [...dragonPlan.overridableSlots.values()]
++    .filter((slot) => slot.teamType === 0 && slot.npcParamId > 0 && slot.thinkParamId > 0 && slot.baseHp > 0 && !slot.dummy)
++    .sort((left, right) => (left.id < right.id ? -1 : left.id > right.id ? 1 : 0));
+ }
+ 
+ function effectiveBossSlots(catalog) {
+@@ -673,7 +694,7 @@ function buildDragonPlan(config, catalog) {
+     (catalog.maps || []).map((map) => [map.id, map.name]),
+   );
+   const bossNames = catalog.bossNames || {};
+-  const result = { enemies: [], bosses: [], reservedSlotIds: new Set() };
++  const result = { enemies: [], bosses: [], reservedSlotIds: new Set(), overridableSlots: new Map() };
+   let enemyIndex = 0;
+   let bossIndex = 0;
+   if (config.randomizeEnemies && simpleRegularDragons.length > 1) {
+@@ -778,6 +799,7 @@ function buildDragonPlan(config, catalog) {
+         delete placementExtra.forceCombatActivation;
+       }
+       result.reservedSlotIds.add(targetBody.id);
++      if (target.parts.length === 0 && !targetIsHydra && target.id !== "hellkite-bridge" && !target.id.startsWith("anor-londo-gargoyle")) result.overridableSlots.set(targetBody.id, targetBody);
+       result.enemies.push(enemyPlacement(
+         config,
+         targetBody,
+@@ -1609,6 +1631,7 @@ function sampleExtractedEnemies(config, catalog, dragonPlan, bossPlan, diagnosti
+   const allSlots = [...slots, ...pinwheelClones];
+   let assignment = regularAssignment;
+   let roaming = new Map();
++  let takenDragonSlots = [];
+   if (roamingMode) {
+     // The regular sampler saw "normals"/"none"; the diagnostics state what was asked for.
+     diagnostics.options = {
+@@ -1616,25 +1639,32 @@ function sampleExtractedEnemies(config, catalog, dragonPlan, bossPlan, diagnosti
+       roamingBossSouls: options.roamingBossSouls, roamingBossesStayDead: options.roamingBossesStayDead,
+     };
+     const candidates = roamingBossCandidates(config, catalog, dragonPlan);
++    // The dragon-class ordinary slots are destinations of the roaming pass too (they are appended after every other slot, so no id of another slot moves).
++    const dragonSlots = roamingDragonSlots(dragonPlan);
++    const dragonOccupants = new Map(dragonPlan.enemies.map((placement) => [placement.slot, { modelName: placement.targetModelName }]));
++    const roamingSlots = [...slots, ...dragonSlots];
+     roaming = planRoamingBosses({
+       seed: config.seed,
+       options,
+-      slots,
+-      allSlots,
+-      assignment: regularAssignment,
++      slots: roamingSlots,
++      allSlots: [...allSlots, ...dragonSlots],
++      assignment: new Map([...regularAssignment, ...dragonSlots.filter((slot) => dragonOccupants.has(slot.id)).map((slot) => [slot.id, dragonOccupants.get(slot.id)])]),
+       fixedModelsByMap,
+       table,
+       bossTypes: deriveRoamingBossTypes(candidates, table, roamingSizeClassOverrides),
+       preventSame: config.preventSameEnemy,
+-      excludedSlotIds: roamingProtectedSlotIds(slots),
++      excludedSlotIds: roamingProtectedSlotIds(roamingSlots),
++      protectedReasons: roamingProtectedReasons(roamingSlots),
+       diagnostics,
+     });
+     diagnostics.count("roamingCandidates", candidates.length);
++    takenDragonSlots = dragonSlots.filter((slot) => roaming.has(slot.id));
++    if (takenDragonSlots.length > 0) diagnostics.count("roamingDragonClassSlots", takenDragonSlots.length);
+     assignment = new Map([...regularAssignment, ...roaming]);
+   }
+   // Decoration (and its index-based ids) is computed over every slot so ids stay stable, but only slots the
+   // sampler assigned get a placement: the others stay exactly vanilla (model document 5, decision 2).
+-  const randomized = decorateEnemyPlacements(config, catalog, allSlots, assignment, pinwheelCloneIds, "sampling-v1", new Set(roaming.keys()), options,
++  const randomized = decorateEnemyPlacements(config, catalog, [...allSlots, ...takenDragonSlots], assignment, pinwheelCloneIds, "sampling-v1", new Set(roaming.keys()), options,
+     options.hostileNpcs ? hostileNpcSourceIds(catalog) : new Set())
+     .filter((placement) => assignment.has(placement.slot));
+   if (options.hostileNpcs) {
+@@ -1645,7 +1675,7 @@ function sampleExtractedEnemies(config, catalog, dragonPlan, bossPlan, diagnosti
+   assertSlotOwnedDrops(randomized);
+   return randomized
+     .concat(massOfSoulsPlan.placements)
+-    .concat(dragonPlan.enemies);
++    .concat(takenDragonSlots.length === 0 ? dragonPlan.enemies : dragonPlan.enemies.filter((placement) => !roaming.has(placement.slot)));
+ }
+ 
+ const canonicalBossModel = new Map([
+diff --git a/engines/combined/vendor/src/core/placement.js b/engines/combined/vendor/src/core/placement.js
+index 6df5bf0..1fc976f 100644
+--- a/engines/combined/vendor/src/core/placement.js
++++ b/engines/combined/vendor/src/core/placement.js
+@@ -540,6 +540,7 @@ export function createPlacementDiagnostics({ algorithm, level = "summary" }) {
+       summary.terminalFailures.push(...from.terminalFailures);
+       for (const [key, value] of Object.entries(from.counters)) summary.counters[key] = (summary.counters[key] ?? 0) + value;
+       Object.assign(summary.maps, from.maps);
++      if (from.roaming) Object.assign((summary.roaming ??= {}), from.roaming);
+       if (level === "detail") {
+         slots.push(...(json.slots ?? []));
+         groups.push(...(json.groups ?? []));
+@@ -557,6 +558,14 @@ export function createPlacementDiagnostics({ algorithm, level = "summary" }) {
+     setMap(mapId, values) {
+       summary.maps[mapId] = { ...values };
+     },
++    /**
++     * What happened to every ordinary destination of a map in the roaming-boss pass (Part E1): destinations, protected by reason, eligible, selected by the replacement chance, boss, normal draw (Bosses or normal enemies only),
++     * unchanged by reason, distinct boss models. Present only in worlds that use roaming bosses.
++     */
++    setRoamingMap(mapId, values) {
++      summary.roaming ??= {};
++      summary.roaming[mapId] = structuredClone(values);
++    },
+     /**
+      * @param {object} record
+      * @param {string} record.slotId
+diff --git a/engines/combined/vendor/src/core/sampling.js b/engines/combined/vendor/src/core/sampling.js
+index 3759365..a5c36e1 100644
+--- a/engines/combined/vendor/src/core/sampling.js
++++ b/engines/combined/vendor/src/core/sampling.js
+@@ -947,7 +947,7 @@ export function deriveBodyTypes(sources, table) {
+   return types.sort((left, right) => compare(left.key, right.key));
+ }
+ 
+-/** Safety limit (DS1TR, not a legacy value): hostile NPCs per map. Every one has a wake-up event, so this bounds the events of a map like ROAMING_BOSS_MAP_CAP does. */
++/** Safety limit (DS1TR, not a legacy value): hostile NPCs per map. Every one has a wake-up event, so this bounds the events of a map. */
+ export const HOSTILE_NPC_MAP_CAP = 12;
+ 
+ /**
+@@ -998,8 +998,12 @@ export function bossDestinationClass(table, slot) {
+  * decided in generator.js; this module only chooses which slot gets which boss, deterministically, inside the model budget.
+  */
+ 
+-/** Safety limit (DS1TR, not a legacy value): roaming bosses per map. Bounds the activation events of a map and keeps a map playable. */
+-export const ROAMING_BOSS_MAP_CAP = 10;
++/*
++ * There is NO limit on the number of roaming bosses of a map. A fixed per-map cap of 10 existed from Part E1 to backend 0.45.4 as a conservative guardrail (it bounded the
++ * custom event window; docs/ENEMY_PLACEMENT_MODEL.md, 10.7, deviation 2) and it made "Bosses only" at 100% change about one ordinary enemy in ten. The legacy tool has no such cap:
++ * its only limit is the number of DISTINCT replacement models per map (MAX_UNIQUE), after which it reuses models already placed. The limits here are the same kind: the model budget
++ * (distinct models, below) and the event window, which grows with the number of events (docs/EVENT_ALLOCATION.md).
++ */
+ 
+ /**
+  * The roaming candidates as typed like the regular models: size class from the capsule, difficulty class from where the boss lives and its
+@@ -1036,7 +1040,7 @@ const countOf = (counts, model, delta) => {
+  * kind):
+  *   1. participation - the same first draw the regular sampler makes for that slot / group (replacement chance);
+  *   2. category      - "bosses": always a boss; "both": a boss with `bossChanceInNormalSlots`, otherwise the normal enemy the sampler chose;
+- *   3. map limit     - at most ROAMING_BOSS_MAP_CAP roaming bosses per map (a group counts all its slots);
++ *   3. (no limit on the number of bosses of a map; see the note above)
+  *   4. candidates    - bosses that fit (Placement fit), are not the slot's own model under Prevent same, and the difficulty class(es) of the
+  *                      curve / Easy Asylum rule; drawn uniformly with list shrink;
+  *   5. model budget  - the boss is admitted only if the final model set of the map (fixed models and every slot's final model) stays within
+@@ -1046,7 +1050,7 @@ const countOf = (counts, model, delta) => {
+  * @returns {Map<string, object>} slot id -> the boss catalog slot used as the source
+  */
+ export function planRoamingBosses({
+-  seed, options, slots, allSlots, assignment, fixedModelsByMap, table, bossTypes, preventSame, excludedSlotIds = new Set(), diagnostics, cap = MODEL_BUDGET_CAP,
++  seed, options, slots, allSlots, assignment, fixedModelsByMap, table, bossTypes, preventSame, excludedSlotIds = new Set(), protectedReasons = new Map(), diagnostics, cap = MODEL_BUDGET_CAP,
+ }) {
+   const roaming = new Map();
+   if (!["bosses", "both"].includes(options.normalReplacement) || bossTypes.length === 0) return roaming;
+@@ -1066,12 +1070,23 @@ export function planRoamingBosses({
+     let used = 0;
+ 
+     const eligible = slots.filter((slot) => slot.mapId === mapId && !excludedSlotIds.has(slot.id)).sort((a, b) => compare(a.id, b.id));
++    // What happened to every ordinary destination of the map, in slots (not subjects): the numbers that explain a plan (docs/ENEMY_PLACEMENT_MODEL.md, 10.7).
++    const stat = {
++      destinations: mapAll.length, protectedByReason: {}, eligible: eligible.length, notParticipating: 0, selected: 0,
++      boss: 0, normalDraw: 0, unchanged: { easyAsylum: 0, fit: 0, preventSame: 0, difficulty: 0, modelBudget: 0, eventLimit: 0, other: 0 }, distinctBossModels: 0,
++    };
++    for (const slot of slots) {
++      if (slot.mapId === mapId && excludedSlotIds.has(slot.id)) {
++        const reason = protectedReasons.get(slot.id) ?? "other";
++        stat.protectedByReason[reason] = (stat.protectedByReason[reason] ?? 0) + 1;
++      }
++    }
+     const subjects = [];
+     if (grouped) {
+       const blocked = new Set(slots.filter((slot) => slot.mapId === mapId && excludedSlotIds.has(slot.id)).map((slot) => slot.modelName));
+       const byModel = new Map();
+       for (const slot of eligible) {
+-        if (blocked.has(slot.modelName)) continue; // a group with a slot that cannot take a boss stays whole
++        if (blocked.has(slot.modelName)) { stat.protectedByReason.groupMemberProtected = (stat.protectedByReason.groupMemberProtected ?? 0) + 1; continue; } // a group with a slot that cannot take a boss stays whole
+         if (!byModel.has(slot.modelName)) byModel.set(slot.modelName, []);
+         byModel.get(slot.modelName).push(slot);
+       }
+@@ -1080,17 +1095,24 @@ export function planRoamingBosses({
+       for (const slot of eligible) subjects.push({ members: [slot], name: `roaming:slot:${slot.id}`, first: () => createSlotStream(seed, slot).int(100) + 1 });
+     }
+     subjects.sort((left, right) => compare(left.members[0].id, right.members[0].id));
++    const bossModelsHere = new Set();
+ 
+     for (const subject of subjects) {
+-      if (subject.first() > options.replacementChance) { diagnostics.count("roamingNotParticipating"); continue; }
++      const size = subject.members.length;
++      if (subject.first() > options.replacementChance) { diagnostics.count("roamingNotParticipating"); stat.notParticipating += size; continue; }
++      stat.selected += size;
+       const rng = new DeterministicRng(deriveSeed(seed, subject.name, SAMPLING_RNG_VERSION));
+-      if (options.normalReplacement === "both" && rng.int(100) + 1 > options.bossChanceInNormalSlots) { diagnostics.count("roamingNormalDraw"); continue; }
+-      if (used + subject.members.length > ROAMING_BOSS_MAP_CAP) { diagnostics.count("roamingMapLimitReached"); continue; }
++      if (options.normalReplacement === "both" && rng.int(100) + 1 > options.bossChanceInNormalSlots) { diagnostics.count("roamingNormalDraw"); stat.normalDraw += size; continue; }
+ 
++      // There is no limit on the NUMBER of bosses of a map: the limits are the ones of the game data (the model budget below, which counts distinct models, not instances)
++      // and the candidates the destination can take. A slot that cannot be given a boss stays as it is, and the reason is counted (never a normal enemy in its place).
+       const maxSize = options.fit === "fits" ? Math.min(...subject.members.map((slot) => slotSizeClass(table, slot))) : UNKNOWN_SLOT_SIZE;
+-      const fitPool = bossTypes.filter((type) => type.size <= maxSize && !(preventSame && subject.members.some((slot) => slot.modelName === type.model)));
++      const sizeOk = bossTypes.filter((type) => type.size <= maxSize);
++      const fitPool = sizeOk.filter((type) => !(preventSame && subject.members.some((slot) => slot.modelName === type.model)));
+       const pools = [];
++      let asylumRule = false;
+       if (easyAsylumMode && mapId === EASY_ASYLUM_MAP) {
++        asylumRule = true;
+         pools.push(fitPool.filter((type) => type.difficulty <= EASY_ASYLUM_MAX_CLASS));
+       } else if (curve) {
+         const destination = slotDifficultyClass(table, subject.members[0]);
+@@ -1115,15 +1137,28 @@ export function planRoamingBosses({
+         }
+         if (chosen) break;
+       }
+-      if (!chosen) { diagnostics.count(budgetBlocked ? "roamingBudgetRejected" : "roamingNoCandidate"); continue; }
++      if (!chosen) {
++        // The exact reason, in the order the pools are narrowed: size, Prevent same, the Easy Asylum rule / difficulty class, the model budget.
++        const reason = budgetBlocked ? "modelBudget" : sizeOk.length === 0 ? "fit" : fitPool.length === 0 ? "preventSame" : asylumRule ? "easyAsylum" : pools.every((pool) => pool.length === 0) ? "difficulty" : "other";
++        stat.unchanged[reason] += size;
++        diagnostics.count(budgetBlocked ? "roamingBudgetRejected" : "roamingNoCandidate");
++        diagnostics.count(`roamingUnchanged:${reason}`, size);
++        continue;
++      }
+       for (const slot of subject.members) roaming.set(slot.id, chosen.candidate.source);
+       counts.clear();
+       for (const [model, count] of chosen.trial) counts.set(model, count);
+-      used += subject.members.length;
+-      diagnostics.count("roamingBosses", subject.members.length);
+-      if (subject.members.length > 1) diagnostics.count("roamingGroups");
++      used += size;
++      stat.boss += size;
++      bossModelsHere.add(chosen.candidate.model);
++      diagnostics.count("roamingBosses", size);
++      if (size > 1) diagnostics.count("roamingGroups");
+     }
++    stat.distinctBossModels = bossModelsHere.size;
++    stat.finalModels = setSize(counts);
++    stat.modelLimit = limit;
+     if (used > 0) diagnostics.count("roamingMaps");
++    diagnostics.setRoamingMap?.(mapId, stat);
+   }
+   return roaming;
+ }

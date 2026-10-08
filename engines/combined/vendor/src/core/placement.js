@@ -540,6 +540,7 @@ export function createPlacementDiagnostics({ algorithm, level = "summary" }) {
       summary.terminalFailures.push(...from.terminalFailures);
       for (const [key, value] of Object.entries(from.counters)) summary.counters[key] = (summary.counters[key] ?? 0) + value;
       Object.assign(summary.maps, from.maps);
+      if (from.roaming) Object.assign((summary.roaming ??= {}), from.roaming);
       if (level === "detail") {
         slots.push(...(json.slots ?? []));
         groups.push(...(json.groups ?? []));
@@ -556,6 +557,14 @@ export function createPlacementDiagnostics({ algorithm, level = "summary" }) {
     /** Per-map totals (model count, replaced slots, ...); keys are map ids. */
     setMap(mapId, values) {
       summary.maps[mapId] = { ...values };
+    },
+    /**
+     * What happened to every ordinary destination of a map in the roaming-boss pass (Part E1): destinations, protected by reason, eligible, selected by the replacement chance, boss, normal draw (Bosses or normal enemies only),
+     * unchanged by reason, distinct boss models. Present only in worlds that use roaming bosses.
+     */
+    setRoamingMap(mapId, values) {
+      summary.roaming ??= {};
+      summary.roaming[mapId] = structuredClone(values);
     },
     /**
      * @param {object} record

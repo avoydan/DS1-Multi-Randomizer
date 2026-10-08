@@ -441,16 +441,37 @@ function hostileNpcSources(catalog) {
 
 const hostileNpcSourceIds = (catalog) => new Set([...(hostileNpcSources(catalog)?.values() ?? [])].flat().map((slot) => slot.id));
 
-/** Regular slots that keep their own enemy even when bosses may roam (they have special handling that a boss would break). */
+/**
+ * Regular slots that keep their own enemy even when bosses may roam (they have special handling that a boss would break), with the reason of each:
+ * a passive slot (the Asylum, New Londo, the Kiln knight, the Parish bonfire Titanite Demon), a slot whose events lock its model, a tangible ghost, or the Darkroot butterfly path.
+ */
+function roamingProtectedReasons(slots) {
+  const reasons = new Map();
+  for (const slot of slots) {
+    const reason =
+      asylumPassiveSlots.has(slot.id) || newLondoPassiveSlots.has(slot.id) || additionalPassiveSlots.has(slot.id) || parishBonfirePassiveSlots.has(slot.id) ? "passiveSlot"
+        : slot.eventModelLocked === true ? "eventModelLocked"
+          : tangibleGhostModels.has(slot.modelName) ? "tangibleGhost"
+            : ((slot.mapId === "m12_00_00_00" || slot.mapId === "m12_00_00_01") && slot.modelName === "c2330") ? "darkrootButterflyPath"
+              : null;
+    if (reason !== null) reasons.set(slot.id, reason);
+  }
+  return reasons;
+}
+
 function roamingProtectedSlotIds(slots) {
-  return new Set(slots.filter((slot) =>
-    asylumPassiveSlots.has(slot.id) ||
-    newLondoPassiveSlots.has(slot.id) ||
-    additionalPassiveSlots.has(slot.id) ||
-    parishBonfirePassiveSlots.has(slot.id) ||
-    slot.eventModelLocked === true ||
-    tangibleGhostModels.has(slot.modelName) ||
-    ((slot.mapId === "m12_00_00_00" || slot.mapId === "m12_00_00_01") && slot.modelName === "c2330")).map((slot) => slot.id));
+  return new Set(roamingProtectedReasons(slots).keys());
+}
+
+/**
+ * The ordinary dragon-class slots (Titanite Demons, Drakes, the Bounding Demons, the Undead Dragon of the valley) that the dragon plan reserves and permutes among themselves.
+ * With roaming bosses they are ordinary destinations like any other: the roaming pass may give them a boss instead of the dragon the plan chose (the dragon is then simply not placed).
+ * Not these: the bridge Hellkite (a static scripted dragon), the Anor Londo gargoyles and the hydras (linked parts), which stay with the dragon plan.
+ */
+function roamingDragonSlots(dragonPlan) {
+  return [...dragonPlan.overridableSlots.values()]
+    .filter((slot) => slot.teamType === 0 && slot.npcParamId > 0 && slot.thinkParamId > 0 && slot.baseHp > 0 && !slot.dummy)
+    .sort((left, right) => (left.id < right.id ? -1 : left.id > right.id ? 1 : 0));
 }
 
 function effectiveBossSlots(catalog) {
@@ -673,7 +694,7 @@ function buildDragonPlan(config, catalog) {
     (catalog.maps || []).map((map) => [map.id, map.name]),
   );
   const bossNames = catalog.bossNames || {};
-  const result = { enemies: [], bosses: [], reservedSlotIds: new Set() };
+  const result = { enemies: [], bosses: [], reservedSlotIds: new Set(), overridableSlots: new Map() };
   let enemyIndex = 0;
   let bossIndex = 0;
   if (config.randomizeEnemies && simpleRegularDragons.length > 1) {
@@ -778,6 +799,7 @@ function buildDragonPlan(config, catalog) {
         delete placementExtra.forceCombatActivation;
       }
       result.reservedSlotIds.add(targetBody.id);
+      if (target.parts.length === 0 && !targetIsHydra && target.id !== "hellkite-bridge" && !target.id.startsWith("anor-londo-gargoyle")) result.overridableSlots.set(targetBody.id, targetBody);
       result.enemies.push(enemyPlacement(
         config,
         targetBody,
@@ -1609,6 +1631,7 @@ function sampleExtractedEnemies(config, catalog, dragonPlan, bossPlan, diagnosti
   const allSlots = [...slots, ...pinwheelClones];
   let assignment = regularAssignment;
   let roaming = new Map();
+  let takenDragonSlots = [];
   if (roamingMode) {
     // The regular sampler saw "normals"/"none"; the diagnostics state what was asked for.
     diagnostics.options = {
@@ -1616,25 +1639,32 @@ function sampleExtractedEnemies(config, catalog, dragonPlan, bossPlan, diagnosti
       roamingBossSouls: options.roamingBossSouls, roamingBossesStayDead: options.roamingBossesStayDead,
     };
     const candidates = roamingBossCandidates(config, catalog, dragonPlan);
+    // The dragon-class ordinary slots are destinations of the roaming pass too (they are appended after every other slot, so no id of another slot moves).
+    const dragonSlots = roamingDragonSlots(dragonPlan);
+    const dragonOccupants = new Map(dragonPlan.enemies.map((placement) => [placement.slot, { modelName: placement.targetModelName }]));
+    const roamingSlots = [...slots, ...dragonSlots];
     roaming = planRoamingBosses({
       seed: config.seed,
       options,
-      slots,
-      allSlots,
-      assignment: regularAssignment,
+      slots: roamingSlots,
+      allSlots: [...allSlots, ...dragonSlots],
+      assignment: new Map([...regularAssignment, ...dragonSlots.filter((slot) => dragonOccupants.has(slot.id)).map((slot) => [slot.id, dragonOccupants.get(slot.id)])]),
       fixedModelsByMap,
       table,
       bossTypes: deriveRoamingBossTypes(candidates, table, roamingSizeClassOverrides),
       preventSame: config.preventSameEnemy,
-      excludedSlotIds: roamingProtectedSlotIds(slots),
+      excludedSlotIds: roamingProtectedSlotIds(roamingSlots),
+      protectedReasons: roamingProtectedReasons(roamingSlots),
       diagnostics,
     });
     diagnostics.count("roamingCandidates", candidates.length);
+    takenDragonSlots = dragonSlots.filter((slot) => roaming.has(slot.id));
+    if (takenDragonSlots.length > 0) diagnostics.count("roamingDragonClassSlots", takenDragonSlots.length);
     assignment = new Map([...regularAssignment, ...roaming]);
   }
   // Decoration (and its index-based ids) is computed over every slot so ids stay stable, but only slots the
   // sampler assigned get a placement: the others stay exactly vanilla (model document 5, decision 2).
-  const randomized = decorateEnemyPlacements(config, catalog, allSlots, assignment, pinwheelCloneIds, "sampling-v1", new Set(roaming.keys()), options,
+  const randomized = decorateEnemyPlacements(config, catalog, [...allSlots, ...takenDragonSlots], assignment, pinwheelCloneIds, "sampling-v1", new Set(roaming.keys()), options,
     options.hostileNpcs ? hostileNpcSourceIds(catalog) : new Set())
     .filter((placement) => assignment.has(placement.slot));
   if (options.hostileNpcs) {
@@ -1645,7 +1675,7 @@ function sampleExtractedEnemies(config, catalog, dragonPlan, bossPlan, diagnosti
   assertSlotOwnedDrops(randomized);
   return randomized
     .concat(massOfSoulsPlan.placements)
-    .concat(dragonPlan.enemies);
+    .concat(takenDragonSlots.length === 0 ? dragonPlan.enemies : dragonPlan.enemies.filter((placement) => !roaming.has(placement.slot)));
 }
 
 const canonicalBossModel = new Map([

@@ -12,6 +12,11 @@ export interface PlacementSummary {
   terminalFailures: string[];
   counters: Record<string, number>;
   maps: Record<string, { slots: number; replaced: number; finalModels: number; modelSet: number; baseline: number; effectiveCap: number; attempts?: number; typeGroups?: number }>;
+  /** Roaming bosses (Part E1), per map: what happened to every ordinary destination (present only in worlds that use them). */
+  roaming?: Record<string, {
+    destinations: number; protectedByReason: Record<string, number>; eligible: number; notParticipating: number; selected: number; boss: number; normalDraw: number;
+    unchanged: Record<'easyAsylum' | 'fit' | 'preventSame' | 'difficulty' | 'modelBudget' | 'eventLimit' | 'other', number>; distinctBossModels: number; finalModels: number; modelLimit: number;
+  }>;
   /** Map attempts that failed and were retried (map-local retries); empty when every map succeeded first time. */
   retries?: Array<{ mapId: string; attempt: number; slotId?: string; baseline?: number; effectiveCap?: number }>;
 }
@@ -72,7 +77,7 @@ export function formatPlacementDiagnostics(diagnostics: PlacementDiagnosticsSumm
   const bossText = bossSlots > 0 ? `bosses sampled ${summary.counters.bossesReplaced ?? 0}/${bossSlots} (${summary.counters.bossesKeptVanilla ?? 0} kept, ${summary.counters.bossSlotsNotParticipating ?? 0} left by chance), ` : '';
   const roamingBosses = summary.counters.roamingBosses ?? 0;
   const roamingText = ['bosses', 'both'].includes(String(options.normalReplacement))
-    ? `roaming bosses ${roamingBosses} in ${summary.counters.roamingMaps ?? 0} map(s) (${summary.counters.roamingMapLimitReached ?? 0} left by the map limit, ${summary.counters.roamingBudgetRejected ?? 0} by the model limit), `
+    ? `roaming bosses ${roamingBosses} in ${summary.counters.roamingMaps ?? 0} map(s) (${Object.entries(summary.counters).filter(([name]) => name.startsWith('roamingUnchanged:')).map(([name, count]) => `${count} unchanged: ${name.slice('roamingUnchanged:'.length)}`).join(', ') || 'none left unchanged by a limit'}), `
     : '';
   return `Enemy placement sampling-v1 (difficulty ${String(options.difficultyMode ?? 'random')}/${String(options.difficultyStrictness ?? 'loose')}): ${poolText}${groups}${bossText}${roamingText}${summary.slots} regular slots, ${replaced} sampled, `
     + `${retried} map(s) retried, ${summary.counters.difficultyLapses ?? 0} difficulty lapses, `
