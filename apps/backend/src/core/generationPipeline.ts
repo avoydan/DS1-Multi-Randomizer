@@ -96,7 +96,7 @@ const defaults: GenerationDependencies = {
   combined: executeCombinedGeneration,
   fog: new FogHostProcess(),
   progressionModel: (prerequisites, variant) => loadProgressionModel(prerequisites, undefined, variant),
-  appVersion: '0.44.2',
+  appVersion: '0.45.0',
 };
 
 async function fingerprint(file: string): Promise<{ size: number; sha256: string }> {
@@ -255,6 +255,7 @@ export async function generateRun(
         masterSeed: config.masterSeed, combinedSeed: seeds.combined,
         items: engineKeyMode === keyMode ? config.items : { ...config.items, keyPlacement: engineKeyMode }, enemies: config.enemies,
         generateSpoilerLog: config.output.generateSpoilerLog,
+        includeDlc: config.output.includeDlc,
         placementDiagnosticsLevel: process.env[placementDiagnosticsVariable] === 'detail' ? 'detail' : 'summary',
         fogTrackedItems,
         progressionModel,

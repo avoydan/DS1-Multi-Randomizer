@@ -1,3 +1,4 @@
+import { describeDlcExclusion, excludeDlcFromCatalog } from './dlcExclusion.js';
 import { access, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -439,7 +440,13 @@ export async function executeCombinedGeneration(
   // 6. Pure, synchronous generation. No I/O happens inside `generate()`.
   let result;
   try {
-    result = core.generate(config, { gameCatalog: catalog });
+    let engineCatalog = catalog;
+    if (request.includeDlc === false) {
+      const excluded = excludeDlcFromCatalog(catalog);
+      engineCatalog = excluded.catalog;
+      log('info', describeDlcExclusion(excluded.summary));
+    }
+    result = core.generate(config, { gameCatalog: engineCatalog });
   } catch (error) {
     // The engine refuses an algorithm that is not implemented. Another seed cannot fix that.
     const errorCode = typeof error === 'object' && error !== null ? (error as { code?: unknown }).code : undefined;

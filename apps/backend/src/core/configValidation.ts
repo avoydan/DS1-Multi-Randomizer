@@ -150,10 +150,9 @@ export function validateRandomizerConfig(input: unknown): asserts input is Rando
   if (config.items.randomizeProtectedItems) {
     problems.push('Protected-item randomization is blocked until progression safety is proven.');
   }
-  if (!config.output.includeDlc) {
-    // The engines have no DLC switch: nothing reads this flag, so accepting `false`
-    // would silently ignore it.
-    problems.push('Excluding DLC content is not supported yet; Include DLC must stay on.');
+  if (!config.output.includeDlc && config.fog.enabled) {
+    // FogMod has no DLC option: its graph always contains the DLC areas and warps (docs/DLC_AUDIT.md), so a world randomizer run cannot leave the DLC out.
+    problems.push('Excluding DLC content needs the fog randomizer to be off: the fog randomizer always includes the DLC areas.');
   }
   if (config.fog.randomStart && !config.fog.bossFogs && !config.fog.traversableFogs) {
     problems.push('A random start requires boss or traversable fog gates.');

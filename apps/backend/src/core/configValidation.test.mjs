@@ -154,10 +154,18 @@ test('requires the Batch 2 options and validates their values', () => {
   assert.doesNotThrow(() => validateRandomizerConfig(valid));
 });
 
-test('refuses to silently ignore Include DLC being turned off', () => {
+test('Include DLC may be turned off, except together with the fog randomizer, which always contains the DLC areas', () => {
   const config = validConfig();
   config.output.includeDlc = false;
-  assert.throws(() => validateRandomizerConfig(config), /Excluding DLC content is not supported yet/);
+  config.fog.enabled = false;
+  assert.doesNotThrow(() => validateRandomizerConfig(config));
+  config.fog.enabled = true;
+  assert.throws(() => validateRandomizerConfig(config), /Excluding DLC content needs the fog randomizer to be off/);
+  const on = validConfig();
+  on.output.includeDlc = true;
+  assert.doesNotThrow(() => validateRandomizerConfig(on));
+  on.output.includeDlc = 'no';
+  assert.throws(() => validateRandomizerConfig(on), /includeDlc/);
 });
 
 test('requires the second Gargoyle mode and validates its value', () => {

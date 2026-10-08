@@ -327,6 +327,23 @@ test('a neutral run never prepares world data or a model for key placement, and 
   assert.equal(requests[0].progressionModel ?? null, null);
 }));
 
+test('the DLC choice reaches the combined engine request: on and off, and the manifest settings say which', async () => fixture(async ({ game, pristine, workspace }) => {
+  for (const includeDlc of [true, false]) {
+    const stub = combinedStub();
+    const requests = [];
+    const input = config(game);
+    input.fog.enabled = false;
+    input.output.includeDlc = includeDlc;
+    const result = await generateRun({ config: input, workspacePath: path.join(workspace, String(includeDlc)) }, () => {}, {
+      getPristineSource: async () => ({ directory: pristine }),
+      getFogPrerequisites: async () => { throw new Error('unexpected'); },
+      combined: async (request, onEvent) => { requests.push(request); return stub(request, onEvent); },
+    });
+    assert.equal(result.ok, true, result.message);
+    assert.equal(requests[0].includeDlc, includeDlc);
+  }
+}));
+
 test('key placement needs the world data: when it cannot be prepared the run stops with a typed code and a plain message', async () => fixture(async ({ game, pristine, workspace }) => {
   let combined = 0;
   const missing = await generateRun({ config: keysConfig(game), workspacePath: workspace }, () => {}, {

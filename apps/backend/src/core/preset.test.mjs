@@ -110,10 +110,24 @@ test('a version-2 preset is migrated with the behavior-preserving Batch 2 values
   assert.match(importPreset(JSON.stringify(smuggled)).problems.join(' '), /not supported in version 2/);
 });
 
-test('a preset that turns Include DLC off is rejected', () => {
-  const preset = exportPreset(config());
-  preset.output.includeDlc = false;
-  assert.match(importPreset(JSON.stringify(preset)).problems.join(' '), /Excluding DLC content/);
+test('Include DLC off round-trips through a preset; with the fog randomizer it is refused; a preset without the switch means the DLC is included', () => {
+  const base = config();
+  base.fog.enabled = false;
+  base.output.includeDlc = false;
+  const preset = exportPreset(base);
+  assert.equal(preset.output.includeDlc, false);
+  const back = importPreset(JSON.stringify(preset));
+  assert.equal(back.ok, true);
+  assert.equal(back.preset.output.includeDlc, false);
+  assert.deepEqual(back.preset, preset);
+  const withFog = JSON.parse(JSON.stringify(preset));
+  withFog.fog.enabled = true;
+  assert.match(importPreset(JSON.stringify(withFog)).problems.join(' '), /Excluding DLC content needs the fog randomizer to be off/);
+  const old = JSON.parse(JSON.stringify(exportPreset(config())));
+  delete old.output.includeDlc;
+  const imported = importPreset(JSON.stringify(old));
+  assert.equal(imported.ok, true);
+  assert.equal(imported.preset.output.includeDlc, true);
 });
 
 test('presets of versions 1 to 3 migrate the second Gargoyle to the earlier single-boss behavior', () => {

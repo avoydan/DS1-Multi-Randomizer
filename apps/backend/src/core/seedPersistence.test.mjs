@@ -143,3 +143,32 @@ test('an entry can be deleted from the history and is then gone for good', async
   assert.equal(await history.get(a.id), null);
   assert.equal((await new RunHistory(root).list()).length, 1);
 }));
+
+test('a world without the DLC is remembered, listed apart from the same world with the DLC, and recreated exactly (Load seed, Regenerate files, Recreate)', async () => stateRoot(async (root) => {
+  const history = new RunHistory(root);
+  const withDlc = prepareRun({ ...fullConfig({ fog: { enabled: false } }), masterSeed: '55555' });
+  const body = fullConfig({ fog: { enabled: false } });
+  body.output.includeDlc = false;
+  const without = prepareRun({ ...body, masterSeed: '55555' });
+  assert.equal(without.ok, true);
+  assert.notEqual(without.seedCode, withDlc.seedCode);
+  const record = (run, folder) => ({ seedCode: run.seedCode, profile: run.profile.id, masterSeed: run.config.masterSeed, settings: run.envelope.settings,
+    packagePath: path.join(root, folder), manifestPath: path.join(root, folder, 'run-manifest.json'), spoilerPath: null });
+  const a = await history.addOrRefresh(record(withDlc, 'on'));
+  const b = await history.addOrRefresh(record(without, 'off'));
+  assert.notEqual(a.id, b.id, 'the same master seed with and without the DLC are two worlds');
+  const again = await history.addOrRefresh(record(without, 'off-2'));
+  assert.equal(again.id, b.id, 'Regenerate files refreshes the world without the DLC');
+  const [newest] = await new RunHistory(root).list();
+  assert.equal(newest.settings.output.includeDlc, false);
+  // The app sends only the stored Seed Code: the DLC choice is inside it.
+  const recreated = prepareRun({ gamePath: 'D:\Games\Mine', seedCode: newest.seedCode });
+  assert.equal(recreated.ok, true);
+  assert.equal(recreated.config.output.includeDlc, false);
+  assert.equal(recreated.seedCode, without.seedCode);
+  // The persisted UI settings keep the choice between sessions.
+  const settings = fullSettings({ fog: { enabled: false } });
+  settings.output.includeDlc = false;
+  await savePersistedSettings(root, { settings, generateSpoilerLog: false });
+  assert.equal((await loadPersistedSettings(root)).persisted.settings.output.includeDlc, false);
+}));

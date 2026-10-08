@@ -14,6 +14,8 @@ export interface CombinedRandomizerRequest {
   enemies: EnemyOptions;
   /** Whether upstream writes `spoiler.txt` into the generated package. */
   generateSpoilerLog: boolean;
+  /** False leaves the DLC out of the data the engine reads (docs/DLC_AUDIT.md); absent or true is the world as it has always been generated. */
+  includeDlc?: boolean;
   /** `detail` adds one record per slot to the sampling-v1 diagnostics (debugging); default `summary`. */
   placementDiagnosticsLevel?: 'summary' | 'detail';
   /** Set when the world randomizer runs: items it follows may only be placed in lots it can follow (see fogItemRules.ts). */

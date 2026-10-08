@@ -169,7 +169,7 @@ export function searchHints(entries: readonly HintEntry[], query: string): HintE
 // --- the world in a few lines -------------------------------------------------------------------------------------------------------------------------------
 
 export interface WorldSummaryLine {
-  id: 'items' | 'enemies' | 'bosses' | 'fog' | 'keyPlacement' | 'itemDifficulty' | 'soulItems' | 'laundromat' | 'enemyAlgorithm' | 'gameLanguage';
+  id: 'items' | 'enemies' | 'bosses' | 'fog' | 'keyPlacement' | 'itemDifficulty' | 'soulItems' | 'laundromat' | 'enemyAlgorithm' | 'gameLanguage' | 'dlc';
   /** A switch, or the id of an option (translated through `optionPath`). */
   value: boolean | string;
   /** The settings resource whose `options.<value>` names the value (`items.keyPlacement`), for enumerated settings. */
@@ -192,6 +192,8 @@ export function summarizeWorld(settings: GenerationSettings): WorldSummaryLine[]
   }
   if (settings.enemies.enabled) lines.push({ id: 'enemyAlgorithm', value: settings.enemies.placement.algorithm, optionPath: 'enemies.algorithm' });
   if (settings.fog.enabled) lines.push({ id: 'gameLanguage', value: settings.fog.language, optionPath: 'fog.gameLanguage' });
+  // Only a world without the DLC says so: the DLC being included is what every world has always been.
+  if (settings.output.includeDlc === false) lines.push({ id: 'dlc', value: false });
   return lines;
 }
 

@@ -47,7 +47,10 @@ export function canonicalizeSettings(input: unknown): GenerationSettings {
     for (const { key, neutral } of CANONICAL_ITEM_EXTENSION_KEYS) if (!Object.hasOwn(itemsSource, key)) itemsSource[key] = neutral;
     return pick(itemsSource, itemKeys, 'settings.items');
   };
-  const top = pick(source, ['items', 'enemies', 'fog', 'output'], 'settings', {
+  // The DLC switch came after format 1: a code, preset or settings file without it was made with the DLC included.
+  const outputSource = { ...object(source.output, 'settings.output') };
+  if (!Object.hasOwn(outputSource, 'includeDlc')) outputSource.includeDlc = true;
+  const top = pick({ ...source, output: outputSource }, ['items', 'enemies', 'fog', 'output'], 'settings', {
     items: canonicalItems,
     enemies: () => enemies,
     fog: (value) => pick(object(value, 'settings.fog'), CANONICAL_FOG_KEYS, 'settings.fog'),

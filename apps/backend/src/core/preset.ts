@@ -179,6 +179,10 @@ export function importPreset(text: string): PresetImportResult {
     }
     if (problems.length > 0) return { ok: false, problems };
   }
+  // A preset without the DLC switch was made with the DLC included.
+  if (settings.output && typeof settings.output === 'object' && !Array.isArray(settings.output) && !Object.hasOwn(settings.output, 'includeDlc')) {
+    settings.output = { includeDlc: true, ...(settings.output as Record<string, unknown>) };
+  }
   const candidate = { gamePath: '', ...settings };
   try {
     validateRandomizerConfig(candidate);

@@ -336,3 +336,34 @@ test('key placement keys are extension keys: neutral values never enter a Seed C
   assert.doesNotMatch(serializeEnvelope(envelopeOf(keyed)), /randomizeLordSouls/u, 'a neutral companion option stays out');
   assert.deepEqual(decodeSeedCode(code).envelope.settings, canonicalizeSettings(keyed));
 });
+
+test('the DLC switch is part of the world: ON keeps every earlier code, OFF is a different code that round-trips, a code without it means ON', () => {
+  const on = broad();
+  on.fog.enabled = false;
+  const off = JSON.parse(JSON.stringify(on));
+  off.output.includeDlc = false;
+  assert.match(serializeEnvelope(envelopeOf(on)), /"output":\{"includeDlc":true\}/u, 'ON is stated exactly as every earlier code states it');
+  const onCode = encodeSeedCode(envelopeOf(on));
+  const offCode = encodeSeedCode(envelopeOf(off));
+  assert.notEqual(onCode, offCode);
+  const decoded = decodeSeedCode(offCode);
+  assert.equal(decoded.ok, true);
+  assert.equal(decoded.envelope.settings.output.includeDlc, false);
+  assert.equal(decoded.seedCode, offCode);
+  assert.equal(decodeSeedCode(onCode).envelope.settings.output.includeDlc, true);
+  // A settings document that predates the switch is complete again with the DLC included, and keeps the code of the DLC-included world.
+  const legacy = JSON.parse(JSON.stringify(on));
+  legacy.output = {};
+  assert.equal(encodeSeedCode(envelopeOf(legacy)), onCode);
+  assert.equal(canonicalizeSettings(legacy).output.includeDlc, true);
+  // The DLC cannot be left out while the world randomizer runs.
+  const withFog = JSON.parse(JSON.stringify(off));
+  withFog.fog.enabled = true;
+  const refused = decodeSeedCode(encodeSeedCode(envelopeOf(withFog)));
+  assert.equal(refused.ok, false);
+  assert.equal(refused.code, 'INVALID_SETTINGS');
+  assert.match(refused.technical, /fog randomizer to be off/u);
+  // Turning it off after loading a seed ends the seed's identity.
+  assert.equal(isLoadedSeedModified(decoded.envelope.settings, canonicalizeSettings(off)), false);
+  assert.equal(isLoadedSeedModified(decoded.envelope.settings, canonicalizeSettings(on)), true);
+});

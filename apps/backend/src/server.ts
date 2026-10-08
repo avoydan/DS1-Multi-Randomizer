@@ -62,7 +62,7 @@ async function findSpoiler(workspacePath: string, packagePath: string): Promise<
   return null;
 }
 
-const APP_VERSION = '0.44.2';
+const APP_VERSION = '0.45.0';
 const runDependencies = { ...generationDependencies, appVersion: APP_VERSION };
 const supportDependencies: SupportDependencies = {
   stateRoot: defaultStateRoot(), runRoot, userDataDir: process.env.DS1TR_USER_DATA ?? null, appLogPath: process.env.DS1TR_APP_LOG ?? null,
