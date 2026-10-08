@@ -432,6 +432,15 @@
       "afterwards": {
         "0": "The exact armor of every NPC row is listed by the static check (SmokeVerify laundromat); what is judged here is only how it looks in the game."
       }
+    },
+    "dlc-off": {
+      "title": "DLC content left out - items, enemies and bosses",
+      "purpose": "Items, enemies and bosses of the base game randomized with the DLC content left out (no fog randomizer: it always includes the DLC areas). The DLC itself stays in the game exactly as it is.",
+      "observe": {
+        "0": "Play the first areas as usual: items, enemies and bosses are randomized and nothing from the Artorias of the Abyss DLC (its enemies, bosses or items) turns up in the base game.",
+        "1": "If you own the DLC, go there when you can: the DLC area, its enemies, bosses and items are exactly as in the normal game (they are not randomized and nothing was removed).",
+        "2": "The hint sheet and the spoiler log name no DLC item or enemy."
+      }
     }
   },
   "checklist": {

@@ -39,7 +39,8 @@
     "soulItems": "Soul items",
     "laundromat": "Laundromat Mixup",
     "enemyAlgorithm": "Enemy placement algorithm",
-    "gameLanguage": "In-game text language"
+    "gameLanguage": "In-game text language",
+    "dlc": "DLC content"
   },
   "on": "on",
   "off": "off",

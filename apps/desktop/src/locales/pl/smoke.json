@@ -462,6 +462,15 @@
       "afterwards": {
         "0": "Dokładna zbroja każdego wiersza NPC jest wymieniona przez kontrolę statyczną (SmokeVerify laundromat); tutaj ocenia się tylko to, jak to wygląda w grze."
       }
+    },
+    "dlc-off": {
+      "title": "Zawartość DLC pominięta - przedmioty, przeciwnicy i bossowie",
+      "purpose": "Przedmioty, przeciwnicy i bossowie z podstawowej gry wylosowani bez zawartości DLC (bez randomizera mgieł, który zawsze obejmuje obszary DLC). Samo DLC zostaje w grze dokładnie takie, jakie jest.",
+      "observe": {
+        "0": "Zagraj w pierwsze obszary jak zwykle: przedmioty, przeciwnicy i bossowie są wylosowani, a nic z DLC Artorias of the Abyss (jego przeciwnicy, bossowie ani przedmioty) nie pojawia się w podstawowej grze.",
+        "1": "Jeśli masz DLC, odwiedź je, gdy będziesz mógł: obszar DLC, jego przeciwnicy, bossowie i przedmioty są dokładnie takie jak w zwykłej grze (nie są losowane i nic nie zostało usunięte).",
+        "2": "Arkusz podpowiedzi i log spoilerów nie wymieniają żadnego przedmiotu ani przeciwnika z DLC."
+      }
     }
   },
   "checklist": {

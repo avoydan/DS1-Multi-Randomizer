@@ -827,6 +827,19 @@ export const SMOKE_SCENARIOS: readonly SmokeScenario[] = [
     ],
     afterwards: ['The exact armor of every NPC row is listed by the static check (SmokeVerify laundromat); what is judged here is only how it looks in the game.'],
   },
+  {
+    id: 'dlc-off', category: 'extended', title: 'DLC content left out - items, enemies and bosses', masterSeed: 'smoke-r-dlc-off-1',
+    purpose: 'Items, enemies and bosses of the base game randomized with the DLC content left out (no fog randomizer: it always includes the DLC areas). The DLC itself stays in the game exactly as it is.',
+    settings: {
+      fog: { enabled: false }, output: { includeDlc: false },
+      enemies: { gwynNerf: 'none', placement: { algorithm: 'sampling-v1', fit: 'fits', difficultyMode: 'random-easy-asylum', replacementChance: 100, normalReplacement: 'normals' } },
+    },
+    observe: [
+      'Play the first areas as usual: items, enemies and bosses are randomized and nothing from the Artorias of the Abyss DLC (its enemies, bosses or items) turns up in the base game.',
+      'If you own the DLC, go there when you can: the DLC area, its enemies, bosses and items are exactly as in the normal game (they are not randomized and nothing was removed).',
+      'The hint sheet and the spoiler log name no DLC item or enemy.',
+    ],
+  },
 ];
 
 /** SMOKE_TEST_BASE_SETTINGS with the scenario's changes applied (objects merge, everything else replaces). */

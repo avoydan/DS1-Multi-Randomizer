@@ -18,8 +18,12 @@
   },
   "options": {
     "includeDlc": {
-      "label": "Uwzględnij DLC",
-      "hint": "Wyłączenie DLC nie jest zaimplementowane; DLC jest zawsze uwzględniane."
+      "label": "Zawartość DLC",
+      "hint": "Uwzględniaj obszary, przeciwników, bossów i przedmioty z DLC w losowaniu. Wyłącz, aby zawartość Artorias of the Abyss nie brała udziału w losowaniu.",
+      "fogHint": "Randomizer mgieł zawsze obejmuje obszary DLC, więc ta opcja zostaje włączona, dopóki działa.",
+      "onNote": "Zawartość DLC jest uwzględniona w losowaniu.",
+      "offNote": "Obszary, przeciwnicy, bossowie i przedmioty z DLC nie biorą udziału w losowaniu. Samo DLC zostaje w grze bez zmian; po prostu nie jest losowane.",
+      "fogNote": "Zawartość DLC jest uwzględniona: randomizer mgieł zawsze obejmuje obszary DLC."
     },
     "spoilerLog": "Generuj log spoilerów"
   },

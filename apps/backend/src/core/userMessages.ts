@@ -34,6 +34,21 @@ const exact: Record<string, string> = {
   COMBINED_RETRIES_EXHAUSTED: 'No working combination was found for this seed. Try another seed.',
   GENERATION_PROFILE_MISMATCH: 'This copy of the app cannot reproduce that world exactly, so nothing was generated. Update or reinstall DS1 Triple Randomizer.',
   MANIFEST_WRITE_FAILED: 'Your randomized files could not be saved. Check that the disk has free space and try again.',
+  DATA_TOOL_MISSING: 'The game data tool of the app could not be started. Reinstall DS1 Triple Randomizer; the details are under Advanced.',
+  DATA_TOOL_FAILED: 'The game data could not be read. Verify the game files in Steam and try again; the details are under Advanced.',
+  CATALOG_UNAVAILABLE: 'The game data could not be prepared. Click Randomize again; if it keeps failing, restart the app.',
+  CATALOG_UNREADABLE: 'The game data could not be read. Click Randomize again; if it keeps failing, restart the app.',
+  CATALOG_STALE: 'The prepared game data is out of date. Restart the app and try again.',
+  CATALOG_SOURCE_MISMATCH: 'The prepared game data does not belong to this installation. Restart the app and try again; if the game was updated, verify its files in Steam.',
+  OUTPUT_WRITE_FAILED: 'Your randomized files could not be saved. Check that the disk has free space and try again.',
+  NO_RANDOMIZATION_FEATURES_ENABLED: 'Nothing is switched on to randomize. Turn on items, enemies or bosses, or the fog randomizer.',
+  WORKSPACE_INSIDE_GAME_DIRECTORY: 'The app could not find a safe place to work. Restart the app and try again.',
+  INVALID_CONFIG: 'These settings cannot be used. Change them and try again.',
+  FOG_HOST_MISSING: 'The fog randomizer component is missing. Reinstall DS1 Triple Randomizer, or switch off the fog randomizer.',
+  FOG_HOST_CRASHED: 'The fog randomizer stopped unexpectedly. Your game was not changed. Try again; if it keeps happening, switch off the fog randomizer.',
+  FOG_HOST_TIMEOUT: 'The fog randomizer took too long and was stopped. Your game was not changed. Try again, or try another seed.',
+  FOG_MERGE_CONFLICT: 'The fog randomizer and the other randomization could not be combined for this seed. Your game was not changed. Try another seed.',
+  FOG_DATA_MISSING: 'The fog randomizer data is not ready yet. Wait until it has been prepared, or click Retry.',
 };
 
 /** Codes whose message was already written for people (they may still carry a technical `CODE:` prefix to strip). */

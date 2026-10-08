@@ -1199,3 +1199,14 @@ Date: 2026-10-07. Full description: `docs/RACE_MODE.md`, `docs/ITEM_DIFFICULTY_M
 6. **Exports are made in the interface, saved by the main process.** Single source for labels (the interface resources); the renderer cannot choose a path or a file type outside a short list. HTML carries a CSP that allows nothing but inline style and escapes every dynamic value.
 7. **Support bundle by allowlist + redaction + leak scan.** Named entries only; refuse rather than send when a known identifier survives; deflated ZIP written in-house (no archive dependency); size caps documented. Correlation ids are diagnostics-only.
 8. **Installer languages** limited to English and Polish (`nsis.installerLanguages`), chosen by the Windows display language; no language dialog.
+
+## DLC content switch (backend 0.45.0, contracts 0.31.0, desktop 0.33.0)
+
+Date: 2026-10-08. Full audit: `docs/DLC_AUDIT.md`.
+
+1. **"DLC off" means "DS1TR neither uses nor writes DLC content"; it never removes or edits the DLC in the game.** The DLC is one map (`m12_01_00_00`). With the switch off its enemies, bosses, pickups, boss rewards, DLC-only enemy drops and DLC-exclusive starting equipment are not candidates, sources or destinations; their game files and param rows stay byte-identical to the clean game (SmokeVerify `dlc-untouched`).
+2. **Done by filtering the catalog, not by changing the engine.** `excludeDlcFromCatalog` (`apps/backend/src/adapters/dlcExclusion.ts`) removes the DLC records from the data the combined engine reads, once, before `generate`. The vendored engine is unchanged; with the switch on the function is not called, so every earlier world is generated exactly as before (all 47 golden fixtures byte-identical).
+3. **One new scan field.** `dlcOnly` on enemy drop lots (fork patch 0025): every enemy awarding the lot stands in the DLC map and no other enemy or event awards it. Omitted otherwise, so no other record changes.
+4. **Fog randomizer + DLC off is refused, not emulated.** FogMod has no DLC option and its graph always contains the DLC areas and warps. Validation refuses the combination (`Excluding DLC content needs the fog randomizer to be off`), the interface locks the switch on while the fog randomizer is on and turning the fog randomizer on puts the DLC back. Revisiting this needs a FogMod change, not a flag.
+5. **No new generation profile.** `output.includeDlc` was already part of the canonical settings (always `true` until now), so every earlier Seed Code, preset and history entry means DLC on and keeps its exact text; a document that lacks the field is read as DLC on. Turning the switch off is a different world and a different Seed Code.
+6. **Hints and diagnostics follow the plan.** A DLC-off plan names no DLC content, so no hint does; the world summary (hint sheet, diagnostics) states "DLC content: off" only for such a world, and the world summary chips show a DLC chip only then.

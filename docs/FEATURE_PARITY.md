@@ -170,7 +170,7 @@ traversable fog gates; DS1TR enforces the same rule in `configValidation.ts`.
 | Regular enemies | `enemies.randomizeRegularEnemies` | FULL |
 | Bosses | `enemies.randomizeBosses` | FULL |
 | Enemy scaling (vanilla / area / progressive) | `enemies.scaling` | FULL |
-| Include DLC | `output.includeDlc` | **UI_ONLY**: nothing reads it. Found in Batch 2 and made honest: the backend rejects `false`, and the control is a disabled planned extension that always includes the DLC. |
+| DLC content (Include DLC) | `output.includeDlc` | **YES (0.45.0)**: on by default (every earlier world); off leaves the DLC map, its enemies, bosses, pickups and rewards out of the randomization without touching the game files (`docs/DLC_AUDIT.md`). Not available with the fog randomizer (FogMod always includes the DLC areas): the switch is locked on there. |
 | Spoiler log | `output.generateSpoilerLog` | FULL |
 
 Note: `output.includeDlc` is carried in the contract. Whether the combined engine honors

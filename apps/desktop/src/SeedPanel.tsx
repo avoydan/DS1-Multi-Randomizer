@@ -11,7 +11,7 @@ export const SummaryChips = ({ settings }: { settings: GenerationSettings }) => 
   const { t } = useTranslation();
   const summary = summarize(settings);
   const chip = (label: string, on: boolean) => <span key={label} className={`summary-chip ${on ? 'on' : 'off'}`}>{label}</span>;
-  return <div className="summary-row">{chip(t('common.chips.items'), summary.items)}{chip(t('common.chips.enemies'), summary.enemies)}{chip(t('common.chips.bosses'), summary.bosses)}{chip(t('common.chips.fog'), summary.fog)}</div>;
+  return <div className="summary-row">{chip(t('common.chips.items'), summary.items)}{chip(t('common.chips.enemies'), summary.enemies)}{chip(t('common.chips.bosses'), summary.bosses)}{chip(t('common.chips.fog'), summary.fog)}{!summary.dlc && chip(t('common.chips.dlc'), false)}</div>;
 };
 
 /** `DS1TR1-06NJDCP6-...-2G`: the start and the end are enough to recognize a code in a list. */

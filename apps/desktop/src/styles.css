@@ -52,7 +52,7 @@ input:focus, select:focus { border-color: #8e7043; box-shadow: 0 0 0 3px #8e7043
 .toggle-row small, .planned-option small { display: block; margin-top: 3px; color: #aa7f47; font-size: 11px; font-weight: 750; letter-spacing: .4px; text-transform: uppercase; }
 .option-group { margin: 17px 0 24px; }
 .option-group h3 { margin: 0 0 7px; color: #d9a95f; font-size: 12px; letter-spacing: 1px; text-transform: uppercase; }
-.option-group h3 span { margin-left: 5px; padding: 3px 6px; border-radius: 99px; background: #352b1f; color: #d7a55e; font-size: 8px; }
+.option-group h3 span { margin-left: 5px; padding: 3px 6px; border-radius: 99px; background: #352b1f; color: #d7a55e; font-size: 11px; }
 .planned-group { padding: 13px; border: 1px dashed #5d4930; border-radius: 10px; background: #1a1712; }
 .planned-group select:disabled, .planned-group input:disabled { opacity: .72; }
 .inline-options { display: grid; grid-template-columns: repeat(2, minmax(0, 260px)); gap: 18px; margin-top: 13px; }

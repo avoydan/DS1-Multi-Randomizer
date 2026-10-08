@@ -18,8 +18,12 @@
   },
   "options": {
     "includeDlc": {
-      "label": "Include DLC",
-      "hint": "Excluding the DLC is not implemented; the DLC is always included."
+      "label": "DLC content",
+      "hint": "Include DLC areas, enemies, bosses and items in randomization. Turn it off to keep the Artorias of the Abyss content out of the randomization.",
+      "fogHint": "The fog randomizer always includes the DLC areas, so this stays on while it is on.",
+      "onNote": "DLC content is included in the randomization.",
+      "offNote": "DLC areas, enemies, bosses and items are left out of the randomization. The DLC itself stays in your game exactly as it is; it is only not randomized.",
+      "fogNote": "DLC content is included: the fog randomizer always contains the DLC areas."
     },
     "spoilerLog": "Generate spoiler log"
   },

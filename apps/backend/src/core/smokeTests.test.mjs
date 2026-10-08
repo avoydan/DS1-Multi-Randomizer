@@ -12,7 +12,7 @@ import { canonicalizeSettings } from '../../dist/core/canonicalSettings.js';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.join(here, '..', '..', '..', '..');
 
-test('the smoke-test worlds are seventeen quick smoke tests and twenty-three extended gameplay tests with unique ids and seeds', () => {
+test('the smoke-test worlds are seventeen quick smoke tests and twenty-four extended gameplay tests with unique ids and seeds', () => {
   const quick = SMOKE_SCENARIOS.filter((scenario) => scenario.category === 'quick').map((scenario) => scenario.id);
   const extended = SMOKE_SCENARIOS.filter((scenario) => scenario.category === 'extended').map((scenario) => scenario.id);
   assert.deepEqual(quick, ['quick-roaming-basic', 'quick-roaming-souls', 'quick-encounter-body', 'quick-roaming-respawn', 'quick-roaming-repeated', 'quick-sampling-asylum', 'quick-hostile-npc', 'quick-transposed-soul', 'quick-key-placement', 'quick-lordvessel', 'quick-lord-soul', 'quick-race', 'quick-race-plus', 'quick-fair', 'quick-unfair', 'quick-very-unfair', 'quick-boss-asylum-demon']);
@@ -20,7 +20,7 @@ test('the smoke-test worlds are seventeen quick smoke tests and twenty-three ext
     'classic-triple', 'sampling-regular', 'second-gargoyle', 'parish-models', 'boss-sampling', 'boss-repeat', 'boss-unique', 'boss-partial',
     'roaming-repeat', 'roaming-gargoyle', 'roaming-fog', 'roaming-parish',
     'body-burg-fights', 'body-fog', 'body-roaming', 'body-both', 'body-gargoyle',
-    'npc-world', 'npc-fog', 'npc-roaming', 'npc-type', 'npc-bosses', 'laundromat-npcs',
+    'npc-world', 'npc-fog', 'npc-roaming', 'npc-type', 'npc-bosses', 'laundromat-npcs', 'dlc-off',
   ]);
   assert.deepEqual(SMOKE_SCENARIOS.map((scenario) => scenario.category), [...quick.map(() => 'quick'), ...extended.map(() => 'extended')], 'quick tests come first');
   // The three item difficulty worlds share ONE master seed on purpose (one sample of the same pickup under each mode); the worlds are told apart by their settings.
@@ -28,7 +28,7 @@ test('the smoke-test worlds are seventeen quick smoke tests and twenty-three ext
   assert.equal(new Set(SMOKE_SCENARIOS.map((scenario) => scenario.id)).size, SMOKE_SCENARIOS.length);
   for (const scenario of SMOKE_SCENARIOS) {
     assert.ok(scenario.observe.length > 0, `${scenario.id} says what to look at`);
-    assert.match(scenario.masterSeed, /^smoke-(q([1-9]|1[0-5])|[a-p])-[a-z-]+(-\d+)?$/u);
+    assert.match(scenario.masterSeed, /^smoke-(q([1-9]|1[0-5])|[a-r])-[a-z-]+(-\d+)?$/u);
   }
   assert.ok(SMOKE_TEST_CHECKLIST.length >= 10);
 });

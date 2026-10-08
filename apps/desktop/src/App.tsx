@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import { ErrorNotice, type ErrorInfo } from './ErrorNotice';
+import { ErrorNotice, useProblemText, type ErrorInfo } from './ErrorNotice';
 import { LanguageSelect } from './LanguageSelect';
 import { behaviorLabel, behaviorValue } from './planText';
 import { HintSheetPanel } from './HintSheetPanel';
@@ -96,6 +96,7 @@ type LaunchKey = 'steam' | 'executable' | 'failed' | 'noBridge';
 
 export function App() {
   const { t, i18n } = useTranslation();
+  const problemText = useProblemText();
   const [config, setConfig] = useState(initialConfig);
   const [backendOnline, setBackendOnline] = useState<boolean | null>(null);
   const [startupError, setStartupError] = useState<string | null>(null);
@@ -237,8 +238,12 @@ export function App() {
       if (mode !== 'bosses' && mode !== 'both') placement.uniqueBosses = false;
       return { ...current, enemies: { ...current.enemies, placement } };
     });
+  // The fog randomizer always contains the DLC areas, so turning it on puts the DLC back in (docs/DLC_AUDIT.md); the DLC switch is locked while it is on.
   const setFog = <K extends keyof RandomizerConfig['fog']>(key: K, value: RandomizerConfig['fog'][K]) =>
-    setConfig((current) => ({ ...current, fog: { ...current.fog, [key]: value } }));
+    setConfig((current) => ({
+      ...current, fog: { ...current.fog, [key]: value },
+      output: key === 'enabled' && value === true ? { ...current.output, includeDlc: true } : current.output,
+    }));
 
   const importPristine = async () => {
     setBusy(true);
@@ -486,13 +491,18 @@ export function App() {
             onState={setGameState}
           />
           <div className="inline-options">
-            <Toggle disabled label={t('app.options.includeDlc.label')} checked hint={t('app.options.includeDlc.hint')} onChange={() => undefined} />
+            <Toggle
+              label={t('app.options.includeDlc.label')} checked={config.output.includeDlc || config.fog.enabled} inactive={config.fog.enabled}
+              hint={config.fog.enabled ? t('app.options.includeDlc.fogHint') : t('app.options.includeDlc.hint')}
+              onChange={(value) => setConfig((current) => ({ ...current, output: { ...current.output, includeDlc: value } }))}
+            />
             <Toggle label={t('app.options.spoilerLog')} checked={config.output.generateSpoilerLog} onChange={(value) => setConfig({ ...config, output: { ...config.output, generateSpoilerLog: value } })} />
           </div>
+          <p className="engine-note dlc-note">{config.fog.enabled ? t('app.options.includeDlc.fogNote') : config.output.includeDlc ? t('app.options.includeDlc.onNote') : t('app.options.includeDlc.offNote')}</p>
           <details className="log-panel"><summary>{t('app.preset.summary')}</summary>
             <textarea className="run-logs" aria-label={t('app.preset.aria')} rows={8} value={presetText} onChange={(event) => setPresetText(event.target.value)} placeholder={t('app.preset.placeholder')} />
             <div className="run-actions"><button className="secondary" onClick={exportPreset}>{t('app.preset.export')}</button><button className="secondary" onClick={importPreset} disabled={!presetText.trim()}>{t('app.preset.apply')}</button><button className="secondary" onClick={resetSettings}>{t('app.preset.reset')}</button></div>
-            {presetProblems.length > 0 && <div className="notice error" role="alert">{t('app.preset.problemsLead')}<ul>{presetProblems.map((problem) => <li key={problem}>{problem}</li>)}</ul></div>}
+            {presetProblems.length > 0 && <div className="notice error" role="alert">{t('app.preset.problemsLead')}<ul>{presetProblems.map((problem) => <li key={problem} title={problem}>{problemText(problem)}</li>)}</ul></div>}
           </details>
         </section>
 

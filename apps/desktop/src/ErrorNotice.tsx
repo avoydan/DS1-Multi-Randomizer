@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { problemKey } from '@ds1tr/contracts';
 
 /**
  * What went wrong, as data: the backend sends a stable `code` (plus an English `detail` for the technical section); the renderer picks
@@ -29,6 +30,15 @@ export function useErrorText(): (error: ErrorInfo) => string {
     if (key) return t(key as never) as string;
     if (error.kind === 'unexpected') return t('errors.unexpected');
     return error.code?.startsWith('FOG_') || error.code?.startsWith('WORLD_DATA_') ? t('errors.genericWorld') : t('errors.generic');
+  };
+}
+
+/** A sentence of a backend validator in the current language when it is a known one, else exactly as the validator wrote it. */
+export function useProblemText(): (problem: string) => string {
+  const { t } = useTranslation();
+  return (problem) => {
+    const found = problemKey(problem);
+    return found ? String(t(`errors.problems.${found.key}` as never, (found.params ?? {}) as never)) : problem;
   };
 }
 

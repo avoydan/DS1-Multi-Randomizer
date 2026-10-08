@@ -1381,6 +1381,24 @@ DS1TR1-06NJDCP6-577CVKTE-TMPX1KA9-5K6MPAEA-SX6JSM9N-3JPQP1KH-VM1WN05G-N216CC7C-P
 - Nothing breaks: the armor shows on the NPC model, the NPC talks, trades and fights as always (a hostile NPC fights in its new armor).
 - Hollowed NPCs (the undead versions) keep their normal look.
 
+### DLC content left out - items, enemies and bosses
+
+**Extended gameplay test** - ID `dlc-off`
+
+Items, enemies and bosses of the base game randomized with the DLC content left out (no fog randomizer: it always includes the DLC areas). The DLC itself stays in the game exactly as it is.
+
+**Gameplay result:** not played in the real game yet; only the static check exists.
+
+```
+DS1TR1-06NJDCP6-577CVKTE-TMPX4KE9-97BCTKTB-TCTHSBBR-8RNHWEJQ-7KGFRKTY-PP1NR02G-AVKR0JRF-KKTGTJQS-83XVM1RT-8THSA3S5-JM7NGJVD-DMPG0EQC-CBRG
+```
+
+**In this world**
+
+- Play the first areas as usual: items, enemies and bosses are randomized and nothing from the Artorias of the Abyss DLC (its enemies, bosses or items) turns up in the base game.
+- If you own the DLC, go there when you can: the DLC area, its enemies, bosses and items are exactly as in the normal game (they are not randomized and nothing was removed).
+- The hint sheet and the spoiler log name no DLC item or enemy.
+
 ## Test worlds in Polish
 
 The test-world panel is available in English and Polish. The scenario texts of the contracts remain the English source; `apps/backend/scripts/smokeLocaleSync.mjs` writes the English resource from them and a test keeps it in step; Polish is written per scenario id (`smokeLocale.test.mjs`). The target and expectation of a quick world are built from the structured expectations and the `smoke.template.*` sentences of the interface language (asserted equal to the contracts' English sentences); decimals follow the language (`8,7 m`). Nothing about the worlds, their Seed Codes or their static checks changed.
