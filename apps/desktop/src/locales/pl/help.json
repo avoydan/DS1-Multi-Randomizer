@@ -316,7 +316,7 @@
       },
       "roamingDead": {
         "short": "Pokonany wędrujący boss już nie wraca.",
-        "what": "Włączone: boss w miejscu zwykłego wroga nie wraca po odpoczynku lub zresetowaniu obszaru (sprawdzone w grze: pozostał martwy). Wyłączone: wraca jak zwykły wróg.",
+        "what": "Włączone: boss w miejscu zwykłego wroga nie wraca po odpoczynku lub zresetowaniu obszaru (sprawdzone w grze: pozostał martwy). Wyłączone: wraca jak zwykły wróg (zapisane w danych gry; jeszcze niepotwierdzone w rozgrywce).",
         "affects": "Czy wędrujący bossowie się odradzają.",
         "limits": "Wymaga ustawienia „Zwykłych wrogów zastępuj” na „Tylko bossami” lub „Bossami lub zwykłymi wrogami”."
       },

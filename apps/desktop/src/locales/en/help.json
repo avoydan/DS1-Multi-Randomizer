@@ -316,7 +316,7 @@
       },
       "roamingDead": {
         "short": "A roaming boss does not come back once defeated.",
-        "what": "On: a boss in a regular spot does not come back after you rest or the area resets (played in the game: it stayed dead). Off: it comes back like a regular enemy.",
+        "what": "On: a boss in a regular spot does not come back after you rest or the area resets (played in the game: it stayed dead). Off: it comes back like a regular enemy (written to the game's data; not yet confirmed in a playthrough).",
         "affects": "Whether roaming bosses respawn.",
         "limits": "Needs \"Replace regular enemies with\" set to \"Only bosses\" or \"Bosses or regular enemies\"."
       },
@@ -425,7 +425,7 @@
       },
       "disconnected": {
         "short": "Going through a gate and back does not return you to where you were.",
-        "what": "Normally the two sides of a fog gate are paired, so going back leads to the place you came from. Off that, the two sides are randomized independently, so a gate you came through may lead somewhere else when you turn around.",
+        "what": "Normally the two sides of a fog gate are paired, so going back leads to the place you came from. With this option the two sides are randomized independently, so a gate you came through may lead somewhere else when you turn around.",
         "affects": "How fog gates connect.",
         "limits": "Needs Transition and fog randomization turned on."
       },

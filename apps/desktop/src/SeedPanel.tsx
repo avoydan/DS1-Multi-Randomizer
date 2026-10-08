@@ -24,7 +24,8 @@ interface Props {
   busy: boolean;
   /** Called with a valid, decoded code: the app takes over its settings and generates that exact world. */
   onLoaded: (seed: LoadedSeed) => void;
-  onClose: () => void;
+  /** Only given where the panel can be dismissed; the Seed Code view has nothing to close, so it shows no Cancel button. */
+  onClose?: () => void;
 }
 
 /** "Load seed": paste a Seed Code. A valid code is loaded and its world is created right away; there is no second step. */
@@ -56,7 +57,7 @@ export function SeedPanel({ busy, onLoaded, onClose }: Props) {
       {error && <ErrorNotice error={error} />}
       <div className="run-actions">
         <button className="primary" disabled={busy || checking || !text.trim()} onClick={() => void load()}>{t('seed.load')}</button>
-        <button className="secondary" onClick={onClose}>{t('common.cancel')}</button>
+        {onClose && <button className="secondary" onClick={onClose}>{t('common.cancel')}</button>}
       </div>
     </div>
   );

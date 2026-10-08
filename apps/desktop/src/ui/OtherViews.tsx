@@ -76,7 +76,7 @@ export function SeedCodeView({ current, busy, onLoaded, onCopy, copied }: {
       <section className="card">
         <h2>{t('app.views.seed.loadTitle')}</h2>
         <p>{t('app.views.seed.loadExplain')}</p>
-        <SeedPanel busy={busy} onLoaded={onLoaded} onClose={() => undefined} />
+        <SeedPanel busy={busy} onLoaded={onLoaded} />
       </section>
       <section className="card">
         <h2>{t('app.views.seed.whatTitle')}</h2>

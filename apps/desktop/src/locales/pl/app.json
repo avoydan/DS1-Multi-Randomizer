@@ -102,7 +102,7 @@
     "unreadable": "Nie udało się odczytać logu spoilerów."
   },
   "advanced": {
-    "title": "Zaawansowane",
+    "title": "Narzędzia",
     "preview": "Podgląd planu losowania",
     "checkAgain": "Sprawdź pliki gry ponownie",
     "internalSeed": "Wewnętrzny master seed: {{seed}} - profil generowania: {{profile}}",

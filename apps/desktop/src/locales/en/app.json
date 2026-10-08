@@ -102,7 +102,7 @@
     "unreadable": "The spoiler log could not be read."
   },
   "advanced": {
-    "title": "Advanced",
+    "title": "Tools",
     "preview": "Preview randomization plan",
     "checkAgain": "Check game files again",
     "internalSeed": "Internal master seed: {{seed}} - generation profile: {{profile}}",

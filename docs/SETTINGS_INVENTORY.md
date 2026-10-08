@@ -554,7 +554,7 @@ The view (Basic or Advanced), the language and the help are interface state: the
 
 ### Roaming bosses stay dead (`enemies.roamingDead`)
 
-* **Mechanic:** On: a boss in a regular spot does not come back after you rest or the area resets (played in the game: it stayed dead). Off: it comes back like a regular enemy.
+* **Mechanic:** On: a boss in a regular spot does not come back after you rest or the area resets (played in the game: it stayed dead). Off: it comes back like a regular enemy (written to the game's data; not yet confirmed in a playthrough).
 * **Affects:** Whether roaming bosses respawn.
 * **Limits:** Needs "Replace regular enemies with" set to "Only bosses" or "Bosses or regular enemies".
 * **Disabled or warned when:**
@@ -753,7 +753,7 @@ The view (Basic or Advanced), the language and the help are interface state: the
 
 ### Disconnected fog gates (`fog.disconnected`)
 
-* **Mechanic:** Normally the two sides of a fog gate are paired, so going back leads to the place you came from. Off that, the two sides are randomized independently, so a gate you came through may lead somewhere else when you turn around.
+* **Mechanic:** Normally the two sides of a fog gate are paired, so going back leads to the place you came from. With this option the two sides are randomized independently, so a gate you came through may lead somewhere else when you turn around.
 * **Affects:** How fog gates connect.
 * **Limits:** Needs Transition and fog randomization turned on.
 * **Disabled or warned when:**

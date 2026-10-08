@@ -187,7 +187,8 @@ input.switch:disabled { cursor: not-allowed; opacity: .5; }
 /* ---- breakpoints: 1366x768 at 125 % / 150 % scaling is about 1093 / 910 CSS pixels wide */
 @media (max-width: 1180px) {
   .game-grid { grid-template-columns: minmax(0, 1fr); }
-  .side-column { position: static; max-height: none; overflow: visible; }
+  /* one column: the run panel (Generate world) comes first, so it is not buried under the settings on a laptop at 125 % / 150 % scaling */
+  .side-column { position: static; max-height: none; overflow: visible; order: -1; }
   .help-panel { position: fixed; z-index: 40; right: 12px; bottom: 12px; width: min(440px, calc(100vw - 24px)); max-height: 62vh; overflow-y: auto; }
   .help-panel.is-empty { position: static; width: auto; max-height: none; box-shadow: none; }
 }
