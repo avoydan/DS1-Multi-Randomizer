@@ -29,7 +29,7 @@ Nothing is hidden without a word. An option that cannot be used now is **disable
 
 ## Options that are not drawn
 
-`items.guaranteeEarlyWeapon` ("Guarantee early weapon") and `items.balancedEarlyLoot` ("Balanced early loot") have **no effect**: the extracted-data path of the combined engine never reads them; the real pipeline produces identical files with them on and off (`apps/backend/scripts/settingEffectReal.mjs`). `items.randomizeProtectedItems` is refused by validation. The fields stay in the configuration, in presets and in Seed Codes, so an old code means what it always meant; only the control is not drawn. The audit also found that "Progressive" enemy scaling produces the same files as "By area"; the choice stays and says so.
+`items.guaranteeEarlyWeapon` ("Guarantee early weapon") and `items.balancedEarlyLoot` ("Balanced early loot") have **no effect** and never had any with real game data (not features of the original randomizers either: `docs/EARLY_OPTIONS_AUDIT.md`): the extracted-data path of the combined engine never reads them; the real pipeline produces identical files with them on and off (`apps/backend/scripts/settingEffectReal.mjs`). `items.randomizeProtectedItems` is refused by validation. The fields stay in the configuration, in presets and in Seed Codes, so an old code means what it always meant; only the control is not drawn. The audit also found that "Progressive" enemy scaling produces the same files as "By area"; the choice stays and says so.
 
 ## Build channels
 

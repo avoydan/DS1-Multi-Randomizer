@@ -162,6 +162,7 @@ CombinedRandomizerRequest
   items.enabled && items.progressionLogic       -> config.progressionLogic
   items.enabled && items.guaranteeEarlyWeapon   -> config.guaranteeEarlyWeapon
   items.enabled && items.balancedEarlyLoot      -> config.balancedEarlyLoot
+  (both flags are mapped and reach the engine, but the engine reads them only in its placeholder-data function; docs/EARLY_OPTIONS_AUDIT.md)
   items.enabled && items.randomizeStartingClass -> config.randomizeStartingClass
   items.enabled && items.randomizeStartingEquipment -> config.randomizeStartingEquipment
   items.enabled && items.randomizeGifts         -> config.randomizeGifts

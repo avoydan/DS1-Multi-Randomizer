@@ -854,7 +854,7 @@ The field stays in the configuration, in presets and in Seed Codes (an old code 
 
 | Id | Config key | Why | Default |
 |---|---|---|---|
-| `items.earlyWeapon` | `items.guaranteeEarlyWeapon` | no effect: the extracted-data path of the combined engine never reads it (probed with the real pipeline: the generated files are identical with it on and off) | `true` |
-| `items.balancedEarlyLoot` | `items.balancedEarlyLoot` | no effect: the extracted-data path of the combined engine never reads it (probed with the real pipeline: the generated files are identical with it on and off) | `true` |
+| `items.earlyWeapon` | `items.guaranteeEarlyWeapon` | no effect, never had any with real game data: not a feature of the original randomizers; the vendored engine implements it only for its placeholder data set (docs/EARLY_OPTIONS_AUDIT.md); probed with the real pipeline: the generated files are identical with it on and off | `true` |
+| `items.balancedEarlyLoot` | `items.balancedEarlyLoot` | no effect, never had any with real game data: not a feature of the original randomizers; the vendored engine implements it only for its placeholder data set (docs/EARLY_OPTIONS_AUDIT.md); probed with the real pipeline: the generated files are identical with it on and off | `true` |
 | `items.protectedItems` | `items.randomizeProtectedItems` | refused: validation rejects it until progression safety is proven | `false` |
 

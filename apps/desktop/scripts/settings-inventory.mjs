@@ -109,7 +109,7 @@ export function buildMarkdown(inventory) {
     lines.push(`* **Implemented in (found by search, validated in ${entry.implementation.validatedIn}):** ${entry.implementation.effect.map((file) => `\`${file}\``).join(', ') || 'n/a'}.`, '');
   }
   lines.push('## Options that are not drawn', '', 'The field stays in the configuration, in presets and in Seed Codes (an old code keeps its meaning); only the control is not drawn, because it cannot do anything in this version.', '', '| Id | Config key | Why | Default |', '|---|---|---|---|');
-  const reasonText = { 'no-effect': 'no effect: the extracted-data path of the combined engine never reads it (probed with the real pipeline: the generated files are identical with it on and off)', refused: 'refused: validation rejects it until progression safety is proven' };
+  const reasonText = { 'no-effect': 'no effect, never had any with real game data: not a feature of the original randomizers; the vendored engine implements it only for its placeholder data set (docs/EARLY_OPTIONS_AUDIT.md); probed with the real pipeline: the generated files are identical with it on and off', refused: 'refused: validation rejects it until progression safety is proven' };
   for (const entry of inventory.entries.filter((candidate) => candidate.hidden)) lines.push(`| \`${entry.id}\` | \`${entry.configKey}\` | ${reasonText[entry.hidden]} | \`${JSON.stringify(entry.default)}\` |`);
   lines.push('');
   return `${lines.join('\n')}\n`;

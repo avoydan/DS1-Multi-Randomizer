@@ -1224,3 +1224,11 @@ Full description: `docs/UI_ARCHITECTURE.md`; every option: `docs/SETTINGS_INVENT
 5. **Build channel.** `build-info.json` carries `channel: public | internal`, independent of signing. A public build hides the internal test worlds; an internal build shows them; Ctrl+Shift+Alt+F12 toggles them for a session. It decides only what the interface shows and is not a security boundary (the backend endpoints are the ordinary ones). A packaged app that cannot read its build information is public. A signed release must be a public-channel build (`release-verify.mjs`).
 6. **The button is "Generate world" / "Generuj świat"** (it was "Randomize / Losuj świat"); the backend's plain-language messages that name the button were changed with it (text only). Config keys, enums and serialized values are unchanged.
 7. **The brand mark that sat in the header is withdrawn** (file, import, styles, documentation); the application icon is the burning-sword artwork from the approved asset sheet (clean crop, ICO 16-256 px).
+
+## Early-weapon / balanced-early-loot audit (2026-10-08; no code change)
+
+Full evidence: `docs/EARLY_OPTIONS_AUDIT.md`.
+
+1. **They are not legacy features that were lost.** Neither the Item Randomizer (`f7cabbd`) nor the Enemy Randomizer (`83f008d`) has an early-weapon or early-loot option. The flags come from the vendored engine (`f120efe`), which implements them only for its placeholder data set (`randomizeItems`, a toy catalog with a `sphere` per location); with real game data it never reads them, in upstream's own product too.
+2. **No behavior is restored and nothing is invented.** The condition for a port (legacy code proves meaningful behavior that DS1TR lacks) is not met. Both flags default to true in every configuration, preset, Seed Code and golden fixture, so making them functional would change every world and need a new generation profile; a new early-game guarantee would be a new feature designed from real item and area data, not a port.
+3. **The controls stay hidden, the fields stay.** Classification: LEGACY DEAD / NO-OP. `apps/backend/src/adapters/combinedEarlyOptions.test.mjs` pins the fact (identical placements and hashes for all four combinations on real-data-shaped catalogs; flags read only by the placeholder function), so changing it must be deliberate.
