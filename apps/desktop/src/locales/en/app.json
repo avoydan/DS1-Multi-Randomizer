@@ -4,14 +4,23 @@
     "title": "Triple Randomizer",
     "tagline": "Randomize items, enemies and fog gates of Dark Souls Remastered."
   },
-  "status": { "starting": "Starting...", "ready": "Ready", "offline": "Not running" },
+  "status": {
+    "starting": "Starting...",
+    "ready": "Ready",
+    "offline": "Not running"
+  },
   "startupError": {
     "text": "DS1 Triple Randomizer could not start its engine. Close and reopen the app; if it keeps happening, download the app again.",
     "details": "Details"
   },
-  "sections": { "game": "Your game" },
+  "sections": {
+    "game": "Your game"
+  },
   "options": {
-    "includeDlc": { "label": "Include DLC", "hint": "Excluding the DLC is not implemented; the DLC is always included." },
+    "includeDlc": {
+      "label": "Include DLC",
+      "hint": "Excluding the DLC is not implemented; the DLC is always included."
+    },
     "spoilerLog": "Generate spoiler log"
   },
   "preset": {
@@ -23,7 +32,8 @@
     "reset": "Restore default settings",
     "exported": "Preset exported. Copy the text to share these settings.",
     "applied": "Preset applied. Review the settings, then click Randomize.",
-    "resetDone": "Settings restored to the defaults."
+    "resetDone": "Settings restored to the defaults.",
+    "problemsLead": "The preset could not be applied. Technical details (in English):"
   },
   "state": {
     "vanilla": "Your game is original and ready to be randomized.",
@@ -80,8 +90,14 @@
     "failed": "Something went wrong."
   },
   "outcome": {
-    "applied": { "text": "Randomized game applied successfully.", "sub": "You can now launch Dark Souls Remastered." },
-    "restored": { "text": "Original game restored successfully.", "sub": "Dark Souls Remastered is back to its original files." }
+    "applied": {
+      "text": "Randomized game applied successfully.",
+      "sub": "You can now launch Dark Souls Remastered."
+    },
+    "restored": {
+      "text": "Original game restored successfully.",
+      "sub": "Dark Souls Remastered is back to its original files."
+    }
   },
   "launch": {
     "steam": "Starting Dark Souls Remastered through Steam...",

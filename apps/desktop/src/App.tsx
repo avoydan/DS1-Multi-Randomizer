@@ -492,7 +492,7 @@ export function App() {
           <details className="log-panel"><summary>{t('app.preset.summary')}</summary>
             <textarea className="run-logs" aria-label={t('app.preset.aria')} rows={8} value={presetText} onChange={(event) => setPresetText(event.target.value)} placeholder={t('app.preset.placeholder')} />
             <div className="run-actions"><button className="secondary" onClick={exportPreset}>{t('app.preset.export')}</button><button className="secondary" onClick={importPreset} disabled={!presetText.trim()}>{t('app.preset.apply')}</button><button className="secondary" onClick={resetSettings}>{t('app.preset.reset')}</button></div>
-            {presetProblems.length > 0 && <div className="notice error" role="alert">{presetProblems.join(' ')}</div>}
+            {presetProblems.length > 0 && <div className="notice error" role="alert">{t('app.preset.problemsLead')}<ul>{presetProblems.map((problem) => <li key={problem}>{problem}</li>)}</ul></div>}
           </details>
         </section>
 

@@ -4,14 +4,23 @@
     "title": "Triple Randomizer",
     "tagline": "Losuj przedmioty, wrogów i bramy mgły w Dark Souls Remastered."
   },
-  "status": { "starting": "Uruchamianie...", "ready": "Gotowe", "offline": "Nie działa" },
+  "status": {
+    "starting": "Uruchamianie...",
+    "ready": "Gotowe",
+    "offline": "Nie działa"
+  },
   "startupError": {
     "text": "DS1 Triple Randomizer nie mógł uruchomić swojego silnika. Zamknij aplikację i otwórz ją ponownie; jeśli problem się powtarza, pobierz aplikację jeszcze raz.",
     "details": "Szczegóły"
   },
-  "sections": { "game": "Twoja gra" },
+  "sections": {
+    "game": "Twoja gra"
+  },
   "options": {
-    "includeDlc": { "label": "Uwzględnij DLC", "hint": "Wyłączenie DLC nie jest zaimplementowane; DLC jest zawsze uwzględniane." },
+    "includeDlc": {
+      "label": "Uwzględnij DLC",
+      "hint": "Wyłączenie DLC nie jest zaimplementowane; DLC jest zawsze uwzględniane."
+    },
     "spoilerLog": "Generuj log spoilerów"
   },
   "preset": {
@@ -23,7 +32,8 @@
     "reset": "Przywróć ustawienia domyślne",
     "exported": "Preset wyeksportowany. Skopiuj tekst, aby udostępnić te ustawienia.",
     "applied": "Preset zastosowany. Sprawdź ustawienia, a potem kliknij Losuj świat.",
-    "resetDone": "Przywrócono ustawienia domyślne."
+    "resetDone": "Przywrócono ustawienia domyślne.",
+    "problemsLead": "Nie udało się zastosować presetu. Szczegóły techniczne (po angielsku):"
   },
   "state": {
     "vanilla": "Twoja gra jest oryginalna i gotowa do zrandomizowania.",
@@ -80,8 +90,14 @@
     "failed": "Coś poszło nie tak."
   },
   "outcome": {
-    "applied": { "text": "Zrandomizowana gra została zastosowana.", "sub": "Możesz teraz uruchomić Dark Souls Remastered." },
-    "restored": { "text": "Oryginalna gra została przywrócona.", "sub": "Dark Souls Remastered wróciło do swoich oryginalnych plików." }
+    "applied": {
+      "text": "Zrandomizowana gra została zastosowana.",
+      "sub": "Możesz teraz uruchomić Dark Souls Remastered."
+    },
+    "restored": {
+      "text": "Oryginalna gra została przywrócona.",
+      "sub": "Dark Souls Remastered wróciło do swoich oryginalnych plików."
+    }
   },
   "launch": {
     "steam": "Uruchamianie Dark Souls Remastered przez Steam...",
