@@ -148,7 +148,7 @@ test('unknown or newer codes get explicit, plain errors: unsupported profile and
   const unsupported = decodeSeedCode(futureProfile);
   assert.equal(unsupported.ok, false);
   assert.equal(unsupported.code, 'UNSUPPORTED_PROFILE');
-  assert.match(unsupported.message, /newer version of DS1 Triple Randomizer/u);
+  assert.match(unsupported.message, /newer version of DS1 Multi Randomizer/u);
   assert.doesNotMatch(unsupported.message, /ds1tr-gen/u, 'the profile id is a diagnostic detail');
   assert.match(unsupported.technical, /ds1tr-gen-v9/u);
   const newerFormat = decodeSeedCode(encodeSeedCode(envelopeOf(fullSettings())).replace('DS1TR1', 'DS1TR2'));

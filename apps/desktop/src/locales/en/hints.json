@@ -72,14 +72,14 @@
   },
   "empty": "This world has no item placements to list.",
   "export": {
-    "title": "DS1 Triple Randomizer - Hint sheet",
+    "title": "DS1 Multi Randomizer - Hint sheet",
     "seedCode": "Seed Code",
     "profile": "Generation profile",
     "created": "World created",
     "level": "Spoiler level",
     "language": "Language",
     "settings": "World settings",
-    "footer": "Made by DS1 Triple Randomizer. This sheet contains spoilers. It is not a guide and changes nothing in the game."
+    "footer": "Made by DS1 Multi Randomizer. This sheet contains spoilers. It is not a guide and changes nothing in the game."
   },
   "viewer": {
     "title": "Hint sheet",

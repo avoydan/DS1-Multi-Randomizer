@@ -1,6 +1,6 @@
 {
   "header": {
-    "title": "Triple Randomizer",
+    "title": "Multi Randomizer",
     "tagline": "Randomize items, enemies and fog gates of Dark Souls Remastered."
   },
   "status": {
@@ -9,7 +9,7 @@
     "offline": "Not running"
   },
   "startupError": {
-    "text": "DS1 Triple Randomizer could not start its engine. Close and reopen the app; if it keeps happening, download the app again.",
+    "text": "DS1 Multi Randomizer could not start its engine. Close and reopen the app; if it keeps happening, download the app again.",
     "details": "Details"
   },
   "sections": {
@@ -118,7 +118,7 @@
   "legal": {
     "eyebrow": "ABOUT & LEGAL",
     "title": "Free software under GPL-3.0-only",
-    "copyright": "Copyright © 2026 DS1 Triple Randomizer contributors. This program comes with absolutely no warranty. You may redistribute and modify it under GNU GPL version 3. Corresponding source and the full license accompany every release.",
+    "copyright": "Copyright © 2026 DS1 Multi Randomizer contributors. This program comes with absolutely no warranty. You may redistribute and modify it under GNU GPL version 3. Corresponding source and the full license accompany every release.",
     "disclaimer": "This unofficial project is not affiliated with FromSoftware or Bandai Namco Entertainment. Use only with your own game installation and play modified game data offline.",
     "readLicense": "Read the GNU GPL v3 license"
   },

@@ -117,7 +117,7 @@ export function decodeSeedCode(input: string): DecodedSeed {
   if (formatVersion !== SEED_FORMAT_VERSION) {
     return {
       ok: false, code: 'UNSUPPORTED_FORMAT',
-      message: 'This seed code was made by a newer version of DS1 Triple Randomizer. Update the app to use it.',
+      message: 'This seed code was made by a newer version of DS1 Multi Randomizer. Update the app to use it.',
       technical: `Seed code format ${formatVersion} is not supported (this application reads format ${SEED_FORMAT_VERSION}).`,
     };
   }
@@ -148,7 +148,7 @@ export function decodeSeedCode(input: string): DecodedSeed {
   if (!profile) {
     return {
       ok: false, code: 'UNSUPPORTED_PROFILE',
-      message: 'This seed needs a newer version of DS1 Triple Randomizer. Update the app to generate this world.',
+      message: 'This seed needs a newer version of DS1 Multi Randomizer. Update the app to generate this world.',
       technical: `Generation profile ${envelope.profile} is not supported by this application.`,
     };
   }

@@ -72,14 +72,14 @@
   },
   "empty": "Ten świat nie ma rozmieszczenia przedmiotów do wypisania.",
   "export": {
-    "title": "DS1 Triple Randomizer - Arkusz podpowiedzi",
+    "title": "DS1 Multi Randomizer - Arkusz podpowiedzi",
     "seedCode": "Kod seeda",
     "profile": "Profil generowania",
     "created": "Świat utworzony",
     "level": "Poziom spoilerów",
     "language": "Język",
     "settings": "Ustawienia świata",
-    "footer": "Wygenerowano w DS1 Triple Randomizer. Ten arkusz zawiera spoilery. To nie jest poradnik i niczego nie zmienia w grze."
+    "footer": "Wygenerowano w DS1 Multi Randomizer. Ten arkusz zawiera spoilery. To nie jest poradnik i niczego nie zmienia w grze."
   },
   "viewer": {
     "title": "Arkusz podpowiedzi",

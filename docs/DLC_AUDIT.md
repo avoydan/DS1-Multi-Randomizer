@@ -10,7 +10,7 @@ Dark Souls Remastered has exactly one DLC map: `m12_01_00_00` (Artorias of the A
 
 | Setting | Meaning |
 |---|---|
-| **DLC content ON** (default, `output.includeDlc = true`) | Exactly what DS1 Triple Randomizer has always done. Nothing runs differently; every earlier world, Seed Code, preset and golden fixture is unchanged. |
+| **DLC content ON** (default, `output.includeDlc = true`) | Exactly what DS1 Multi Randomizer has always done. Nothing runs differently; every earlier world, Seed Code, preset and golden fixture is unchanged. |
 | **DLC content OFF** (`output.includeDlc = false`) | DS1TR does not randomize or use DLC content: no DLC enemy slot, DLC boss, DLC pickup, DLC merchant shop, DLC NPC gift, DLC boss reward, DLC-only enemy drop or DLC-exclusive starting equipment takes part, as a source or as a destination. **The DLC is never removed or edited in the game**: its map, event, param rows and files stay byte-identical to the clean game (verified by SmokeVerify `dlc-untouched`). |
 | **Fog randomizer + DLC OFF** | **Not supported.** FogMod has no DLC option: its graph always contains the DLC areas and warps. A world randomizer run cannot leave the DLC out, so the combination is refused by validation (`Excluding DLC content needs the fog randomizer to be off: …`) and the UI keeps the switch on and locked while the fog randomizer is on. There is no fake compatibility. |
 

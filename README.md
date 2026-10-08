@@ -1,12 +1,12 @@
-# DS1 Triple Randomizer
+# DS1 Multi Randomizer
 
-DS1 Triple Randomizer is a Windows desktop application for generating one
+DS1 Multi Randomizer is a Windows desktop application for generating one
 deterministic Dark Souls Remastered randomization from item, enemy/boss, and
 FogMod settings.
 
 ## For players
 
-1. Download the **installer** (`DS1-Triple-Randomizer-Setup-<version>.exe`) and run it. It installs for your user only and never asks for administrator rights. A **portable** build (`DS1-Triple-Randomizer-<version>-x64.exe`) is also offered: it unpacks itself to a temporary folder every time it starts, which some antivirus products dislike, so the installer is the recommended one.
+1. Download the **installer** (`DS1-Multi-Randomizer-Setup-<version>.exe`) and run it. It installs for your user only and never asks for administrator rights. A **portable** build (`DS1-Multi-Randomizer-<version>-x64.exe`) is also offered: it unpacks itself to a temporary folder every time it starts, which some antivirus products dislike, so the installer is the recommended one.
 2. Choose your settings. New settings start with the recommended **Sampling** enemy placement; older Seed Codes and saved settings keep the algorithm they were made with.
 3. Click **Randomize**, then **Apply to game**.
 4. Click **Launch game** (or start Dark Souls Remastered from Steam) and play offline.

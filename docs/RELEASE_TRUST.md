@@ -1,6 +1,6 @@
 # Release trust
 
-How a DS1 Triple Randomizer release is built, what is in it, what is signed, what Windows and antivirus products are likely to say, and what the owner has to do before a **public** release.
+How a DS1 Multi Randomizer release is built, what is in it, what is signed, what Windows and antivirus products are likely to say, and what the owner has to do before a **public** release.
 
 > **State today (desktop 0.26.0): every build is UNSIGNED.** No code-signing certificate exists for this project and none was bought, requested or generated for release. The signing pipeline is built and tested with a throwaway certificate (never shipped, never committed); a public release is **refused** by the tooling until a trusted identity is supplied. Nothing here claims that a build is trusted, antivirus-clean or SmartScreen-approved.
 
@@ -20,12 +20,12 @@ Everything that Windows can execute and that DS1TR ships or writes. Paths are re
 
 | File | Role | Started by | Signed by the pipeline |
 |---|---|---|---|
-| `DS1 Triple Randomizer.exe` | the Electron application (renamed `electron.exe`, DS1TR icon and version resource) | the person (shortcut, Start menu) | yes |
+| `DS1 Multi Randomizer.exe` | the Electron application (renamed `electron.exe`, DS1TR icon and version resource) | the person (shortcut, Start menu) | yes |
 | `resources/runtime/engines/combined/vendor/tools/DsrDataTool/DsrDataTool.exe` | reads and patches the game files into a workspace (self-contained .NET 8, one file, **not compressed**) | the backend, a child process, argument array, no shell | yes |
 | `resources/runtime/tools/fog-host/FogHost.exe` | runs the fog randomizer (FogMod) on prepared data (self-contained .NET 8, one file, not compressed) | the backend, same way | yes |
-| `DS1-Triple-Randomizer-Setup-<version>.exe` | the installer (NSIS, per-user) - the **recommended** download | the person | yes |
-| `Uninstall DS1 Triple Randomizer.exe` | the uninstaller the installer writes | the person (Windows Settings) | yes (electron-builder signs it with the installer; not separately verified here) |
-| `DS1-Triple-Randomizer-<version>-x64.exe` | the portable build - the **secondary** download | the person | yes |
+| `DS1-Multi-Randomizer-Setup-<version>.exe` | the installer (NSIS, per-user) - the **recommended** download | the person | yes |
+| `Uninstall DS1 Multi Randomizer.exe` | the uninstaller the installer writes | the person (Windows Settings) | yes (electron-builder signs it with the installer; not separately verified here) |
+| `DS1-Multi-Randomizer-<version>-x64.exe` | the portable build - the **secondary** download | the person | yes |
 | `d3dcompiler_47.dll` | Direct3D shader compiler, already signed by Microsoft | Chromium | not re-signed |
 | `ffmpeg.dll`, `libEGL.dll`, `libGLESv2.dll`, `vk_swiftshader.dll`, `vulkan-1.dll` | Electron / Chromium libraries, shipped as their authors built them | Chromium | not re-signed (the pipeline never alters third-party binaries) |
 
@@ -38,7 +38,7 @@ DLL and native module policy: DS1TR adds **no** native Node module and no DLL of
 * **Processes DS1TR starts:** the backend (Electron's own binary in Node mode, argument vector), `DsrDataTool.exe`, `FogHost.exe`, the game executable when the person presses Play/Launch (detached), and four Windows tools with fixed arguments and `windowsHide`: `reg query` (read the Steam install path), `tasklist` (is the game running), `taskkill /T` (stop the backend tree when the application closes). Nothing uses `shell: true`, `cmd.exe`, PowerShell, `wscript`, `mshta`, `rundll32`, `certutil`, `bitsadmin`, `schtasks` or `Start-Process`. Searched in `apps/backend/src` and `apps/desktop/electron`.
 * **URLs opened:** the `steam://` launch of the person's own game through `shell.openExternal`, and the GPL page link in the About text.
 * **Temp and extraction:** the application writes data only (JSON caches) to the temp folder and never executes anything from it. Its runtime lives in the install folder (`resources/runtime`) and its state in the user data folder. **The portable build is different by construction:** it extracts itself to a temporary folder at every start and runs from there (an electron-builder behaviour). Run-from-temp is a pattern antivirus heuristics treat with suspicion, which is the main reason the installer is the recommended download.
-* **Privilege:** `requestedExecutionLevel asInvoker` on every executable; the installer is per-user (`perMachine: false`, `allowElevation: false`), writes under `%LOCALAPPDATA%\Programs\DS1 Triple Randomizer` by default (tested), never asks for administrator rights, and the package contains no elevation helper (`packElevateHelper: false`). Checked by `release-verify.mjs`.
+* **Privilege:** `requestedExecutionLevel asInvoker` on every executable; the installer is per-user (`perMachine: false`, `allowElevation: false`), writes under `%LOCALAPPDATA%\Programs\DS1 Multi Randomizer` by default (tested), never asks for administrator rights, and the package contains no elevation helper (`packElevateHelper: false`). Checked by `release-verify.mjs`.
 * **Persistence:** the application installs no service, no scheduled task, no startup entry and no driver. The installer adds shortcuts and one per-user uninstall entry.
 * **Network (audited):** the backend listens on `127.0.0.1` on a random port, protected by a per-session token. The only outbound request is one HTTPS download of 40 world-data files from the pinned FogMod commit on `raw.githubusercontent.com`, each file verified by SHA-256 before it is used (only when the world randomizer is switched on and the cache is missing). No telemetry, no accounts, no auto-update, no upload of anything.
 * **Heuristic red flags audit:** no UPX or other packer, no obfuscation, no self-modifying code, no `.pdb`, no embedded scripts in resources, no hidden windows beyond `windowsHide` for the helper tools listed above, no anti-debug code. The two remaining *heuristic* properties are honest ones: the helpers are large self-contained .NET single files, and the application edits game files (that is its purpose; it works on a verified copy first and keeps one restore authority).

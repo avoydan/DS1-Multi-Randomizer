@@ -1,6 +1,6 @@
 # World randomizer data: provenance of the 59 files FogHost reads
 
-FogHost (the Fog engine of DS1 Triple Randomizer, around FogMod `6e6dc7886d0f8bcc53c1800d95c9e859d1f2f87f`) reads exactly
+FogHost (the Fog engine of DS1 Multi Randomizer, around FogMod `6e6dc7886d0f8bcc53c1800d95c9e859d1f2f87f`) reads exactly
 59 files from a "data root" and verifies each of them on every run (`tools/fog-host/src/DataRoot.cs`). Earlier builds made
 the player find and select that folder. It is now prepared by the application itself (`apps/backend/src/adapters/worldData.ts`);
 this document records where every file comes from and why it is handled the way it is.

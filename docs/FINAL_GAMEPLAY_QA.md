@@ -6,7 +6,7 @@ Play **offline**. Use a copy of the game or a save you do not mind losing; the a
 
 ## How to start any world
 
-1. Open DS1 Triple Randomizer. Nothing needs to be changed in the settings for these tests.
+1. Open DS1 Multi Randomizer. Nothing needs to be changed in the settings for these tests.
 2. **Test worlds**: open **App settings** (left, below the menu) -> **Tools** -> **Test worlds for playtesting** (these internal test worlds are shown only in an INTERNAL build, or in a public build after the shortcut **Ctrl+Shift+Alt+F12**; a normal public build hides them), open the **Test world** list, choose the title written in the tables below *exactly*, scroll down and press **Create this test world**. The app creates that world (it uses the same Load seed path as a shared Seed Code).
 3. **Full playthrough worlds** (section 4): press **Load seed** (when a world is already applied it is under **...** next to **Copy seed**, and the button there becomes **Restore and create shared world**), paste the Seed Code into **Shared seed code** and press **Load**.
 4. Press **Apply to game**, wait for "Randomized game applied successfully.", press **Launch game** (or start the game from Steam).

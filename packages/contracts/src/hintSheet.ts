@@ -349,7 +349,7 @@ export function buildHintHtml(input: HintExportInput): string {
   out.push('<meta charset="utf-8">');
   out.push('<meta name="viewport" content="width=device-width, initial-scale=1">');
   out.push('<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; img-src data:">');
-  out.push(`<meta name="generator" content="DS1 Triple Randomizer ${e(document.appVersion)}">`);
+  out.push(`<meta name="generator" content="DS1 Multi Randomizer ${e(document.appVersion)}">`);
   out.push(`<title>${e(t('hints.export.title'))} - ${e(shortSeed(document.seedCode))}</title>`);
   out.push(`<style>${HTML_STYLE}</style>`);
   out.push('</head>', '<body>', '<main>');

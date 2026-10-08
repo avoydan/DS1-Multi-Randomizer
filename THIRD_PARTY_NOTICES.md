@@ -1,6 +1,6 @@
 # Third-party notices
 
-DS1 Triple Randomizer is licensed under GPL-3.0-only.
+DS1 Multi Randomizer is licensed under GPL-3.0-only.
 
 No Dark Souls Remastered game data is included in this repository. A
 selective, pinned vendor of `kellernz1/ds-randomizer` (the files needed to

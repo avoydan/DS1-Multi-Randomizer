@@ -1,6 +1,6 @@
 # Licensing and distribution policy
 
-DS1 Triple Randomizer is licensed under GPL-3.0-only.
+DS1 Multi Randomizer is licensed under GPL-3.0-only.
 
 ## Combined engine
 

@@ -123,7 +123,7 @@ export function buildDiagnosticsText(diagnostics: Diagnostics, t: Translate, opt
   const app = diagnostics.application;
   out.push(t('diagnostics.title'), '='.repeat(t('diagnostics.title').length), '');
   out.push(t('diagnostics.section.summary'), '-'.repeat(t('diagnostics.section.summary').length));
-  out.push(line(t('diagnostics.field.application'), `DS1 Triple Randomizer ${app.desktopVersion ?? app.backendVersion}`));
+  out.push(line(t('diagnostics.field.application'), `DS1 Multi Randomizer ${app.desktopVersion ?? app.backendVersion}`));
   out.push(line(t('diagnostics.field.installMode'), t(`diagnostics.installMode.${app.installMode}`)));
   out.push(line(t('diagnostics.field.signing'), t(`diagnostics.signing.${diagnostics.release.signing}`)));
   out.push(line(t('diagnostics.field.game'), diagnostics.game.state ? t(`diagnostics.gameState.${diagnostics.game.state}`) : t('diagnostics.gameState.unknown')));

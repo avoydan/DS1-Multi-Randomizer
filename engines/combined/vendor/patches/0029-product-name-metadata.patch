@@ -1,0 +1,20 @@
+diff --git a/engines/combined/vendor/tools/DsrDataTool/DsrDataTool.csproj b/engines/combined/vendor/tools/DsrDataTool/DsrDataTool.csproj
+index 7babf3e..c3c64e3 100644
+--- a/engines/combined/vendor/tools/DsrDataTool/DsrDataTool.csproj
++++ b/engines/combined/vendor/tools/DsrDataTool/DsrDataTool.csproj
+@@ -10,11 +10,11 @@
+     <NuGetAudit>false</NuGetAudit>
+     <RestoreIgnoreFailedSources>true</RestoreIgnoreFailedSources>
+     <!-- Windows file properties: the project that ships this build, never the game's publisher. -->
+-    <Company>DS1 Triple Randomizer project</Company>
+-    <Product>DS1 Triple Randomizer</Product>
++    <Company>DS1 Multi Randomizer project</Company>
++    <Product>DS1 Multi Randomizer</Product>
+     <AssemblyTitle>DsrDataTool</AssemblyTitle>
+-    <Description>DsrDataTool: reads and patches Dark Souls Remastered game data into a workspace for DS1 Triple Randomizer</Description>
+-    <Copyright>Copyright © 2026 DS1 Triple Randomizer project (GPL-3.0-only, derived from ds-randomizer)</Copyright>
++    <Description>DsrDataTool: reads and patches Dark Souls Remastered game data into a workspace for DS1 Multi Randomizer</Description>
++    <Copyright>Copyright © 2026 DS1 Multi Randomizer project (GPL-3.0-only, derived from ds-randomizer)</Copyright>
+   </PropertyGroup>
+ 
+   <ItemGroup>

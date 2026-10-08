@@ -143,7 +143,7 @@ async function createWindow(): Promise<void> {
     minWidth: 980,
     minHeight: 680,
     backgroundColor: '#0d1016',
-    title: 'DS1 Triple Randomizer',
+    title: 'DS1 Multi Randomizer',
     webPreferences: {
       preload: path.join(currentDirectory, 'preload.cjs'),
       contextIsolation: true,
@@ -221,7 +221,7 @@ ipcMain.handle('game:launch', (_event, gamePath: string) => launchGame(typeof ga
 
 app.whenReady().then(async () => {
   await loadSettings();
-  desktopLog.write('info', `DS1 Triple Randomizer ${app.getVersion()} started (${installModeOf(app.isPackaged, process.env)}, ${buildChannel} channel), language ${currentLanguage()}`);
+  desktopLog.write('info', `DS1 Multi Randomizer ${app.getVersion()} started (${installModeOf(app.isPackaged, process.env)}, ${buildChannel} channel), language ${currentLanguage()}`);
   await startBackend();
   await createWindow();
 }).catch((error) => { dialog.showErrorBox(say('startupFailedTitle'), String(error)); app.quit(); });

@@ -32,7 +32,7 @@ export function prepareRun(body: RunRequestBody, makeSeed: () => string = newMas
     if (!decoded.ok) return { ok: false, code: decoded.code, message: decoded.message, technical: decoded.technical };
     const { envelope } = decoded;
     const profile = resolveGenerationProfile(envelope.profile);
-    if (!profile) return { ok: false, code: 'UNSUPPORTED_PROFILE', message: 'This seed needs a newer version of DS1 Triple Randomizer.', technical: envelope.profile };
+    if (!profile) return { ok: false, code: 'UNSUPPORTED_PROFILE', message: 'This seed needs a newer version of DS1 Multi Randomizer.', technical: envelope.profile };
     return {
       ok: true, config: joinConfig(envelope.settings, gamePath, envelope.masterSeed, spoiler), profile, seedCode: decoded.seedCode,
       envelope, fromSeedCode: true,

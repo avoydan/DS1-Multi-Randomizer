@@ -68,7 +68,7 @@ export async function resolveFogPrerequisites(
   try { await access(executablePath); } catch {
     return { failure: {
       code: 'FOG_HOST_MISSING',
-      userMessage: 'A part of the fog randomizer is missing from this installation. Please download DS1 Triple Randomizer again.',
+      userMessage: 'A part of the fog randomizer is missing from this installation. Please download DS1 Multi Randomizer again.',
       technical: `FogHost executable not found: ${executablePath}`,
     } };
   }

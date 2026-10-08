@@ -1,6 +1,6 @@
 {
   "header": {
-    "title": "Triple Randomizer",
+    "title": "Multi Randomizer",
     "tagline": "Losuj przedmioty, wrogów i bramy mgły w Dark Souls Remastered."
   },
   "status": {
@@ -9,7 +9,7 @@
     "offline": "Nie działa"
   },
   "startupError": {
-    "text": "DS1 Triple Randomizer nie mógł uruchomić swojego silnika. Zamknij aplikację i otwórz ją ponownie; jeśli problem się powtarza, pobierz aplikację jeszcze raz.",
+    "text": "DS1 Multi Randomizer nie mógł uruchomić swojego silnika. Zamknij aplikację i otwórz ją ponownie; jeśli problem się powtarza, pobierz aplikację jeszcze raz.",
     "details": "Szczegóły"
   },
   "sections": {
@@ -118,7 +118,7 @@
   "legal": {
     "eyebrow": "O PROGRAMIE I LICENCJA",
     "title": "Wolne oprogramowanie na licencji GPL-3.0-only",
-    "copyright": "Copyright © 2026 współtwórcy DS1 Triple Randomizer. Program jest udostępniany bez jakiejkolwiek gwarancji. Możesz go rozpowszechniać i modyfikować na warunkach GNU GPL w wersji 3. Odpowiadający kod źródłowy i pełny tekst licencji towarzyszą każdemu wydaniu.",
+    "copyright": "Copyright © 2026 współtwórcy DS1 Multi Randomizer. Program jest udostępniany bez jakiejkolwiek gwarancji. Możesz go rozpowszechniać i modyfikować na warunkach GNU GPL w wersji 3. Odpowiadający kod źródłowy i pełny tekst licencji towarzyszą każdemu wydaniu.",
     "disclaimer": "Ten nieoficjalny projekt nie jest powiązany z FromSoftware ani Bandai Namco Entertainment. Używaj go wyłącznie z własną instalacją gry i graj na zmodyfikowanych danych gry offline.",
     "readLicense": "Przeczytaj licencję GNU GPL v3"
   },

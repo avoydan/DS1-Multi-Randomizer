@@ -10,11 +10,11 @@
     <RootNamespace>FogHost</RootNamespace>
     <Version>0.6.0</Version>
     <!-- Windows file properties (what Explorer, SmartScreen and antivirus consoles show): this project's own, never the game's publisher. -->
-    <Company>DS1 Triple Randomizer project</Company>
-    <Product>DS1 Triple Randomizer</Product>
+    <Company>DS1 Multi Randomizer project</Company>
+    <Product>DS1 Multi Randomizer</Product>
     <AssemblyTitle>FogHost</AssemblyTitle>
-    <Description>FogHost: headless host of the fog randomizer used by DS1 Triple Randomizer</Description>
-    <Copyright>Copyright © 2026 DS1 Triple Randomizer project. Contains FogMod (Apache-2.0) and SoulsIds sources.</Copyright>
+    <Description>FogHost: headless host of the fog randomizer used by DS1 Multi Randomizer</Description>
+    <Copyright>Copyright © 2026 DS1 Multi Randomizer project. Contains FogMod (Apache-2.0) and SoulsIds sources.</Copyright>
     <Nullable>disable</Nullable>
     <LangVersion>latest</LangVersion>
     <ImplicitUsings>disable</ImplicitUsings>

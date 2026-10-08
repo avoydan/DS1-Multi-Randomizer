@@ -73,7 +73,7 @@ export function DiagnosticsPanel({ gamePath, worldId, refreshKey, onClose }: Pro
             {failure?.code && <span>{errorText({ code: failure.code })} <code>{failure.code}</code></span>}
           </div>
           <dl className="hint-meta">
-            <dt>{t('diagnostics.field.application')}</dt><dd>DS1 Triple Randomizer {diagnostics.application.desktopVersion ?? diagnostics.application.backendVersion}</dd>
+            <dt>{t('diagnostics.field.application')}</dt><dd>DS1 Multi Randomizer {diagnostics.application.desktopVersion ?? diagnostics.application.backendVersion}</dd>
             <dt>{t('diagnostics.field.installMode')}</dt><dd>{t(`diagnostics.installMode.${diagnostics.application.installMode}`)}</dd>
             <dt>{t('diagnostics.field.signing')}</dt><dd>{t(`diagnostics.signing.${diagnostics.release.signing}`)}</dd>
             <dt>{t('diagnostics.field.game')}</dt><dd>{diagnostics.game.state ? t(`diagnostics.gameState.${diagnostics.game.state}`) : t('diagnostics.gameState.unknown')}</dd>

@@ -32,7 +32,7 @@ Electron + React + TypeScript + Vite
         typed application boundary
                 |
                 v
-        Triple Randomizer Core
+        Multi Randomizer Core
           /             \
          v               v
 Combined DSR engine    Fog adapter

@@ -1,6 +1,6 @@
 # Security and privacy
 
-What DS1 Triple Randomizer does with your computer, your files and the network. The signing and antivirus side is in `docs/RELEASE_TRUST.md`.
+What DS1 Multi Randomizer does with your computer, your files and the network. The signing and antivirus side is in `docs/RELEASE_TRUST.md`.
 
 ## Privacy
 
