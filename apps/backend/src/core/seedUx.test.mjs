@@ -75,7 +75,7 @@ test('Run history is collapsed by default, regenerating does not add history, an
   assert.match(panel, /useState\(false\)/u);
   assert.equal(en('history.title'), 'Run history');
   assert.ok(used(panel, 'history.title'));
-  for (const [key, label] of [['history.viewSettings', 'View settings'], ['history.viewSpoiler', 'View spoiler log'], ['history.regenerate', 'Regenerate files'], ['history.delete', 'Delete from history']]) {
+  for (const [key, label] of [['history.viewSettings', 'View settings'], ['history.viewSpoiler', 'View spoiler file'], ['history.regenerate', 'Regenerate files'], ['history.delete', 'Delete from history']]) {
     assert.ok(used(panel, key), key);
     assert.equal(en(key), label);
   }

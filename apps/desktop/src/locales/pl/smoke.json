@@ -158,7 +158,7 @@
       },
       "afterwards": {
         "0": "W tym świecie nie ma nic więcej do sprawdzania. Tam, gdzie leżałaby sama Soul of Smough, leży teraz broń (albo inny przedmiot z puli): dusza z tego seeda już nie istnieje.",
-        "1": "Aby zobaczyć cały obraz, włącz log spoilerów: sekcja BOSS REWARDS wymienia każdą duszę bossa i to, co leży na jej miejscu."
+        "1": "Aby zobaczyć cały obraz, włącz plik ze spoilerami: sekcja BOSS REWARDS wymienia każdą duszę bossa i to, co leży na jej miejscu."
       }
     },
     "quick-key-placement": {
@@ -170,7 +170,7 @@
         "2": "Peculiar Doll nie leży już w celi: leży w innym miejscu tego świata, osiągalnym przed wszystkim, co go wymaga."
       },
       "afterwards": {
-        "0": "W tym świecie nie ma nic więcej do sprawdzania. Pozostałe klucze też się przesunęły, a rozmieszczenie gwarantuje, że do każdego obszaru da się dojść; aby zobaczyć, gdzie leży każdy klucz, włącz log spoilerów: sekcja KEY PLACEMENT wymienia każdy klucz i miejsce, w którym leży.",
+        "0": "W tym świecie nie ma nic więcej do sprawdzania. Pozostałe klucze też się przesunęły, a rozmieszczenie gwarantuje, że do każdego obszaru da się dojść; aby zobaczyć, gdzie leży każdy klucz, włącz plik ze spoilerami: sekcja KEY PLACEMENT wymienia każdy klucz i miejsce, w którym leży.",
         "1": "Pełnym sprawdzeniem jest przejście gry z kluczami tam, gdzie mówi spoiler: ten świat pokazuje tylko, że przesunięty klucz można podnieść i użyć."
       }
     },
@@ -184,7 +184,7 @@
       },
       "afterwards": {
         "0": "W tym świecie nie ma nic więcej do sprawdzania. W Anor Londo Gwynevere wręcza inny przedmiot z puli zamiast Lordvessel; ta część świata jest daleko od startu i nie należy do tego testu.",
-        "1": "Aby zobaczyć każdy klucz, włącz log spoilerów: sekcja KEY PLACEMENT wymienia każdy klucz i miejsce, w którym leży."
+        "1": "Aby zobaczyć każdy klucz, włącz plik ze spoilerami: sekcja KEY PLACEMENT wymienia każdy klucz i miejsce, w którym leży."
       }
     },
     "quick-lord-soul": {
@@ -197,7 +197,7 @@
       },
       "afterwards": {
         "0": "W tym świecie nie ma nic więcej do sprawdzania. Gravelord Nito, gdy do niego dojdziesz, upuszcza inny przedmiot z puli zamiast Lord Soul: sama Lord Soul istnieje w tym świecie raz, w Twojej celi.",
-        "1": "Aby zobaczyć każdy klucz, włącz log spoilerów: sekcja KEY PLACEMENT wymienia każdy klucz i miejsce, w którym leży."
+        "1": "Aby zobaczyć każdy klucz, włącz plik ze spoilerami: sekcja KEY PLACEMENT wymienia każdy klucz i miejsce, w którym leży."
       }
     },
     "quick-race": {
@@ -209,7 +209,7 @@
         "2": "Peculiar Doll nie leży już w celi: leży w innym miejscu tego świata, w jednym z miejsc Trybu wyścigu."
       },
       "afterwards": {
-        "0": "W tym świecie nie ma nic więcej do sprawdzania. W Trybie wyścigu każdy klucz i każdy żar leży w nagrodzie za bossa, w skrzyni lub w miejscu, gdzie zwykle leży klucz; aby zobaczyć gdzie, włącz log spoilerów: sekcja KEY PLACEMENT wymienia każdy z nich."
+        "0": "W tym świecie nie ma nic więcej do sprawdzania. W Trybie wyścigu każdy klucz i każdy żar leży w nagrodzie za bossa, w skrzyni lub w miejscu, gdzie zwykle leży klucz; aby zobaczyć gdzie, włącz plik ze spoilerami: sekcja KEY PLACEMENT wymienia każdy z nich."
       }
     },
     "quick-race-plus": {
@@ -221,7 +221,7 @@
         "2": "Peculiar Doll nie leży już w celi: leży w innym miejscu tego świata."
       },
       "afterwards": {
-        "0": "W tym świecie nie ma nic więcej do sprawdzania. Istnieje, aby pokazać, że Tryb wyścigu + tworzy inny świat niż Tryb wyścigu: co najmniej jeden klucz leży tam, gdzie dosięga go tylko skip (log spoilerów wymienia każdy klucz). To, czy skipy działają w grze, nie należy do tego testu."
+        "0": "W tym świecie nie ma nic więcej do sprawdzania. Istnieje, aby pokazać, że Tryb wyścigu + tworzy inny świat niż Tryb wyścigu: co najmniej jeden klucz leży tam, gdzie dosięga go tylko skip (plik ze spoilerami wymienia każdy klucz). To, czy skipy działają w grze, nie należy do tego testu."
       }
     },
     "quick-fair": {
@@ -469,7 +469,7 @@
       "observe": {
         "0": "Zagraj w pierwsze obszary jak zwykle: przedmioty, przeciwnicy i bossowie są wylosowani, a nic z DLC Artorias of the Abyss (jego przeciwnicy, bossowie ani przedmioty) nie pojawia się w podstawowej grze.",
         "1": "Jeśli masz DLC, odwiedź je, gdy będziesz mógł: obszar DLC, jego przeciwnicy, bossowie i przedmioty są dokładnie takie jak w zwykłej grze (nie są losowane i nic nie zostało usunięte).",
-        "2": "Arkusz podpowiedzi i log spoilerów nie wymieniają żadnego przedmiotu ani przeciwnika z DLC."
+        "2": "Arkusz podpowiedzi i plik ze spoilerami nie wymieniają żadnego przedmiotu ani przeciwnika z DLC."
       }
     }
   },

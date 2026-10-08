@@ -456,7 +456,7 @@ export const SMOKE_SCENARIOS: readonly SmokeScenario[] = [
     ],
     afterwards: [
       'Nothing else is to be checked in this world. Where the Soul of Smough itself would lie, a weapon (or another pool item) lies now: the soul of this seed no longer exists.',
-      'To see the whole picture turn on the spoiler log: the section BOSS REWARDS names every boss soul and what lies in its place.',
+      'To see the whole picture turn on the spoiler file: the section BOSS REWARDS names every boss soul and what lies in its place.',
     ],
   },
   {
@@ -474,7 +474,7 @@ export const SMOKE_SCENARIOS: readonly SmokeScenario[] = [
       'The Peculiar Doll is not in the cell any more: it lies in another place of this world, reachable before anything that needs it.',
     ],
     afterwards: [
-      'Nothing else is to be checked in this world. The other keys moved too, and the placement guarantees that every area can be reached; to see where every key lies turn on the spoiler log: the section KEY PLACEMENT names each key and the pickup it lies in.',
+      'Nothing else is to be checked in this world. The other keys moved too, and the placement guarantees that every area can be reached; to see where every key lies turn on the spoiler file: the section KEY PLACEMENT names each key and the pickup it lies in.',
       'The full check is a run through the game with the keys where the spoiler says: this world only shows that a moved key can be picked up and used.',
     ],
   },
@@ -494,7 +494,7 @@ export const SMOKE_SCENARIOS: readonly SmokeScenario[] = [
     ],
     afterwards: [
       "Nothing else is to be checked in this world. In Anor Londo, Gwynevere hands over another item of the pool instead of the Lordvessel; that part of the world is far from the start and is not part of this test.",
-      'To see every key turn on the spoiler log: the section KEY PLACEMENT names each key and the pickup it lies in.',
+      'To see every key turn on the spoiler file: the section KEY PLACEMENT names each key and the pickup it lies in.',
     ],
   },
   {
@@ -513,7 +513,7 @@ export const SMOKE_SCENARIOS: readonly SmokeScenario[] = [
     ],
     afterwards: [
       'Nothing else is to be checked in this world. Gravelord Nito, when you reach him, drops another item of the pool instead of the Lord Soul: the Lord Soul itself exists once in this world, in your cell.',
-      'To see every key turn on the spoiler log: the section KEY PLACEMENT names each key and the pickup it lies in.',
+      'To see every key turn on the spoiler file: the section KEY PLACEMENT names each key and the pickup it lies in.',
     ],
   },
   {
@@ -531,7 +531,7 @@ export const SMOKE_SCENARIOS: readonly SmokeScenario[] = [
       'The Peculiar Doll is not in the cell any more: it lies in another place of this world, in one of the Race Mode places.',
     ],
     afterwards: [
-      'Nothing else is to be checked in this world. In Race Mode every key and every ember lies in a boss reward, a chest or a place where a key normally lies; to see where, turn on the spoiler log: the section KEY PLACEMENT names each one.',
+      'Nothing else is to be checked in this world. In Race Mode every key and every ember lies in a boss reward, a chest or a place where a key normally lies; to see where, turn on the spoiler file: the section KEY PLACEMENT names each one.',
     ],
   },
   {
@@ -549,7 +549,7 @@ export const SMOKE_SCENARIOS: readonly SmokeScenario[] = [
       'The Peculiar Doll is not in the cell any more: it lies in another place of this world.',
     ],
     afterwards: [
-      'Nothing else is to be checked in this world. It exists to show that Race Mode + makes a different world from Race Mode: at least one key lies where only a skip reaches it (the spoiler log names every key). Whether the skips work in the game is not part of this test.',
+      'Nothing else is to be checked in this world. It exists to show that Race Mode + makes a different world from Race Mode: at least one key lies where only a skip reaches it (the spoiler file names every key). Whether the skips work in the game is not part of this test.',
     ],
   },
   {
@@ -837,7 +837,7 @@ export const SMOKE_SCENARIOS: readonly SmokeScenario[] = [
     observe: [
       'Play the first areas as usual: items, enemies and bosses are randomized and nothing from the Artorias of the Abyss DLC (its enemies, bosses or items) turns up in the base game.',
       'If you own the DLC, go there when you can: the DLC area, its enemies, bosses and items are exactly as in the normal game (they are not randomized and nothing was removed).',
-      'The hint sheet and the spoiler log name no DLC item or enemy.',
+      'The hint sheet and the spoiler file name no DLC item or enemy.',
     ],
   },
 ];

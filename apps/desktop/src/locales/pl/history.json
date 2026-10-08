@@ -11,11 +11,11 @@
   "applyPlay": "Zastosuj / Graj",
   "restoreFirst": "Najpierw przywróć oryginalne pliki gry.",
   "viewSettings": "Pokaż ustawienia",
-  "viewSpoiler": "Pokaż log spoilerów",
+  "viewSpoiler": "Pokaż plik ze spoilerami",
   "delete": "Usuń z historii",
   "detailsTitle": {
     "settings": "Ustawienia tego świata",
-    "spoiler": "Log spoilerów"
+    "spoiler": "Plik ze spoilerami"
   },
   "diagnostics": "Diagnostyka"
 }

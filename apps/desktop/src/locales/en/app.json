@@ -97,9 +97,9 @@
     "noBridge": "Start Dark Souls Remastered from Steam."
   },
   "spoiler": {
-    "SPOILER_NONE": "This world has no spoiler log.",
-    "SPOILER_UNAVAILABLE": "The spoiler log is no longer available. Use Regenerate files to create it again.",
-    "unreadable": "The spoiler log could not be read."
+    "SPOILER_NONE": "This world has no spoiler file.",
+    "SPOILER_UNAVAILABLE": "The spoiler file is no longer available. Use Regenerate files to create it again.",
+    "unreadable": "The spoiler file could not be read."
   },
   "advanced": {
     "title": "Tools",

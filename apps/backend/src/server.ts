@@ -205,11 +205,11 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'POST' && url.pathname === '/api/history/spoiler') {
       const body = await readJson<{ id?: string }>(req);
       const entry = typeof body.id === 'string' ? await history.get(body.id) : null;
-      if (!entry?.spoilerPath) return send(res, 200, { ok: false, code: 'SPOILER_NONE', message: 'This world has no spoiler log.' });
+      if (!entry?.spoilerPath) return send(res, 200, { ok: false, code: 'SPOILER_NONE', message: 'This world has no spoiler file.' });
       try {
         return send(res, 200, { ok: true, text: await readFile(entry.spoilerPath, 'utf8') });
       } catch {
-        return send(res, 200, { ok: false, code: 'SPOILER_UNAVAILABLE', message: 'The spoiler log is no longer available. Use Regenerate files to create it again.' });
+        return send(res, 200, { ok: false, code: 'SPOILER_UNAVAILABLE', message: 'The spoiler file is no longer available. Use Regenerate files to create it again.' });
       }
     }
 

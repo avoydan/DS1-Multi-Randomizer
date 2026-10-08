@@ -11,11 +11,11 @@
   "applyPlay": "Apply / Play",
   "restoreFirst": "Restore the original game first.",
   "viewSettings": "View settings",
-  "viewSpoiler": "View spoiler log",
+  "viewSpoiler": "View spoiler file",
   "delete": "Delete from history",
   "detailsTitle": {
     "settings": "Settings of this world",
-    "spoiler": "Spoiler log"
+    "spoiler": "Spoiler file"
   },
   "diagnostics": "Diagnostics"
 }

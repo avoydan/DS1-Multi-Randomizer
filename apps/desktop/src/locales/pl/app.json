@@ -97,9 +97,9 @@
     "noBridge": "Uruchom Dark Souls Remastered ze Steam."
   },
   "spoiler": {
-    "SPOILER_NONE": "Ten świat nie ma logu spoilerów.",
-    "SPOILER_UNAVAILABLE": "Log spoilerów nie jest już dostępny. Użyj opcji Wygeneruj pliki ponownie, aby go odtworzyć.",
-    "unreadable": "Nie udało się odczytać logu spoilerów."
+    "SPOILER_NONE": "Ten świat nie ma pliku ze spoilerami.",
+    "SPOILER_UNAVAILABLE": "Plik ze spoilerami nie jest już dostępny. Użyj opcji Wygeneruj pliki ponownie, aby go odtworzyć.",
+    "unreadable": "Nie udało się odczytać pliku ze spoilerami."
   },
   "advanced": {
     "title": "Narzędzia",
