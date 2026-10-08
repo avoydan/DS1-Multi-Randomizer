@@ -20,6 +20,8 @@ copy any of them, or create their files again. After **Apply to game** you can s
 
 **Hints.** After a world exists, **… → View hints** opens a read-only **hint sheet** with three spoiler levels (*Low spoilers*, *Progression*, *Full spoilers*); you can switch the level, search, and export it as **HTML**, **TXT** or **JSON** in English or Polish. It works for any world in **Run history** too (the **…** menu of its row) and changes nothing in the game.
 
+**DLC.** **DLC content** (on by default) decides whether the Artorias of the Abyss areas, enemies, bosses and items take part in the randomization. Turn it off and they stay out of it: the DLC itself stays in your game exactly as it is, it is only not randomized (see `docs/DLC_AUDIT.md`). The fog randomizer always includes the DLC areas, so the switch is locked on while it is on.
+
 **Something went wrong?** Open **Advanced → Diagnostics and support**. **Copy diagnostics** gives a short summary; **Export support bundle** saves one ZIP (summary, diagnostics, manifest, the newest log lines) to a place you choose. It contains **no game files** and no personal folders: your Windows user name, computer name, folders and any password or token are removed before it is saved. Nothing is sent anywhere; you decide who gets the file.
 
 **Builds are not code-signed yet** (`docs/RELEASE_TRUST.md`): Windows SmartScreen and some antivirus products may warn about an unrecognised publisher. Check the SHA-256 of your download against the one published with the release. Nothing is uploaded or collected by the app (`docs/SECURITY_AND_PRIVACY.md`).
