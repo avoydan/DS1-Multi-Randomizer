@@ -380,17 +380,25 @@ static GameCatalog ScanGame(string gameDirectory)
                 var startingData = ReadStartingData(binder, paramdefPath);
                 startingClasses = startingData.Classes;
                 startingItemLots = startingData.ItemLots;
+                var enemyNpcSlots = slots.Where(slot =>
+                    slot.NpcParamId >= 0 &&
+                    slot.ModelName.StartsWith('c')).ToList();
+                // NpcParam rows used only by enemies of the DLC map (docs/DLC_AUDIT.md): their drop lots belong to the DLC.
+                var dlcOnlyNpcParamIds = enemyNpcSlots
+                    .GroupBy(slot => slot.NpcParamId)
+                    .Where(group => group.All(slot => slot.MapId == "m12_01_00_00"))
+                    .Select(group => group.Key)
+                    .ToHashSet();
                 var randomizerData = ReadRandomizerParamData(
                     binder,
                     paramdefPath,
                     itemNames,
-                    slots.Where(slot =>
-                            slot.NpcParamId >= 0 &&
-                            slot.ModelName.StartsWith('c'))
+                    enemyNpcSlots
                         .Select(slot => slot.NpcParamId)
                         .ToHashSet(),
                     eventAwardItemLotIds,
-                    Path.Combine(gameDirectory, "event"));
+                    Path.Combine(gameDirectory, "event"),
+                    dlcOnlyNpcParamIds);
                 bossRewards = randomizerData.BossRewards;
                 transpositionRecipes = randomizerData.TranspositionRecipes;
                 itemTraits = randomizerData.ItemTraits;
@@ -450,7 +458,8 @@ static RandomizerParamData ReadRandomizerParamData(
     ItemNameLookup itemNames,
     HashSet<int> safeNpcParamIds,
     HashSet<int> eventAwardItemLotIds,
-    string eventDirectory)
+    string eventDirectory,
+    HashSet<int>? dlcOnlyNpcParamIds = null)
 {
     var paramdefs = BND3.Read(paramdefPath).Files
         .Select(file => PARAMDEF.Read(file.Bytes))
@@ -540,6 +549,23 @@ static RandomizerParamData ReadRandomizerParamData(
             .Select(cell => Convert.ToInt32(cell.Value)))
         .Where(id => id > 0)
         .ToHashSet();
+    // Drop lots awarded only by DLC-only NpcParam rows (and by no event): DLC enemy drops, tagged for the DLC exclusion.
+    IEnumerable<int> LotsOf(IEnumerable<PARAM.Row> rows) => rows
+        .SelectMany(row => row.Cells
+            .Where(cell => cell.Def.InternalName.StartsWith(
+                "itemLotId_", StringComparison.OrdinalIgnoreCase))
+            .Select(cell => Convert.ToInt32(cell.Value)))
+        .Where(id => id > 0);
+    var dlcOnlyDropLotIds = new HashSet<int>();
+    if (dlcOnlyNpcParamIds is { Count: > 0 })
+    {
+        dlcOnlyDropLotIds = LotsOf(npcParam.Rows.Where(row =>
+                safeNpcParamIds.Contains(row.ID) && dlcOnlyNpcParamIds.Contains(row.ID)))
+            .ToHashSet();
+        dlcOnlyDropLotIds.ExceptWith(LotsOf(npcParam.Rows.Where(row =>
+            safeNpcParamIds.Contains(row.ID) && !dlcOnlyNpcParamIds.Contains(row.ID))));
+        dlcOnlyDropLotIds.ExceptWith(eventAwardItemLotIds);
+    }
     dropLotIds.UnionWith(eventAwardItemLotIds);
     // The Darkroot Basin Hydra grants this ring through encounter-specific
     // logic that is not represented by the ordinary hostile NPC drop scan.
@@ -573,7 +599,8 @@ static RandomizerParamData ReadRandomizerParamData(
         .Select(row => new ItemLotRecord(
             row.ID,
             DescribeItemLot(row),
-            ItemLotEntries(row)))
+            ItemLotEntries(row),
+            dlcOnlyDropLotIds.Contains(row.ID) ? true : null))
         .OrderBy(row => row.RowId)
         .ToList();
 
@@ -5678,7 +5705,11 @@ record StartingData(
     List<StartingClassRecord> Classes,
     List<StartingItemLotRecord> ItemLots);
 record ParamRowRecord(int RowId, string Name);
-record ItemLotRecord(int RowId, string Name, List<ItemLotEntryRecord> Entries);
+/// <summary>
+/// An item lot. <c>DlcOnly</c> (enemy drop lots only, DLC exclusion, patch 0025) is true when every enemy that awards the lot stands in the DLC map
+/// and no other enemy or event awards it; it is omitted (null) otherwise, so every other record keeps its exact JSON.
+/// </summary>
+record ItemLotRecord(int RowId, string Name, List<ItemLotEntryRecord> Entries, bool? DlcOnly = null);
 record ItemLotEntryRecord(
     int Slot,
     int ItemId,

@@ -150,6 +150,56 @@ export const sets = {
     { name: 'triple-race-plus', patch: merge2(structuredClone(DEFAULT_GENERATION_SETTINGS), { items: { keyPlacement: 'race-plus', soulItems: 'transposed', laundromat: true } }), seeds: 25 },
     { name: 'triple-very-unfair', patch: merge2(structuredClone(DEFAULT_GENERATION_SETTINGS), { items: { keyPlacement: 'shuffled', itemDifficulty: 'very-unfair', laundromat: true } }), seeds: 25 },
   ],
+  /**
+   * DLC exclusion (docs/DLC_AUDIT.md): worlds with the DLC left out through the real data tool. Every package is compared with the clean game by SmokeVerify
+   * `dlc-untouched` (the DLC map files, the DLC enemies' NpcParam rows, the DLC item lot rows and boss reward rows are exactly the clean game's) and the plan is searched for any DLC content.
+   * The DLC cannot be left out while the world randomizer runs, so no case here uses Fog; the "-on" case is the control with the DLC on.
+   */
+  'dlc-off': (() => {
+    const off = { output: { includeDlc: false } };
+    const allPools = { randomizeGifts: true, randomizeEnemyDrops: true, randomizeShops: true };
+    const heavy = sampling({ normalReplacement: 'both', bossReplacement: 'both', hostileNpcs: true, typeReplacement: 'enabled-except-roaming-bosses', fit: 'anywhere', replacementChance: 70 });
+    return [
+      { name: 'items-only', patch: merge2({ enemies: { enabled: false } }, noFog, off, { items: { ...allPools, soulItems: 'transposed' } }), seeds: 20 },
+      { name: 'enemies-only', patch: merge2(noItems, noFog, off, sampling({ normalReplacement: 'both', fit: 'anywhere' })), seeds: 20 },
+      { name: 'enemies-permutation', patch: merge2(noItems, noFog, off, { enemies: { placement: { algorithm: 'permutation-v1' } } }), seeds: 10 },
+      { name: 'bosses-classic', patch: merge2(noItems, noFog, off, { enemies: { randomizeRegularEnemies: false, randomizeBosses: true } }), seeds: 10 },
+      { name: 'bosses-random-and-bodies', patch: merge2(noItems, noFog, off, sampling({ bossReplacement: 'both', bossChanceInBossSlots: 60, fit: 'anywhere' }, { randomizeRegularEnemies: false })), seeds: 15 },
+      { name: 'triple-without-fog', patch: merge2(structuredClone(DEFAULT_GENERATION_SETTINGS), noFog, off, heavy, { items: { ...allPools, soulItems: 'transposed' } }), seeds: 20 },
+      { name: 'keys-lords', patch: merge2({ enemies: { enabled: false } }, noFog, off, { items: { keyPlacement: 'shuffled', randomizeLordvessel: true, randomizeLordSouls: true, ...allPools } }), seeds: 15 },
+      { name: 'race', patch: merge2({ enemies: { enabled: false } }, noFog, off, { items: { keyPlacement: 'race', ...allPools, soulItems: 'transposed' } }), seeds: 15 },
+      { name: 'race-plus', patch: merge2({ enemies: { enabled: false } }, noFog, off, { items: { keyPlacement: 'race-plus', randomizeLordvessel: true, randomizeLordSouls: true } }), seeds: 15 },
+      { name: 'very-unfair-transposed', patch: merge2({ enemies: { enabled: false } }, noFog, off, { items: { itemDifficulty: 'very-unfair', ...allPools, soulItems: 'transposed' } }), seeds: 10 },
+      { name: 'laundromat-npc-armor', patch: merge2({ enemies: { enabled: false } }, noFog, off, { items: { laundromat: true } }), seeds: 10 },
+      { name: 'items-only-on', patch: merge2({ enemies: { enabled: false } }, noFog, { items: { ...allPools, soulItems: 'transposed' } }), seeds: 5 },
+    ];
+  })(),
+  /**
+   * The final broad sweep before the release candidate (docs/IMPLEMENTATION_STATUS.md): the volumes the project asked for, every world through the real data tool (and the real FogHost where
+   * Fog is on), each also read by the standing audits (event owners, item lots, key progression with FogMod's own checker, Race destinations, difficulty tiers, DLC untouched).
+   * The fog randomizer cannot run with the DLC off, so there is no DLC-off Fog case: that combination is refused by validation (configValidation.test.mjs).
+   */
+  'final-rc': (() => {
+    const allPools = { randomizeGifts: true, randomizeEnemyDrops: true, randomizeShops: true };
+    const chaos = sampling({ normalReplacement: 'both', bossReplacement: 'both', bossChanceInNormalSlots: 20, bossChanceInBossSlots: 60, hostileNpcs: true, typeReplacement: 'enabled-except-roaming-bosses', fit: 'anywhere', replacementChance: 70 }, { secondGargoyle: 'replace' });
+    const off = { output: { includeDlc: false } };
+    return [
+      { name: 'triple-default-nofog', patch: merge2(structuredClone(DEFAULT_GENERATION_SETTINGS), noFog), seeds: 100 },
+      { name: 'triple-chaos-nofog', patch: merge2(structuredClone(DEFAULT_GENERATION_SETTINGS), noFog, chaos, { items: { ...allPools, soulItems: 'transposed' } }), seeds: 100 },
+      { name: 'triple-default-fog', patch: structuredClone(DEFAULT_GENERATION_SETTINGS), seeds: 100 },
+      { name: 'triple-keys-fog', patch: merge2(structuredClone(DEFAULT_GENERATION_SETTINGS), { items: { keyPlacement: 'shuffled', randomizeLordvessel: true, randomizeLordSouls: true, soulItems: 'transposed' } }), seeds: 100 },
+      { name: 'race', patch: merge2({ enemies: { enabled: false } }, noFog, { items: { keyPlacement: 'race', ...allPools, soulItems: 'transposed' } }), seeds: 100 },
+      { name: 'race-plus', patch: merge2({ enemies: { enabled: false } }, noFog, { items: { keyPlacement: 'race-plus', randomizeLordvessel: true, randomizeLordSouls: true } }), seeds: 100 },
+      { name: 'very-unfair', patch: merge2({ enemies: { enabled: false } }, noFog, { items: { itemDifficulty: 'very-unfair', ...allPools, soulItems: 'transposed' } }), seeds: 100 },
+      { name: 'keys-lords', patch: merge2({ enemies: { enabled: false } }, noFog, { items: { keyPlacement: 'shuffled', randomizeLordvessel: true, randomizeLordSouls: true, ...allPools } }), seeds: 100 },
+      { name: 'e1-bosses-in-regular-slots', patch: merge2(noItems, noFog, sampling({ normalReplacement: 'both', bossChanceInNormalSlots: 30, fit: 'anywhere', replacementChance: 80 })), seeds: 100 },
+      { name: 'e2-normals-in-boss-slots', patch: merge2(noItems, noFog, sampling({ bossReplacement: 'both', bossChanceInBossSlots: 60, fit: 'anywhere' }, { secondGargoyle: 'replace' })), seeds: 100 },
+      { name: 'hostile-npcs', patch: merge2(noItems, noFog, sampling({ normalReplacement: 'normals', hostileNpcs: true, fit: 'fits', replacementChance: 100 })), seeds: 100 },
+      { name: 'boss-sampling', patch: merge2(noItems, noFog, sampling({ bossReplacement: 'bosses', fit: 'anywhere' }, { gwynNerf: 'strong' })), seeds: 100 },
+      { name: 'dlc-off-triple', patch: merge2(structuredClone(DEFAULT_GENERATION_SETTINGS), noFog, off, chaos, { items: { ...allPools, soulItems: 'transposed' } }), seeds: 100 },
+      { name: 'dlc-off-keys-race', patch: merge2({ enemies: { enabled: false } }, noFog, off, { items: { keyPlacement: 'race', randomizeLordvessel: true, randomizeLordSouls: true, ...allPools, soulItems: 'transposed' } }), seeds: 100 },
+    ];
+  })(),
   /** Part F1: hostile NPCs through the real data tool (Fog is covered by the fogHostE2e sweeps): events, rows and AI bundles of every placed NPC. */
   'hostile-npc-f1': [
     { name: 'npc-anywhere', patch: merge2(noItems, noFog, sampling({ hostileNpcs: true, fit: 'anywhere', difficultyMode: 'random' })) },
@@ -339,6 +389,23 @@ async function main() {
       void document;
       try { return JSON.parse(out.stdout.trim().split(/\r?\n/u).pop()); } catch { return { plannedRows: 0, problems: [`the laundromat verifier did not run: ${String(out.stderr).slice(0, 200)}`] }; }
     };
+    // DLC exclusion: the package leaves the DLC exactly as the clean game has it, and the plan names no DLC content.
+    const auditDlc = async (run) => {
+      const document = await placementsOf(run);
+      const catalogFile = await (async () => {
+        const attempts = (await readdir(run.workspacePath)).filter((name) => /^combined-\d+$/u.test(name)).sort((a, b) => Number(b.slice(9)) - Number(a.slice(9)));
+        const base = path.join(run.workspacePath, attempts[0]);
+        const found = [path.join(base, 'dsr-catalog.json'), ...(await readdir(base)).map((name) => path.join(base, name, 'dsr-catalog.json'))];
+        for (const candidate of found) { if (await readFile(candidate).then(() => true, () => false)) return candidate; }
+        return null;
+      })();
+      const problems = [];
+      if (JSON.stringify(document.placements).includes('m12_01_00_00')) problems.push('the plan names the DLC map');
+      if (!catalogFile) return { filesChecked: 0, npcRowsChecked: 0, lotRowsChecked: 0, problems: ['the catalog of the run was not found'] };
+      const tree = await readdir(path.join(run.result.packagePath, 'param')).then(() => run.result.packagePath, () => path.join(run.result.packagePath, 'mod'));
+      const out = spawnSync(verifier, ['dlc-untouched', tree, path.join(source, 'paramdef', 'paramdef.paramdefbnd.dcx'), catalogFile, source], { encoding: 'utf8' });
+      try { const result = JSON.parse(out.stdout.trim().split(/\r?\n/u).pop()); return { ...result, problems: [...problems, ...result.problems] }; } catch { return { filesChecked: 0, npcRowsChecked: 0, lotRowsChecked: 0, problems: [...problems, `the DLC verifier did not run: ${String(out.stderr).slice(0, 200)}`] }; }
+    };
     const difficultyOf = async (run) => (await placementsOf(run)).validation?.itemDifficulty ?? null;
 
     const generate = async (spec, seed, label) => {
@@ -360,7 +427,7 @@ async function main() {
 
     for (const spec of caseList.filter((entry) => !args.cases || args.cases.includes(entry.name))) {
       const seeds = args.seeds ?? spec.seeds ?? 12;
-      const stats = { case: spec.name, seeds, ok: 0, failed: [], retries: 0, windowOverruns: 0, windowInexact: 0, eventOwnerChecked: 0, eventOwnerFrozen: 0, eventOwnerFailures: [], lotsChecked: 0, raceChecked: 0, raceItems: 0, raceFailures: [], laundromatRows: 0, laundromatFailures: [], difficultyFailures: [], tiers: {}, progressionChecked: 0, placementsChecked: 0, keysPlaced: 0, placementFailures: [], progressionFailures: [], keyAttempts: 0, keysMoved: 0, bossRewardsChecked: 0, lotFailures: [], floorReserved: 0, windowMoved: 0, movedSeeds: [], maxEvents: 0, maxEventsMap: '', nonDeterministic: 0, maxModels: 0, started: Date.now() };
+      const stats = { dlcWorlds: 0, dlcFiles: 0, dlcNpcRows: 0, dlcLotRows: 0, dlcFailures: [], case: spec.name, seeds, ok: 0, failed: [], retries: 0, windowOverruns: 0, windowInexact: 0, eventOwnerChecked: 0, eventOwnerFrozen: 0, eventOwnerFailures: [], lotsChecked: 0, raceChecked: 0, raceItems: 0, raceFailures: [], laundromatRows: 0, laundromatFailures: [], difficultyFailures: [], tiers: {}, progressionChecked: 0, placementsChecked: 0, keysPlaced: 0, placementFailures: [], progressionFailures: [], keyAttempts: 0, keysMoved: 0, bossRewardsChecked: 0, lotFailures: [], floorReserved: 0, windowMoved: 0, movedSeeds: [], maxEvents: 0, maxEventsMap: '', nonDeterministic: 0, maxModels: 0, started: Date.now() };
       const indices = args.only ?? Array.from({ length: seeds }, (_, offset) => offset + 1);
       stats.seeds = indices.length;
       for (const index of indices) {
@@ -380,6 +447,11 @@ async function main() {
           stats.bossRewardsChecked += lots.bossRewardTargets;
           if (lots.problems.length > 0) stats.lotFailures.push(`#${index}: ${lots.problems.slice(0, 2).join(' | ')}`);
           const items = run.prepared.config.items;
+          if (run.prepared.config.output.includeDlc === false) {
+            const dlc = await auditDlc(run);
+            stats.dlcWorlds += 1; stats.dlcFiles += dlc.filesChecked; stats.dlcNpcRows += dlc.npcRowsChecked; stats.dlcLotRows += dlc.lotRowsChecked;
+            if (dlc.problems.length > 0 || dlc.npcRowsChecked === 0 || dlc.lotRowsChecked === 0) stats.dlcFailures.push(`#${index}: ${dlc.problems.slice(0, 2).join(' | ') || 'nothing was compared'}`);
+          }
           if (items.laundromat) {
             const laundromat = await auditLaundromat(run);
             stats.laundromatRows += laundromat.plannedRows;
@@ -444,7 +516,7 @@ async function main() {
       console.log(JSON.stringify(stats));
     }
     const failed = summary.reduce((total, entry) => total + entry.failed.length, 0);
-    const bad = summary.reduce((total, entry) => total + entry.windowOverruns + entry.nonDeterministic + entry.eventOwnerFailures.length + entry.lotFailures.length + entry.progressionFailures.length + entry.placementFailures.length + entry.raceFailures.length + entry.laundromatFailures.length + entry.difficultyFailures.length, 0);
+    const bad = summary.reduce((total, entry) => total + entry.windowOverruns + entry.nonDeterministic + entry.dlcFailures.length + entry.eventOwnerFailures.length + entry.lotFailures.length + entry.progressionFailures.length + entry.placementFailures.length + entry.raceFailures.length + entry.laundromatFailures.length + entry.difficultyFailures.length, 0);
     console.log(`MATRIX ${args.set}: ${summary.reduce((total, entry) => total + entry.ok, 0)} ok, ${failed} failed, ${bad} invariant violations (window overruns / non-deterministic reruns / event owner audit)`);
     if (failed > 0 || bad > 0) process.exitCode = 1;
   } finally {

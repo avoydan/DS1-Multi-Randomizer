@@ -204,6 +204,78 @@ if (args.Length > 0 && args[0] == "lots")
     return problems.Count == 0 ? 0 : 1;
 }
 
+// SmokeVerify dlc-untouched <package game tree> <paramdef.paramdefbnd.dcx> <catalog.json> <original game dir>
+// A world made with the DLC left out (docs/DLC_AUDIT.md) must leave the DLC exactly as the clean game has it: the map and event files of the DLC map are absent from
+// the package or byte-identical, every NpcParam row that only DLC enemies use, every item lot row of the DLC (its world lots and the drop lots only DLC enemies award)
+// and every DLC boss reward row are cell for cell the clean game's.
+if (args.Length > 0 && args[0] == "dlc-untouched")
+{
+    const string dlcMap = "m12_01_00_00";
+    var defs = BND3.Read(args[2]).Files.Select(file => PARAMDEF.Read(file.Bytes)).ToList();
+    PARAM Read(BND3 bnd, string suffix)
+    {
+        var file = bnd.Files.Single(entry => entry.Name.EndsWith(suffix, StringComparison.OrdinalIgnoreCase));
+        var param = PARAM.Read(file.Bytes);
+        param.ApplyParamdef(defs.First(definition => definition.ParamType == param.ParamType));
+        return param;
+    }
+    var catalog = JsonDocument.Parse(File.ReadAllText(args[3])).RootElement;
+    var problems = new List<string>();
+    var filesChecked = 0;
+    foreach (var relative in new[] { "map/MapStudio/" + dlcMap + ".msb.dcx", "map/MapStudio/" + dlcMap + ".msb", "event/" + dlcMap + ".emevd.dcx" })
+    {
+        var packaged = Path.Combine(args[1], relative.Replace('/', Path.DirectorySeparatorChar));
+        if (!File.Exists(packaged)) continue;
+        filesChecked++;
+        var clean = Path.Combine(args[4], relative.Replace('/', Path.DirectorySeparatorChar));
+        if (!File.Exists(clean) || !File.ReadAllBytes(packaged).AsSpan().SequenceEqual(File.ReadAllBytes(clean))) problems.Add($"{relative} differs from the clean game");
+    }
+    var nowBnd = BND3.Read(Path.Combine(args[1], "param", "GameParam", "GameParam.parambnd.dcx"));
+    var thenBnd = BND3.Read(Path.Combine(args[4], "param", "GameParam", "GameParam.parambnd.dcx"));
+    string Text(object? value) => value is byte[] bytes ? Convert.ToHexString(bytes) : Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture) ?? "";
+    int CompareRows(string suffix, IEnumerable<int> ids, string label)
+    {
+        var now = Read(nowBnd, suffix).Rows.ToDictionary(row => row.ID);
+        var then = Read(thenBnd, suffix).Rows.ToDictionary(row => row.ID);
+        var count = 0;
+        foreach (var id in ids.Distinct())
+        {
+            if (!then.TryGetValue(id, out var original)) continue;
+            count++;
+            if (!now.TryGetValue(id, out var row)) { problems.Add($"{label} row {id} is missing from the package"); continue; }
+            foreach (var cell in row.Cells)
+            {
+                if (!cell.Def.InternalName.StartsWith("lotItemBasePoint", StringComparison.Ordinal) && Text(cell.Value) != Text(original[cell.Def.InternalName].Value))
+                { problems.Add($"{label} row {id} cell {cell.Def.InternalName} was changed"); break; }
+            }
+        }
+        return count;
+    }
+    // NpcParam rows used only by enemies of the DLC map.
+    var slotsByNpc = new Dictionary<int, bool>();
+    foreach (var slot in catalog.GetProperty("enemySlots").EnumerateArray())
+    {
+        var npcId = slot.GetProperty("npcParamId").GetInt32();
+        if (npcId < 0) continue;
+        var inDlc = slot.GetProperty("mapId").GetString() == dlcMap;
+        slotsByNpc[npcId] = slotsByNpc.TryGetValue(npcId, out var all) ? all && inDlc : inDlc;
+    }
+    var dlcNpcRows = slotsByNpc.Where(entry => entry.Value).Select(entry => entry.Key).ToList();
+    var npcChecked = CompareRows("NpcParam.param", dlcNpcRows, "NpcParam");
+    var lotIds = new List<int>();
+    foreach (var lot in catalog.GetProperty("worldItemLots").EnumerateArray())
+        if (lot.GetProperty("mapId").GetString() == dlcMap) lotIds.Add(lot.GetProperty("rowId").GetInt32());
+    foreach (var lot in catalog.GetProperty("enemyDropLots").EnumerateArray())
+        if (lot.TryGetProperty("dlcOnly", out var tagged) && tagged.ValueKind == JsonValueKind.True) lotIds.Add(lot.GetProperty("rowId").GetInt32());
+    foreach (var reward in catalog.GetProperty("bossRewards").EnumerateArray())
+        if (reward.GetProperty("dlc").GetBoolean())
+            foreach (var lot in reward.GetProperty("lots").EnumerateArray())
+                foreach (var row in lot.GetProperty("chain").EnumerateArray()) lotIds.Add(row.GetProperty("rowId").GetInt32());
+    var lotsChecked = CompareRows("ItemLotParam.param", lotIds, "ItemLotParam");
+    Console.WriteLine(JsonSerializer.Serialize(new { filesChecked, npcRowsChecked = npcChecked, lotRowsChecked = lotsChecked, problems }));
+    return problems.Count == 0 ? 0 : 1;
+}
+
 var modDir = args[0];
 var paramdefs = BND3.Read(args[1]).Files.Select(file => PARAMDEF.Read(file.Bytes)).ToList();
 var expectations = JsonSerializer.Deserialize<List<Expectation>>(File.ReadAllText(args[2]), new JsonSerializerOptions { PropertyNameCaseInsensitive = true })!;
