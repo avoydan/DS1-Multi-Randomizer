@@ -157,10 +157,10 @@ traversable fog gates; DS1TR enforces the same rule in `configValidation.ts`.
 | Option | Contract key | Status |
 |---|---|---|
 | World items | `items.randomizeWorldItems` | FULL |
-| Protected items | `items.randomizeProtectedItems` | INTENTIONALLY_UNSUPPORTED: the engine implements it, but the backend rejects it ("blocked until progression safety is proven") and the UI control is disabled. Enabling is a product-safety decision, not wiring. |
+| Protected items | `items.randomizeProtectedItems` | INTENTIONALLY_UNSUPPORTED: the engine implements it, but the backend rejects it ("blocked until progression safety is proven") and the UI draws no control. Enabling is a product-safety decision, not wiring. |
 | Progression safeguards | `items.progressionLogic` | FULL |
-| Guaranteed early weapon | `items.guaranteeEarlyWeapon` | FULL |
-| Balanced early loot | `items.balancedEarlyLoot` | FULL |
+| Guaranteed early weapon | `items.guaranteeEarlyWeapon` | NO_EFFECT_IN_THIS_VERSION: the field is accepted, stored and part of old Seed Codes, but the extracted-data path of the combined engine never reads it (probed with the real pipeline: the generated files are identical with it on and off). The interface does not draw a control for it (`docs/SETTINGS_INVENTORY.md`, "Options that are not drawn"). |
+| Balanced early loot | `items.balancedEarlyLoot` | NO_EFFECT_IN_THIS_VERSION: same as above (only the older prototype path reads it). No control is drawn. |
 | Starting class | `items.randomizeStartingClass` | FULL |
 | Starting equipment | `items.randomizeStartingEquipment` | FULL |
 | NPC gifts | `items.randomizeGifts` | FULL |

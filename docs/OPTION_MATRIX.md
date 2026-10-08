@@ -10,8 +10,8 @@ Items:
 - world items;
 - protected/progression items;
 - progression safeguards;
-- guaranteed early weapon;
-- balanced early loot;
+- guaranteed early weapon (accepted and stored; no effect in this version, not drawn: see SETTINGS_INVENTORY.md);
+- balanced early loot (accepted and stored; no effect in this version, not drawn: see SETTINGS_INVENTORY.md);
 - starting class;
 - starting equipment;
 - NPC gifts;

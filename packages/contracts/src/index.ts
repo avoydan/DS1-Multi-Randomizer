@@ -396,3 +396,4 @@ export * from './smokeTests.js';
 export * from './hintSheet.js';
 export * from './diagnostics.js';
 export * from './problemText.js';
+export * from './settingsRegistry.js';
