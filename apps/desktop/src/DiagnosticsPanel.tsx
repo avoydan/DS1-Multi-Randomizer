@@ -12,6 +12,8 @@ interface Props {
   gamePath: string;
   /** A world of the history to describe; without it the applied world, else the newest. */
   worldId?: string | null;
+  /** Changes when the world or the game changed, so the summary is read again. */
+  refreshKey?: string;
   /** Shown as a dialog when given (the history's "Diagnostics"); inline in Advanced otherwise. */
   onClose?: () => void;
 }
@@ -20,7 +22,7 @@ interface Props {
  * Diagnostics and support (docs/DIAGNOSTICS.md, docs/SUPPORT_BUNDLE.md): a friendly summary first, the technical details behind a toggle, "Copy
  * diagnostics" and "Export support bundle". The model comes from the backend already sanitized; the texts are built here in the app language.
  */
-export function DiagnosticsPanel({ gamePath, worldId, onClose }: Props) {
+export function DiagnosticsPanel({ gamePath, worldId, refreshKey, onClose }: Props) {
   const { t } = useTranslation();
   const errorText = useErrorText();
   const [diagnostics, setDiagnostics] = useState<Diagnostics | null>(null);
@@ -38,7 +40,7 @@ export function DiagnosticsPanel({ gamePath, worldId, onClose }: Props) {
       const result = await api.diagnostics(gamePath, currentLanguage(), worldId ?? undefined);
       setDiagnostics(result.diagnostics);
     } catch { setFailed(true); }
-  }, [gamePath, worldId]);
+  }, [gamePath, worldId, refreshKey]);
 
   useEffect(() => { void load(); }, [load]);
 

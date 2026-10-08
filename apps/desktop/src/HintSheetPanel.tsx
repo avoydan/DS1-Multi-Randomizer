@@ -107,7 +107,7 @@ export function HintSheetPanel({ entryId, exportFirst = false, onClose }: Props)
               <span className="field-note">{t('hints.viewer.count', { count: shown.length })}</span>
             </div>
             {document.unhintable > 0 && <p className="field-note">{t('hints.viewer.unhintable', { count: document.unhintable })}</p>}
-            {entries.length === 0 && <p className="field-note">{t('hints.empty')}</p>}
+            {entries.length === 0 && <p className="field-note">{document.records.length === 0 ? t('hints.empty') : t('hints.noProgression')}</p>}
             {entries.length > 0 && shown.length === 0 && <p className="field-note">{t('hints.viewer.noMatch')}</p>}
             <div className="hint-list">
               {sections.map((section) => (

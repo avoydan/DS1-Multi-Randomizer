@@ -726,7 +726,7 @@ export function App() {
             </div>
             {lastRun && <p>{t('app.advanced.internalSeed', { seed: lastRun.masterSeed, profile: lastRun.profile })}</p>}
             {generation?.ok && <p>{t('app.advanced.files', { path: generation.packagePath, count: generation.manifest.files.length })}</p>}
-            <details className="log-panel" onToggle={(event) => setDiagnosticsOpen((event.currentTarget as HTMLDetailsElement).open)}><summary>{t('diagnostics.panel.title')}</summary>{diagnosticsOpen && <DiagnosticsPanel gamePath={config.gamePath} />}</details>
+            <details className="log-panel" onToggle={(event) => setDiagnosticsOpen((event.currentTarget as HTMLDetailsElement).open)}><summary>{t('diagnostics.panel.title')}</summary>{diagnosticsOpen && <DiagnosticsPanel gamePath={config.gamePath} refreshKey={`${lastOperationId ?? ''}|${history.length}|${gameState?.state ?? ''}`} />}</details>
             <SmokeTestPanel busy={busy} onCreate={(seed) => void loadSeed(seed)} />
             <pre className="run-logs" aria-label={t('app.advanced.detailsAria')}>{logs.length ? logs.join('\n') : t('app.advanced.nothing')}</pre>
           </details>

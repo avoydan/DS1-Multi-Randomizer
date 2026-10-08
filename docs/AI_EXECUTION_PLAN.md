@@ -981,7 +981,7 @@ See `docs/IMPLEMENTATION_STATUS.md` and `docs/FOGHOST_INTEGRATION.md`
 
 # TASK 17 — CODEX
 
-State: PENDING
+State: ACTIVE
 
 ## Packaging and release readiness
 

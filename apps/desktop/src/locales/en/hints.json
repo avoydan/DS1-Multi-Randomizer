@@ -105,5 +105,6 @@
     "exportNote": "The export has the spoiler level you chose here. HTML opens in any browser and works offline.",
     "unhintable_one": "{{count}} placement could not be described and is not listed.",
     "unhintable_other": "{{count}} placements could not be described and are not listed."
-  }
+  },
+  "noProgression": "With these settings no key or other progression item was moved: they lie where the game puts them. Choose Full spoilers to see every placement."
 }

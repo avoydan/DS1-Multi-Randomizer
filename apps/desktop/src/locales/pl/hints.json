@@ -109,5 +109,6 @@
     "unhintable_few": "Nie udało się opisać {{count}} rozmieszczeń; nie ma ich na liście.",
     "unhintable_many": "Nie udało się opisać {{count}} rozmieszczeń; nie ma ich na liście.",
     "unhintable_other": "Nie udało się opisać {{count}} rozmieszczeń; nie ma ich na liście."
-  }
+  },
+  "noProgression": "Przy tych ustawieniach żaden klucz ani inny przedmiot postępu nie został przeniesiony: leżą tam, gdzie umieszcza je gra. Wybierz Pełne spoilery, aby zobaczyć każde rozmieszczenie."
 }
