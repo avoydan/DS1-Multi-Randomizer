@@ -6,6 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { migrateSettings, normalizeGamePath, type StoredSettings } from './settings.js';
 import { launchGame } from './launchGame.js';
+import { DesktopLog, installModeOf } from './appLog.js';
 import { MAX_SAVE_BYTES, SAVE_KINDS, parseSaveRequest, saveBytes } from './saveFile.js';
 import { mainMessage, normalizeLanguageSetting, resolveLanguage, type AppLanguage, type LanguageSetting, type MainMessageKey } from './language.js';
 
@@ -18,6 +19,8 @@ let backendError: string | null = null;
 let sessionToken = '';
 let settings: StoredSettings = {};
 let quitting = false;
+/** The application's own log (userData/logs/app.log); the backend and the support bundle read it. */
+const desktopLog = new DesktopLog(path.join(app.getPath('userData'), 'logs', 'app.log'));
 
 /** The language the person chose, or the operating system's when it is Auto (docs/I18N.md). Resolved before the window exists. */
 const systemLocales = (): string[] => [...app.getPreferredSystemLanguages(), app.getLocale()];
@@ -79,11 +82,16 @@ async function startBackend(): Promise<void> {
       DS1TR_DOTNET_PATH: dataTool,
       DS1TR_DATA_TOOL_EXE: dataTool,
       DS1TR_STATE_DIR: path.join(app.getPath('userData'), 'state'),
+      DS1TR_USER_DATA: app.getPath('userData'),
+      DS1TR_APP_LOG: desktopLog.file,
+      DS1TR_DESKTOP_VERSION: app.getVersion(),
+      DS1TR_INSTALL_MODE: installModeOf(app.isPackaged, process.env),
     },
     stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
     windowsHide: true,
   });
   backend = child;
+  desktopLog.write('info', 'backend process started');
   let output = '';
   let errors = '';
   await new Promise<void>((resolve) => {
@@ -93,13 +101,13 @@ async function startBackend(): Promise<void> {
       if (finished) return;
       finished = true;
       clearTimeout(timeout);
-      if (error) backendError = `${error}${errors ? ` ${errors.slice(-500)}` : ''}`;
+      if (error) { backendError = `${error}${errors ? ` ${errors.slice(-500)}` : ''}`; desktopLog.write('error', `backend startup problem: ${backendError}`, 'BACKEND_UNAVAILABLE'); }
       resolve();
     }
     child.stdout?.on('data', (chunk: Buffer) => {
       output += chunk.toString();
       const match = output.match(/\[backend\] http:\/\/127\.0\.0\.1:(\d+)/);
-      if (match) { backendUrl = `http://127.0.0.1:${match[1]}/api`; finish(); }
+      if (match) { backendUrl = `http://127.0.0.1:${match[1]}/api`; desktopLog.write('info', 'backend is listening'); finish(); }
     });
     child.stderr?.on('data', (chunk: Buffer) => { errors += chunk.toString(); });
     child.on('error', (error) => finish(say('backendCannotStart', { reason: error.message })));
@@ -150,6 +158,7 @@ ipcMain.handle('language:set', async (_event, value: unknown) => {
   const { language: _previous, ...rest } = settings;
   settings = next === 'auto' ? rest : { ...rest, language: next };
   await saveSettings();
+  desktopLog.write('info', `language set to ${next} (resolved ${currentLanguage()})`);
   return { setting: languageSetting(), resolved: currentLanguage() };
 });
 // Export a document the renderer made (hint sheet, support bundle): the person chooses where; the renderer never supplies a path.
@@ -164,8 +173,10 @@ ipcMain.handle('file:save', async (event, value: unknown) => {
   if (chosen.canceled || !chosen.filePath) return { ok: false, canceled: true };
   try {
     await writeFile(chosen.filePath, bytes);
+    desktopLog.write('info', `exported ${request.kind} (${bytes.length} bytes)`);
     return { ok: true, name: path.basename(chosen.filePath) };
-  } catch {
+  } catch (error) {
+    desktopLog.write('error', `export failed: ${error instanceof Error ? error.message : String(error)}`, 'WRITE_FAILED');
     return { ok: false, canceled: false, code: 'WRITE_FAILED' };
   }
 });
@@ -193,6 +204,7 @@ ipcMain.handle('game:launch', (_event, gamePath: string) => launchGame(typeof ga
 
 app.whenReady().then(async () => {
   await loadSettings();
+  desktopLog.write('info', `DS1 Triple Randomizer ${app.getVersion()} started (${installModeOf(app.isPackaged, process.env)}), language ${currentLanguage()}`);
   await startBackend();
   await createWindow();
 }).catch((error) => { dialog.showErrorBox(say('startupFailedTitle'), String(error)); app.quit(); });

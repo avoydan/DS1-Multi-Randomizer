@@ -34,5 +34,5 @@ test('the screen remembers a chosen folder only after the installation check acc
   assert.match(readiness, /if \(decision\.kind === 'saved' \|\| decision\.kind === 'detected'\) onPath\(decision\.path\)/u);
   const main = await readFile(path.join(desktop, '..', 'electron', 'main.ts'), 'utf8');
   assert.match(main, /ipcMain\.handle\('game:remember-path'/u);
-  assert.doesNotMatch(main.slice(main.indexOf("'dialog:select-game-directory'"), main.indexOf("'game:remember-path'")), /saveSettings/u, 'choosing a folder alone saves nothing');
+  assert.doesNotMatch(main.slice(main.indexOf("'dialog:select-game-directory'"), main.indexOf("'language:get'")), /saveSettings/u, 'choosing a folder alone saves nothing');
 });

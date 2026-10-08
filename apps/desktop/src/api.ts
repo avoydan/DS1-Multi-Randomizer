@@ -1,4 +1,4 @@
-import type { HintDocument, DecodedSeedPayload, EnemyPoolDescription, GenerationSettings, PersistedSettings, RunHistoryEntry, GameStateReport, GenerationEvent, GenerationResult, InstallationValidation, OperationResult, PipelinePlan, PresetDocument, PresetImportResult, RandomizerConfig } from '@ds1tr/contracts';
+import type { Diagnostics, HintDocument, DecodedSeedPayload, EnemyPoolDescription, GenerationSettings, PersistedSettings, RunHistoryEntry, GameStateReport, GenerationEvent, GenerationResult, InstallationValidation, OperationResult, PipelinePlan, PresetDocument, PresetImportResult, RandomizerConfig } from '@ds1tr/contracts';
 
 export interface DetectedInstallation { gamePath: string; label: string; valid: boolean; problems: string[] }
 export interface SmokeTestList {
@@ -78,6 +78,10 @@ export const api = {
   deleteHistoryEntry: (id: string) => post<{ ok: boolean }>('/history/delete', { id }),
   spoiler: (id: string) => post<{ ok: true; text: string } | { ok: false; code?: string; message: string }>('/history/spoiler', { id }),
   hints: (id: string) => post<{ ok: true; document: HintDocument } | { ok: false; code: string }>('/hints/get', { id }),
+  diagnostics: (gamePath: string, language: string, worldId?: string) => post<{ ok: true; diagnostics: Diagnostics }>('/diagnostics', { gamePath, language, worldId }),
+  supportBundle: (request: { gamePath: string; language: string; worldId?: string; summaryText: string; readmeText: string }) =>
+    post<{ ok: true; fileName: string; contentBase64: string; report: { entries: Array<{ name: string; bytes: number; truncated: boolean }>; totalBytes: number; redactions: number } } | { ok: false; code: string }>('/support/bundle', request),
+  log: (entry: { level: 'info' | 'warning' | 'error'; stage?: string; message: string; correlationId?: string; code?: string }) => post<{ ok: boolean }>('/log', entry, true).catch(() => undefined),
   smokeTests: () => post<SmokeTestList>('/smoke/list', {}),
   loadSettings: () => post<{ found: boolean; persisted: PersistedSettings | null; warning: string | null }>('/settings/load', {}),
   saveSettings: (settings: GenerationSettings, generateSpoilerLog: boolean) => post<{ ok: boolean }>('/settings/save', { settings, generateSpoilerLog }, true),

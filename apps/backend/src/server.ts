@@ -22,6 +22,11 @@ import { smokeTestWorlds } from './core/smokeTests.js';
 import { supportedGenerationProfiles } from './core/generationProfiles.js';
 import { defaultWorldDataCacheRoot } from './adapters/fogPrerequisites.js';
 import { hintsAvailableFor, hintsForEntry, persistHints } from './core/hintStore.js';
+import { AppLogger, LOG_STAGES, type LogLevel, type LogStage } from './core/appLog.js';
+import { OperationTracker } from './core/operations.js';
+import { createRedactor, redactionContext, redactJson } from './core/redaction.js';
+import { assembleSupportBundle, gatherDiagnostics, supportRedaction, type SupportDependencies } from './core/support.js';
+import { writeFile } from 'node:fs/promises';
 
 const HOST = process.env.DS1TR_HOST ?? '127.0.0.1';
 const PORT = Number(process.env.DS1TR_PORT ?? 43177);
@@ -33,6 +38,9 @@ const generationDependencies = {
 };
 const runRoot = path.join(defaultStateRoot(), 'runs');
 const history = new RunHistory(defaultStateRoot());
+// Support logging (docs/DIAGNOSTICS.md): structured lines with a stage and a correlation id, secrets removed as they are written.
+const logger = new AppLogger(path.join(defaultStateRoot(), 'logs', 'backend.log'), { redact: createRedactor(redactionContext({ directories: [] })) });
+const operations = new OperationTracker(defaultStateRoot(), logger);
 /**
  * Where the spoiler log of a run is. A combined-only package holds it; a world randomizer package does not, so the log of the
  * item/enemy stage (the last combined attempt of the run folder) is used. Nothing is copied into the package.
@@ -54,8 +62,13 @@ async function findSpoiler(workspacePath: string, packagePath: string): Promise<
   return null;
 }
 
-const APP_VERSION = '0.43.0';
+const APP_VERSION = '0.44.0';
 const runDependencies = { ...generationDependencies, appVersion: APP_VERSION };
+const supportDependencies: SupportDependencies = {
+  stateRoot: defaultStateRoot(), runRoot, userDataDir: process.env.DS1TR_USER_DATA ?? null, appLogPath: process.env.DS1TR_APP_LOG ?? null,
+  backendLogPath: logger.file, runtimeRoot: process.env.DS1TR_RUNTIME_ROOT ?? null, appVersion: APP_VERSION, env: process.env,
+  listHistory: () => history.list(), detectState: (gamePath) => authority.detectState(gamePath),
+};
 
 function send(res: http.ServerResponse, status: number, body: unknown): void {
   res.writeHead(status, {
@@ -148,17 +161,23 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'POST' && url.pathname === '/api/game/activate') {
       const body = await readJson<{ gamePath?: string; packagePath?: string }>(req);
       if (!body.gamePath || !body.packagePath) return send(res, 400, { error: 'Game and package paths are required.' });
+      const operation = operations.begin('apply');
       const result = await authority.activate(body.gamePath, body.packagePath);
       if (result.ok) await history.markApplied(body.packagePath).catch(() => undefined);
-      return send(res, result.ok ? 200 : 409, result);
+      if (result.ok) operation.finish({ ok: true });
+      else { operation.note('error', 'APPLY', `${result.code}: ${result.message}`, result.code); operation.finish({ ok: false, code: result.code }); }
+      return send(res, result.ok ? 200 : 409, { ...result, correlationId: operation.correlationId });
     }
 
     if (req.method === 'POST' && url.pathname === '/api/game/restore') {
       const body = await readJson<{ gamePath?: string }>(req);
       if (!body.gamePath) return send(res, 400, { error: 'Game path is required.' });
+      const operation = operations.begin('restore');
       const result = await authority.restore(body.gamePath);
       if (result.ok) await history.markRestored().catch(() => undefined);
-      return send(res, result.ok ? 200 : 409, result);
+      if (result.ok) operation.finish({ ok: true });
+      else { operation.note('error', 'RESTORE', `${result.code}: ${result.message}`, result.code); operation.finish({ ok: false, code: result.code }); }
+      return send(res, result.ok ? 200 : 409, { ...result, correlationId: operation.correlationId });
     }
 
     if (req.method === 'POST' && url.pathname === '/api/seed/decode') {
@@ -201,6 +220,39 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, document ? { ok: true, document } : { ok: false, code: 'HINTS_UNAVAILABLE' });
     }
 
+    if (req.method === 'POST' && url.pathname === '/api/diagnostics') {
+      const body = await readJson<{ gamePath?: string; language?: string; worldId?: string }>(req);
+      const gamePath = typeof body.gamePath === 'string' ? body.gamePath : undefined;
+      const diagnostics = await gatherDiagnostics(supportDependencies, { gamePath, language: body.language, worldId: typeof body.worldId === 'string' ? body.worldId : undefined });
+      // Everything the interface shows or copies has been through the same redaction as the support bundle.
+      return send(res, 200, { ok: true, diagnostics: redactJson(diagnostics, createRedactor(supportRedaction(supportDependencies, gamePath))) });
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/support/bundle') {
+      const body = await readJson<{ gamePath?: string; language?: string; worldId?: string; summaryText?: unknown; readmeText?: unknown }>(req);
+      const bundle = await assembleSupportBundle(supportDependencies, {
+        gamePath: typeof body.gamePath === 'string' ? body.gamePath : undefined, language: body.language, worldId: typeof body.worldId === 'string' ? body.worldId : undefined,
+        summaryText: typeof body.summaryText === 'string' ? body.summaryText : '', readmeText: typeof body.readmeText === 'string' ? body.readmeText : '',
+      });
+      if (!bundle.ok) {
+        logger.error('APP', `support bundle refused: ${bundle.code}`, { code: bundle.code });
+        return send(res, 200, { ok: false, code: bundle.code });
+      }
+      logger.info('APP', `support bundle made: ${bundle.report.entries.length} files, ${bundle.report.totalBytes} bytes, ${bundle.report.redactions} redactions`);
+      return send(res, 200, { ok: true, fileName: bundle.fileName, contentBase64: bundle.archive.toString('base64'), report: bundle.report });
+    }
+
+    // The interface reports its own problems here so they carry the same correlation id as the backend's lines.
+    if (req.method === 'POST' && url.pathname === '/api/log') {
+      const body = await readJson<{ level?: string; stage?: string; message?: unknown; correlationId?: unknown; code?: unknown }>(req);
+      const level: LogLevel = body.level === 'error' || body.level === 'warning' || body.level === 'debug' ? body.level : 'info';
+      const stage: LogStage = (LOG_STAGES as readonly string[]).includes(body.stage ?? '') ? body.stage as LogStage : 'APP';
+      logger.log(level, stage, typeof body.message === 'string' ? body.message.slice(0, 2000) : '', {
+        source: 'renderer', ...(typeof body.correlationId === 'string' ? { correlationId: body.correlationId.slice(0, 64) } : {}), ...(typeof body.code === 'string' ? { code: body.code.slice(0, 64) } : {}),
+      });
+      return send(res, 200, { ok: true });
+    }
+
     if (req.method === 'POST' && url.pathname === '/api/settings/load') {
       const loaded = await loadPersistedSettings(defaultStateRoot());
       return send(res, 200, loaded);
@@ -225,13 +277,21 @@ const server = http.createServer(async (req, res) => {
         'Access-Control-Allow-Origin': 'null',
       });
       if (!prepared.ok) {
-        res.write(`event: result\ndata: ${JSON.stringify({ ok: false, code: prepared.code, message: prepared.message, stage: 'seed', technical: prepared.technical })}\n\n`);
+        const refused = operations.begin('generate');
+        refused.note('warning', 'SEED', `the request was refused: ${prepared.code}`, prepared.code);
+        refused.finish({ ok: false, code: prepared.code, stage: 'seed' });
+        res.write(`event: result\ndata: ${JSON.stringify({ ok: false, code: prepared.code, message: prepared.message, stage: 'seed', technical: prepared.technical, correlationId: refused.correlationId })}\n\n`);
         return res.end();
       }
       const workspacePath = path.join(runRoot, randomUUID());
       await mkdir(workspacePath, { recursive: true });
+      const operation = operations.begin('generate', {
+        seedCode: prepared.seedCode, profile: prepared.profile.id, workspacePath,
+        plan: { items: prepared.config.items.enabled, enemies: prepared.config.enemies.enabled },
+      });
       try {
         const result = await generateRun({ config: prepared.config, workspacePath, profile: prepared.profile, seedCode: prepared.seedCode }, (event) => {
+          operation.event(event);
           res.write(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`);
         }, runDependencies);
         if (result.ok) {
@@ -245,12 +305,19 @@ const server = http.createServer(async (req, res) => {
             seedCode: prepared.seedCode, profile: prepared.profile.id, masterSeed: prepared.config.masterSeed, settings: prepared.envelope.settings,
             packagePath: result.packagePath, manifestPath: result.manifestPath, spoilerPath, hintsPath,
           }).catch(() => null);
-          res.write(`event: result\ndata: ${JSON.stringify({ ...result, seedCode: prepared.seedCode, profile: prepared.profile.id, masterSeed: prepared.config.masterSeed, historyId: entry?.id ?? null, settings: prepared.envelope.settings })}\n\n`);
+          operation.set({ historyId: entry?.id ?? null, packagePath: result.packagePath });
+          operation.finish({ ok: true });
+          res.write(`event: result\ndata: ${JSON.stringify({ ...result, seedCode: prepared.seedCode, profile: prepared.profile.id, masterSeed: prepared.config.masterSeed, historyId: entry?.id ?? null, settings: prepared.envelope.settings, correlationId: operation.correlationId })}\n\n`);
         } else {
-          res.write(`event: result\ndata: ${JSON.stringify(result)}\n\n`);
+          // The manifest of a failed attempt (attempts, retry reasons, validation notes) is kept next to the run so a support bundle can carry it.
+          await writeFile(path.join(workspacePath, 'failed-manifest.json'), JSON.stringify(result.manifest, null, 2)).catch(() => undefined);
+          operation.finish({ ok: false, code: result.code, stage: result.stage });
+          res.write(`event: result\ndata: ${JSON.stringify({ ...result, correlationId: operation.correlationId })}\n\n`);
         }
       } catch (error) {
-        res.write(`event: result\ndata: ${JSON.stringify({ ok: false, code: 'PIPELINE_FAILED', message: userMessageFor('PIPELINE_FAILED', String(error)), stage: 'generation' })}\n\n`);
+        operation.note('error', 'SERVER', `unexpected failure: ${String(error)}`, 'PIPELINE_FAILED');
+        operation.finish({ ok: false, code: 'PIPELINE_FAILED', stage: 'generation' });
+        res.write(`event: result\ndata: ${JSON.stringify({ ok: false, code: 'PIPELINE_FAILED', message: userMessageFor('PIPELINE_FAILED', String(error)), stage: 'generation', correlationId: operation.correlationId })}\n\n`);
       }
       return res.end();
     }

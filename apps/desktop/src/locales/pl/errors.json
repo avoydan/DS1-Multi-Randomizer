@@ -66,6 +66,11 @@
     "UNSUPPORTED_FORMAT": "Ten kod seeda powstał w nowszej wersji DS1 Triple Randomizer. Zaktualizuj aplikację, aby go użyć.",
     "UNSUPPORTED_PROFILE": "Ten seed wymaga nowszej wersji DS1 Triple Randomizer. Zaktualizuj aplikację, aby wygenerować ten świat.",
     "INVALID_SETTINGS": "Ustawienia zapisane w tym kodzie seeda nie mogą być użyte w tej wersji aplikacji.",
-    "BACKEND_UNAVAILABLE": "DS1 Triple Randomizer nie połączył się ze swoim silnikiem. Zamknij aplikację i uruchom ją ponownie."
+    "BACKEND_UNAVAILABLE": "DS1 Triple Randomizer nie połączył się ze swoim silnikiem. Zamknij aplikację i uruchom ją ponownie.",
+    "BUNDLE_SANITIZATION_FAILED": "Paczka wsparcia nie została utworzona: aplikacja nie mogła upewnić się, że nie zostały w niej żadne dane osobowe. Nic nie zostało zapisane.",
+    "BUNDLE_TOO_LARGE": "Paczka wsparcia byłaby zbyt duża, więc nie została utworzona.",
+    "BUNDLE_INVALID_ENTRY": "Paczka wsparcia nie została utworzona z powodu wewnętrznego problemu. Nic nie zostało zapisane.",
+    "BUNDLE_EMPTY": "Nie ma jeszcze czego włożyć do paczki wsparcia.",
+    "HINTS_UNAVAILABLE": "Arkusz podpowiedzi nie jest dostępny dla tego świata."
   }
 }

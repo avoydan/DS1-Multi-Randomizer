@@ -19,10 +19,12 @@ interface Props {
   onDelete: (entry: RunHistoryEntry) => void;
   onSpoiler: (entry: RunHistoryEntry) => Promise<string>;
   onHints: (entry: RunHistoryEntry, exportFirst: boolean) => void;
+  onDiagnostics: (entry: RunHistoryEntry) => void;
+  onSupportBundle: (entry: RunHistoryEntry) => void;
 }
 
 /** Persistent run history: collapsed to one row until opened; each world shows only its quick actions, the rest is in the menu. */
-export function RunHistoryPanel({ entries, gameState, busy, onApply, onRegenerate, onCopy, onLaunch, onDelete, onSpoiler, onHints }: Props) {
+export function RunHistoryPanel({ entries, gameState, busy, onApply, onRegenerate, onCopy, onLaunch, onDelete, onSpoiler, onHints, onDiagnostics, onSupportBundle }: Props) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [menuFor, setMenuFor] = useState<string | null>(null);
@@ -67,6 +69,8 @@ export function RunHistoryPanel({ entries, gameState, busy, onApply, onRegenerat
                         <button role="menuitem" disabled={!entry.hintsAvailable} title={entry.hintsAvailable ? '' : t('hints.action.unavailable')} onClick={() => { setMenuFor(null); onHints(entry, false); }}>{t('hints.action.view')}</button>
                         <button role="menuitem" disabled={!entry.hintsAvailable} title={entry.hintsAvailable ? '' : t('hints.action.unavailable')} onClick={() => { setMenuFor(null); onHints(entry, true); }}>{t('hints.action.export')}</button>
                         <button role="menuitem" onClick={() => showSettings(entry)}>{t('history.viewSettings')}</button>
+                        <button role="menuitem" onClick={() => { setMenuFor(null); onDiagnostics(entry); }}>{t('history.diagnostics')}</button>
+                        <button role="menuitem" onClick={() => { setMenuFor(null); onSupportBundle(entry); }}>{t('support.ui.export')}</button>
                         {entry.spoilerPath && <button role="menuitem" onClick={() => void showSpoiler(entry)}>{t('history.viewSpoiler')}</button>}
                         <button role="menuitem" className="danger" onClick={() => { setMenuFor(null); onDelete(entry); }}>{t('history.delete')}</button>
                       </div>

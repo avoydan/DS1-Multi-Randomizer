@@ -5,6 +5,8 @@ import { ErrorNotice, type ErrorInfo } from './ErrorNotice';
 import { LanguageSelect } from './LanguageSelect';
 import { behaviorLabel, behaviorValue } from './planText';
 import { HintSheetPanel } from './HintSheetPanel';
+import { DiagnosticsPanel } from './DiagnosticsPanel';
+import { exportSupportBundle } from './supportBundle';
 import { EnemyPoolEditor } from './EnemyPoolEditor';
 import { Readiness } from './Readiness';
 import { SeedPanel, SummaryChips, shortSeedCode, type LoadedSeed } from './SeedPanel';
@@ -122,6 +124,10 @@ export function App() {
   const [workLabel, setWorkLabel] = useState<WorkKey>('working');
   const [runMenuOpen, setRunMenuOpen] = useState(false);
   /** The world whose hint sheet is open (history entry id), and whether it opened on the export options. */
+  const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
+  /** The id of the last operation the backend reported: lines the interface logs about it carry the same id. */
+  const [lastOperationId, setLastOperationId] = useState<string | undefined>(undefined);
+  const [diagnosticsTarget, setDiagnosticsTarget] = useState<string | null>(null);
   const [hintTarget, setHintTarget] = useState<{ id: string; exportFirst: boolean } | null>(null);
 
   useEffect(() => {
@@ -177,6 +183,7 @@ export function App() {
   const reportError = (error: unknown) => {
     const detail = error instanceof Error ? error.message : String(error);
     setLogs((current) => [...current, `error: ${detail}`]);
+    void api.log({ level: 'error', stage: 'APP', message: detail, correlationId: lastOperationId });
     setProblem({ kind: 'unexpected', detail });
     setMessage(t('app.message.failed'));
   };
@@ -266,6 +273,7 @@ export function App() {
         else setLogs((current) => [...current, `[${event.stage}] ${event.level}: ${event.message}`]);
       }, seedCode);
       setGeneration(result);
+      if (result.correlationId) setLastOperationId(result.correlationId);
       if (result.ok) {
         const detail = result as typeof result & { masterSeed?: string };
         setLastRun({ seedCode: result.seedCode, profile: result.profile, masterSeed: detail.masterSeed ?? result.manifest.masterSeed });
@@ -288,6 +296,7 @@ export function App() {
     setLaunchMessage(null);
     try {
       const result = await api.activate(config.gamePath, packagePath);
+      if (result.correlationId) setLastOperationId(result.correlationId);
       if (result.ok) {
         setNotice('applied');
         setMessage(t('app.outcome.applied.text'));
@@ -315,6 +324,7 @@ export function App() {
     setLaunchMessage(null);
     try {
       const result = await api.restore(config.gamePath);
+      if (result.correlationId) setLastOperationId(result.correlationId);
       if (result.ok) {
         setGeneration(null);
         setNotice('restored');
@@ -401,6 +411,14 @@ export function App() {
       const result = await api.spoiler(entry.id);
       return result.ok ? result.text : t(`app.spoiler.${result.code === 'SPOILER_NONE' || result.code === 'SPOILER_UNAVAILABLE' ? result.code : 'unreadable'}`);
     } catch { return t('app.spoiler.unreadable'); }
+  };
+
+  /** Export support bundle for one world of the history: the result is announced in the status line, a refusal shows as an error. */
+  const bundleOf = async (entry: RunHistoryEntry) => {
+    setProblem(null);
+    const outcome = await exportSupportBundle(config.gamePath, entry.id, (key, params) => t(key as never, params as never) as unknown as string);
+    if (outcome.kind === 'refused') setProblem({ code: outcome.code });
+    else setMessage(outcome.kind === 'saved' ? t('support.ui.saved', { name: outcome.name, count: outcome.count, size: outcome.size }) : outcome.kind === 'cancelled' ? t('support.ui.cancelled') : t('support.ui.failed'));
   };
 
   const exportPreset = async () => {
@@ -699,7 +717,7 @@ export function App() {
             entries={history} gameState={gameState} busy={busy}
             onApply={(entry) => void applyPackage(entry.packagePath)} onRegenerate={(entry) => void regenerate(entry)}
             onCopy={(entry) => void copySeed(entry.seedCode)} onLaunch={() => void launch()}
-            onDelete={(entry) => void deleteEntry(entry)} onSpoiler={spoilerOf} onHints={(entry, exportFirst) => setHintTarget({ id: entry.id, exportFirst })}
+            onDelete={(entry) => void deleteEntry(entry)} onSpoiler={spoilerOf} onHints={(entry, exportFirst) => setHintTarget({ id: entry.id, exportFirst })} onDiagnostics={(entry) => setDiagnosticsTarget(entry.id)} onSupportBundle={(entry) => void bundleOf(entry)}
           />
           <details className="log-panel" open={logs.length > 0}><summary>{t('app.advanced.title')}</summary>
             <div className="run-actions">
@@ -708,6 +726,7 @@ export function App() {
             </div>
             {lastRun && <p>{t('app.advanced.internalSeed', { seed: lastRun.masterSeed, profile: lastRun.profile })}</p>}
             {generation?.ok && <p>{t('app.advanced.files', { path: generation.packagePath, count: generation.manifest.files.length })}</p>}
+            <details className="log-panel" onToggle={(event) => setDiagnosticsOpen((event.currentTarget as HTMLDetailsElement).open)}><summary>{t('diagnostics.panel.title')}</summary>{diagnosticsOpen && <DiagnosticsPanel gamePath={config.gamePath} />}</details>
             <SmokeTestPanel busy={busy} onCreate={(seed) => void loadSeed(seed)} />
             <pre className="run-logs" aria-label={t('app.advanced.detailsAria')}>{logs.length ? logs.join('\n') : t('app.advanced.nothing')}</pre>
           </details>
@@ -715,6 +734,7 @@ export function App() {
 
         {plan && <section className="card plan-card"><div className="section-title"><span>02</span><h2>{t('app.plan.title')}</h2></div>{plan.behaviors && plan.behaviors.length > 0 && <ul className="plan-behaviors" aria-label={t('app.plan.behaviorsAria')}>{plan.behaviors.map((line) => <li key={line.labelKey ?? line.label}><strong>{behaviorLabel(t, line)}</strong><span>{behaviorValue(t, line)}</span></li>)}</ul>}<div className="seed-grid">{plan.stages.map((stage) => <div key={stage.engine}><span>{t(`plan.engines.${stage.engine}`)}</span><strong>{stage.enabled ? stage.seed : t('app.plan.disabled')}</strong></div>)}</div><div className="engine-status-list">{plan.engineStatus.map((status) => <div key={status.name} className="engine-status"><strong>{t(`plan.engines.${status.name}`)}</strong><span className={`pill ${status.ready ? 'ready' : ''}`}>{t(`plan.modes.${status.mode}`)}</span><p>{t(`plan.details.${status.mode === 'executable' && status.ready ? 'ready' : status.mode}`)}</p></div>)}</div></section>}
 
+        {diagnosticsTarget && <DiagnosticsPanel gamePath={config.gamePath} worldId={diagnosticsTarget} onClose={() => setDiagnosticsTarget(null)} />}
         {hintTarget && <HintSheetPanel entryId={hintTarget.id} exportFirst={hintTarget.exportFirst} onClose={() => setHintTarget(null)} />}
 
         <section className="card legal-card">

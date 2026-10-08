@@ -239,8 +239,8 @@ export async function executeCombinedGeneration(
   const progress = (value: number, message: string): void => {
     onEvent({ type: 'progress', progress: value, message });
   };
-  const log = (level: 'info' | 'warning' | 'error', message: string): void => {
-    onEvent({ type: 'log', level, message });
+  const log = (level: 'info' | 'warning' | 'error', message: string, component?: 'data-tool'): void => {
+    onEvent({ type: 'log', level, message, ...(component ? { component } : {}) });
   };
 
   // 1. Pure request -> upstream config mapping, including the `enabled`
@@ -320,10 +320,10 @@ export async function executeCombinedGeneration(
 
   const forwardDataToolEvent = (event: DsrDataToolEvent): void => {
     if (event.type === 'log') {
-      log(event.stream === 'stderr' ? 'warning' : 'info', event.message.trimEnd());
+      log(event.stream === 'stderr' ? 'warning' : 'info', event.message.trimEnd(), 'data-tool');
       return;
     }
-    log('info', `DsrDataTool ${event.command} ${event.status}.`);
+    log('info', `DsrDataTool ${event.command} ${event.status}.`, 'data-tool');
   };
 
   const runDataTool = async (

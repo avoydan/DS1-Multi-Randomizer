@@ -24,7 +24,7 @@ export interface CombinedRandomizerRequest {
 
 export type CombinedRandomizerEvent =
   | { type: 'progress'; progress: number; message?: string }
-  | { type: 'log'; level: 'info' | 'warning' | 'error'; message: string };
+  | { type: 'log'; level: 'info' | 'warning' | 'error'; message: string; /** The helper program the line came from, for the log's stage. */ component?: 'data-tool' };
 
 export type CombinedRandomizerEventCallback = (event: CombinedRandomizerEvent) => void;
 

@@ -1,0 +1,25 @@
+{
+  "readme": {
+    "title": "DS1 Triple Randomizer - Support bundle",
+    "what": "This archive was made by DS1 Triple Randomizer so that someone can help with a problem. Nothing was sent anywhere: you chose where to save it and you decide who receives it. Open summary.txt first.",
+    "contents": "What is in it:",
+    "files": {
+      "summary": "a readable summary of the application, the game and your last world",
+      "diagnostics": "the same information as structured data (versions, Seed Code, settings, retries, timings)",
+      "generation": "the run manifest with the package file hashes, a summary of the last operations and the validation reason codes",
+      "logs": "the newest lines of the application log, the backend log and the log of the last randomization",
+      "release": "the build information (version, commit, signature state)"
+    },
+    "never": "What is never in it: your Dark Souls Remastered files or any file generated from them, executables, certificates or keys, environment variables, passwords, tokens, cookies, browser data, or the folder of your game.",
+    "redaction": "Before saving, the application removed your Windows user name, your computer name, the folders of your profile, the application data, the temporary folder and the game folder (they appear as <USER>, <HOST>, <USER_DATA>, <TEMP> and <GAME_DIR>), as well as passwords, tokens, keys, cookies, e-mail and network addresses. The Seed Code and the file hashes are kept on purpose. Look through the files if you want to check.",
+    "reproduce": "To recreate the same world: use Load seed with the Seed Code in summary.txt. The generation profile and the versions are in diagnostics.json."
+  },
+  "ui": {
+    "export": "Export support bundle",
+    "exporting": "Preparing the support bundle...",
+    "saved": "Saved: {{name}} ({{count}} files, {{size}})",
+    "cancelled": "Export cancelled.",
+    "failed": "The support bundle could not be made.",
+    "note": "A ZIP with a summary, structured diagnostics, the newest log lines and the manifest of your last world. No game files, no personal folders; secrets are removed before saving."
+  }
+}

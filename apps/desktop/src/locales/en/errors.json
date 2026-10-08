@@ -66,6 +66,11 @@
     "UNSUPPORTED_FORMAT": "This seed code was made by a newer version of DS1 Triple Randomizer. Update the app to use it.",
     "UNSUPPORTED_PROFILE": "This seed needs a newer version of DS1 Triple Randomizer. Update the app to generate this world.",
     "INVALID_SETTINGS": "The settings inside this seed code cannot be used by this version of the app.",
-    "BACKEND_UNAVAILABLE": "DS1 Triple Randomizer could not reach its engine. Close and reopen the app."
+    "BACKEND_UNAVAILABLE": "DS1 Triple Randomizer could not reach its engine. Close and reopen the app.",
+    "BUNDLE_SANITIZATION_FAILED": "The support bundle was not made: the application could not make sure that no personal data was left in it. Nothing was saved.",
+    "BUNDLE_TOO_LARGE": "The support bundle would be too large, so it was not made.",
+    "BUNDLE_INVALID_ENTRY": "The support bundle was not made because of an internal problem. Nothing was saved.",
+    "BUNDLE_EMPTY": "There is nothing to put into a support bundle yet.",
+    "HINTS_UNAVAILABLE": "The hint sheet is not available for this world."
   }
 }

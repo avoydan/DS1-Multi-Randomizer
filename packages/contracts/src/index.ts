@@ -346,11 +346,12 @@ export interface GameStateReport {
   problems: string[];
 }
 
-export type OperationResult<T> = ({ ok: true } & T) | {
+export type OperationResult<T> = ({ ok: true; correlationId?: string } & T) | {
   ok: false;
   code: string;
   message: string;
   problems: string[];
+  correlationId?: string;
 };
 
 export type GenerationEvent =
@@ -366,8 +367,10 @@ export type GenerationResult =
     historyId?: string | null;
     /** The settings of the generated world (the Seed Code's), which the controls may no longer show. */
     settings?: GenerationSettings;
+    /** Ties this operation together in the logs and the support bundle (diagnostics only; not part of the world). */
+    correlationId?: string;
   }
-  | { ok: false; code: string; message: string; stage: string };
+  | { ok: false; code: string; message: string; stage: string; correlationId?: string; technical?: string };
 
 export const PRESET_FORMAT = 'ds1tr-preset';
 export const PRESET_VERSION = 15;
@@ -391,3 +394,4 @@ export * from './generation.js';
 export * from './installation.js';
 export * from './smokeTests.js';
 export * from './hintSheet.js';
+export * from './diagnostics.js';

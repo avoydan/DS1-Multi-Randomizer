@@ -16,5 +16,6 @@
   "detailsTitle": {
     "settings": "Settings of this world",
     "spoiler": "Spoiler log"
-  }
+  },
+  "diagnostics": "Diagnostics"
 }

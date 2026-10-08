@@ -1,4 +1,4 @@
-﻿import { spawn } from 'node:child_process';
+﻿import { execFileSync, spawn } from 'node:child_process';
 import { cp, mkdir, rm, writeFile, access, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -99,6 +99,17 @@ for (const [source, target] of [
 ]) await copy(path.join(root, source), path.join(notices, target));
 await copy(path.join(root, 'engines/combined/vendor/UPSTREAM_PIN.md'), path.join(notices, 'combined-engine-upstream-pin.md'));
 await writeFile(path.join(notices, 'README.txt'), 'DS1 Triple Randomizer is GPL-3.0-only. Third-party notices and pinned source details are in this folder. Electron and Chromium licenses are in the application root. JuicerMV.SoulsFormats 0.1.3 declares GPL-3.0-only; ZstdSharp.Port 0.8.1, YamlDotNet 7.0.0, and Newtonsoft.Json 13.0.3 declare MIT. The static data files of FogMod (annotations, layouts, and event and talk scripts edited by its author) are never bundled: the application fetches them once, over HTTPS, from the FogMod repository (Apache-2.0, https://github.com/thefifthmatt/FogMod) at the pinned commit, verifies the SHA-256 of every file and keeps them in its own cache; the map and parameter files the world randomizer needs are copied from the own Dark Souls Remastered installation of the player (see world-randomizer-data-provenance.md). The .NET helper programs are published self-contained and include the .NET runtime (MIT, Microsoft). The public corresponding-source fork and release tag are required before publication.\n');
+// Build information the running application can report in its diagnostics and support bundle (docs/DIAGNOSTICS.md). The signing state is NOT recorded as a
+// fact here: a public build (--release) is only accepted after tools/release/release-verify.mjs required a trusted signature, a development build is unsigned.
+const readVersion = async (file) => JSON.parse(await readFile(path.join(root, file), 'utf8')).version;
+const fogHostProject = /<Version>([^<]+)<\/Version>/u.exec(await readFile(path.join(root, 'tools/fog-host/FogHost.csproj'), 'utf8'))?.[1] ?? null;
+let commit = null;
+try { commit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, windowsHide: true }).toString().trim(); } catch { commit = null; }
+await writeFile(path.join(runtime, 'build-info.json'), `${JSON.stringify({
+  schema: 'ds1tr-build-info-1', version: appVersion, commit, mode: releaseMode ? 'public' : 'development',
+  versions: { desktop: appVersion, backend: await readVersion('apps/backend/package.json'), contracts: await readVersion('packages/contracts/package.json'), foghostProject: fogHostProject },
+  builtAt: new Date().toISOString(),
+}, null, 2)}\n`);
 const packageApp = path.join(desktop, 'release', 'package-app');
 await rm(packageApp, { recursive: true, force: true });
 await copy(path.join(desktop, 'dist'), path.join(packageApp, 'dist'));

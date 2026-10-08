@@ -1,0 +1,25 @@
+{
+  "readme": {
+    "title": "DS1 Triple Randomizer - Paczka wsparcia",
+    "what": "To archiwum utworzył DS1 Triple Randomizer, aby ktoś mógł pomóc w rozwiązaniu problemu. Nic nie zostało nigdzie wysłane: Ty wybierasz, gdzie je zapisać, i Ty decydujesz, kto je dostanie. Zacznij od pliku summary.txt.",
+    "contents": "Co zawiera:",
+    "files": {
+      "summary": "czytelne podsumowanie aplikacji, gry i Twojego ostatniego świata",
+      "diagnostics": "te same informacje jako dane strukturalne (wersje, kod seeda, ustawienia, ponowienia, czasy)",
+      "generation": "manifest uruchomienia ze skrótami plików paczki, podsumowanie ostatnich operacji i kody przyczyn walidacji",
+      "logs": "najnowsze linie logu aplikacji, logu silnika i logu ostatniego losowania",
+      "release": "informacje o kompilacji (wersja, commit, stan podpisu)"
+    },
+    "never": "Czego nigdy nie zawiera: plików Dark Souls Remastered ani żadnych plików z nich wygenerowanych, programów wykonywalnych, certyfikatów ani kluczy, zmiennych środowiskowych, haseł, tokenów, ciasteczek, danych przeglądarki ani folderu Twojej gry.",
+    "redaction": "Przed zapisem aplikacja usunęła nazwę użytkownika Windows, nazwę komputera, foldery profilu, dane aplikacji, folder tymczasowy i folder gry (widać je jako <USER>, <HOST>, <USER_DATA>, <TEMP> i <GAME_DIR>), a także hasła, tokeny, klucze, ciasteczka, adresy e-mail i adresy sieciowe. Kod seeda i skróty plików zostawiono celowo. Możesz przejrzeć pliki, jeśli chcesz to sprawdzić.",
+    "reproduce": "Aby odtworzyć ten sam świat, użyj Wczytaj seed z kodem seeda z pliku summary.txt. Profil generowania i wersje są w pliku diagnostics.json."
+  },
+  "ui": {
+    "export": "Eksportuj paczkę wsparcia",
+    "exporting": "Przygotowywanie paczki wsparcia...",
+    "saved": "Zapisano: {{name}} ({{count}} plików, {{size}})",
+    "cancelled": "Eksport anulowany.",
+    "failed": "Nie udało się utworzyć paczki wsparcia.",
+    "note": "Archiwum ZIP z podsumowaniem, diagnostyką strukturalną, najnowszymi liniami logów i manifestem Twojego ostatniego świata. Bez plików gry i bez osobistych folderów; sekrety są usuwane przed zapisem."
+  }
+}

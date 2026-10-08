@@ -33,7 +33,7 @@ export interface GenerationRequest {
 
 export type GenerationEvent =
   | { type: 'progress'; stage: string; progress: number; message: string }
-  | { type: 'log'; stage: string; level: 'info' | 'warning' | 'error'; message: string };
+  | { type: 'log'; stage: string; level: 'info' | 'warning' | 'error'; message: string; component?: 'data-tool' | 'fog-host' };
 
 export interface GenerationManifest {
   schemaVersion: 1;
@@ -96,7 +96,7 @@ const defaults: GenerationDependencies = {
   combined: executeCombinedGeneration,
   fog: new FogHostProcess(),
   progressionModel: (prerequisites, variant) => loadProgressionModel(prerequisites, undefined, variant),
-  appVersion: '0.43.0',
+  appVersion: '0.44.0',
 };
 
 async function fingerprint(file: string): Promise<{ size: number; sha256: string }> {
@@ -352,7 +352,7 @@ export async function generateRun(
           stagingDirectory: staging.value.stagingDirectory, logPath: staging.value.logPath,
           compatibility },
       }, (event) => {
-        if (event.type === 'log') onEvent({ type: 'log', stage: 'fog', level: event.stream === 'stderr' ? 'warning' : 'info', message: event.message });
+        if (event.type === 'log') onEvent({ type: 'log', stage: 'fog', level: event.stream === 'stderr' ? 'warning' : 'info', message: event.message, component: 'fog-host' });
         else progress('fog', 0.75, event.message);
       });
       if (!response.ok) {
