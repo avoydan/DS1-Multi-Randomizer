@@ -93,8 +93,8 @@ export const v1Cases = [
   { name: 'custom-enemy-pool', masterSeed: 'golden-v1-pool', patch: { items: { enabled: false }, fog: { enabled: false },
     enemies: { randomizeBosses: false, placement: { algorithm: 'sampling-v1', replacementChance: 100, fit: 'fits', difficultyMode: 'random-easy-asylum', typeReplacement: 'enabled', customPool: poolC } } } },
   { name: 'second-gargoyle-keep', masterSeed: 'golden-v1-gargoyle', patch: { items: { enabled: false }, fog: { enabled: false }, enemies: { randomizeRegularEnemies: false, secondGargoyle: 'keep', gwynNerf: 'strong' } } },
-  { name: 'custom-pool-model-grace', masterSeed: 'golden-v1-grace-75', patch: { items: { enabled: false }, fog: { enabled: false },
-    enemies: { randomizeBosses: false, placement: { algorithm: 'sampling-v1', replacementChance: 25, fit: 'fits', difficultyMode: 'random-easy-asylum', customPool: poolC } } } },
+  { name: 'custom-pool-model-grace', masterSeed: 'golden-v1-grace-3', patch: { items: { enabled: false }, fog: { enabled: false },
+    enemies: { randomizeBosses: false, placement: { algorithm: 'sampling-v1', replacementChance: 60, fit: 'fits', difficultyMode: 'random-easy-asylum', customPool: poolC } } } },
   { name: 'world-options', masterSeed: 'golden-v1-world', patch: { items: { enabled: false }, enemies: { enabled: false },
     fog: { majorPvpFogs: true, minorPvpFogs: true, lordvesselGates: true, disconnectedFogs: true, glitchedLogic: true, requireLordSouls: false, language: 'POLISH' } } },
 ];

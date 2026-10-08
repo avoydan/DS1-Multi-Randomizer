@@ -1224,7 +1224,7 @@
       "help": {
         "en": {
           "short": "How likely each enemy spot is to be replaced at all.",
-          "what": "The chance that a regular enemy spot takes part in the replacement. It is decided once for each spot (once for each kind with \"Replace by kind\"), before anything else, and does not depend on what the spot would receive. 100% means that every spot takes part; whether it then changes depends on the other options (with Only bosses a spot stays as it is only when a boss cannot stand there).",
+          "what": "The chance that a regular enemy spot takes part in the replacement. It is decided once for each spot (once for each kind with \"Replace by kind\"), before anything else, and does not depend on what the spot would receive. 100% means that every spot takes part; whether it then changes depends on the other options (with Only bosses a spot stays as it is only when a boss cannot stand there). The large regular enemies (Titanite Demons, Drakes, Bounding Demons, the hydras and the Mass of Souls) take part by the same chance, each as one spot together with all its parts; at 0% none of them changes.",
           "affects": "How many regular enemies stay as in the original game.",
           "limits": "Only used with the placement method \"Pick a replacement for every spot\". The limit of 30 enemy models per map never gets worse.",
           "example": null
@@ -1254,8 +1254,8 @@
         "validatedIn": "apps/backend/src/core/configValidation.ts",
         "effect": [
           "apps/backend/src/core/enemyPlacement.ts",
-          "engines/combined/vendor/src/core/placement.js",
-          "engines/combined/vendor/src/core/sampling.js"
+          "engines/combined/vendor/src/core/generator.js",
+          "engines/combined/vendor/src/core/placement.js"
         ]
       }
     },
@@ -1284,7 +1284,7 @@
           "short": "What regular enemy spots receive.",
           "what": "Decides what a regular enemy spot that takes part (see Replacement chance) receives: only regular enemies, only bosses, or either. A boss in a regular spot walks the world like a regular enemy (a roaming boss): it has no boss bar, no fog gate and no encounter reward, and it drops only a share of its souls (Roaming boss souls). Bosses that need their own arena (Bed of Chaos, Ceaseless Discharge, Dark Sun Gwyndolin, Lord Gwyn) and multi-body bosses never appear there.",
           "affects": "Regular enemy spots, including large regular enemies such as the Titanite Demons and the Drakes. The options for roaming bosses depend on it.",
-          "limits": "Only used with the placement method \"Pick a replacement for every spot\". With Only bosses a spot stays as it is, and is never given a regular enemy instead, only when a boss cannot stand there: the spot is protected (some passive, scripted or ghost enemies), Size of replacements is \"Only where they fit\" and no boss fits, the Undead Asylum with an Easy Asylum matching mode, the matching rules or \"No replacement by the same kind\" leave no boss, or the map would load more than about 30 different models (bosses already in the map are reused, so this rarely matters). There is no limit on the number of bosses in a map, and the same boss can appear many times.",
+          "limits": "Only used with the placement method \"Pick a replacement for every spot\". With Only bosses a spot stays as it is, and is never given a regular enemy instead, only when a boss cannot stand there: the spot is protected (some passive, scripted or ghost enemies), the enemy is a large one made of several parts (the hydras, the Anor Londo Gargoyles, the bridge Hellkite, the Mass of Souls), Size of replacements is \"Only where they fit\" and no boss fits, the Undead Asylum with an Easy Asylum matching mode, the matching rules or \"No replacement by the same kind\" leave no boss, or the map would load more than about 30 different models (bosses already in the map are reused, so this rarely matters). There is no limit on the number of bosses in a map, and the same boss can appear many times.",
           "example": null
         },
         "pl": {
@@ -1294,7 +1294,7 @@
       "choiceExplanations": {
         "none": {
           "label": "Nothing (they stay)",
-          "explanation": "Regular enemy spots are not replaced."
+          "explanation": "Regular enemy spots are not replaced, and neither are the large ones (Titanite Demons, Drakes, Bounding Demons, hydras, the Mass of Souls)."
         },
         "normals": {
           "label": "Only regular enemies",

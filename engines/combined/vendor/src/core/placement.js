@@ -541,6 +541,7 @@ export function createPlacementDiagnostics({ algorithm, level = "summary" }) {
       for (const [key, value] of Object.entries(from.counters)) summary.counters[key] = (summary.counters[key] ?? 0) + value;
       Object.assign(summary.maps, from.maps);
       if (from.roaming) Object.assign((summary.roaming ??= {}), from.roaming);
+      if (from.units) Object.assign((summary.units ??= {}), from.units);
       if (level === "detail") {
         slots.push(...(json.slots ?? []));
         groups.push(...(json.groups ?? []));
@@ -565,6 +566,14 @@ export function createPlacementDiagnostics({ algorithm, level = "summary" }) {
     setRoamingMap(mapId, values) {
       summary.roaming ??= {};
       summary.roaming[mapId] = structuredClone(values);
+    },
+    /**
+     * Counters of one family of the unit planners (G-03): the dragon-class units, the hydras and the Mass of Souls groups. Present only in sampling-v1 worlds that
+     * plan ordinary units: logical units, what the mode and the Replacement chance decided, what changed, helper records.
+     */
+    setUnits(family, values) {
+      summary.units ??= {};
+      summary.units[family] = structuredClone(values);
     },
     /**
      * @param {object} record

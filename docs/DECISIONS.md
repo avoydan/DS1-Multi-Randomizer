@@ -1242,3 +1242,11 @@ Full evidence: `docs/BOSSES_ONLY_AUDIT.md`.
 3. **Easy Asylum is explicit and local.** It keeps the Undead Asylum as it is (bosses are not "easy"), and nothing else; it never gives the Asylum an ordinary enemy under Bosses only.
 4. **A pre-public correctness exception, not a new profile.** Four fixtures change (`GENERATION_COMPATIBILITY.md`, "Recorded exception 4"); Seed Codes, presets and `ds1tr-gen-v1` keep their identity.
 5. **The diagnostics are internal.** Per-map counters (destinations, protected by reason, selected, boss, normal draw, unchanged by reason, distinct boss models) live in the run manifest and the log line, not in a screen.
+
+## Unit participation: the large regular enemies obey Replacement chance and "Nothing" (2026-10-09, backend 0.45.6)
+
+1. **One decision per logical unit, taken at its root.** The dragon-class units, the hydras and the Mass of Souls groups take part in their exchange when the mode lets an ordinary enemy replace an ordinary enemy (`normals`, `both`) and the first draw of the root slot's stream is within the Replacement chance: the draw the regular sampler and the roaming pass already make. No new stream, no extra draw, so nothing else moves. Parts and helper records follow the root.
+2. **The structural planners stay.** The exchange, the parts, the synthetic heads, the static bridge and the Titanite Demon rule are unchanged; only who takes part changed. A unit that does not take part is reserved (never an ordinary enemy of the regular pool) and emits nothing.
+3. **A lone unit keeps itself; a Titanite Demon that a subset cannot place stays.** Both are counted. They are the honest limits of exchanging whole units (the Mass of Souls pair exchanges only when both groups take part).
+4. **A pre-public correctness exception, not a new profile.** Twelve fixtures in seven files change (`GENERATION_COMPATIBILITY.md`, "Recorded exception 5"); Seed Codes, presets and `ds1tr-gen-v1` keep their identity. Chance 100 with `normals` or `both` is byte for byte unchanged.
+5. **The help states it.** "Nothing" and Replacement chance now say that the large regular enemies follow them (EN and PL), and the limits of "Bosses only" name the units with linked parts.

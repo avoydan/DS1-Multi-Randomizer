@@ -342,7 +342,7 @@ The view (Basic or Advanced), the language and the help are interface state: the
 
 ### Replacement chance (`enemies.replacementChance`)
 
-* **Mechanic:** The chance that a regular enemy spot takes part in the replacement. It is decided once for each spot (once for each kind with "Replace by kind"), before anything else, and does not depend on what the spot would receive. 100% means that every spot takes part; whether it then changes depends on the other options (with Only bosses a spot stays as it is only when a boss cannot stand there).
+* **Mechanic:** The chance that a regular enemy spot takes part in the replacement. It is decided once for each spot (once for each kind with "Replace by kind"), before anything else, and does not depend on what the spot would receive. 100% means that every spot takes part; whether it then changes depends on the other options (with Only bosses a spot stays as it is only when a boss cannot stand there). The large regular enemies (Titanite Demons, Drakes, Bounding Demons, the hydras and the Mass of Souls) take part by the same chance, each as one spot together with all its parts; at 0% none of them changes.
 * **Affects:** How many regular enemies stay as in the original game.
 * **Limits:** Only used with the placement method "Pick a replacement for every spot". The limit of 30 enemy models per map never gets worse.
 * **Disabled or warned when:**
@@ -352,15 +352,15 @@ The view (Basic or Advanced), the language and the help are interface state: the
 * **Seed Code and presets:** part of the world (Seed Code, preset, history); exported and imported.
 * **Neutral value (an old record without the key means this):** `100`.
 * **Evidence:** read from the code that does it.
-* **Implemented in (found by search, validated in apps/backend/src/core/configValidation.ts):** `apps/backend/src/core/enemyPlacement.ts`, `engines/combined/vendor/src/core/placement.js`, `engines/combined/vendor/src/core/sampling.js`.
+* **Implemented in (found by search, validated in apps/backend/src/core/configValidation.ts):** `apps/backend/src/core/enemyPlacement.ts`, `engines/combined/vendor/src/core/generator.js`, `engines/combined/vendor/src/core/placement.js`.
 
 ### Replace regular enemies with (`enemies.normalReplacement`)
 
 * **Mechanic:** Decides what a regular enemy spot that takes part (see Replacement chance) receives: only regular enemies, only bosses, or either. A boss in a regular spot walks the world like a regular enemy (a roaming boss): it has no boss bar, no fog gate and no encounter reward, and it drops only a share of its souls (Roaming boss souls). Bosses that need their own arena (Bed of Chaos, Ceaseless Discharge, Dark Sun Gwyndolin, Lord Gwyn) and multi-body bosses never appear there.
 * **Affects:** Regular enemy spots, including large regular enemies such as the Titanite Demons and the Drakes. The options for roaming bosses depend on it.
-* **Limits:** Only used with the placement method "Pick a replacement for every spot". With Only bosses a spot stays as it is, and is never given a regular enemy instead, only when a boss cannot stand there: the spot is protected (some passive, scripted or ghost enemies), Size of replacements is "Only where they fit" and no boss fits, the Undead Asylum with an Easy Asylum matching mode, the matching rules or "No replacement by the same kind" leave no boss, or the map would load more than about 30 different models (bosses already in the map are reused, so this rarely matters). There is no limit on the number of bosses in a map, and the same boss can appear many times.
+* **Limits:** Only used with the placement method "Pick a replacement for every spot". With Only bosses a spot stays as it is, and is never given a regular enemy instead, only when a boss cannot stand there: the spot is protected (some passive, scripted or ghost enemies), the enemy is a large one made of several parts (the hydras, the Anor Londo Gargoyles, the bridge Hellkite, the Mass of Souls), Size of replacements is "Only where they fit" and no boss fits, the Undead Asylum with an Easy Asylum matching mode, the matching rules or "No replacement by the same kind" leave no boss, or the map would load more than about 30 different models (bosses already in the map are reused, so this rarely matters). There is no limit on the number of bosses in a map, and the same boss can appear many times.
 * **Choices:**
-  * `none` (Nothing (they stay)): Regular enemy spots are not replaced.
+  * `none` (Nothing (they stay)): Regular enemy spots are not replaced, and neither are the large ones (Titanite Demons, Drakes, Bounding Demons, hydras, the Mass of Souls).
   * `normals` (Only regular enemies): Only regular enemies take part (the usual replacement).
   * `bosses` (Only bosses): Every regular enemy selected for replacement receives a boss, as many as there are spots, the same boss as often as it comes up. A spot that cannot safely take a boss stays as it is.
   * `both` (Bosses or regular enemies): Each spot that takes part gets a boss with the chance set in the boss section, otherwise a regular enemy. At 100% every spot that takes part is offered a boss; a spot that cannot take one keeps the regular enemy chosen for it.

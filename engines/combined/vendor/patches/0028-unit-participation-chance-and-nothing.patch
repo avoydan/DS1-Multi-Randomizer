@@ -1,0 +1,280 @@
+diff --git a/engines/combined/vendor/src/core/generator.js b/engines/combined/vendor/src/core/generator.js
+index 13cf6b8..f1ad7de 100644
+--- a/engines/combined/vendor/src/core/generator.js
++++ b/engines/combined/vendor/src/core/generator.js
+@@ -15,6 +15,7 @@ import {
+   ROAMING_BOSS_MODES,
+   assertSlotOwnedDrops,
+   createPlacementDiagnostics,
++  createSlotStream,
+   permutationDiagnostics,
+   resolveEnemyPlacementAlgorithm,
+   resolveEnemyPlacementOptions,
+@@ -582,7 +583,63 @@ function enemyPlacement(config, target, source, scaledNpcParamId, extra = {}) {
+   };
+ }
+ 
+-function buildDragonPlan(config, catalog) {
++/**
++ * Unit participation (guard audit G-03; docs/GENERATION_GUARD_AUDIT.md). The ordinary dragon-class units (Titanite Demons, Drakes, Bounding Demons, the valley and
++ * the painted Undead Dragon, the bridge Hellkite, the Anor Londo gargoyles), the hydras and the Mass of Souls groups are planned as whole units by their own planners,
++ * because their parts and entities must move together. Under sampling-v1 a unit takes part in that exchange only when
++ *   1. "Replace regular enemies with" lets an ordinary enemy replace an ordinary enemy ("normals" or "both"; "none" and "bosses" never do), and
++ *   2. the first draw of the stream of the unit's ROOT slot (its first body) is within the Replacement chance: the very draw the regular sampler and the roaming-boss
++ *      pass make for that slot, so the three planners agree and no other stream is consumed.
++ * Related parts and helper records follow the root. permutation-v1 is frozen (returns null: every unit takes part, as it always did).
++ */
++function unitParticipation(config) {
++  if (config.enemyPlacementAlgorithm !== "sampling-v1") return null;
++  const options = resolveEnemyPlacementOptions(config, "sampling-v1");
++  const exchangeMode = options.normalReplacement === "normals" || options.normalReplacement === "both";
++  return {
++    exchangeMode,
++    decide: (root) => (!exchangeMode
++      ? "mode"
++      : createSlotStream(config.seed, root).int(100) + 1 <= options.replacementChance ? "selected" : "chance"),
++  };
++}
++
++/** The per-family counters of the unit planners (summary.units): what was a unit, what the mode and the chance decided, what changed, what are helper records. */
++function summarizeUnits(ledger, records, groupOf) {
++  const visible = (record) => record.changed === true && record.disableEntity !== true && record.syntheticEnemy !== true;
++  const byGroup = new Map();
++  for (const record of records) {
++    const group = groupOf(record);
++    if (group === undefined) continue;
++    if (!byGroup.has(group)) byGroup.set(group, { visible: 0, helper: 0, identity: 0 });
++    const entry = byGroup.get(group);
++    if (visible(record)) entry.visible += 1;
++    else if (record.disableEntity === true || record.syntheticEnemy === true) entry.helper += 1;
++    else entry.identity += 1;
++  }
++  const families = {};
++  for (const unit of ledger) {
++    const family = (families[unit.family] ??= {
++      logicalUnits: 0, eligible: 0, selectedByChance: 0, notSelectedByChance: 0, notEligibleByMode: 0, rejectedStructural: 0, replaced: 0, unchanged: 0, visibleRecords: 0, helperRecords: 0, identityRecords: 0,
++    });
++    const group = byGroup.get(unit.id) ?? { visible: 0, helper: 0, identity: 0 };
++    family.logicalUnits += 1;
++    if (unit.decision === "mode") family.notEligibleByMode += 1;
++    else {
++      family.eligible += 1;
++      if (unit.decision === "chance") family.notSelectedByChance += 1;
++      else family.selectedByChance += 1;
++      if (unit.decision === "structural") family.rejectedStructural += 1;
++    }
++    if (group.visible > 0) family.replaced += 1; else family.unchanged += 1;
++    family.visibleRecords += group.visible;
++    family.helperRecords += group.helper;
++    family.identityRecords += group.identity;
++  }
++  return families;
++}
++
++function buildDragonPlan(config, catalog, diagnostics = null) {
+   const bossSlotIds = new Set(effectiveBossSlots(catalog).map((slot) => slot.id));
+   const slots = catalog.enemySlots;
+   const byModel = (modelName, mapId = null) =>
+@@ -669,14 +726,23 @@ function buildDragonPlan(config, catalog) {
+     ),
+   ].filter((entry) => entry.bodies.length > 0);
+ 
+-  const enabled = units.filter((entry) => {
+-    const boss = entry.bodies.some((body) => bossSlotIds.has(body.id));
+-    return boss ? config.randomizeBosses : config.randomizeEnemies;
++  const isBossUnit = (entry) =>
++    entry.bodies.some((body) => bossSlotIds.has(body.id));
++  const participation = unitParticipation(config);
++  const decisionOf = (entry) => (participation === null ? "selected" : participation.decide(entry.bodies[0].id));
++  const unitLedger = [];
++  const familyOfUnit = (entry) => (isHydra(entry) ? "hydra" : "dragon");
++  const enabledAll = units.filter((entry) => (isBossUnit(entry) ? config.randomizeBosses : config.randomizeEnemies));
++  // A boss unit follows the boss options (the classic boss shuffle does not read the Replacement chance by design); an ordinary unit takes part by participation.
++  const enabled = enabledAll.filter((entry) => {
++    if (isBossUnit(entry)) return true;
++    const decision = decisionOf(entry);
++    unitLedger.push({ id: entry.id, family: familyOfUnit(entry), decision });
++    return decision === "selected";
+   });
++  const idleUnits = enabledAll.filter((entry) => !enabled.includes(entry));
+   const assignments = new Map();
+   const rng = createStream(config.seed, "dragons", config.version);
+-  const isBossUnit = (entry) =>
+-    entry.bodies.some((body) => bossSlotIds.has(body.id));
+   const poolKeys = new Set(enabled.map(
+     (entry) => `${isBossUnit(entry) ? "boss" : "regular"}:${entry.parts.length}`,
+   ));
+@@ -697,12 +763,44 @@ function buildDragonPlan(config, catalog) {
+   const result = { enemies: [], bosses: [], reservedSlotIds: new Set(), overridableSlots: new Map() };
+   let enemyIndex = 0;
+   let bossIndex = 0;
+-  if (config.randomizeEnemies && simpleRegularDragons.length > 1) {
+-    const simpleSources = shuffledWithoutNativeTitaniteDemon(
+-      rng,
+-      simpleRegularDragons,
+-    );
+-    simpleRegularDragons.forEach((target, index) => {
++  // Units that do not take part keep their vanilla bodies and parts, but they stay reserved: they are not ordinary enemies and must never enter the regular pool.
++  for (const entry of idleUnits) [...entry.bodies, ...entry.parts].forEach((slot) => result.reservedSlotIds.add(slot.id));
++  if (config.randomizeEnemies) {
++    // Every ordinary dragon-class destination without linked parts is a destination of the roaming-boss pass, whether or not its unit takes part in the exchange.
++    for (const entry of simpleRegularDragons) {
++      const body = entry.bodies[0];
++      if (entry.parts.length === 0 && !isHydra(entry) && entry.id !== "hellkite-bridge" && !entry.id.startsWith("anor-londo-gargoyle")) result.overridableSlots.set(body.id, body);
++      result.reservedSlotIds.add(body.id);
++      entry.parts.forEach((part) => result.reservedSlotIds.add(part.id));
++    }
++  }
++  let participants = config.randomizeEnemies
++    ? simpleRegularDragons.filter((entry) => {
++      const decision = decisionOf(entry);
++      unitLedger.push({ id: entry.id, family: familyOfUnit(entry), decision });
++      return decision === "selected";
++    })
++    : [];
++  let simpleSources = null;
++  if (config.randomizeEnemies) {
++    // The Titanite Demon rule (no Titanite Demon takes a native Titanite Demon slot) can be unsatisfiable for a subset (more Titanite Demons than other units to take
++    // their place). The last Titanite Demon of the subset then stays as it is, deterministically (counted as a structural rejection); a lone unit keeps itself.
++    // The classic permutation (participation null) never drops a unit: it fails as it always did.
++    while (participants.length > 1) {
++      try {
++        simpleSources = shuffledWithoutNativeTitaniteDemon(rng, participants);
++        break;
++      } catch (error) {
++        const drop = participants.map((entry) => entry.bodies[0].modelName === "c2300").lastIndexOf(true);
++        if (participation === null || drop < 0) throw error;
++        const dropped = participants[drop];
++        unitLedger.find((unit) => unit.id === dropped.id).decision = "structural";
++        participants = participants.filter((_, position) => position !== drop);
++      }
++    }
++  }
++  if (simpleSources !== null) {
++    participants.forEach((target, index) => {
+       const source = simpleSources[index];
+       const targetBody = target.bodies[0];
+       const shuffledSourceBody = source.bodies[0];
+@@ -793,7 +891,9 @@ function buildDragonPlan(config, catalog) {
+           initialTeamType: 2,
+           baseThinkParamId: sourceBody.thinkParamId,
+           destinationThinkParamId: targetBody.thinkParamId,
+-          targetThinkParamId: 9_700_000 + enemyIndex,
++          // 9_700_000 + the running index when every unit takes part (the classic permutation and chance 100, unchanged); with a subset the running index is small enough
++          // to meet the boss think rows (9_700_000 + the archetype index), so the id then comes from the unit's own position, above that range.
++          targetThinkParamId: 9_700_000 + (participants.length === simpleRegularDragons.length ? enemyIndex : 200 + simpleRegularDragons.indexOf(target)),
+           preserveDestinationPerception: true,
+         });
+         delete placementExtra.forceCombatActivation;
+@@ -999,6 +1099,7 @@ function buildDragonPlan(config, catalog) {
+     });
+     for (const auxiliary of hellkiteAuxiliary) {
+       result.reservedSlotIds.add(auxiliary.id);
++      if (participation !== null && !participants.some((entry) => entry.id === "hellkite-bridge")) continue;
+       result.enemies.push(enemyPlacement(
+         config,
+         auxiliary,
+@@ -1093,6 +1194,11 @@ function buildDragonPlan(config, catalog) {
+     });
+   }
+ 
++  if (diagnostics !== null && unitLedger.length > 0) {
++    const families = summarizeUnits(unitLedger, result.enemies, (record) => record.linkedDragonGroup);
++    for (const [family, values] of Object.entries(families)) diagnostics.setUnits(family, values);
++  }
++
+   if (config.randomizeBosses) {
+     const linkedBossRng = createStream(
+       config.seed,
+@@ -1260,7 +1366,7 @@ function buildDragonPlan(config, catalog) {
+   return result;
+ }
+ 
+-function buildMassOfSoulsPlan(config, catalog) {
++function buildMassOfSoulsPlan(config, catalog, diagnostics = null) {
+   if (!config.randomizeEnemies) {
+     return { placements: [], reservedSlotIds: new Set() };
+   }
+@@ -1282,7 +1388,15 @@ function buildMassOfSoulsPlan(config, catalog) {
+   }
+   const reservedSlotIds = new Set(groups.flat().map((slot) => slot.id));
+   const placements = [];
++  // The two groups exchange places with each other; each group is one logical unit (root: its Mass of Souls body). A group takes part by unit participation, and a
++  // group never exchanges with a group that does not: with one group alone nothing moves (a lone unit keeps itself).
++  const participation = unitParticipation(config);
++  const ledger = groups.map((entry, groupIndex) => ({
++    id: `mass-of-souls-${groupIndex}`, family: "massOfSouls", decision: participation === null ? "selected" : participation.decide(entry[0].id),
++  }));
++  const exchanging = ledger.every((unit) => unit.decision === "selected");
+   groups.forEach((targetGroup, groupIndex) => {
++    if (!exchanging) return;
+     const sourceGroup = groups[1 - groupIndex];
+     targetGroup.forEach((target, index) => {
+       placements.push(enemyPlacement(
+@@ -1297,6 +1411,10 @@ function buildMassOfSoulsPlan(config, catalog) {
+       ));
+     });
+   });
++  if (diagnostics !== null) {
++    const families = summarizeUnits(ledger, placements, (record) => record.linkedEnemyGroup);
++    for (const [family, values] of Object.entries(families)) diagnostics.setUnits(family, values);
++  }
+   return { placements, reservedSlotIds };
+ }
+ 
+@@ -1314,8 +1432,8 @@ function planExtractedEnemies(algorithm, config, catalog, dragonPlan, bossPlan,
+ }
+ 
+ // The slots, special plans and fixed models both algorithms start from.
+-function regularEnemyContext(config, catalog, dragonPlan, bossPlan) {
+-  const massOfSoulsPlan = buildMassOfSoulsPlan(config, catalog);
++function regularEnemyContext(config, catalog, dragonPlan, bossPlan, diagnostics = null) {
++  const massOfSoulsPlan = buildMassOfSoulsPlan(config, catalog, diagnostics);
+   const bossSlotIds = new Set(effectiveBossSlots(catalog).map((slot) => slot.id));
+   const bossFamilyModels = new Set(
+     effectiveBossSlots(catalog).flatMap((slot) => [
+@@ -1614,7 +1732,7 @@ function sampleExtractedEnemies(config, catalog, dragonPlan, bossPlan, diagnosti
+   if (!config.randomizeEnemies) return dragonPlan.enemies;
+   const options = resolveEnemyPlacementOptions(config, "sampling-v1");
+   const { massOfSoulsPlan, slots, pinwheelClones, pinwheelCloneIds, fixedModelsByMap } =
+-    regularEnemyContext(config, catalog, dragonPlan, bossPlan);
++    regularEnemyContext(config, catalog, dragonPlan, bossPlan, diagnostics);
+   // Part E1: with bosses allowed in regular slots the regular sampler plans the normal enemies only ("bosses" leaves every
+   // slot to the boss pass, "both" keeps the normal draw for the slots that do not get a boss) and the roaming pass overrides slots.
+   const roamingMode = ROAMING_BOSS_MODES.includes(options.normalReplacement);
+@@ -3590,7 +3708,7 @@ export function generate(inputConfig, { gameCatalog = null } = {}) {
+     gameCatalog?.enemySlots?.length && gameCatalog?.enemyArchetypes?.length,
+   );
+   const dragonPlan = extractedData
+-    ? buildDragonPlan(config, gameCatalog)
++    ? buildDragonPlan(config, gameCatalog, placementDiagnostics)
+     : null;
+   const bossPlan = extractedData
+     ? randomizeExtractedBosses(config, gameCatalog, dragonPlan, placementDiagnostics)
+diff --git a/engines/combined/vendor/src/core/placement.js b/engines/combined/vendor/src/core/placement.js
+index 1fc976f..edd27db 100644
+--- a/engines/combined/vendor/src/core/placement.js
++++ b/engines/combined/vendor/src/core/placement.js
+@@ -541,6 +541,7 @@ export function createPlacementDiagnostics({ algorithm, level = "summary" }) {
+       for (const [key, value] of Object.entries(from.counters)) summary.counters[key] = (summary.counters[key] ?? 0) + value;
+       Object.assign(summary.maps, from.maps);
+       if (from.roaming) Object.assign((summary.roaming ??= {}), from.roaming);
++      if (from.units) Object.assign((summary.units ??= {}), from.units);
+       if (level === "detail") {
+         slots.push(...(json.slots ?? []));
+         groups.push(...(json.groups ?? []));
+@@ -566,6 +567,14 @@ export function createPlacementDiagnostics({ algorithm, level = "summary" }) {
+       summary.roaming ??= {};
+       summary.roaming[mapId] = structuredClone(values);
+     },
++    /**
++     * Counters of one family of the unit planners (G-03): the dragon-class units, the hydras and the Mass of Souls groups. Present only in sampling-v1 worlds that
++     * plan ordinary units: logical units, what the mode and the Replacement chance decided, what changed, helper records.
++     */
++    setUnits(family, values) {
++      summary.units ??= {};
++      summary.units[family] = structuredClone(values);
++    },
+     /**
+      * @param {object} record
+      * @param {string} record.slotId

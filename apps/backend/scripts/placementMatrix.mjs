@@ -87,6 +87,21 @@ export const sets = {
     { name: 'owner-world-fog', patch: merge2(noItems, sampling({ normalReplacement: 'bosses', replacementChance: 100, fit: 'anywhere', difficultyMode: 'random-easy-asylum', bossReplacement: 'classic', roamingBossSouls: 50, roamingBossesStayDead: true })), seeds: 10 },
     { name: 'bosses-only-100-fog-stay-alive', patch: merge2(noItems, sampling({ normalReplacement: 'bosses', replacementChance: 100, fit: 'anywhere', difficultyMode: 'random', roamingBossesStayDead: false })), seeds: 10 },
   ],
+  /**
+   * Unit participation (guard audit G-03): the dragon-class units, the hydras and the Mass of Souls groups follow Replacement chance and "Nothing". Subsets of units are exchanged
+   * (and a Titanite Demon may stay), so every case must still reach the data tool and the world randomizer without a conflict. The "-fog" cases run the world randomizer as well.
+   */
+  'unit-participation': [
+    ...[0, 25, 50, 75, 100].map((chance) => ({ name: `units-normals-c${chance}`, patch: merge2(noItems, noFog, sampling({ normalReplacement: 'normals', replacementChance: chance, fit: 'anywhere', difficultyMode: 'random' })), seeds: 20 })),
+    { name: 'units-nothing', patch: merge2(noItems, noFog, sampling({ normalReplacement: 'none', replacementChance: 100 })), seeds: 6 },
+    { name: 'units-bosses-only-50', patch: merge2(noItems, noFog, sampling({ normalReplacement: 'bosses', replacementChance: 50, fit: 'anywhere', difficultyMode: 'random' })), seeds: 10 },
+    { name: 'units-both-50', patch: merge2(noItems, noFog, sampling({ normalReplacement: 'both', bossChanceInNormalSlots: 25, replacementChance: 50, fit: 'anywhere', difficultyMode: 'random' })), seeds: 10 },
+    { name: 'units-curve-70-bosses', patch: merge2(noItems, noFog, sampling({ normalReplacement: 'normals', replacementChance: 70, fit: 'fits', difficultyMode: 'curve', difficultyStrictness: 'strict', bossReplacement: 'bosses' }, { gwynNerf: 'strong', secondGargoyle: 'replace' })), seeds: 10 },
+    { name: 'units-normals-c50-fog', patch: merge2(noItems, sampling({ normalReplacement: 'normals', replacementChance: 50, fit: 'anywhere', difficultyMode: 'random' })), seeds: 10 },
+    { name: 'units-normals-c70-fog-bosses', patch: merge2(noItems, sampling({ normalReplacement: 'normals', replacementChance: 70, fit: 'fits', difficultyMode: 'curve', difficultyStrictness: 'strict', bossReplacement: 'bosses' }, { gwynNerf: 'strong', secondGargoyle: 'replace' })), seeds: 10 },
+    { name: 'units-nothing-fog', patch: merge2(noItems, sampling({ normalReplacement: 'none', replacementChance: 100 })), seeds: 6 },
+    { name: 'units-bosses-only-50-fog', patch: merge2(noItems, sampling({ normalReplacement: 'bosses', replacementChance: 50, fit: 'anywhere', difficultyMode: 'random' })), seeds: 10 },
+  ],
   /** Part G: the EXACT product default (what a fresh installation starts with), with the engines switched the way a person would switch them. */
   'product-default': [
     { name: 'default-items-enemies-bosses', patch: merge2(structuredClone(DEFAULT_GENERATION_SETTINGS), noFog), seeds: 100 },

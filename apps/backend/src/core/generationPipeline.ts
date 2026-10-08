@@ -96,7 +96,7 @@ const defaults: GenerationDependencies = {
   combined: executeCombinedGeneration,
   fog: new FogHostProcess(),
   progressionModel: (prerequisites, variant) => loadProgressionModel(prerequisites, undefined, variant),
-  appVersion: '0.45.5',
+  appVersion: '0.45.6',
 };
 
 async function fingerprint(file: string): Promise<{ size: number; sha256: string }> {
@@ -201,7 +201,7 @@ export async function generateRun(
     });
     if (!prerequisites) {
       return config.fog.enabled
-        ? fail('fog', 'FOG_PREREQUISITES_MISSING', 'The fog randomizer is not available in this installation. Turn it off, or download DS1 Triple Randomizer again.')
+        ? fail('fog', 'FOG_PREREQUISITES_MISSING', 'The fog randomizer is not available in this installation. Turn it off, or download DS1 Multi Randomizer again.')
         : fail('combined', 'KEY_PLACEMENT_MODEL_UNAVAILABLE', 'World data for key placement is not available in this installation.');
     }
     if ('failure' in prerequisites) {
@@ -215,7 +215,7 @@ export async function generateRun(
     const dataDrift = drift({ worldDataId: prerequisites.worldDataId });
     if (dataDrift) return fail('fog', 'GENERATION_PROFILE_MISMATCH', dataDrift);
     try { await requireFile(fogReady.executablePath); await access(fogReady.dataRoot); }
-    catch { return fail('fog', 'FOG_PREREQUISITES_MISSING', 'The fog randomizer files could not be found. Click Retry; if it keeps failing, download DS1 Triple Randomizer again.'); }
+    catch { return fail('fog', 'FOG_PREREQUISITES_MISSING', 'The fog randomizer files could not be found. Click Retry; if it keeps failing, download DS1 Multi Randomizer again.'); }
   }
 
   // The fog randomizer follows some items by lot; the item shuffle must keep them where it can (fogItemRules.ts).
