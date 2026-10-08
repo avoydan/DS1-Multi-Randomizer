@@ -193,6 +193,16 @@ export const v1ExtraCaseSets = {
     { name: 'triple-modes', masterSeed: 'golden-v1-triple-modes', patch: { items: { keyPlacement: 'race', randomizeLordSouls: true, itemDifficulty: 'unfair', soulItems: 'transposed', laundromat: true },
       enemies: { gwynNerf: 'medium', secondGargoyle: 'replace', placement: { algorithm: 'sampling-v1', replacementChance: 100, fit: 'fits', bossReplacement: 'bosses', normalReplacement: 'both', bossChanceInNormalSlots: 15 } } } },
   ],
+  // DLC content left out (docs/DLC_AUDIT.md). Only worlds WITHOUT the DLC are recorded here: the worlds with the DLC are the fixtures above, unchanged.
+  'dlc-off': [
+    { name: 'dlc-off-items', masterSeed: 'golden-v1-dlc-items', patch: { fog: { enabled: false }, enemies: { enabled: false }, output: { includeDlc: false }, items: { ...broadItems, soulItems: 'transposed' } } },
+    { name: 'dlc-off-enemies-bosses', masterSeed: 'golden-v1-dlc-enemies', patch: { items: { enabled: false }, fog: { enabled: false }, output: { includeDlc: false },
+      enemies: { gwynNerf: 'strong', secondGargoyle: 'replace', placement: { algorithm: 'sampling-v1', replacementChance: 80, fit: 'anywhere', difficultyMode: 'random', bossReplacement: 'both', bossChanceInBossSlots: 60 } } } },
+    { name: 'dlc-off-triple-without-fog', masterSeed: 'golden-v1-dlc-triple', patch: { fog: { enabled: false }, output: { includeDlc: false }, items: { ...broadItems, soulItems: 'transposed' },
+      enemies: { placement: { algorithm: 'sampling-v1', replacementChance: 70, fit: 'fits', normalReplacement: 'both', hostileNpcs: true } } } },
+    { name: 'dlc-off-race-lords', masterSeed: 'golden-v1-dlc-race', patch: { fog: { enabled: false }, enemies: { enabled: false }, output: { includeDlc: false },
+      items: { keyPlacement: 'race', randomizeLordvessel: true, randomizeLordSouls: true, soulItems: 'transposed' } } },
+  ],
   'boss-baseline': [
     { name: 'sampling-bosses-fog', masterSeed: 'golden-v1-boss-fog', patch: { enemies: { gwynNerf: 'strong', secondGargoyle: 'replace',
       placement: { algorithm: 'sampling-v1', replacementChance: 70, fit: 'fits', difficultyMode: 'curve', difficultyStrictness: 'strict' } } } },
