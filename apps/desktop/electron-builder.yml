@@ -8,7 +8,7 @@ artifactName: DS1-Multi-Randomizer-${version}-${arch}.${ext}
 # electron/updateSource.ts; tools/release/release-verify.mjs fails when they differ. The placeholder REPLACE_WITH_GITHUB_OWNER would mean "not chosen yet": such a build has no update source.
 publish:
   provider: github
-  owner: remohomer
+  owner: avoydan
   repo: DS1-Multi-Randomizer
   releaseType: release
 directories:

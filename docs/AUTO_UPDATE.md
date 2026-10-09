@@ -43,18 +43,18 @@ The update source is written **explicitly** in two places that must agree, and n
 
 `tools/release/release-verify.mjs` fails when they differ, when `app-update.yml` of the package says something else, or (for a build that is going to be published) while the owner is still the placeholder `REPLACE_WITH_GITHUB_OWNER`. A build with the placeholder has **no update source**: it never contacts GitHub, the Updates card says so, and a public release cannot be made from it.
 
-### Which repository? (an owner decision, with a recommendation)
+### Current repository
 
-No git remote is configured in this working copy, so whether the source repository is public is not known here.
+The source and public releases are hosted together in [`avoydan/DS1-Multi-Randomizer`](https://github.com/avoydan/DS1-Multi-Randomizer), a public repository with `main` as its default branch. The release workflow targets this repository by default, so the single-repository setup uses its `GITHUB_TOKEN` and needs no release-token secret or `RELEASE_REPOSITORY` variable.
 
-* **Recommended: one public repository** that holds the source and the releases. DS1 Multi Randomizer is GPL-3.0-only and its own notices promise "corresponding source with every release"; distributing binaries publicly means the recipients must be able to get the matching source (GPL-3.0 section 6; this is not legal advice). One public repository does that with no extra work, needs **no secret** (the workflow's own `GITHUB_TOKEN` is enough) and gives every release a tag that points at its source commit.
+DS1 Multi Randomizer is GPL-3.0-only and its own notices promise "corresponding source with every release"; distributing binaries publicly means the recipients must be able to get the matching source (GPL-3.0 section 6; this is not legal advice). This single public repository gives every release a tag that points at its source commit.
 * **Alternative: a separate public release repository** (conceptually `DS1-Multi-Randomizer-Releases`), if the source repository must stay private. It works for updates (the clients follow the release repository), but: the workflow then needs the secret `RELEASE_REPO_TOKEN` (a fine-grained token limited to that one repository, Contents read/write) and the variable `RELEASE_REPOSITORY`, the tag of a release is only a label, and the GPL source obligation still has to be met somewhere else (a link or a written offer in the release notes). Do not choose this only to avoid publishing source.
 
 Either way the application contains **no token** and a normal user never authenticates to GitHub: public releases are read anonymously.
 
 ### Treat the update source as infrastructure
 
-The owner/repository pair is baked into every installed copy. If that repository is **renamed**, GitHub redirects old release URLs for a while, but an updater following a redirect chain is not something to rely on; if it is **transferred**, redirects exist only until a new repository takes the old name; if it is **deleted**, every installed copy silently stops finding updates and can only be rescued by a manual download. So: choose the name once, do not change it after the first public release, and if it must ever change, publish a final release **in the old repository** whose application points at the new one, and keep the old repository alive until the installed base has moved.
+The owner/repository pair is baked into every installed copy. The repository has now moved to `avoydan/DS1-Multi-Randomizer`; v0.38.2 is the first release configured with that destination. At migration verification, the old `releases.atom` URL redirected to the new repository. Earlier clients can use that redirect while GitHub maintains it; keep the transferred repository available and direct users to the current [v0.38.2 release](https://github.com/avoydan/DS1-Multi-Randomizer/releases/tag/v0.38.2) if an older client cannot follow it. For future owner or repository changes, coordinate a release whose update source points to the new destination before relying on the old feed being retired.
 
 ## 3. What the clients do
 

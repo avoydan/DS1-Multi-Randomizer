@@ -18,11 +18,12 @@ const requireFromRoot = createRequire(path.join(repositoryRoot, 'package.json'))
 const SOURCE = { provider: 'github', owner: 'ds1-owner', repo: 'DS1-Multi-Randomizer' };
 const UPDATER = "updater.autoDownload = false; updater.autoInstallOnAppQuit = false; updater.allowPrerelease = false; if (this.#options.buildChannel === 'internal') updater.allowPrerelease = true; updater.allowDowngrade = false;";
 
-test('the committed update source is explicit, matches electron-builder.yml, and is still the placeholder until the owner chooses (a development build warns, a publication fails)', async () => {
+test('the committed update source targets avoydan/DS1-Multi-Randomizer and matches electron-builder.yml', async () => {
   const sourceTs = parseUpdateSourceTs(await read('apps', 'desktop', 'electron', 'updateSource.ts'));
   const builder = parseBuilderPublish(await read('apps', 'desktop', 'electron-builder.yml'));
   const updater = await read('apps', 'desktop', 'electron', 'updater.ts');
   assert.equal(sourceTs.provider, 'github');
+  assert.deepEqual(sourceTs, { provider: 'github', owner: 'avoydan', repo: 'DS1-Multi-Randomizer' });
   assert.deepEqual({ provider: builder.provider, owner: builder.owner, repo: builder.repo }, sourceTs, 'the code and electron-builder.yml carry the same three values');
   assert.equal(builder.releaseType, 'release');
   const development = checkUpdateConfiguration({ sourceTs, builderPublish: builder, updaterText: updater, publication: false });

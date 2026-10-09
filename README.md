@@ -4,6 +4,10 @@ DS1 Multi Randomizer is a Windows desktop application for generating one
 deterministic Dark Souls Remastered randomization from item, enemy/boss, and
 FogMod settings.
 
+## Download
+
+[Download latest release (v0.38.2)](https://github.com/avoydan/DS1-Multi-Randomizer/releases/tag/v0.38.2) · [All releases](https://github.com/avoydan/DS1-Multi-Randomizer/releases)
+
 ## For players
 
 1. Download the **installer** (`DS1-Multi-Randomizer-<version>-Setup-x64.exe`) and run it. It installs for your user only and never asks for administrator rights. A **portable** build (`DS1-Multi-Randomizer-<version>-Portable-x64.exe`) is also offered: it unpacks itself to a temporary folder every time it starts, which some antivirus products dislike, so the installer is the recommended one.
