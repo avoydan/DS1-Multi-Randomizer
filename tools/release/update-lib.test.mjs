@@ -8,7 +8,7 @@ import { createRequire } from 'node:module';
 import {
   checkAsarRuntimeDependencies, checkLatestYml, checkUpdateConfiguration, findSecrets, isConfiguredSource, parseBuilderPublish, parseFlatYaml, parseUpdateSourceTs, sha512Base64, versionOfTag,
 } from './update-lib.mjs';
-import { repositoryRoot } from './release-lib.mjs';
+import { repositoryRoot, windowsPowerShellEnvironment } from './release-lib.mjs';
 
 // The update rules of the release tooling (docs/AUTO_UPDATE.md): pure checks over text and numbers, plus structural checks of the committed workflow and configuration.
 // Nothing here builds, signs, uploads or contacts GitHub.
@@ -151,4 +151,9 @@ test('the updater and everything it requires must be inside app.asar, resolved t
   assert.match(checkAsarRuntimeDependencies({ entries: without('/ms/'), readJson })[0].message, /does not contain ms/u);
   assert.match(checkAsarRuntimeDependencies({ entries: files.filter((entry) => entry !== 'dist-electron/node_modules/electron-updater/out/main.js'), readJson })[0].message, /lacks its entry file/u);
   assert.match(checkAsarRuntimeDependencies({ entries: files.map((entry) => entry.replace('dist-electron/node_modules', 'node_modules')), readJson })[0].message, /does not contain electron-updater/u, 'a root node_modules is not where the shell looks');
+});
+
+test('Windows PowerShell started from PowerShell 7 gets no inherited PSModulePath (the hosted runner failed to load Get-AuthenticodeSignature with it)', () => {
+  const environment = windowsPowerShellEnvironment({ Path: 'C:/x', PSModulePath: 'C:/Program Files/PowerShell/7/Modules', psmodulepath: 'again' }, { DS1TR_RELEASE_LIST: 'list.json' });
+  assert.deepEqual(environment, { Path: 'C:/x', DS1TR_RELEASE_LIST: 'list.json' });
 });

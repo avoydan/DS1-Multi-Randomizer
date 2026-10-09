@@ -50,12 +50,21 @@ $out = foreach ($f in $list) {
 ConvertTo-Json -InputObject @($out) -Compress -Depth 4
 `;
 
+/**
+ * Windows PowerShell 5.1 started from PowerShell 7 (the default shell of GitHub-hosted runners) inherits PSModulePath with the PowerShell 7 module folders and then cannot
+ * load Microsoft.PowerShell.Security (Get-AuthenticodeSignature). Removing the variable lets it compute its own default.
+ */
+export function windowsPowerShellEnvironment(base, extra = {}) {
+  const environment = Object.fromEntries(Object.entries(base).filter(([name]) => name.toLowerCase() !== 'psmodulepath'));
+  return { ...environment, ...extra };
+}
+
 async function runPowerShell(script, directory, list) {
   const file = path.join(directory, 'script.ps1');
   await writeFile(file, script, 'utf8');
   const { stdout } = await new Promise((resolve, reject) => {
     execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', file],
-      { windowsHide: true, maxBuffer: 16 * 1024 * 1024, env: { ...process.env, DS1TR_RELEASE_LIST: list } },
+      { windowsHide: true, maxBuffer: 16 * 1024 * 1024, env: windowsPowerShellEnvironment(process.env, { DS1TR_RELEASE_LIST: list }) },
       (error, out, err) => (error ? reject(new Error(`${error.message} ${err}`)) : resolve({ stdout: out })));
   });
   return stdout;
