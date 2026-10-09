@@ -4,7 +4,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import {
   AUTO_CHECK_INTERVAL_MS, AUTO_CHECK_RETRY_MS, UPDATE_INVOKE_CHANNELS, UPDATE_STATE_EVENT, UpdateController, UNSET_OWNER,
-  isNewerStable, isUpdateSourceConfigured, releaseUrlFor,
+  isNewerStable, isNoStableReleaseError, isUpdateSourceConfigured, releaseUrlFor,
 } from '../dist-electron/updater.js';
 import { normalizeUpdateSettings, migrateSettings } from '../dist-electron/settings.js';
 
@@ -13,6 +13,13 @@ import { normalizeUpdateSettings, migrateSettings } from '../dist-electron/setti
 
 const SOURCE = { provider: 'github', owner: 'ds1-owner', repo: 'DS1-Multi-Randomizer' };
 const NOW = Date.parse('2026-10-10T12:00:00.000Z');
+
+function missingStableReleaseError(source = SOURCE, status = '404 Not Found') {
+  const url = `https://github.com/${source.owner}/${source.repo}/releases/latest`;
+  const error = new Error(`Cannot parse releases feed: Error: Unable to find latest version on GitHub (${url}), please ensure a production release exists: HttpError: ${status}\nHeaders: {}\nXML: <feed><entry><link href="https://github.com/${source.owner}/${source.repo}/releases/tag/v0.38.0" /></entry></feed>`);
+  error.code = 'ERR_UPDATER_INVALID_RELEASE_FEED';
+  return error;
+}
 
 class FakeUpdater {
   autoDownload = true;
@@ -129,6 +136,59 @@ test('4. a failed check is non-fatal, is reported with a code, and can be repeat
   assert.ok(logs.some((entry) => entry.code === 'UPDATE_CHECK_FAILED'));
   updater.checkError = null;
   assert.equal((await controller.check({ manual: true })).phase, 'available');
+});
+
+test('a public check treats GitHub 404 for /releases/latest as informational when only prereleases exist', async () => {
+  const { controller, updater, prefs, logs } = harness({ buildChannel: 'public', currentVersion: '0.38.0' });
+  updater.checkError = missingStableReleaseError();
+  const state = await controller.check({ manual: true });
+  assert.equal(state.phase, 'noStableRelease');
+  assert.equal(state.error, null);
+  assert.equal(state.availableVersion, null);
+  assert.equal(state.releaseUrl, null);
+  assert.equal(state.lastCheckAt, new Date(NOW).toISOString());
+  assert.equal(prefs().lastCheckOk, true, 'absence of a stable release is a successful check');
+  assert.equal(updater.allowPrerelease, false, 'public builds still ignore prereleases');
+  assert.ok(logs.some((entry) => entry.level === 'info' && entry.code === 'NO_STABLE_RELEASE'));
+  assert.equal(isNoStableReleaseError(missingStableReleaseError(), SOURCE), true);
+});
+
+test('a network failure or a different HTTP/API failure remains an updater error', async () => {
+  const failures = [
+    new Error('getaddrinfo ENOTFOUND github.com'),
+    missingStableReleaseError(SOURCE, '502 Bad Gateway'),
+    Object.assign(new Error(`Unable to find latest version on GitHub (https://github.com/${SOURCE.owner}/${SOURCE.repo}/releases/latest): HttpError: 404 Not Found\nXML: <feed />`), { code: 'ERR_UPDATER_INVALID_RELEASE_FEED' }),
+    Object.assign(new Error('Unable to find latest version on GitHub (https://github.com/other/repo/releases/latest): HttpError: 404 Not Found'), { code: 'ERR_UPDATER_INVALID_RELEASE_FEED' }),
+  ];
+  for (const failure of failures) {
+    const { controller, updater, prefs } = harness({ buildChannel: 'public' });
+    updater.checkError = failure;
+    const state = await controller.check({ manual: true });
+    assert.equal(state.phase, 'error', failure.message);
+    assert.equal(state.error.code, 'CHECK_FAILED');
+    assert.equal(prefs().lastCheckOk, false);
+    assert.equal(isNoStableReleaseError(failure, SOURCE), false);
+  }
+});
+
+test('a stable release follows the normal update flow', async () => {
+  const { controller, updater } = harness({ buildChannel: 'public', currentVersion: '0.38.0' });
+  updater.result = { isUpdateAvailable: true, updateInfo: { version: '0.38.1', releaseDate: '2026-10-11T10:00:00.000Z' } };
+  const state = await controller.check({ manual: true });
+  assert.equal(state.phase, 'available');
+  assert.equal(state.availableVersion, '0.38.1');
+  assert.equal(state.releaseUrl, `https://github.com/${SOURCE.owner}/${SOURCE.repo}/releases/tag/v0.38.1`);
+  assert.equal(updater.allowPrerelease, false);
+});
+
+test('an internal QA build can find a plain-version GitHub prerelease', async () => {
+  const { controller, updater } = harness({ buildChannel: 'internal', currentVersion: '0.38.0' });
+  // GitHub marks this release as a prerelease; its numeric tag is intentionally plain SemVer.
+  updater.result = { isUpdateAvailable: true, updateInfo: { version: '0.38.1', releaseDate: '2026-10-11T10:00:00.000Z' } };
+  const state = await controller.check({ manual: true });
+  assert.equal(updater.allowPrerelease, true);
+  assert.equal(state.phase, 'available');
+  assert.equal(state.availableVersion, '0.38.1');
 });
 
 test('a technical detail never carries a local path', async () => {

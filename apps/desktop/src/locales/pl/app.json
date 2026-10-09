@@ -228,6 +228,7 @@
     "check": "Sprawdź aktualizacje",
     "checking": "Sprawdzanie...",
     "upToDate": "Masz najnowszą wersję.",
+    "noStableRelease": "Brak dostępnych stabilnych aktualizacji. Wersje testowe nie są instalowane automatycznie.",
     "neverChecked": "Jeszcze nie sprawdzano.",
     "lastChecked": "Ostatnio sprawdzono: {{when}}",
     "available": "Dostępna jest wersja {{version}} aplikacji DS1 Multi Randomizer.",

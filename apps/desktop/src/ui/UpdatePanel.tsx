@@ -13,6 +13,7 @@ function useUpdateWords(state: UpdateState | null, refused: string | null) {
   switch (state.phase) {
     case 'checking': line = t('app.update.checking'); break;
     case 'upToDate': line = t('app.update.upToDate'); break;
+    case 'noStableRelease': line = t('app.update.noStableRelease'); break;
     case 'available': line = t(state.capability === 'manual' ? 'app.update.availableManual' : 'app.update.available', { version }); break;
     case 'downloading': line = t('app.update.downloading', { percent: state.progress ?? 0 }); break;
     case 'downloaded': line = t('app.update.ready', { version }); break;

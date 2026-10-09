@@ -32,7 +32,7 @@ export const UPDATE_INVOKE_CHANNELS = [
 ] as const;
 export const UPDATE_STATE_EVENT = 'updates:state' as const;
 
-export type UpdatePhase = 'idle' | 'checking' | 'upToDate' | 'available' | 'downloading' | 'downloaded' | 'installing' | 'error' | 'unsupported';
+export type UpdatePhase = 'idle' | 'checking' | 'upToDate' | 'noStableRelease' | 'available' | 'downloading' | 'downloaded' | 'installing' | 'error' | 'unsupported';
 /** auto: an installed build downloads and installs by itself on request; manual: a portable build only learns that a version exists; none: no update at all. */
 export type UpdateCapability = 'auto' | 'manual' | 'none';
 export type UpdateUnsupportedReason = 'development' | 'no-update-source';
@@ -131,6 +131,24 @@ export function releaseUrlFor(source: UpdateSource, version: string | null): str
   const base = `https://github.com/${source.owner}/${source.repo}/releases`;
   if (version === null) return `${base}/latest`;
   return /^\d+\.\d+\.\d+$/u.test(version) ? `${base}/tag/v${version}` : `${base}/latest`;
+}
+
+/**
+ * electron-updater 6.8.9 wraps GitHub's `/releases/latest` 404 in `ERR_UPDATER_INVALID_RELEASE_FEED`.
+ * Only that exact endpoint/status combination means the public repository has no stable release; other HTTP/API/network
+ * failures must remain errors.
+ */
+export function isNoStableReleaseError(error: unknown, source: UpdateSource): boolean {
+  if (!isUpdateSourceConfigured(source) || !error || typeof error !== 'object') return false;
+  const candidate = error as { code?: unknown; message?: unknown };
+  if (candidate.code !== 'ERR_UPDATER_INVALID_RELEASE_FEED' || typeof candidate.message !== 'string') return false;
+  const marker = `Unable to find latest version on GitHub (https://github.com/${source.owner}/${source.repo}/releases/latest), please ensure a production release exists:`;
+  const markerIndex = candidate.message.indexOf(marker);
+  if (markerIndex < 0) return false;
+  const nestedError = candidate.message.slice(markerIndex + marker.length, markerIndex + marker.length + 256);
+  if (!/\bHttpError:\s*404(?:\s|$)/u.test(nestedError)) return false;
+  const feed = /(?:^|\n)XML:\s*([\s\S]*)$/u.exec(candidate.message)?.[1];
+  return typeof feed === 'string' && /<(?:[\w.-]+:)?entry(?:\s|>)/u.test(feed);
 }
 
 export type UpdateListener = (state: UpdateState) => void;
@@ -250,6 +268,12 @@ export class UpdateController {
         this.#set({ phase: 'upToDate', availableVersion: null, releaseDate: null, releaseUrl: null });
       }
     } catch (error) {
+      if (this.#options.buildChannel !== 'internal' && isNoStableReleaseError(error, this.#options.source)) {
+        await this.#options.prefs.set({ lastCheckAt: stamp, lastCheckOk: true }).catch(() => undefined);
+        this.#options.log?.('info', 'no stable GitHub release is available; public prereleases remain disabled', 'NO_STABLE_RELEASE');
+        this.#set({ phase: 'noStableRelease', availableVersion: null, releaseDate: null, releaseUrl: null, lastCheckAt: stamp, error: null, progress: null });
+        return this.getState();
+      }
       const detail = clip(error instanceof Error ? error.message : String(error));
       await this.#options.prefs.set({ lastCheckAt: stamp, lastCheckOk: false }).catch(() => undefined);
       this.#options.log?.('warning', `update check failed: ${detail}`, 'UPDATE_CHECK_FAILED');

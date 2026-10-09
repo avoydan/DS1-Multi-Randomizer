@@ -48,6 +48,11 @@ test('every English key exists in Polish and Polish has no extra keys (plural fo
   assert.deepEqual([...plBases].filter((key) => !enBases.has(key)), [], 'Polish keys that do not exist in English');
 });
 
+test('the no-stable-release update state is a clear informational message in both languages', () => {
+  assert.equal(en.app.update.noStableRelease, 'No stable updates are available. Test versions are not installed automatically.');
+  assert.equal(pl.app.update.noStableRelease, 'Brak dostępnych stabilnych aktualizacji. Wersje testowe nie są instalowane automatycznie.');
+});
+
 test('plural forms are complete: English one/other, Polish one/few/many/other', () => {
   for (const [name, entry] of groupBases(enFlat)) if (entry.plural) assert.deepEqual([...entry.forms].sort(), ['one', 'other'], `English ${name}`);
   for (const [name, entry] of groupBases(plFlat)) if (entry.plural) assert.deepEqual([...entry.forms].sort(), ['few', 'many', 'one', 'other'], `Polish ${name}`);
