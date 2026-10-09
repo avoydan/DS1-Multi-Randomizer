@@ -6,6 +6,29 @@ export interface StoredSettings {
   gamePath?: string;
   /** The language the person chose (Auto follows the operating system). Absent means Auto. Never part of a world. */
   language?: LanguageSetting;
+  /** Application updates (docs/AUTO_UPDATE.md). Absent means the defaults: automatic checks ON, nothing checked yet. Never part of a world. */
+  updates?: StoredUpdateSettings;
+}
+
+export interface StoredUpdateSettings {
+  /** Only ever stored as `false`: automatic checks are ON unless the person turned them off. */
+  autoCheck?: false;
+  /** When the last check ended, ISO 8601, and whether it succeeded (a failed one is retried after an hour, a successful one after a day). */
+  lastCheckAt?: string;
+  lastCheckOk?: boolean;
+}
+
+/** The update settings of any older or damaged file: only a valid date and booleans survive. */
+export function normalizeUpdateSettings(value: unknown): StoredUpdateSettings | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+  const source = value as Record<string, unknown>;
+  const result: StoredUpdateSettings = {};
+  if (source.autoCheck === false) result.autoCheck = false;
+  if (typeof source.lastCheckAt === 'string' && Number.isFinite(Date.parse(source.lastCheckAt))) {
+    result.lastCheckAt = new Date(Date.parse(source.lastCheckAt)).toISOString();
+    result.lastCheckOk = source.lastCheckOk === true;
+  }
+  return Object.keys(result).length > 0 ? result : null;
 }
 
 /**
@@ -31,6 +54,8 @@ export function migrateSettings(raw: unknown): { settings: StoredSettings; chang
   if (typeof source.gamePath === 'string' && source.gamePath.trim() !== '') settings.gamePath = source.gamePath;
   const language = normalizeLanguageSetting(source.language);
   if (language && language !== 'auto') settings.language = language;
+  const updates = normalizeUpdateSettings(source.updates);
+  if (updates) settings.updates = updates;
   const keptKeys = Object.keys(settings);
   const changed = Object.keys(source).length !== keptKeys.length || Object.keys(source).some((key) => !keptKeys.includes(key));
   return { settings, changed };

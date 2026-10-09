@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
+import type { UpdateErrorCode, UpdateState } from './updater.js';
 
 contextBridge.exposeInMainWorld('desktop', {
   selectGameDirectory: (): Promise<string | null> => ipcRenderer.invoke('dialog:select-game-directory'),
@@ -12,6 +13,20 @@ contextBridge.exposeInMainWorld('desktop', {
     const handler = (_event: unknown, shown: boolean) => listener(shown === true);
     ipcRenderer.on('dev-tools:changed', handler);
     return () => { ipcRenderer.removeListener('dev-tools:changed', handler); };
+  },
+  /** Application updates (docs/AUTO_UPDATE.md): six narrow calls and one event. The updater itself, GitHub and the installer stay in the main process. */
+  updates: {
+    state: (): Promise<UpdateState | null> => ipcRenderer.invoke('updates:get'),
+    check: (): Promise<UpdateState | null> => ipcRenderer.invoke('updates:check'),
+    download: (): Promise<UpdateState | null> => ipcRenderer.invoke('updates:download'),
+    install: (): Promise<{ ok: boolean; code?: UpdateErrorCode; state?: UpdateState }> => ipcRenderer.invoke('updates:install'),
+    openReleasePage: (): Promise<boolean> => ipcRenderer.invoke('updates:open-release'),
+    setAutoCheck: (enabled: boolean): Promise<UpdateState | null> => ipcRenderer.invoke('updates:set-auto-check', enabled === true),
+    onState: (listener: (state: UpdateState) => void): (() => void) => {
+      const handler = (_event: unknown, state: UpdateState) => listener(state);
+      ipcRenderer.on('updates:state', handler);
+      return () => { ipcRenderer.removeListener('updates:state', handler); };
+    },
   },
   connection: (): Promise<{ apiBase: string | null; token: string; error: string | null; gamePath: string }> => ipcRenderer.invoke('runtime:connection'),
 });

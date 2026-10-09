@@ -1,4 +1,5 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, shell, type IpcMainInvokeEvent } from 'electron';
+import electronUpdater from 'electron-updater';
 import { spawn, execFile, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { readFile, writeFile, mkdir, access } from 'node:fs/promises';
@@ -9,6 +10,8 @@ import { launchGame } from './launchGame.js';
 import { DesktopLog, installModeOf } from './appLog.js';
 import { MAX_SAVE_BYTES, SAVE_KINDS, parseSaveRequest, saveBytes } from './saveFile.js';
 import { isDevToolsShortcut, parseBuildChannel, type BuildChannel } from './channel.js';
+import { UPDATE_SOURCE } from './updateSource.js';
+import { PERIODIC_CHECK_MS, STARTUP_CHECK_DELAY_MS, UPDATE_STATE_EVENT, UpdateController, type UpdaterLike } from './updater.js';
 import { mainMessage, normalizeLanguageSetting, resolveLanguage, type AppLanguage, type LanguageSetting, type MainMessageKey } from './language.js';
 
 const currentDirectory = path.dirname(fileURLToPath(import.meta.url));
@@ -20,6 +23,9 @@ let backendError: string | null = null;
 let sessionToken = '';
 let settings: StoredSettings = {};
 let quitting = false;
+let mainWindow: BrowserWindow | null = null;
+/** Application updates (docs/AUTO_UPDATE.md): the policy lives in updater.ts; this file only wires the real parts. */
+let updates: UpdateController | null = null;
 /** Whether the internal test tools are shown: always in an internal or development build, and in a public build only after the optional shortcut (this session only). */
 let buildChannel: BuildChannel = 'public';
 let devToolsShown = false;
@@ -129,6 +135,52 @@ async function startBackend(): Promise<void> {
   });
 }
 
+/**
+ * Is the backend working on files right now (a generation, an Apply, a Restore, ...)? Asked before the application restarts to install an update. No running backend
+ * means nothing is running; a running backend that cannot answer counts as busy, because "cannot confirm it is idle" must never restart over a half-written game folder.
+ */
+async function backendHasActivity(): Promise<boolean> {
+  const child = backend;
+  if (!app.isPackaged || !child || child.exitCode !== null || !backendUrl) return false;
+  try {
+    const response = await fetch(`${backendUrl}/activity`, { headers: { 'X-DS1TR-Token': sessionToken }, signal: AbortSignal.timeout(2500) });
+    if (!response.ok) return true;
+    return ((await response.json()) as { busy?: unknown }).busy !== false;
+  } catch { return true; }
+}
+
+function createUpdates(): UpdateController {
+  const controller = new UpdateController({
+    createUpdater: () => electronUpdater.autoUpdater as unknown as UpdaterLike,
+    currentVersion: app.getVersion(),
+    mode: installModeOf(app.isPackaged, process.env),
+    source: UPDATE_SOURCE,
+    prefs: {
+      get: () => ({ autoCheck: settings.updates?.autoCheck !== false, lastCheckAt: settings.updates?.lastCheckAt ?? null, lastCheckOk: settings.updates?.lastCheckOk === true }),
+      set: async (patch) => {
+        const next = { ...settings.updates };
+        if ('autoCheck' in patch) { if (patch.autoCheck === false) next.autoCheck = false; else delete next.autoCheck; }
+        if (patch.lastCheckAt !== undefined) next.lastCheckAt = patch.lastCheckAt ?? undefined;
+        if (patch.lastCheckOk !== undefined) next.lastCheckOk = patch.lastCheckOk;
+        const { updates: _previous, ...rest } = settings;
+        settings = Object.keys(next).length > 0 ? { ...rest, updates: next } : rest;
+        await saveSettings();
+      },
+    },
+    isOperationActive: backendHasActivity,
+    openExternal: (url) => shell.openExternal(url),
+    log: (level, message, code) => desktopLog.write(level, message, code),
+  });
+  controller.subscribe((state) => { mainWindow?.webContents.send(UPDATE_STATE_EVENT, state); });
+  return controller;
+}
+
+/** The first automatic check waits until the window has been up for a while; a long-running session checks again every few hours (the 24-hour throttle decides whether it really runs). */
+function scheduleUpdateChecks(): void {
+  setTimeout(() => { void updates?.maybeAutoCheck(); }, STARTUP_CHECK_DELAY_MS).unref();
+  setInterval(() => { void updates?.maybeAutoCheck(); }, PERIODIC_CHECK_MS).unref();
+}
+
 /** The DS1TR icon: shipped next to the runtime when packaged, in build/ during development. */
 const iconPath = () => (app.isPackaged ? path.join(process.resourcesPath, 'icon.ico') : path.join(currentDirectory, '..', 'build', 'icon.ico'));
 
@@ -151,6 +203,8 @@ async function createWindow(): Promise<void> {
       sandbox: true,
     },
   });
+  mainWindow = win;
+  win.on('closed', () => { if (mainWindow === win) mainWindow = null; });
   win.webContents.on('before-input-event', (event, input) => {
     if (!isDevToolsShortcut(input)) return;
     event.preventDefault();
@@ -210,6 +264,14 @@ ipcMain.handle('runtime:connection', () => ({
   error: backendError,
   gamePath: settings.gamePath ?? '',
 }));
+// Updates: a narrow surface. Only the main window may call it, nothing takes a path or an address, and the renderer never touches the updater object.
+const fromMainWindow = (event: IpcMainInvokeEvent): boolean => mainWindow !== null && event.sender === mainWindow.webContents;
+ipcMain.handle('updates:get', (event) => (fromMainWindow(event) ? updates?.getState() ?? null : null));
+ipcMain.handle('updates:check', (event) => (fromMainWindow(event) ? updates?.check({ manual: true }) ?? null : null));
+ipcMain.handle('updates:download', (event) => (fromMainWindow(event) ? updates?.download() ?? null : null));
+ipcMain.handle('updates:install', async (event) => (fromMainWindow(event) && updates ? updates.install() : { ok: false, code: 'NOT_SUPPORTED' }));
+ipcMain.handle('updates:open-release', async (event) => (fromMainWindow(event) && updates ? updates.openReleasePage() : false));
+ipcMain.handle('updates:set-auto-check', async (event, enabled: unknown) => (fromMainWindow(event) && updates && typeof enabled === 'boolean' ? updates.setAutoCheck(enabled) : null));
 ipcMain.handle('game:launch', (_event, gamePath: string) => launchGame(typeof gamePath === 'string' ? gamePath : '', {
   openExternal: (url) => shell.openExternal(url),
   startDetached: async (executable, directory) => {
@@ -223,7 +285,9 @@ app.whenReady().then(async () => {
   await loadSettings();
   desktopLog.write('info', `DS1 Multi Randomizer ${app.getVersion()} started (${installModeOf(app.isPackaged, process.env)}, ${buildChannel} channel), language ${currentLanguage()}`);
   await startBackend();
+  updates = createUpdates();
   await createWindow();
+  scheduleUpdateChecks();
 }).catch((error) => { dialog.showErrorBox(say('startupFailedTitle'), String(error)); app.quit(); });
 app.on('before-quit', (event) => {
   if (quitting) return;

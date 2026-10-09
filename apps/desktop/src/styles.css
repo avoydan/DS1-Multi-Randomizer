@@ -319,3 +319,15 @@ input[type="checkbox"]:not(.switch) { width: 17px; height: 17px; padding: 0; acc
   .brand-top { font-size: 24px; }
   .brand strong { font-size: 19px; }
 }
+
+/* Application updates (docs/AUTO_UPDATE.md) */
+.update-card .update-line { font-weight: 600; margin: 8px 0 4px; }
+.update-card .update-when { color: var(--muted, #9aa4b2); font-size: 13px; margin: 0 0 8px; }
+.update-card progress { width: 100%; margin: 6px 0 10px; }
+.update-card .update-details { margin: 8px 0; font-size: 13px; }
+.update-card .update-details code { display: block; margin-top: 6px; white-space: pre-wrap; word-break: break-word; }
+.update-auto { display: flex; align-items: flex-start; gap: 12px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); cursor: pointer; }
+.update-auto > span { display: flex; flex-direction: column; gap: 2px; }
+.update-auto small { color: var(--muted, #9aa4b2); font-size: 12.5px; }
+.update-notice { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.update-notice .update-actions { margin: 0; }

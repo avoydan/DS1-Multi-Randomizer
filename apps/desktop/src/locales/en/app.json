@@ -215,5 +215,43 @@
       "title": "About",
       "version": "Version {{version}}"
     }
+  },
+  "update": {
+    "title": "Updates",
+    "note": "DS1 Multi Randomizer looks for new versions on GitHub. Nothing is installed without your click, and a failed check never stops you from using the app.",
+    "autoCheck": "Automatic update checks",
+    "autoCheckNote": "Checks at most once a day while the app is open. Turn it off to check only by hand.",
+    "check": "Check for updates",
+    "checking": "Checking...",
+    "upToDate": "You're up to date.",
+    "neverChecked": "Not checked yet.",
+    "lastChecked": "Last checked: {{when}}",
+    "available": "DS1 Multi Randomizer {{version}} is available.",
+    "availableManual": "DS1 Multi Randomizer {{version}} is available.",
+    "portableNote": "Portable version must be updated manually: download the new version, then replace this file.",
+    "whatsNew": "What's new",
+    "download": "Download update",
+    "downloading": "Downloading... {{percent}}%",
+    "ready": "Update ready. DS1 Multi Randomizer {{version}} starts after the restart.",
+    "restart": "Restart and update",
+    "later": "Later",
+    "installing": "Installing the update...",
+    "openPage": "Open the download page",
+    "blocked": "Finish the current operation before updating.",
+    "details": "Details",
+    "errors": {
+      "CHECK_FAILED": "Unable to check for updates. You can keep using the app.",
+      "DOWNLOAD_FAILED": "Unable to download update. You can keep using the app and try again.",
+      "INSTALL_FAILED": "The update could not be started. You can keep using the app.",
+      "OPERATION_ACTIVE": "Finish the current operation before updating.",
+      "INVALID_STATE": "That is not possible right now.",
+      "NOT_SUPPORTED": "This version must be updated manually."
+    },
+    "unsupported": {
+      "development": "Updates are checked only in the installed app, not in a development run.",
+      "no-update-source": "This build has no update source, so it does not check for updates."
+    },
+    "noticeAvailable": "Update available: version {{version}}.",
+    "noticeReady": "Update ready: version {{version}}."
   }
 }

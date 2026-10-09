@@ -100,7 +100,7 @@ export function parseArguments(argv) {
   const flags = new Set();
   const values = new Map();
   const positional = [];
-  const withValue = new Set(['mode', 'expected-publisher', 'manifest', 'out', 'unpacked', 'installer', 'portable', 'commit']);
+  const withValue = new Set(['mode', 'expected-publisher', 'manifest', 'out', 'unpacked', 'installer', 'portable', 'commit', 'tag', 'stage']);
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
     if (argument.startsWith('--')) {

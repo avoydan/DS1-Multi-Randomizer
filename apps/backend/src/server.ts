@@ -24,6 +24,7 @@ import { defaultWorldDataCacheRoot } from './adapters/fogPrerequisites.js';
 import { hintsAvailableFor, hintsForEntry, persistHints } from './core/hintStore.js';
 import { AppLogger, LOG_STAGES, type LogLevel, type LogStage } from './core/appLog.js';
 import { OperationTracker } from './core/operations.js';
+import { ACTIVITY_ROUTES, ActivityTracker } from './core/activity.js';
 import { createRedactor, redactionContext, redactJson } from './core/redaction.js';
 import { assembleSupportBundle, gatherDiagnostics, supportRedaction, type SupportDependencies } from './core/support.js';
 import { writeFile } from 'node:fs/promises';
@@ -41,6 +42,8 @@ const history = new RunHistory(defaultStateRoot());
 // Support logging (docs/DIAGNOSTICS.md): structured lines with a stage and a correlation id, secrets removed as they are written.
 const logger = new AppLogger(path.join(defaultStateRoot(), 'logs', 'backend.log'), { redact: createRedactor(redactionContext({ directories: [] })) });
 const operations = new OperationTracker(defaultStateRoot(), logger);
+// What is working on files right now: the desktop shell asks before it restarts to install an update (docs/AUTO_UPDATE.md).
+const activity = new ActivityTracker();
 /**
  * Where the spoiler log of a run is. A combined-only package holds it; a world randomizer package does not, so the log of the
  * item/enemy stage (the last combined attempt of the run folder) is used. Nothing is copied into the package.
@@ -62,7 +65,7 @@ async function findSpoiler(workspacePath: string, packagePath: string): Promise<
   return null;
 }
 
-const APP_VERSION = '0.45.6';
+const APP_VERSION = '0.46.0';
 const runDependencies = { ...generationDependencies, appVersion: APP_VERSION };
 const supportDependencies: SupportDependencies = {
   stateRoot: defaultStateRoot(), runRoot, userDataDir: process.env.DS1TR_USER_DATA ?? null, appLogPath: process.env.DS1TR_APP_LOG ?? null,
@@ -99,9 +102,15 @@ const server = http.createServer(async (req, res) => {
 
   try {
     const url = new URL(req.url ?? '/', `http://${HOST}:${PORT}`);
+    const activityKind = req.method === 'POST' ? ACTIVITY_ROUTES.get(url.pathname) : undefined;
+    if (activityKind) res.once('close', activity.begin(activityKind));
 
     if (req.method === 'GET' && url.pathname === '/api/health') {
       return send(res, 200, { ok: true, service: 'ds1-triple-randomizer-backend', version: APP_VERSION });
+    }
+
+    if (req.method === 'GET' && url.pathname === '/api/activity') {
+      return send(res, 200, { ok: true, ...activity.snapshot() });
     }
 
     if (req.method === 'POST' && url.pathname === '/api/installation/validate') {

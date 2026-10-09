@@ -1,6 +1,6 @@
 {
   "name": "@ds1tr/desktop",
-  "version": "0.36.0",
+  "version": "0.37.0",
   "license": "GPL-3.0-only",
   "private": true,
   "type": "module",
@@ -9,11 +9,12 @@
     "dev": "concurrently -k \"vite\" \"tsc -p electron/tsconfig.json --watch\" \"wait-on http://127.0.0.1:5173 && electron .\"",
     "build": "vite build --configLoader runner && tsc -p electron/tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p electron/tsconfig.json --noEmit",
-    "test": "node --test electron/settings.test.mjs electron/language.test.mjs electron/saveFile.test.mjs src/i18n/locales.test.mjs electron/launchGame.test.mjs electron/channel.test.mjs src/ui/settingsCoverage.test.mjs src/ui/branding.test.mjs ../../tools/release/release-tools.test.mjs",
+    "test": "node --test electron/settings.test.mjs electron/language.test.mjs electron/saveFile.test.mjs src/i18n/locales.test.mjs electron/launchGame.test.mjs electron/channel.test.mjs electron/updater.test.mjs src/ui/settingsCoverage.test.mjs src/ui/branding.test.mjs ../../tools/release/release-tools.test.mjs ../../tools/release/update-lib.test.mjs",
     "package:win": "node scripts/package-win.mjs"
   },
   "dependencies": {
     "@ds1tr/contracts": "*",
+    "electron-updater": "6.8.9",
     "i18next": "^26.4.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

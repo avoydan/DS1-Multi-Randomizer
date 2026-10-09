@@ -64,6 +64,7 @@ Entropy of the executable (bits per byte, `shannon entropy of the file`): compre
 |---|---|
 | `npm run package:win -w @ds1tr/desktop` | **development / test build**: installer + portable, **not signed**, verified by `release-verify.mjs` in development mode (an unsigned build reports `UNSIGNED` and passes). This is what every build to date is. |
 | `npm run package:win -w @ds1tr/desktop -- --release` | **public release build**: signing is mandatory. Without credentials in the environment it stops **before building anything** (tested). With them, electron-builder signs the application, both helpers, the installer, the uninstaller and the portable, and the build ends with `release-verify.mjs --require-signature`. |
+| `npm run package:win -w @ds1tr/desktop -- --channel=public --unsigned-release` | **publication build without a signature**: what the GitHub release workflow builds today. Public channel, update checks become failures (update source set, `latest.yml` matches the installer), reported as `unsigned-release`, never as signed. See [AUTO_UPDATE.md](AUTO_UPDATE.md). |
 | `node tools/release/release-gate.mjs [--public --expected-publisher "<text>"]` | the hard-fail checklist of section 7 (public mode refuses a dirty tree, a skipped golden check and any unsigned artifact) |
 
 Credentials come **only from the environment** and are never read from, written to or committed in the repository (`.gitignore` also excludes `*.pfx`, `*.p12`, `*.pem`, `*.key`; the verifier fails when such a file is inside a package):

@@ -219,5 +219,43 @@
       "title": "O programie",
       "version": "Wersja {{version}}"
     }
+  },
+  "update": {
+    "title": "Aktualizacje",
+    "note": "DS1 Multi Randomizer szuka nowych wersji w GitHubie. Nic nie instaluje się bez Twojego kliknięcia, a nieudane sprawdzenie nigdy nie przeszkadza w używaniu aplikacji.",
+    "autoCheck": "Automatyczne sprawdzanie aktualizacji",
+    "autoCheckNote": "Sprawdza najwyżej raz na dobę, gdy aplikacja jest otwarta. Wyłącz, aby sprawdzać tylko ręcznie.",
+    "check": "Sprawdź aktualizacje",
+    "checking": "Sprawdzanie...",
+    "upToDate": "Masz najnowszą wersję.",
+    "neverChecked": "Jeszcze nie sprawdzano.",
+    "lastChecked": "Ostatnio sprawdzono: {{when}}",
+    "available": "Dostępna jest wersja {{version}} aplikacji DS1 Multi Randomizer.",
+    "availableManual": "Dostępna jest wersja {{version}} aplikacji DS1 Multi Randomizer.",
+    "portableNote": "Wersję przenośną trzeba zaktualizować ręcznie: pobierz nową wersję, a potem zastąp ten plik.",
+    "whatsNew": "Co nowego",
+    "download": "Pobierz aktualizację",
+    "downloading": "Pobieranie... {{percent}}%",
+    "ready": "Aktualizacja gotowa. Po ponownym uruchomieniu wystartuje DS1 Multi Randomizer {{version}}.",
+    "restart": "Uruchom ponownie i zaktualizuj",
+    "later": "Później",
+    "installing": "Instalowanie aktualizacji...",
+    "openPage": "Otwórz stronę pobierania",
+    "blocked": "Zakończ bieżącą operację przed aktualizacją.",
+    "details": "Szczegóły",
+    "errors": {
+      "CHECK_FAILED": "Nie udało się sprawdzić aktualizacji. Możesz dalej korzystać z aplikacji.",
+      "DOWNLOAD_FAILED": "Nie udało się pobrać aktualizacji. Możesz dalej korzystać z aplikacji i spróbować ponownie.",
+      "INSTALL_FAILED": "Nie udało się uruchomić aktualizacji. Możesz dalej korzystać z aplikacji.",
+      "OPERATION_ACTIVE": "Zakończ bieżącą operację przed aktualizacją.",
+      "INVALID_STATE": "To nie jest teraz możliwe.",
+      "NOT_SUPPORTED": "Tę wersję trzeba zaktualizować ręcznie."
+    },
+    "unsupported": {
+      "development": "Aktualizacje są sprawdzane tylko w zainstalowanej aplikacji, nie w uruchomieniu deweloperskim.",
+      "no-update-source": "Ta kompilacja nie ma źródła aktualizacji, więc nie sprawdza aktualizacji."
+    },
+    "noticeAvailable": "Dostępna aktualizacja: wersja {{version}}.",
+    "noticeReady": "Aktualizacja gotowa: wersja {{version}}."
   }
 }

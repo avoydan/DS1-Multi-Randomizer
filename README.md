@@ -24,7 +24,7 @@ copy any of them, or create their files again. After **Apply to game** you can s
 
 **Something went wrong?** Open **Advanced → Diagnostics and support**. **Copy diagnostics** gives a short summary; **Export support bundle** saves one ZIP (summary, diagnostics, manifest, the newest log lines) to a place you choose. It contains **no game files** and no personal folders: your Windows user name, computer name, folders and any password or token are removed before it is saved. Nothing is sent anywhere; you decide who gets the file.
 
-**Builds are not code-signed yet** (`docs/RELEASE_TRUST.md`): Windows SmartScreen and some antivirus products may warn about an unrecognised publisher. Check the SHA-256 of your download against the one published with the release. Nothing is uploaded or collected by the app (`docs/SECURITY_AND_PRIVACY.md`).
+**Builds are not code-signed yet** (`docs/RELEASE_TRUST.md`): Windows SmartScreen and some antivirus products may warn about an unrecognised publisher. Check the SHA-256 of your download against the one published with the release. Nothing is uploaded or collected by the app (`docs/SECURITY_AND_PRIVACY.md`). The installed app can check GitHub Releases for a newer version and, only when you press the buttons, download and install it (`docs/AUTO_UPDATE.md`); the release steps are in `docs/RELEASE_CHECKLIST.md`.
 
 You need Windows and your own copy of Dark Souls Remastered on Steam. Nothing else has to be installed or downloaded by
 hand: the app finds the game, prepares everything it needs (the world randomizer fetches a small set of data files once

@@ -16,7 +16,8 @@ export interface BuildInfo {
   schema: 'ds1tr-build-info-1';
   version: string;
   commit: string | null;
-  mode: 'development' | 'public';
+  /** `public` is a signed public release, `unsigned-release` a public build without a signature (docs/AUTO_UPDATE.md), `development` everything else. Only `public` is reported as signed. */
+  mode: 'development' | 'public' | 'unsigned-release';
   /** What the interface shows: `public` hides the internal test worlds. Builds made before the channel existed have none and are read as public. */
   channel?: 'public' | 'internal';
   versions: { desktop: string; backend: string; contracts: string; foghostProject: string | null };

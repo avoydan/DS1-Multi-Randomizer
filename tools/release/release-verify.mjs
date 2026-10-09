@@ -1,7 +1,7 @@
 // Release verification: what a DS1 Multi Randomizer release contains, what is signed, and whether it is ready for the public.
 //
 //   node tools/release/release-verify.mjs [--unpacked <dir>] [--installer <file>] [--portable <file>] [--manifest <out.json>]
-//                                          [--require-signature] [--expected-publisher <text>] [--allow-untrusted-root] [--json]
+//                                          [--require-signature] [--expected-publisher <text>] [--allow-untrusted-root] [--publication] [--tag vX.Y.Z] [--json]
 //
 // DEVELOPMENT mode (the default): structure problems fail, an unsigned build is reported as UNSIGNED and does not fail.
 // PUBLIC mode (--require-signature): every DS1TR-authored executable and artifact must carry a valid, trusted Authenticode signature with a
@@ -9,18 +9,25 @@
 // --allow-untrusted-root exists to test the signing pipeline with a throwaway certificate: it accepts a signature that is cryptographically
 // intact but chains to no trusted root and labels the result TEST-SIGNED, never TRUSTED SIGNED.
 //
+// --publication: the build is going to be PUBLISHED (unsigned or not). The update checks (docs/AUTO_UPDATE.md) then become failures: the update source must be set, the
+// channel must be public, latest.yml must match the installer. --require-signature implies it. --tag vX.Y.Z fails unless the tag is the packaged version.
+//
 // Nothing here signs, uploads or changes anything: it reads files, hashes them and asks Windows for their Authenticode state.
 
 import path from 'node:path';
+import { createRequire } from 'node:module';
 import { execFile } from 'node:child_process';
 import { readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import {
   exists, listFiles, parseArguments, readJson, readSignatures, readVersionInfo, repositoryRoot, sha256File,
 } from './release-lib.mjs';
+import { checkAsarRuntimeDependencies, checkLatestYml, checkUpdateConfiguration, findSecrets, parseBuilderPublish, parseFlatYaml, parseUpdateSourceTs, sha512Base64, versionOfTag } from './update-lib.mjs';
 
 const { flags, values } = parseArguments(process.argv.slice(2));
 const requireSignature = flags.has('require-signature');
 const allowUntrustedRoot = flags.has('allow-untrusted-root');
+const publication = requireSignature || flags.has('publication');
+const requestedTag = values.get('tag') ?? null;
 const expectedPublisher = values.get('expected-publisher') ?? process.env.DS1TR_EXPECTED_PUBLISHER ?? '';
 const releaseDirectory = path.join(repositoryRoot, 'apps', 'desktop', 'release');
 const unpacked = path.resolve(values.get('unpacked') ?? path.join(releaseDirectory, 'win-unpacked'));
@@ -108,6 +115,46 @@ const builderConfig = await readFile(path.join(repositoryRoot, 'apps', 'desktop'
 if (!/requestedExecutionLevel:\s*asInvoker/u.test(builderConfig)) fail('privilege', 'electron-builder.yml no longer pins requestedExecutionLevel: asInvoker');
 if (!/perMachine:\s*false/u.test(builderConfig)) fail('privilege', 'the installer is no longer per-user (nsis.perMachine: false)');
 
+// ---- updates (docs/AUTO_UPDATE.md) ---------------------------------------------------------------------------------------------------
+const sourceTs = parseUpdateSourceTs(await readFile(path.join(repositoryRoot, 'apps', 'desktop', 'electron', 'updateSource.ts'), 'utf8'));
+const appUpdateFile = path.join(unpacked, 'resources', 'app-update.yml');
+const appUpdate = (await exists(appUpdateFile)) ? parseFlatYaml(await readFile(appUpdateFile, 'utf8')) : null;
+if (!appUpdate) (publication ? fail : warn)('updates', 'resources/app-update.yml is missing from the package: an installed copy would not know where to look for updates');
+for (const finding of checkUpdateConfiguration({ sourceTs, builderPublish: parseBuilderPublish(builderConfig), updaterText: await readFile(path.join(repositoryRoot, 'apps', 'desktop', 'electron', 'updater.ts'), 'utf8'), appUpdate, publication })) findings.push(finding);
+if (requestedTag !== null && versionOfTag(requestedTag) !== version) fail('version', `the requested tag ${requestedTag} is not v${version}: a release must carry the version that is packaged`);
+if (publication && channel !== 'public') fail('channel', `a build to be published must be a public-channel build; build-info.json says ${channel ?? 'nothing'}`);
+const buildInfoText = (await exists(buildInfoFile)) ? await readFile(buildInfoFile, 'utf8') : '';
+try { if (buildInfoText && JSON.parse(buildInfoText).version !== version) fail('version', `build-info.json says ${JSON.parse(buildInfoText).version}, package.json says ${version}`); } catch { /* an unreadable build-info is reported by the channel check */ }
+
+// latest.yml, the blockmap and the absence of secrets: the metadata an installed client trusts must describe THIS installer.
+const updateAssets = { latest: null, blockmap: null };
+const installerArtifact = artifacts.find((artifact) => artifact.kind === 'installer');
+const latestFile = path.join(releaseDirectory, 'latest.yml');
+if (installerArtifact && (await exists(latestFile))) {
+  const latest = parseFlatYaml(await readFile(latestFile, 'utf8'));
+  const installerSha512 = await sha512Base64(installerArtifact.file);
+  const blockmapPresent = await exists(`${installerArtifact.file}.blockmap`);
+  for (const finding of checkLatestYml({ latest, version, installerName: installerArtifact.relative, installerSha512, installerSize: (await stat(installerArtifact.file)).size, tag: requestedTag, blockmapPresent })) findings.push(finding);
+  updateAssets.latest = { version: latest.version, path: latest.path, sha512: latest.sha512, releaseDate: latest.releaseDate };
+  updateAssets.blockmap = blockmapPresent ? `${installerArtifact.relative}.blockmap` : null;
+} else if (publication) {
+  fail('updates', installerArtifact ? 'latest.yml was not produced next to the installer: installed clients could not see this release' : 'no installer, so no latest.yml to check');
+} else {
+  warn('updates', 'no latest.yml next to the installer (electron-builder writes it with the installer; a development run without the publish block does not)');
+}
+// The shell imports electron-updater at start-up: it must be inside app.asar together with everything it requires.
+const asarFile = path.join(unpacked, 'resources', 'app.asar');
+if (await exists(asarFile)) {
+  const asar = createRequire(path.join(repositoryRoot, 'package.json'))('@electron/asar');
+  const asarEntries = asar.listPackage(asarFile).map((entry) => entry.split('\\').join('/').replace(/^\//u, ''));
+  for (const finding of checkAsarRuntimeDependencies({ entries: asarEntries, readJson: (entry) => JSON.parse(asar.extractFile(asarFile, entry.split('/').join(path.sep)).toString('utf8')) })) findings.push(finding);
+} else fail('updates', 'resources/app.asar is missing');
+const secretTargets = [appUpdateFile, buildInfoFile, latestFile, path.join(unpacked, 'resources', 'app.asar')];
+for (const target of secretTargets) if (await exists(target)) {
+  const hits = findSecrets((await readFile(target)).toString('latin1'));
+  if (hits.length > 0) fail('secrets', `${path.basename(target)} contains something that looks like a credential (${hits.length} pattern(s)): no token or key may ever be packaged`);
+}
+
 // ---- signatures ---------------------------------------------------------------------------------------------------------------------
 const toSign = [
   ...policy.ds1trExecutables.map((entry) => ({ label: entry.path, file: path.join(unpacked, entry.path) })),
@@ -156,12 +203,17 @@ const manifest = {
   product: policy.product,
   version,
   generationProfile: /CURRENT_GENERATION_PROFILE\s*=\s*([A-Z0-9_]+)/u.test(await readFile(path.join(repositoryRoot, 'packages', 'contracts', 'src', 'generation.ts'), 'utf8')) ? 'ds1tr-gen-v1 (the profile of every Seed Code made so far; later profiles stay runnable)' : 'unknown',
-  mode: requireSignature ? 'public' : 'development',
+  mode: requireSignature ? 'public' : publication ? 'unsigned-release' : 'development',
   channel,
   signatureState: overall,
   expectedPublisher: expectedPublisher || null,
   versions: { desktop: version, backend: (await readJson(path.join(repositoryRoot, 'apps', 'backend', 'package.json'))).version, contracts: (await readJson(path.join(repositoryRoot, 'packages', 'contracts', 'package.json'))).version, foghost: fogVersion, randomizer: randomizerVersion },
   fogPin: { foghostPinnedCommit: pinCommit, worldDataCommit },
+  updates: {
+    provider: sourceTs.provider, owner: sourceTs.owner, repo: sourceTs.repo, sourceConfigured: sourceTs.owner !== 'REPLACE_WITH_GITHUB_OWNER',
+    tag: requestedTag, publication, latestYml: updateAssets.latest, blockmap: updateAssets.blockmap,
+    appUpdate: appUpdate ? { provider: appUpdate.provider ?? null, owner: appUpdate.owner ?? null, repo: appUpdate.repo ?? null, publisherName: appUpdate.publisherName ?? null } : null,
+  },
   provenance: await provenance(),
   artifacts: [],
   executables: [],

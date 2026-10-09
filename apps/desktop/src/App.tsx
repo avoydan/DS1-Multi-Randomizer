@@ -16,6 +16,8 @@ import { api } from './api';
 import logo from './assets/branding/app-mark.png';
 import { HelpPanel, HelpProvider } from './ui/HelpPanel';
 import { AboutView, AppSettingsView, PresetsView, SeedCodeView, TransferView } from './ui/OtherViews';
+import { UpdateNotice } from './ui/UpdatePanel';
+import { useUpdates } from './ui/useUpdates';
 import { useDevTools } from './ui/devTools';
 import { AdvancedView, BasicView, ModeSwitch, type SettingsMode } from './ui/SettingsViews';
 import { Sidebar, type ViewId } from './ui/Sidebar';
@@ -77,6 +79,8 @@ export function App() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [plan, setPlan] = useState<PipelinePlan | null>(null);
   const [busy, setBusy] = useState(false);
+  // Application updates (docs/AUTO_UPDATE.md): shown in App settings and About, and as one line at the top while a version is waiting.
+  const updates = useUpdates();
   const [message, setMessage] = useState('');
   const [gameState, setGameState] = useState<GameStateReport | null>(null);
   const [generation, setGeneration] = useState<GenerationResult | null>(null);
@@ -506,6 +510,7 @@ export function App() {
         <Sidebar view={view} onView={(next) => { setView(next); setViewMessage(''); }} backend={backendOnline} version={__APP_VERSION__} logo={logo} />
         <main className="content" id="main">
           {settingsWarning && <div className="notice">{settingsWarning}</div>}
+          <UpdateNotice updates={updates} hidden={view === 'settings' || view === 'about'} />
           {startupError && <div className="notice error">{t('app.startupError.text')}<details><summary>{t('app.startupError.details')}</summary>{startupError}</details></div>}
 
           {view === 'game' && (
@@ -555,8 +560,8 @@ export function App() {
             />
           )}
           {view === 'seed' && <SeedCodeView current={currentSeed} busy={busy} copied={copied} onCopy={(code) => void copySeed(code)} onLoaded={(seed) => void loadSeed(seed)} />}
-          {view === 'settings' && <AppSettingsView>{toolsCard}</AppSettingsView>}
-          {view === 'about' && <AboutView version={__APP_VERSION__} logo={logo} />}
+          {view === 'settings' && <AppSettingsView updates={updates}>{toolsCard}</AppSettingsView>}
+          {view === 'about' && <AboutView version={__APP_VERSION__} logo={logo} updates={updates} />}
 
           {diagnosticsTarget && <DiagnosticsPanel gamePath={config.gamePath} worldId={diagnosticsTarget} onClose={() => setDiagnosticsTarget(null)} />}
           {hintTarget && <HintSheetPanel entryId={hintTarget.id} exportFirst={hintTarget.exportFirst} onClose={() => setHintTarget(null)} />}

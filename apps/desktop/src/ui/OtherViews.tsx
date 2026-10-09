@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next';
 import type { GenerationSettings } from '@ds1tr/contracts';
 import { LanguageSelect } from '../LanguageSelect';
 import { SeedPanel, SummaryChips, type LoadedSeed } from '../SeedPanel';
+import { UpdateCard } from './UpdatePanel';
+import type { UpdatesApi } from './useUpdates';
 
 /** The destinations of the sidebar other than "Your game". They show and move text; none of them changes how a world is made. */
 
@@ -86,18 +88,19 @@ export function SeedCodeView({ current, busy, onLoaded, onCopy, copied }: {
   );
 }
 
-export function AppSettingsView({ children }: { children: ReactNode }) {
+export function AppSettingsView({ children, updates }: { children: ReactNode; updates: UpdatesApi }) {
   const { t } = useTranslation();
   return (
     <>
       <ViewHeader title={t('app.views.settings.title')} note={t('app.views.settings.note')} />
       <section className="card"><h2>{t('app.views.settings.languageTitle')}</h2><p>{t('app.views.settings.languageNote')}</p><LanguageSelect /></section>
+      <UpdateCard updates={updates} showAutoCheck />
       {children}
     </>
   );
 }
 
-export function AboutView({ version, logo }: { version: string; logo: string }) {
+export function AboutView({ version, logo, updates }: { version: string; logo: string; updates: UpdatesApi }) {
   const { t } = useTranslation();
   return (
     <>
@@ -111,6 +114,7 @@ export function AboutView({ version, logo }: { version: string; logo: string }) 
           <p>{t('app.header.tagline')}</p>
         </div>
       </section>
+      <UpdateCard updates={updates} showAutoCheck={false} />
       <section className="card legal-card">
         <h2>{t('app.legal.title')}</h2>
         <p>{t('app.legal.copyright')}</p>

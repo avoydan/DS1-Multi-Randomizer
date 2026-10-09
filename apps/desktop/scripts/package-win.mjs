@@ -2,6 +2,7 @@
 import { cp, mkdir, rm, writeFile, access, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { stageRuntimeDependencies } from './stage-dependencies.mjs';
 
 // Modes (docs/RELEASE_TRUST.md):
 //   npm run package:win -w @ds1tr/desktop                 development / test build: the installer and the portable build, NOT signed
@@ -9,12 +10,18 @@ import { fileURLToPath } from 'node:url';
 //                                                          (CSC_LINK + CSC_KEY_PASSWORD, or DS1TR_SIGN_CERT_SHA1 / DS1TR_SIGN_CERT_SUBJECT for a certificate in the
 //                                                          Windows store such as a hardware token, or DS1TR_ARTIFACT_SIGNING=1 with the Azure variables); without
 //                                                          them the build stops before it starts. Nothing is ever read from the repository.
+//   npm run package:win -w @ds1tr/desktop -- --channel=public --unsigned-release
+//                                                          an UNSIGNED build meant to be published (docs/AUTO_UPDATE.md): public channel, the update source must be set, and the
+//                                                          release verification runs with --publication. It is never reported as signed; the owner decides whether to publish it.
 const releaseMode = process.argv.includes('--release');
+const unsignedRelease = process.argv.includes('--unsigned-release');
 // The CHANNEL decides what the interface shows (docs/RELEASE_TRUST.md): `public` hides the internal test worlds, `internal` shows them. It is independent of signing: a --release build is always
 // public; without --release a build is internal unless --channel=public asks for the public interface (to look at what a player will see). The channel never reaches a world.
 const channelFlag = process.argv.find((argument) => argument.startsWith('--channel='))?.slice('--channel='.length);
 if (channelFlag !== undefined && channelFlag !== 'public' && channelFlag !== 'internal') throw new Error('--channel must be public or internal.');
 if (releaseMode && channelFlag === 'internal') throw new Error('A --release build is a public build: it cannot use the internal channel.');
+if (unsignedRelease && releaseMode) throw new Error('--unsigned-release and --release exclude each other: --release signs, --unsigned-release is the honest name of a public build without a signature.');
+if (unsignedRelease && channelFlag !== 'public') throw new Error('--unsigned-release is a public build: pass --channel=public.');
 const channel = releaseMode ? 'public' : (channelFlag ?? 'internal');
 const appVersion = JSON.parse(await readFile(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'package.json'), 'utf8')).version;
 const desktop = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -112,7 +119,7 @@ const fogHostProject = /<Version>([^<]+)<\/Version>/u.exec(await readFile(path.j
 let commit = null;
 try { commit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, windowsHide: true }).toString().trim(); } catch { commit = null; }
 await writeFile(path.join(runtime, 'build-info.json'), `${JSON.stringify({
-  schema: 'ds1tr-build-info-1', version: appVersion, commit, mode: releaseMode ? 'public' : 'development', channel,
+  schema: 'ds1tr-build-info-1', version: appVersion, commit, mode: releaseMode ? 'public' : unsignedRelease ? 'unsigned-release' : 'development', channel,
   versions: { desktop: appVersion, backend: await readVersion('apps/backend/package.json'), contracts: await readVersion('packages/contracts/package.json'), foghostProject: fogHostProject },
   builtAt: new Date().toISOString(),
 }, null, 2)}\n`);
@@ -120,9 +127,17 @@ const packageApp = path.join(desktop, 'release', 'package-app');
 await rm(packageApp, { recursive: true, force: true });
 await copy(path.join(desktop, 'dist'), path.join(packageApp, 'dist'));
 await copy(path.join(desktop, 'dist-electron'), path.join(packageApp, 'dist-electron'));
+// The one runtime dependency of the desktop shell is the updater (docs/AUTO_UPDATE.md): its closure is staged from the workspace as the lockfile pinned it, so the packaged
+// application never installs anything from the network. They live in dist-electron/node_modules because electron-builder never walks a node_modules folder at the root of the app
+// (beforeBuild returns false: the dependencies are handled here), while a nested one is copied by the dist-electron/** pattern; Node resolves them from main.js upwards.
+const desktopManifest = JSON.parse(await readFile(path.join(desktop, 'package.json'), 'utf8'));
+const runtimeDependencies = { 'electron-updater': desktopManifest.dependencies['electron-updater'] };
+const stagedDependencies = await stageRuntimeDependencies({ root, names: Object.keys(runtimeDependencies), destination: path.join(packageApp, 'dist-electron', 'node_modules') });
+console.log(`staged ${stagedDependencies.length} runtime packages for the updater`);
+// No productName here on purpose: Electron derives the user data folder (settings, history, presets, state) from this package name, and it must not move (docs/RELEASE_TRUST.md).
 await writeFile(path.join(packageApp, 'package.json'), JSON.stringify({
   name: 'ds1-triple-randomizer-desktop', version: appVersion, main: 'dist-electron/main.js', author: { name: 'DS1 Multi Randomizer project' },
-  type: 'module', license: 'GPL-3.0-only', description: 'Dark Souls Remastered multi randomizer',
+  type: 'module', license: 'GPL-3.0-only', description: 'Dark Souls Remastered multi randomizer', dependencies: runtimeDependencies,
 }, null, 2));
 const signingOverrides = !releaseMode ? [] : [
   '-c.win.signExecutable=true', '-c.win.forceCodeSigning=true',
@@ -136,4 +151,4 @@ const signingOverrides = !releaseMode ? [] : [
 await run(process.execPath, [path.join(root, 'node_modules', 'electron-builder', 'cli.js'), '--win', '--x64', '--config', 'electron-builder.yml', '--publish', 'never', ...signingOverrides], desktop,
   { ...process.env, ELECTRON_BUILDER_CACHE: path.join(desktop, 'release', 'builder-cache') });
 // Whatever was built is verified at once: structure, versions, metadata, and (public mode) the signatures. Development builds report UNSIGNED and pass.
-await run(process.execPath, [path.join(root, 'tools', 'release', 'release-verify.mjs'), '--manifest', path.join(desktop, 'release', 'release-manifest.json'), ...(releaseMode ? ['--require-signature'] : [])], root);
+await run(process.execPath, [path.join(root, 'tools', 'release', 'release-verify.mjs'), '--manifest', path.join(desktop, 'release', 'release-manifest.json'), ...(releaseMode ? ['--require-signature'] : []), ...(unsignedRelease ? ['--publication'] : [])], root);

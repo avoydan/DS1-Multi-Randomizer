@@ -1,0 +1,143 @@
+# DS1 Multi Randomizer - release workflow (docs/AUTO_UPDATE.md).
+#
+# It is started BY HAND (workflow_dispatch) and it NEVER publishes: at most it creates a DRAFT GitHub release. Nobody sees a draft except people with write access to the
+# repository, and installed clients only follow PUBLISHED, non-prerelease releases. The owner downloads the draft, tests it, and clicks "Publish release" himself.
+#
+# Nothing here runs on push, on a pull request, on a schedule or on a tag. Hosted runners have no copy of Dark Souls Remastered, so the golden fixtures
+# (goldenCompatibility.mjs verify, which need a clean game copy) are verified by the owner on his computer; the workflow asks for the short hash of the commit he verified
+# and refuses to continue unless it is the commit being built.
+#
+# Secrets: none are needed when the draft is created in THIS repository (the workflow token is enough). Only when the public releases live in a SEPARATE repository does the
+# workflow use the secret RELEASE_REPO_TOKEN (a fine-grained token limited to that one repository, "Contents: read and write") and the variable RELEASE_REPOSITORY.
+# No token is ever written into the application, the installer, app-update.yml or a log.
+
+name: Release (draft)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release, for example 0.36.0. It must equal "version" in apps/desktop/package.json (stable releases only: no prerelease suffix).'
+        required: true
+        type: string
+      golden_attestation:
+        description: 'The first 7 characters of the commit you verified on your computer with goldenCompatibility.mjs verify (51/51 PASS). It must be the commit being built.'
+        required: true
+        type: string
+      create_draft:
+        description: 'Create the DRAFT release. Untick to build and verify only; the files then stay a workflow artifact for 14 days.'
+        required: true
+        type: boolean
+        default: true
+
+# Least privilege: read-only by default; the one job below raises only what it needs.
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+  DOTNET_NOLOGO: '1'
+  VERSION: ${{ inputs.version }}
+
+jobs:
+  release:
+    name: Test, package, verify, draft
+    runs-on: windows-latest
+    timeout-minutes: 120
+    permissions:
+      contents: write # creates the DRAFT release and uploads its files; nothing else is requested
+    steps:
+      - name: The request is well formed
+        shell: bash
+        env:
+          ATTESTATION: ${{ inputs.golden_attestation }}
+        run: |
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::The version must look like 0.36.0: three numbers, no leading v, no prerelease suffix."; exit 1; }
+          [[ "$ATTESTATION" =~ ^[0-9a-f]{7}$ ]] || { echo "::error::golden_attestation must be the first 7 characters of a commit hash."; exit 1; }
+          [ "${ATTESTATION}" = "${GITHUB_SHA:0:7}" ] || { echo "::error::golden_attestation ${ATTESTATION} is not the commit being built (${GITHUB_SHA:0:7}). Verify the golden fixtures on THIS commit first."; exit 1; }
+
+      - name: Check out the commit
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: The version, the update source and the target repository agree
+        shell: bash
+        env:
+          TARGET_REPO: ${{ vars.RELEASE_REPOSITORY || github.repository }}
+        run: |
+          packaged="$(node -p "require('./apps/desktop/package.json').version")"
+          [ "$packaged" = "$VERSION" ] || { echo "::error::apps/desktop/package.json says $packaged, the request says $VERSION. A release carries the version that is packaged."; exit 1; }
+          expected="$(node tools/release/update-source.mjs)" || { echo "::error::The update source is not set (see docs/AUTO_UPDATE.md, One-time setup)."; exit 1; }
+          [ "$expected" = "$TARGET_REPO" ] || { echo "::error::Installed clients follow $expected, but this workflow would upload to $TARGET_REPO."; exit 1; }
+          echo "Releasing $VERSION to $TARGET_REPO"
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install .NET 8 (the two helper programs)
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Install dependencies (exactly as locked)
+        run: npm ci
+
+      - name: Backend tests
+        shell: bash
+        run: |
+          npm run build -w @ds1tr/contracts
+          npm run build -w @ds1tr/backend
+          npm test -w @ds1tr/backend
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Desktop tests
+        shell: bash
+        run: |
+          npm run build -w @ds1tr/desktop
+          npm test -w @ds1tr/desktop
+
+      - name: Package (public channel, unsigned)
+        run: npm run package:win -w @ds1tr/desktop -- --channel=public --unsigned-release
+
+      - name: Verify the release and stage its files
+        shell: bash
+        run: |
+          node tools/release/release-verify.mjs --publication --tag "v$VERSION" --manifest apps/desktop/release/release-manifest.json
+          node tools/release/release-assets.mjs --tag "v$VERSION" --stage apps/desktop/release/assets
+
+      - name: Keep the files as a workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-assets-${{ inputs.version }}
+          path: apps/desktop/release/assets/*
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Create the DRAFT release
+        if: ${{ inputs.create_draft }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_REPO_TOKEN || github.token }}
+          TARGET_REPO: ${{ vars.RELEASE_REPOSITORY || github.repository }}
+        run: |
+          if gh release view "v$VERSION" --repo "$TARGET_REPO" >/dev/null 2>&1; then
+            echo "::error::A release v$VERSION already exists in $TARGET_REPO. Delete the old draft first; a published version is never replaced."
+            exit 1
+          fi
+          args=(--repo "$TARGET_REPO" --draft --title "DS1 Multi Randomizer $VERSION")
+          # The tag is created when the owner publishes. In the same repository it points at the built commit; in a separate release repository it is only a label.
+          if [ "$TARGET_REPO" = "$GITHUB_REPOSITORY" ]; then args+=(--target "$GITHUB_SHA"); fi
+          if [ -f "docs/release-notes/v$VERSION.md" ]; then args+=(--notes-file "docs/release-notes/v$VERSION.md"); else args+=(--generate-notes); fi
+          gh release create "v$VERSION" "${args[@]}" apps/desktop/release/assets/*
+          echo "Draft release v$VERSION created in $TARGET_REPO. Test it, then click Publish release."

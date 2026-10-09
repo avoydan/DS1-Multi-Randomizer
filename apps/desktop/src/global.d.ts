@@ -1,3 +1,5 @@
+import type { UpdateErrorCode, UpdateState } from '../electron/updater';
+
 export {};
 
 declare global {
@@ -14,6 +16,16 @@ declare global {
       saveFile(request: { kind: 'html' | 'txt' | 'json' | 'zip'; defaultName: string; content: string }): Promise<{ ok: boolean; canceled: boolean; name?: string; code?: string }>;
       devTools(): Promise<boolean>;
       onDevTools(listener: (shown: boolean) => void): () => void;
+      /** Application updates (docs/AUTO_UPDATE.md). A null state means no desktop shell answered. */
+      updates: {
+        state(): Promise<UpdateState | null>;
+        check(): Promise<UpdateState | null>;
+        download(): Promise<UpdateState | null>;
+        install(): Promise<{ ok: boolean; code?: UpdateErrorCode; state?: UpdateState }>;
+        openReleasePage(): Promise<boolean>;
+        setAutoCheck(enabled: boolean): Promise<UpdateState | null>;
+        onState(listener: (state: UpdateState) => void): () => void;
+      };
       connection(): Promise<{ apiBase: string | null; token: string; error: string | null; gamePath: string }>;
     };
   }

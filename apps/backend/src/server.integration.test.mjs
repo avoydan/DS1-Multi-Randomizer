@@ -32,6 +32,9 @@ test('desktop API exposes typed state and generation failure without touching a 
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
   assert.equal(ready, true, 'backend starts');
+  // Nothing is running: the desktop shell may restart to install an update (docs/AUTO_UPDATE.md).
+  const idle = await (await fetch(`${url}/activity`)).json();
+  assert.deepEqual(idle, { ok: true, busy: false, active: [] });
   const denied = await fetch(`${url}/game/restore`, {
     method: 'POST', headers: { Origin: 'https://example.org', 'Content-Type': 'application/json' },
     body: JSON.stringify({ gamePath: 'irrelevant' }),
@@ -64,6 +67,10 @@ test('desktop API exposes typed state and generation failure without touching a 
   // A world that is not in the history has no hint sheet; nothing is made up for an id (or a missing id).
   assert.deepEqual(await (await post('/hints/get', { id: 'not-a-world' })).json(), { ok: false, code: 'HINTS_UNAVAILABLE' });
   assert.deepEqual(await (await post('/hints/get', {})).json(), { ok: false, code: 'HINTS_UNAVAILABLE' });
+  // The requests above (an import, a generation stream) have ended, so nothing counts as running any more: the activity ends with the response.
+  let after = await (await fetch(`${url}/activity`)).json();
+  for (let attempt = 0; attempt < 20 && after.busy; attempt += 1) { await new Promise((resolve) => setTimeout(resolve, 50)); after = await (await fetch(`${url}/activity`)).json(); }
+  assert.deepEqual(after, { ok: true, busy: false, active: [] });
   const badPreset = await post('/preset/import', { text: '{}' });
   assert.equal(badPreset.status, 400);
   assert.equal((await badPreset.json()).ok, false);
