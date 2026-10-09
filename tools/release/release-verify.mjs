@@ -129,7 +129,8 @@ try { if (buildInfoText && JSON.parse(buildInfoText).version !== version) fail('
 // latest.yml, the blockmap and the absence of secrets: the metadata an installed client trusts must describe THIS installer.
 const updateAssets = { latest: null, blockmap: null };
 const installerArtifact = artifacts.find((artifact) => artifact.kind === 'installer');
-const latestFile = path.join(releaseDirectory, 'latest.yml');
+// latest.yml sits next to the installer it describes (the build folder, or a folder of downloaded release assets given with --installer).
+const latestFile = path.join(installerArtifact ? path.dirname(installerArtifact.file) : releaseDirectory, 'latest.yml');
 if (installerArtifact && (await exists(latestFile))) {
   const latest = parseFlatYaml(await readFile(latestFile, 'utf8'));
   const installerSha512 = await sha512Base64(installerArtifact.file);
