@@ -1,6 +1,6 @@
 import { useId } from 'react';
 import type { RandomizerConfig } from '@ds1tr/contracts';
-import { displayedValue, settingState, type SettingDef } from '@ds1tr/contracts';
+import { displayedValue, settingState, type ReasonId, type SettingDef } from '@ds1tr/contracts';
 import { EnemyPoolEditor } from '../EnemyPoolEditor';
 import { HelpButton } from './HelpPanel';
 import { helpChoiceKey, settingChoiceKey, settingLabelKey, useTx } from './text';
@@ -11,13 +11,37 @@ export interface SettingRowProps {
   onChange: (id: string, value: unknown) => void;
   /** Basic tiles show the short explanation under the name. */
   describe?: boolean;
+  /** Advanced settings can offer a direct path to the control that unlocks this one. */
+  onJumpToSetting?: (settingId: string) => void;
 }
+
+const REASON_TARGET: Partial<Record<ReasonId, string>> = {
+  itemsOff: 'items.enabled',
+  enemiesOff: 'enemies.enabled',
+  regularEnemiesOff: 'enemies.regular',
+  bossesOff: 'enemies.bosses',
+  fogOff: 'fog.enabled',
+  needsWorldItems: 'items.worldItems',
+  needsStartingEquipment: 'items.startingEquipment',
+  needsKeyPlacement: 'items.keyPlacement',
+  racePlusFair: 'items.keyPlacement',
+  samplingOnly: 'enemies.algorithm',
+  needsCurve: 'enemies.difficultyMode',
+  needsRoamingMode: 'enemies.normalReplacement',
+  needsBothNormalMode: 'enemies.normalReplacement',
+  needsBossDraw: 'enemies.bossReplacement',
+  needsBossBothMode: 'enemies.bossReplacement',
+  needsNormalEnemiesMode: 'enemies.normalReplacement',
+  customPoolActive: 'enemies.customPool',
+  dlcWithFog: 'fog.enabled',
+  warnKeysNeedWorldItems: 'items.worldItems',
+};
 
 /**
  * One option of the configuration, drawn from the registry: the name, the control, the `?` that explains it, and the reason when it cannot be changed now.
  * A disabled option always says why (`help.reasons.*`); nothing is hidden without a word.
  */
-export function SettingRow({ def, config, onChange, describe = false }: SettingRowProps) {
+export function SettingRow({ def, config, onChange, describe = false, onJumpToSetting }: SettingRowProps) {
   const { tx } = useTx();
   const uid = useId();
   const state = settingState(config, def.id);
@@ -27,6 +51,13 @@ export function SettingRow({ def, config, onChange, describe = false }: SettingR
   const raw = displayedValue(config, def.id);
   const reason = !state.enabled && state.reason ? tx(`help.reasons.${state.reason}`) : null;
   const warning = state.warning ? tx(`help.reasons.${state.warning}`) : null;
+  const dependency = state.reason ?? state.warning;
+  const dependencyTarget = dependency ? REASON_TARGET[dependency] : undefined;
+  const jumpButton = dependencyTarget && onJumpToSetting ? (
+    <button type="button" className="setting-jump-link" onClick={() => onJumpToSetting(dependencyTarget)}>
+      {tx('help.ui.jumpToSetting', { setting: tx(settingLabelKey(dependencyTarget)) })}
+    </button>
+  ) : null;
   const describedBy = [reason ? reasonId : null, warning ? reasonId : null, def.kind === 'select' ? noteId : null].filter(Boolean).join(' ') || undefined;
   const classes = `setting-row kind-${def.kind}${state.enabled ? '' : ' is-disabled'}${describe ? ' is-tile' : ''}`;
 
@@ -88,8 +119,8 @@ export function SettingRow({ def, config, onChange, describe = false }: SettingR
       {describe && <p className="setting-desc">{tx(`help.settings.${def.id}.short`)}</p>}
       {!isRow && control}
       {note && <p className="setting-note" id={noteId}>{note}</p>}
-      {reason && <p className="setting-reason" id={reasonId} role="note">{reason}</p>}
-      {!reason && warning && <p className="setting-warning" id={reasonId} role="note">{warning}</p>}
+      {reason && <p className="setting-reason" id={reasonId} role="note"><span>{reason}</span>{jumpButton}</p>}
+      {!reason && warning && <p className="setting-warning" id={reasonId} role="note"><span>{warning}</span>{jumpButton}</p>}
     </div>
   );
 }

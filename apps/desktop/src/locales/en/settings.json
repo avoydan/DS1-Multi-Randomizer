@@ -4,13 +4,9 @@
       "title": "Items",
       "note": "What is found in the world, given, dropped and sold."
     },
-    "enemies": {
-      "title": "Enemies",
-      "note": "Which regular enemy stands where."
-    },
-    "bosses": {
-      "title": "Bosses",
-      "note": "Which boss fills which arena, and roaming bosses."
+    "combat": {
+      "title": "Enemies and bosses",
+      "note": "Regular enemies, what fills their spots, and boss arenas."
     },
     "transitions": {
       "title": "Transitions and fog",
@@ -21,12 +17,26 @@
       "note": "Where the items that open the world lie."
     },
     "classic": {
-      "title": "Classic options",
-      "note": "Options carried over from the earlier randomizers."
+      "title": "Item extras",
+      "note": "Extra ways to shuffle souls and NPC outfits."
     },
     "other": {
       "title": "World and output",
       "note": "DLC and the spoiler file."
+    }
+  },
+  "subsections": {
+    "regularEnemies": {
+      "title": "Regular enemies",
+      "note": "Choose how regular enemies are placed, scaled and replaced."
+    },
+    "enemySlots": {
+      "title": "Regular enemy spots",
+      "note": "Choose whether regular enemy spots can hold regular enemies, roaming bosses or both. The roaming boss chance and behavior are next to this choice."
+    },
+    "arenaBosses": {
+      "title": "Boss arenas",
+      "note": "Choose what appears in boss fights and how those arenas are shuffled."
     }
   },
   "items": {

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { RandomizerConfig } from '@ds1tr/contracts';
 import {
-  BASIC_LAYOUT, SECTION_IDS, customAdvancedSettings, sectionsWithCustomSettings, settingById, settingsOfSection, type SectionId,
+  BASIC_LAYOUT, COMBAT_SUBSECTION_IDS, SECTION_IDS, customAdvancedSettings, sectionsWithCustomSettings, settingById, settingsOfSection, settingsOfSubsection, type CombatSubsectionId, type SectionId,
 } from '@ds1tr/contracts';
 import { Icon, type IconName } from './icons';
 import { SettingRow } from './SettingRow';
@@ -14,7 +14,8 @@ const TILE_ICON: Record<string, IconName> = {
   'items.enabled': 'items', 'enemies.enabled': 'enemies', 'fog.enabled': 'fog', 'enemies.bosses': 'bosses',
   'items.npcGifts': 'items', 'items.shops': 'items', 'output.dlc': 'crown', 'output.spoiler': 'doc',
 };
-const SECTION_ICON: Record<SectionId, IconName> = { items: 'items', enemies: 'enemies', bosses: 'bosses', transitions: 'fog', keys: 'keys', classic: 'gear', other: 'other' };
+const SECTION_ICON: Record<SectionId, IconName> = { items: 'items', combat: 'enemies', transitions: 'fog', keys: 'keys', classic: 'gear', other: 'other' };
+const SUBSECTION_ICON: Record<CombatSubsectionId, IconName> = { regularEnemies: 'enemies', enemySlots: 'other', arenaBosses: 'bosses' };
 
 interface ViewProps { config: RandomizerConfig; onChange: (id: string, value: unknown) => void }
 
@@ -80,9 +81,24 @@ export function AdvancedView({ config, onChange, onBackToBasic, openSections }: 
   const { t } = useTranslation();
   const { tx } = useTx();
   const [open, setOpen] = useState<Set<SectionId>>(() => new Set(openSections));
+  const [jumpTarget, setJumpTarget] = useState<string | null>(null);
   // Coming from the basic notice opens the sections that hold the custom values; the person's own choices are kept otherwise.
   useEffect(() => { if (openSections.length > 0) setOpen((current) => new Set([...current, ...openSections])); }, [openSections]);
+  useEffect(() => {
+    if (!jumpTarget) return;
+    const row = document.querySelector<HTMLElement>(`[data-setting="${jumpTarget}"]`);
+    if (row) {
+      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      row.querySelector<HTMLElement>('input:not(:disabled), select:not(:disabled), button:not(:disabled)')?.focus({ preventScroll: true });
+    }
+    setJumpTarget(null);
+  }, [jumpTarget, open]);
   const toggle = (id: SectionId) => setOpen((current) => { const next = new Set(current); if (!next.delete(id)) next.add(id); return next; });
+  const jumpToSetting = (id: string) => {
+    const target = settingById(id);
+    setOpen((current) => new Set([...current, target.section]));
+    setJumpTarget(id);
+  };
   const customIds = new Set(customAdvancedSettings(config));
   return (
     <div className="advanced-view">
@@ -95,6 +111,7 @@ export function AdvancedView({ config, onChange, onBackToBasic, openSections }: 
           const settings = settingsOfSection(section);
           const isOpen = open.has(section);
           const customHere = settings.filter((setting) => customIds.has(setting.id)).length;
+          const renderSetting = (setting: (typeof settings)[number]) => <SettingRow key={setting.id} def={setting} config={config} onChange={onChange} onJumpToSetting={jumpToSetting} />;
           return (
             <section key={section} className={`accordion-item${isOpen ? ' is-open' : ''}`} data-section={section}>
               <h3>
@@ -109,9 +126,28 @@ export function AdvancedView({ config, onChange, onBackToBasic, openSections }: 
               {isOpen && (
                 <div id={`section-${section}`} className="accordion-body">
                   <p className="section-note">{tx(`settings.sections.${section}.note`)}</p>
-                  <div className="option-list">
-                    {settings.map((setting) => <SettingRow key={setting.id} def={setting} config={config} onChange={onChange} />)}
-                  </div>
+                  {section === 'combat' ? (
+                    <>
+                      <div className="combat-master option-list">{settings.filter((setting) => !setting.subsection).map(renderSetting)}</div>
+                      {COMBAT_SUBSECTION_IDS.map((subsection) => {
+                        const subsectionSettings = settingsOfSubsection(subsection);
+                        return (
+                          <section key={subsection} className={`combat-subsection combat-subsection-${subsection}`} aria-labelledby={`combat-${subsection}`} data-subsection={subsection}>
+                            <header className="combat-subsection-head">
+                              <span className="combat-subsection-icon"><Icon name={SUBSECTION_ICON[subsection]} size={17} /></span>
+                              <div>
+                                <h4 id={`combat-${subsection}`}>{tx(`settings.subsections.${subsection}.title`)}</h4>
+                                <p>{tx(`settings.subsections.${subsection}.note`)}</p>
+                              </div>
+                            </header>
+                            <div className="option-list">{subsectionSettings.map(renderSetting)}</div>
+                          </section>
+                        );
+                      })}
+                    </>
+                  ) : (
+                    <div className="option-list">{settings.map(renderSetting)}</div>
+                  )}
                 </div>
               )}
             </section>

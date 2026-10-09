@@ -4,13 +4,9 @@
       "title": "Przedmioty",
       "note": "Co leży w świecie, co się dostaje, wypada i jest sprzedawane."
     },
-    "enemies": {
-      "title": "Wrogowie",
-      "note": "Który zwykły wróg stoi gdzie."
-    },
-    "bosses": {
-      "title": "Bossowie",
-      "note": "Który boss wypełnia którą arenę oraz wędrujący bossowie."
+    "combat": {
+      "title": "Wrogowie i bossowie",
+      "note": "Zwykli wrogowie, zawartość ich miejsc oraz bossowie na arenach."
     },
     "transitions": {
       "title": "Przejścia i mgły",
@@ -21,12 +17,26 @@
       "note": "Gdzie leżą przedmioty otwierające świat."
     },
     "classic": {
-      "title": "Opcje klasyczne",
-      "note": "Opcje przeniesione z wcześniejszych randomizerów."
+      "title": "Dodatki do przedmiotów",
+      "note": "Dodatkowe sposoby tasowania dusz i strojów NPC."
     },
     "other": {
       "title": "Świat i wynik",
       "note": "DLC i plik ze spoilerami."
+    }
+  },
+  "subsections": {
+    "regularEnemies": {
+      "title": "Zwykli wrogowie",
+      "note": "Wybierz metodę rozmieszczania, siłę i zasady zamiany zwykłych wrogów."
+    },
+    "enemySlots": {
+      "title": "Zawartość zwykłych miejsc",
+      "note": "Zdecyduj, czy zwykłe miejsca w świecie mogą otrzymywać zwykłych wrogów, wędrujących bossów czy oba typy. Szansa i zachowanie wędrujących bossów są tutaj obok tego wyboru."
+    },
+    "arenaBosses": {
+      "title": "Bossowie na arenach",
+      "note": "Ustaw, jakie walki z bossami pojawią się na arenach i jak będą tasowane."
     }
   },
   "items": {

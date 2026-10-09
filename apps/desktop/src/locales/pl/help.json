@@ -12,7 +12,8 @@
     "recommended": "Zalecane",
     "evidencePartial": "Opis oparty na tym, jak kod randomizera mgieł traktuje tę opcję; dokładny skutek w grze nie był tu obserwowany.",
     "selected": "Wybrane",
-    "unavailable": "Niedostępne"
+    "unavailable": "Niedostępne",
+    "jumpToSetting": "Przejdź do: {{setting}}"
   },
   "reasons": {
     "itemsOff": "Włącz losowanie przedmiotów, aby zmienić tę opcję.",
@@ -27,11 +28,11 @@
     "racePlusFair": "Tryb wyścigu + jest zawsze Uczciwy.",
     "samplingOnly": "Używane tylko przy metodzie „Wybierz zamiennik dla każdego miejsca”.",
     "needsCurve": "Używane tylko wtedy, gdy dopasowanie trudności to jeden z trybów z krzywą trudności.",
-    "needsRoamingMode": "Wymaga ustawienia „Zwykłych wrogów zastępuj” na „Tylko bossami” lub „Bossami lub zwykłymi wrogami”.",
-    "needsBothNormalMode": "Wymaga ustawienia „Zwykłych wrogów zastępuj” na „Bossami lub zwykłymi wrogami”.",
-    "needsBossDraw": "Wymaga ustawienia „Zamiana bossów” na „Losowi bossowie” lub „Bossowie lub zwykli wrogowie”.",
-    "needsBossBothMode": "Wymaga ustawienia „Zamiana bossów” na „Bossowie lub zwykli wrogowie”.",
-    "needsNormalEnemiesMode": "Wymaga ustawienia „Zwykłych wrogów zastępuj” na „Tylko zwykłymi wrogami” lub „Bossami lub zwykłymi wrogami”.",
+    "needsRoamingMode": "Ustaw „Zwykłych wrogów zastępuj” na „Tylko bossami” lub „Bossami lub zwykłymi wrogami”.",
+    "needsBothNormalMode": "Ustaw „Zwykłych wrogów zastępuj” na „Bossami lub zwykłymi wrogami”.",
+    "needsBossDraw": "Ustaw „Zamiana bossów” na „Losowi bossowie” lub „Bossowie lub zwykli wrogowie”.",
+    "needsBossBothMode": "Ustaw „Zamiana bossów” na „Bossowie lub zwykli wrogowie”.",
+    "needsNormalEnemiesMode": "Ustaw „Zwykłych wrogów zastępuj” na „Tylko zwykłymi wrogami” lub „Bossami lub zwykłymi wrogami”.",
     "customPoolActive": "Niedostępne razem z własną pulą wrogów.",
     "dlcWithFog": "Randomizer mgieł zawsze obejmuje obszary DLC, więc ta opcja zostaje włączona, dopóki on jest włączony.",
     "warnKeysNeedWorldItems": "Rozmieszczenie kluczy wymaga „Przedmiotów leżących w świecie”: włącz je, bo inaczej nie da się utworzyć świata.",

@@ -6,8 +6,8 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import {
-  BASIC_LAYOUT, DEFAULT_GENERATION_SETTINGS, GENERATION_FIELD_POLICY, SECTION_IDS, SETTINGS, VISIBLE_SETTINGS, applySetting, customAdvancedSettings, displayedValue,
-  joinConfig, sectionsWithCustomSettings, settingById, settingState, settingValue, settingsOfSection,
+  BASIC_LAYOUT, COMBAT_SUBSECTION_IDS, DEFAULT_GENERATION_SETTINGS, GENERATION_FIELD_POLICY, SECTION_IDS, SETTINGS, VISIBLE_SETTINGS, applySetting, customAdvancedSettings, displayedValue,
+  joinConfig, sectionsWithCustomSettings, settingById, settingState, settingValue, settingsOfSection, settingsOfSubsection,
 } from '@ds1tr/contracts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -99,6 +99,36 @@ test('the sections list every visible option once, in the order shown', () => {
     assert.ok(text('en', `settings.sections.${section}.title`) && text('pl', `settings.sections.${section}.title`), section);
     assert.ok(text('en', `settings.sections.${section}.note`) && text('pl', `settings.sections.${section}.note`), section);
   }
+});
+
+test('the combined combat section keeps ordinary enemies, roaming bosses and arena bosses in their own named groups', () => {
+  assert.deepEqual(SECTION_IDS, ['items', 'combat', 'transitions', 'keys', 'classic', 'other']);
+  assert.deepEqual(COMBAT_SUBSECTION_IDS, ['regularEnemies', 'enemySlots', 'arenaBosses']);
+  const allGrouped = COMBAT_SUBSECTION_IDS.flatMap((group) => {
+    const settings = settingsOfSubsection(group);
+    assert.ok(settings.length > 0, `${group} is not empty`);
+    for (const language of ['en', 'pl']) {
+      assert.ok(text(language, `settings.subsections.${group}.title`), `${language}: ${group} has no title`);
+      assert.ok(text(language, `settings.subsections.${group}.note`), `${language}: ${group} has no note`);
+    }
+    assert.ok(settings.every((setting) => setting.section === 'combat'), `${group} stays in the combined panel`);
+    return settings.map((setting) => setting.id);
+  });
+  assert.equal(new Set(allGrouped).size, allGrouped.length, 'a setting appears in only one subsection');
+  assert.deepEqual(settingsOfSubsection('enemySlots').map((setting) => setting.id), [
+    'enemies.normalReplacement', 'enemies.bossChanceNormal', 'enemies.roamingSouls', 'enemies.roamingDead',
+  ]);
+  assert.ok(settingsOfSubsection('arenaBosses').some((setting) => setting.id === 'enemies.bossReplacement'));
+  assert.ok(settingsOfSubsection('arenaBosses').some((setting) => setting.id === 'enemies.uniqueBosses'));
+  assert.ok(settingsOfSection('combat').some((setting) => setting.id === 'enemies.hostileNpcs'));
+});
+
+test('advanced settings use compact toggle columns and return to one column on narrow windows', () => {
+  const css = readFileSync(path.join(here, '..', 'styles.css'), 'utf8');
+  assert.match(css, /\.option-list\s*\{[^}]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/su);
+  assert.match(css, /\.setting-row\.kind-select,\s*\.setting-row\.kind-range,\s*\.setting-row\.kind-pool\s*\{\s*grid-column:\s*1\s*\/\s*-1/su);
+  assert.match(css, /@media\s*\(max-width:\s*960px\)\s*\{\s*\.option-list\s*\{\s*grid-template-columns:\s*minmax\(0,\s*1fr\)/su);
+  assert.match(css, /\.combat-subsection\s*\{[^}]*border:\s*1px solid/su);
 });
 
 // ---- reasons
@@ -202,7 +232,7 @@ test('custom advanced settings are detected, listed per section, and ignore the 
   assert.deepEqual(customAdvancedSettings(basicOnly), []);
   const changed = applySetting(basicOnly, 'enemies.gwyn', 'none');
   assert.deepEqual(customAdvancedSettings(changed), ['enemies.gwyn']);
-  assert.deepEqual(sectionsWithCustomSettings(changed), ['classic']);
+  assert.deepEqual(sectionsWithCustomSettings(changed), ['combat']);
   assert.match(text('pl', 'app.basic.customActive'), /^Aktywne są niestandardowe ustawienia zaawansowane\.$/u);
   assert.match(text('en', 'app.basic.customActive'), /^Custom advanced settings are active\.$/u);
   assert.deepEqual(customAdvancedSettings(applySetting(config(), 'items.progressionLogic', false)), ['items.progressionLogic']);

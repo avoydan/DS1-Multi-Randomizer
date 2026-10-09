@@ -8,67 +8,67 @@ The view (Basic or Advanced), the language and the help are interface state: the
 
 ## Options
 
-| Id | Config key | Values | Default | Section | View | EN label | PL label |
-|---|---|---|---|---|---|---|---|
-| `items.enabled` | `items.enabled` | [true,false] | `true` | items | Basic (main) and Advanced | Item randomization | Losowanie przedmiotów |
-| `items.worldItems` | `items.randomizeWorldItems` | [true,false] | `true` | items | Advanced | Items lying in the world | Przedmioty leżące w świecie |
-| `items.progressionLogic` | `items.progressionLogic` | [true,false] | `true` | items | Advanced | Protect progression gifts and shop goods | Chroń dary i towary sklepowe ważne dla postępu |
-| `items.npcGifts` | `items.randomizeGifts` | [true,false] | `false` | items | Basic (common) and Advanced | NPC gifts | Dary od NPC |
-| `items.enemyDrops` | `items.randomizeEnemyDrops` | [true,false] | `false` | items | Advanced | Enemy drops | Łupy z wrogów |
-| `items.guaranteedDrops` | `items.guaranteedEnemyDrops` | [true,false] | `false` | items | Advanced | Guaranteed enemy drops | Gwarantowane łupy z wrogów |
-| `items.shops` | `items.randomizeShops` | [true,false] | `false` | items | Basic (common) and Advanced | Shops | Sklepy |
-| `items.startingClass` | `items.randomizeStartingClass` | [true,false] | `false` | items | Advanced | Starting class stats | Statystyki klasy startowej |
-| `items.startingEquipment` | `items.randomizeStartingEquipment` | [true,false] | `false` | items | Advanced | Starting equipment | Wyposażenie startowe |
-| `items.startingItems` | `items.startingItems` | ["shield-1h","shield-2h","mixed-pool"] | `"shield-2h"` | items | Advanced | Starting weapon types | Rodzaje broni startowej |
-| `items.keyPlacement` | `items.keyPlacement` | ["vanilla","shuffled","race","race-plus"] | `"vanilla"` | keys | Advanced | Key placement | Rozmieszczenie kluczy |
-| `items.lordvessel` | `items.randomizeLordvessel` | [true,false] | `false` | keys | Advanced | Lordvessel placement | Rozmieszczenie Lordvessel |
-| `items.lordSouls` | `items.randomizeLordSouls` | [true,false] | `false` | keys | Advanced | Lord Soul placement | Rozmieszczenie Lord Souls |
-| `items.difficulty` | `items.itemDifficulty` | ["fair","unfair","very-unfair"] | `"fair"` | keys | Advanced | Item difficulty | Trudność przedmiotów |
-| `items.soulItems` | `items.soulItems` | ["shuffled","replaced","transposed"] | `"shuffled"` | classic | Advanced | Soul items | Przedmioty-dusze |
-| `items.fashionSouls` | `items.fashionSouls` | [true,false] | `true` | classic | Advanced | Split armor sets | Rozdzielaj zestawy zbroi |
-| `items.laundromat` | `items.laundromat` | [true,false] | `false` | classic | Advanced | NPC outfits | Stroje NPC |
-| `enemies.enabled` | `enemies.enabled` | [true,false] | `true` | enemies | Basic (main) and Advanced | Enemy randomization | Losowanie wrogów |
-| `enemies.regular` | `enemies.randomizeRegularEnemies` | [true,false] | `true` | enemies | Advanced | Regular enemies | Zwykli wrogowie |
-| `enemies.scaling` | `enemies.scaling` | ["vanilla","area","progressive"] | `"area"` | enemies | Advanced | Enemy strength scaling | Skalowanie siły wrogów |
-| `enemies.algorithm` | `enemies.placement.algorithm` | ["sampling-v1","permutation-v1"] | `"sampling-v1"` | enemies | Advanced | Placement method | Metoda rozmieszczenia |
-| `enemies.replacementChance` | `enemies.placement.replacementChance` | 0..100 (integer percent) | `100` | enemies | Advanced | Replacement chance | Szansa zamiany |
-| `enemies.normalReplacement` | `enemies.placement.normalReplacement` | ["none","normals","bosses","both"] | `"normals"` | enemies | Advanced | Replace regular enemies with | Zwykłych wrogów zastępuj |
-| `enemies.fit` | `enemies.placement.fit` | ["fits","anywhere","anywhere-except-npcs"] | `"fits"` | enemies | Advanced | Size of replacements | Rozmiar zamienników |
-| `enemies.difficultyMode` | `enemies.placement.difficultyMode` | ["curve-easy-asylum","curve","random-easy-asylum","random"] | `"random-easy-asylum"` | enemies | Advanced | Difficulty matching | Dopasowanie trudności |
-| `enemies.strictness` | `enemies.placement.difficultyStrictness` | ["strict","loose","very-loose"] | `"loose"` | enemies | Advanced | Matching strictness | Ścisłość dopasowania |
-| `enemies.typeReplacement` | `enemies.placement.typeReplacement` | ["enabled","enabled-except-roaming-bosses","disabled"] | `"disabled"` | enemies | Advanced | Replace by kind | Zamiana według rodzaju |
-| `enemies.customPool` | `enemies.placement.customPool` | null, or a list of model ids | `null` | enemies | Advanced | Custom enemy pool | Własna pula wrogów |
-| `enemies.bosses` | `enemies.randomizeBosses` | [true,false] | `true` | bosses | Basic (main) and Advanced | Boss randomization | Losowanie bossów |
-| `enemies.bossReplacement` | `enemies.placement.bossReplacement` | ["classic","bosses","normals","both"] | `"classic"` | bosses | Advanced | Boss replacement | Zamiana bossów |
-| `enemies.bossChanceBoss` | `enemies.placement.bossChanceInBossSlots` | 0..100 (integer percent) | `90` | bosses | Advanced | Boss chance where a regular enemy may stand | Szansa na bossa tam, gdzie może stanąć zwykły wróg |
-| `enemies.uniqueBosses` | `enemies.placement.uniqueBosses` | [true,false] | `false` | bosses | Advanced | Use every boss once first | Najpierw użyj każdego bossa raz |
-| `enemies.bossChanceNormal` | `enemies.placement.bossChanceInNormalSlots` | 0..100 (integer percent) | `10` | bosses | Advanced | Boss chance in regular enemy spots | Szansa na bossa w miejscach zwykłych wrogów |
-| `enemies.roamingSouls` | `enemies.placement.roamingBossSouls` | 0..100 (integer percent) | `50` | bosses | Advanced | Roaming boss souls | Dusze wędrujących bossów |
-| `enemies.roamingDead` | `enemies.placement.roamingBossesStayDead` | [true,false] | `false` | bosses | Advanced | Roaming bosses stay dead | Wędrujący bossowie zostają martwi |
-| `enemies.mimics` | `enemies.replaceMimics` | [true,false] | `true` | classic | Advanced | Replace Mimics | Zastępuj Mimiki |
-| `enemies.hostileNpcs` | `enemies.placement.hostileNpcs` | [true,false] | `false` | classic | Advanced | Hostile NPCs | Wrogie NPC |
-| `enemies.mosquitoes` | `enemies.replaceRespawningMosquitoes` | [true,false] | `true` | classic | Advanced | Replace respawning mosquitoes | Zastępuj odradzające się komary |
-| `enemies.sameEnemy` | `enemies.preventSameEnemy` | [true,false] | `false` | classic | Advanced | No replacement by the same kind | Bez zamiany na ten sam rodzaj |
-| `enemies.pinwheel` | `enemies.pinwheelChaos` | [true,false] | `false` | classic | Advanced | Keep Pinwheel, replace its clones | Zostaw Pinwheel, zastąp jego klony |
-| `enemies.gargoyle` | `enemies.secondGargoyle` | ["replace","keep","single-boss"] | `"replace"` | classic | Advanced | Second Bell Gargoyle | Drugi Bell Gargoyle |
-| `enemies.gwyn` | `enemies.gwynNerf` | ["strong","medium","none"] | `"medium"` | classic | Advanced | Lord Gwyn as a replacement boss | Lord Gwyn jako boss zamiennik |
-| `fog.enabled` | `fog.enabled` | [true,false] | `true` | transitions | Basic (main) and Advanced | Transition and fog randomization | Losowanie przejść i mgieł |
-| `fog.traversable` | `fog.traversableFogs` | [true,false] | `true` | transitions | Advanced | Ordinary fog gates | Zwykłe bramy mgły |
-| `fog.bossFogs` | `fog.bossFogs` | [true,false] | `true` | transitions | Advanced | Boss fog gates | Bramy mgły bossów |
-| `fog.warps` | `fog.areaWarps` | [true,false] | `true` | transitions | Advanced | Warps between locations | Teleporty między lokacjami |
-| `fog.majorPvp` | `fog.majorPvpFogs` | [true,false] | `false` | transitions | Advanced | Major PvP fog gates | Główne bramy mgły PvP |
-| `fog.minorPvp` | `fog.minorPvpFogs` | [true,false] | `false` | transitions | Advanced | Minor PvP fog gates | Poboczne bramy mgły PvP |
-| `fog.lordvesselGates` | `fog.lordvesselGates` | [true,false] | `false` | transitions | Advanced | Golden Lordvessel fog gates | Złote bramy mgły Lordvessel |
-| `fog.randomStart` | `fog.randomStart` | [true,false] | `false` | transitions | Advanced | Random start | Losowy start |
-| `fog.disconnected` | `fog.disconnectedFogs` | [true,false] | `false` | transitions | Advanced | Disconnected fog gates | Rozłączone bramy mgły |
-| `fog.noFall` | `fog.noFallBedOfChaos` | [true,false] | `false` | transitions | Advanced | No-Fall Bed of Chaos | Bed of Chaos bez upadku |
-| `fog.scaling` | `fog.scaling` | [true,false] | `true` | transitions | Advanced | Strength by distance from the start | Siła według odległości od startu |
-| `fog.glitched` | `fog.glitchedLogic` | [true,false] | `false` | transitions | Advanced | Allow skips and glitches | Dopuść skipy i glitche |
-| `fog.requireLordSouls` | `fog.requireLordSouls` | [true,false] | `true` | transitions | Advanced | Require Lord Souls | Wymagaj Lord Souls |
-| `fog.pacifist` | `fog.pacifistMode` | [true,false] | `false` | transitions | Advanced | Pacifist mode | Tryb pacyfisty |
-| `fog.gameLanguage` | `fog.language` | ["ENGLISH","FRENCH","GERMAN","ITALIAN","JAPANESE","KOREAN","NSPANISH","POLISH","PORTUGUESE","RUSSIAN","SCHINESE","SPANISH","TCHINESE"] | `"ENGLISH"` | transitions | Advanced | Language of fog messages | Język komunikatów mgieł |
-| `output.dlc` | `output.includeDlc` | [true,false] | `true` | other | Basic (world) and Advanced | Include DLC content | Uwzględnij zawartość DLC |
-| `output.spoiler` | `output.generateSpoilerLog` | [true,false] | `true` | other | Basic (world) and Advanced | Save the spoiler file | Zapisz plik ze spoilerami |
+| Id | Config key | Values | Default | Section | Subsection | View | EN label | PL label |
+|---|---|---|---|---|---|---|---|---|
+| `items.enabled` | `items.enabled` | [true,false] | `true` | items |  | Basic (main) and Advanced | Item randomization | Losowanie przedmiotów |
+| `items.worldItems` | `items.randomizeWorldItems` | [true,false] | `true` | items |  | Advanced | Items lying in the world | Przedmioty leżące w świecie |
+| `items.progressionLogic` | `items.progressionLogic` | [true,false] | `true` | items |  | Advanced | Protect progression gifts and shop goods | Chroń dary i towary sklepowe ważne dla postępu |
+| `items.npcGifts` | `items.randomizeGifts` | [true,false] | `false` | items |  | Basic (common) and Advanced | NPC gifts | Dary od NPC |
+| `items.enemyDrops` | `items.randomizeEnemyDrops` | [true,false] | `false` | items |  | Advanced | Enemy drops | Łupy z wrogów |
+| `items.guaranteedDrops` | `items.guaranteedEnemyDrops` | [true,false] | `false` | items |  | Advanced | Guaranteed enemy drops | Gwarantowane łupy z wrogów |
+| `items.shops` | `items.randomizeShops` | [true,false] | `false` | items |  | Basic (common) and Advanced | Shops | Sklepy |
+| `items.startingClass` | `items.randomizeStartingClass` | [true,false] | `false` | items |  | Advanced | Starting class stats | Statystyki klasy startowej |
+| `items.startingEquipment` | `items.randomizeStartingEquipment` | [true,false] | `false` | items |  | Advanced | Starting equipment | Wyposażenie startowe |
+| `items.startingItems` | `items.startingItems` | ["shield-1h","shield-2h","mixed-pool"] | `"shield-2h"` | items |  | Advanced | Starting weapon types | Rodzaje broni startowej |
+| `items.keyPlacement` | `items.keyPlacement` | ["vanilla","shuffled","race","race-plus"] | `"vanilla"` | keys |  | Advanced | Key placement | Rozmieszczenie kluczy |
+| `items.lordvessel` | `items.randomizeLordvessel` | [true,false] | `false` | keys |  | Advanced | Lordvessel placement | Rozmieszczenie Lordvessel |
+| `items.lordSouls` | `items.randomizeLordSouls` | [true,false] | `false` | keys |  | Advanced | Lord Soul placement | Rozmieszczenie Lord Souls |
+| `items.difficulty` | `items.itemDifficulty` | ["fair","unfair","very-unfair"] | `"fair"` | keys |  | Advanced | Item difficulty | Trudność przedmiotów |
+| `items.soulItems` | `items.soulItems` | ["shuffled","replaced","transposed"] | `"shuffled"` | classic |  | Advanced | Soul items | Przedmioty-dusze |
+| `items.fashionSouls` | `items.fashionSouls` | [true,false] | `true` | classic |  | Advanced | Split armor sets | Rozdzielaj zestawy zbroi |
+| `items.laundromat` | `items.laundromat` | [true,false] | `false` | classic |  | Advanced | NPC outfits | Stroje NPC |
+| `enemies.enabled` | `enemies.enabled` | [true,false] | `true` | combat |  | Basic (main) and Advanced | Enemy randomization | Losowanie wrogów |
+| `enemies.regular` | `enemies.randomizeRegularEnemies` | [true,false] | `true` | combat | regularEnemies | Advanced | Regular enemies | Zwykli wrogowie |
+| `enemies.scaling` | `enemies.scaling` | ["vanilla","area","progressive"] | `"area"` | combat | regularEnemies | Advanced | Enemy strength scaling | Skalowanie siły wrogów |
+| `enemies.algorithm` | `enemies.placement.algorithm` | ["sampling-v1","permutation-v1"] | `"sampling-v1"` | combat | regularEnemies | Advanced | Placement method | Metoda rozmieszczenia |
+| `enemies.replacementChance` | `enemies.placement.replacementChance` | 0..100 (integer percent) | `100` | combat | regularEnemies | Advanced | Replacement chance | Szansa zamiany |
+| `enemies.fit` | `enemies.placement.fit` | ["fits","anywhere","anywhere-except-npcs"] | `"fits"` | combat | regularEnemies | Advanced | Size of replacements | Rozmiar zamienników |
+| `enemies.difficultyMode` | `enemies.placement.difficultyMode` | ["curve-easy-asylum","curve","random-easy-asylum","random"] | `"random-easy-asylum"` | combat | regularEnemies | Advanced | Difficulty matching | Dopasowanie trudności |
+| `enemies.strictness` | `enemies.placement.difficultyStrictness` | ["strict","loose","very-loose"] | `"loose"` | combat | regularEnemies | Advanced | Matching strictness | Ścisłość dopasowania |
+| `enemies.typeReplacement` | `enemies.placement.typeReplacement` | ["enabled","enabled-except-roaming-bosses","disabled"] | `"disabled"` | combat | regularEnemies | Advanced | Replace by kind | Zamiana według rodzaju |
+| `enemies.customPool` | `enemies.placement.customPool` | null, or a list of model ids | `null` | combat | regularEnemies | Advanced | Custom enemy pool | Własna pula wrogów |
+| `enemies.mimics` | `enemies.replaceMimics` | [true,false] | `true` | combat | regularEnemies | Advanced | Replace Mimics | Zastępuj Mimiki |
+| `enemies.mosquitoes` | `enemies.replaceRespawningMosquitoes` | [true,false] | `true` | combat | regularEnemies | Advanced | Replace respawning mosquitoes | Zastępuj odradzające się komary |
+| `enemies.sameEnemy` | `enemies.preventSameEnemy` | [true,false] | `false` | combat | regularEnemies | Advanced | No replacement by the same kind | Bez zamiany na ten sam rodzaj |
+| `enemies.pinwheel` | `enemies.pinwheelChaos` | [true,false] | `false` | combat | regularEnemies | Advanced | Keep Pinwheel, replace its clones | Zostaw Pinwheel, zastąp jego klony |
+| `enemies.hostileNpcs` | `enemies.placement.hostileNpcs` | [true,false] | `false` | combat | regularEnemies | Advanced | Hostile NPCs | Wrogie NPC |
+| `enemies.normalReplacement` | `enemies.placement.normalReplacement` | ["none","normals","bosses","both"] | `"normals"` | combat | enemySlots | Advanced | Replace regular enemies with | Zwykłych wrogów zastępuj |
+| `enemies.bossChanceNormal` | `enemies.placement.bossChanceInNormalSlots` | 0..100 (integer percent) | `10` | combat | enemySlots | Advanced | Boss chance in regular enemy spots | Szansa na bossa w miejscach zwykłych wrogów |
+| `enemies.roamingSouls` | `enemies.placement.roamingBossSouls` | 0..100 (integer percent) | `50` | combat | enemySlots | Advanced | Roaming boss souls | Dusze wędrujących bossów |
+| `enemies.roamingDead` | `enemies.placement.roamingBossesStayDead` | [true,false] | `false` | combat | enemySlots | Advanced | Roaming bosses stay dead | Wędrujący bossowie zostają martwi |
+| `enemies.bosses` | `enemies.randomizeBosses` | [true,false] | `true` | combat | arenaBosses | Basic (main) and Advanced | Boss randomization | Losowanie bossów |
+| `enemies.bossReplacement` | `enemies.placement.bossReplacement` | ["classic","bosses","normals","both"] | `"classic"` | combat | arenaBosses | Advanced | Boss replacement | Zamiana bossów |
+| `enemies.bossChanceBoss` | `enemies.placement.bossChanceInBossSlots` | 0..100 (integer percent) | `90` | combat | arenaBosses | Advanced | Boss chance where a regular enemy may stand | Szansa na bossa tam, gdzie może stanąć zwykły wróg |
+| `enemies.uniqueBosses` | `enemies.placement.uniqueBosses` | [true,false] | `false` | combat | arenaBosses | Advanced | Use every boss once first | Najpierw użyj każdego bossa raz |
+| `enemies.gargoyle` | `enemies.secondGargoyle` | ["replace","keep","single-boss"] | `"replace"` | combat | arenaBosses | Advanced | Second Bell Gargoyle | Drugi Bell Gargoyle |
+| `enemies.gwyn` | `enemies.gwynNerf` | ["strong","medium","none"] | `"medium"` | combat | arenaBosses | Advanced | Lord Gwyn as a replacement boss | Lord Gwyn jako boss zamiennik |
+| `fog.enabled` | `fog.enabled` | [true,false] | `true` | transitions |  | Basic (main) and Advanced | Transition and fog randomization | Losowanie przejść i mgieł |
+| `fog.traversable` | `fog.traversableFogs` | [true,false] | `true` | transitions |  | Advanced | Ordinary fog gates | Zwykłe bramy mgły |
+| `fog.bossFogs` | `fog.bossFogs` | [true,false] | `true` | transitions |  | Advanced | Boss fog gates | Bramy mgły bossów |
+| `fog.warps` | `fog.areaWarps` | [true,false] | `true` | transitions |  | Advanced | Warps between locations | Teleporty między lokacjami |
+| `fog.majorPvp` | `fog.majorPvpFogs` | [true,false] | `false` | transitions |  | Advanced | Major PvP fog gates | Główne bramy mgły PvP |
+| `fog.minorPvp` | `fog.minorPvpFogs` | [true,false] | `false` | transitions |  | Advanced | Minor PvP fog gates | Poboczne bramy mgły PvP |
+| `fog.lordvesselGates` | `fog.lordvesselGates` | [true,false] | `false` | transitions |  | Advanced | Golden Lordvessel fog gates | Złote bramy mgły Lordvessel |
+| `fog.randomStart` | `fog.randomStart` | [true,false] | `false` | transitions |  | Advanced | Random start | Losowy start |
+| `fog.disconnected` | `fog.disconnectedFogs` | [true,false] | `false` | transitions |  | Advanced | Disconnected fog gates | Rozłączone bramy mgły |
+| `fog.noFall` | `fog.noFallBedOfChaos` | [true,false] | `false` | transitions |  | Advanced | No-Fall Bed of Chaos | Bed of Chaos bez upadku |
+| `fog.scaling` | `fog.scaling` | [true,false] | `true` | transitions |  | Advanced | Strength by distance from the start | Siła według odległości od startu |
+| `fog.glitched` | `fog.glitchedLogic` | [true,false] | `false` | transitions |  | Advanced | Allow skips and glitches | Dopuść skipy i glitche |
+| `fog.requireLordSouls` | `fog.requireLordSouls` | [true,false] | `true` | transitions |  | Advanced | Require Lord Souls | Wymagaj Lord Souls |
+| `fog.pacifist` | `fog.pacifistMode` | [true,false] | `false` | transitions |  | Advanced | Pacifist mode | Tryb pacyfisty |
+| `fog.gameLanguage` | `fog.language` | ["ENGLISH","FRENCH","GERMAN","ITALIAN","JAPANESE","KOREAN","NSPANISH","POLISH","PORTUGUESE","RUSSIAN","SCHINESE","SPANISH","TCHINESE"] | `"ENGLISH"` | transitions |  | Advanced | Language of fog messages | Język komunikatów mgieł |
+| `output.dlc` | `output.includeDlc` | [true,false] | `true` | other |  | Basic (world) and Advanced | Include DLC content | Uwzględnij zawartość DLC |
+| `output.spoiler` | `output.generateSpoilerLog` | [true,false] | `true` | other |  | Basic (world) and Advanced | Save the spoiler file | Zapisz plik ze spoilerami |
 
 ## What each option does, and when it is available
 
@@ -354,25 +354,6 @@ The view (Basic or Advanced), the language and the help are interface state: the
 * **Evidence:** read from the code that does it.
 * **Implemented in (found by search, validated in apps/backend/src/core/configValidation.ts):** `apps/backend/src/core/enemyPlacement.ts`, `engines/combined/vendor/src/core/generator.js`, `engines/combined/vendor/src/core/placement.js`.
 
-### Replace regular enemies with (`enemies.normalReplacement`)
-
-* **Mechanic:** Decides what a regular enemy spot that takes part (see Replacement chance) receives: only regular enemies, only bosses, or either. A boss in a regular spot walks the world like a regular enemy (a roaming boss): it has no boss bar, no fog gate and no encounter reward, and it drops only a share of its souls (Roaming boss souls). Bosses that need their own arena (Bed of Chaos, Ceaseless Discharge, Dark Sun Gwyndolin, Lord Gwyn) and multi-body bosses never appear there.
-* **Affects:** Regular enemy spots, including large regular enemies such as the Titanite Demons and the Drakes. The options for roaming bosses depend on it.
-* **Limits:** Only used with the placement method "Pick a replacement for every spot". With Only bosses a spot stays as it is, and is never given a regular enemy instead, only when a boss cannot stand there: the spot is protected (some passive, scripted or ghost enemies), the enemy is a large one made of several parts (the hydras, the Anor Londo Gargoyles, the bridge Hellkite, the Mass of Souls), Size of replacements is "Only where they fit" and no boss fits, the Undead Asylum with an Easy Asylum matching mode, the matching rules or "No replacement by the same kind" leave no boss, or the map would load more than about 30 different models (bosses already in the map are reused, so this rarely matters). There is no limit on the number of bosses in a map, and the same boss can appear many times.
-* **Choices:**
-  * `none` (Nothing (they stay)): Regular enemy spots are not replaced, and neither are the large ones (Titanite Demons, Drakes, Bounding Demons, hydras, the Mass of Souls).
-  * `normals` (Only regular enemies): Only regular enemies take part (the usual replacement).
-  * `bosses` (Only bosses): Every regular enemy selected for replacement receives a boss, as many as there are spots, the same boss as often as it comes up. A spot that cannot safely take a boss stays as it is.
-  * `both` (Bosses or regular enemies): Each spot that takes part gets a boss with the chance set in the boss section, otherwise a regular enemy. At 100% every spot that takes part is offered a boss; a spot that cannot take one keeps the regular enemy chosen for it.
-* **Disabled or warned when:**
-  * `enemiesOff`: Turn on Enemy randomization to change this option.
-  * `regularEnemiesOff`: Turn on Regular enemies to change this option.
-  * `samplingOnly`: Only used with the placement method "Pick a replacement for every spot".
-* **Seed Code and presets:** part of the world (Seed Code, preset, history); exported and imported.
-* **Neutral value (an old record without the key means this):** `"normals"`.
-* **Evidence:** read from the code that does it.
-* **Implemented in (found by search, validated in apps/backend/src/core/configValidation.ts):** `apps/backend/src/core/enemyPlacement.ts`, `engines/combined/vendor/src/core/generator.js`, `engines/combined/vendor/src/core/placement.js`.
-
 ### Size of replacements (`enemies.fit`)
 
 * **Mechanic:** "Only where they fit" never puts an enemy into a spot smaller than the enemy; with Only bosses a spot that is too small for every boss stays as it is. "Anywhere" allows any size, with a higher risk of enemies clipping into walls or getting stuck.
@@ -461,6 +442,136 @@ The view (Basic or Advanced), the language and the help are interface state: the
 * **Evidence:** read from the code that does it.
 * **Implemented in (found by search, validated in apps/backend/src/core/configValidation.ts):** `apps/backend/src/core/enemyPlacement.ts`, `engines/combined/vendor/src/core/generator.js`, `engines/combined/vendor/src/core/placement.js`.
 
+### Replace Mimics (`enemies.mimics`)
+
+* **Mechanic:** On, Mimics are replaced like other enemies and can turn up elsewhere. Off, the nine Mimic spots keep their Mimic and no Mimic is placed anywhere else.
+* **Affects:** The nine Mimic spots.
+* **Limits:** Needs Regular enemies turned on.
+* **Disabled or warned when:**
+  * `enemiesOff`: Turn on Enemy randomization to change this option.
+  * `regularEnemiesOff`: Turn on Regular enemies to change this option.
+* **Seed Code and presets:** part of the world (Seed Code, preset, history); exported and imported.
+* **Evidence:** read from the code that does it.
+* **Implemented in (found by search, validated in apps/backend/src/core/configValidation.ts):** `engines/combined/vendor/src/core/config.js`, `engines/combined/vendor/src/core/generator.js`.
+
+### Replace respawning mosquitoes (`enemies.mosquitoes`)
+
+* **Mechanic:** On, the six respawning mosquitoes of the Blighttown swamp are replaced like other enemies. Off, they stay where they are and are not used elsewhere.
+* **Affects:** Those six mosquitoes only.
+* **Limits:** Needs Regular enemies turned on.
+* **Disabled or warned when:**
+  * `enemiesOff`: Turn on Enemy randomization to change this option.
+  * `regularEnemiesOff`: Turn on Regular enemies to change this option.
+* **Seed Code and presets:** part of the world (Seed Code, preset, history); exported and imported.
+* **Evidence:** read from the code that does it.
+* **Implemented in (found by search, validated in apps/backend/src/core/configValidation.ts):** `engines/combined/vendor/src/core/config.js`, `engines/combined/vendor/src/core/generator.js`.
+
+### No replacement by the same kind (`enemies.sameEnemy`)
+
+* **Mechanic:** A regular enemy is never replaced by an enemy of its own kind. Bosses are never replaced by the same boss anyway.
+* **Affects:** Regular enemy spots.
+* **Limits:** Needs Regular enemies turned on.
+* **Example:** A Hollow never becomes a Hollow.
+* **Disabled or warned when:**
+  * `enemiesOff`: Turn on Enemy randomization to change this option.
+  * `regularEnemiesOff`: Turn on Regular enemies to change this option.
+* **Seed Code and presets:** part of the world (Seed Code, preset, history); exported and imported.
+* **Evidence:** read from the code that does it.
+* **Implemented in (found by search, validated in apps/backend/src/core/configValidation.ts):** `engines/combined/vendor/src/core/config.js`, `engines/combined/vendor/src/core/generator.js`.
+
+### Keep Pinwheel, replace its clones (`enemies.pinwheel`)
+
+* **Mechanic:** On: the main Pinwheel in the Catacombs is not replaced and is not used as a boss elsewhere; its fourteen one-hit clones are replaced by regular enemies that have their normal health. Off: the main Pinwheel is replaced like any boss and its clones are left out.
+* **Affects:** The Pinwheel fight in the Catacombs.
+* **Limits:** Needs Regular enemies turned on.
+* **Disabled or warned when:**
+  * `enemiesOff`: Turn on Enemy randomization to change this option.
+  * `regularEnemiesOff`: Turn on Regular enemies to change this option.
+* **Seed Code and presets:** part of the world (Seed Code, preset, history); exported and imported.
+* **Evidence:** read from the code that does it.
+* **Implemented in (found by search, validated in apps/backend/src/core/configValidation.ts):** `engines/combined/vendor/src/core/config.js`, `engines/combined/vendor/src/core/generator.js`.
+
+### Hostile NPCs (`enemies.hostileNpcs`)
+
+* **Mechanic:** The Undead Merchant, Andre of Astora and Vamos can stand in place of regular enemies as hostile fighters. The real NPCs are never touched and nothing they sell or teach changes.
+* **Affects:** Regular enemy spots (at most twelve hostile NPCs per map).
+* **Limits:** Needs the placement method "Pick a replacement for every spot" with "Replace regular enemies with" set to "Only regular enemies" or "Bosses or regular enemies". Not available with a custom enemy pool.
+* **Disabled or warned when:**
+  * `customPoolActive`: Not available together with a custom enemy pool.
+  * `enemiesOff`: Turn on Enemy randomization to change this option.
+  * `needsNormalEnemiesMode`: Set "Replace regular enemies with" to "Only regular enemies" or "Bosses or regular enemies".
+  * `regularEnemiesOff`: Turn on Regular enemies to change this option.
+  * `samplingOnly`: Only used with the placement method "Pick a replacement for every spot".
+* **Seed Code and presets:** part of the world (Seed Code, preset, history); exported and imported.
+* **Neutral value (an old record without the key means this):** `false`.
+* **Evidence:** read from the code that does it.
+* **Implemented in (found by search, validated in apps/backend/src/core/configValidation.ts):** `apps/backend/src/core/enemyPlacement.ts`, `engines/combined/vendor/src/core/generator.js`, `engines/combined/vendor/src/core/placement.js`.
+
+### Replace regular enemies with (`enemies.normalReplacement`)
+
+* **Mechanic:** Decides what a regular enemy spot that takes part (see Replacement chance) receives: only regular enemies, only bosses, or either. A boss in a regular spot walks the world like a regular enemy (a roaming boss): it has no boss bar, no fog gate and no encounter reward, and it drops only a share of its souls (Roaming boss souls). Bosses that need their own arena (Bed of Chaos, Ceaseless Discharge, Dark Sun Gwyndolin, Lord Gwyn) and multi-body bosses never appear there.
+* **Affects:** Regular enemy spots, including large regular enemies such as the Titanite Demons and the Drakes. The options for roaming bosses depend on it.
+* **Limits:** Only used with the placement method "Pick a replacement for every spot". With Only bosses a spot stays as it is, and is never given a regular enemy instead, only when a boss cannot stand there: the spot is protected (some passive, scripted or ghost enemies), the enemy is a large one made of several parts (the hydras, the Anor Londo Gargoyles, the bridge Hellkite, the Mass of Souls), Size of replacements is "Only where they fit" and no boss fits, the Undead Asylum with an Easy Asylum matching mode, the matching rules or "No replacement by the same kind" leave no boss, or the map would load more than about 30 different models (bosses already in the map are reused, so this rarely matters). There is no limit on the number of bosses in a map, and the same boss can appear many times.
+* **Choices:**
+  * `none` (Nothing (they stay)): Regular enemy spots are not replaced, and neither are the large ones (Titanite Demons, Drakes, Bounding Demons, hydras, the Mass of Souls).
+  * `normals` (Only regular enemies): Only regular enemies take part (the usual replacement).
+  * `bosses` (Only bosses): Every regular enemy selected for replacement receives a boss, as many as there are spots, the same boss as often as it comes up. A spot that cannot safely take a boss stays as it is.
+  * `both` (Bosses or regular enemies): Each spot that takes part gets a boss with the chance set in the boss section, otherwise a regular enemy. At 100% every spot that takes part is offered a boss; a spot that cannot take one keeps the regular enemy chosen for it.
+* **Disabled or warned when:**
+  * `enemiesOff`: Turn on Enemy randomization to change this option.
+  * `regularEnemiesOff`: Turn on Regular enemies to change this option.
+  * `samplingOnly`: Only used with the placement method "Pick a replacement for every spot".
+* **Seed Code and presets:** part of the world (Seed Code, preset, history); exported and imported.
+* **Neutral value (an old record without the key means this):** `"normals"`.
+* **Evidence:** read from the code that does it.
+* **Implemented in (found by search, validated in apps/backend/src/core/configValidation.ts):** `apps/backend/src/core/enemyPlacement.ts`, `engines/combined/vendor/src/core/generator.js`, `engines/combined/vendor/src/core/placement.js`.
+
+### Boss chance in regular enemy spots (`enemies.bossChanceNormal`)
+
+* **Mechanic:** Of the regular enemy spots that take part, this share receives a boss (a roaming boss) instead of a regular enemy.
+* **Affects:** Regular enemy spots.
+* **Limits:** Needs "Replace regular enemies with" set to "Bosses or regular enemies".
+* **Disabled or warned when:**
+  * `enemiesOff`: Turn on Enemy randomization to change this option.
+  * `needsBothNormalMode`: Set "Replace regular enemies with" to "Bosses or regular enemies".
+  * `regularEnemiesOff`: Turn on Regular enemies to change this option.
+  * `samplingOnly`: Only used with the placement method "Pick a replacement for every spot".
+* **Seed Code and presets:** part of the world (Seed Code, preset, history); exported and imported.
+* **Neutral value (an old record without the key means this):** `10`.
+* **Evidence:** read from the code that does it.
+* **Implemented in (found by search, validated in apps/backend/src/core/configValidation.ts):** `apps/backend/src/core/enemyPlacement.ts`, `engines/combined/vendor/src/core/generator.js`, `engines/combined/vendor/src/core/placement.js`.
+
+### Roaming boss souls (`enemies.roamingSouls`)
+
+* **Mechanic:** The share of the souls a boss gives in its own arena that it drops when it stands in a regular enemy spot.
+* **Affects:** The souls dropped by roaming bosses.
+* **Limits:** Needs "Replace regular enemies with" set to "Only bosses" or "Bosses or regular enemies".
+* **Example:** 50%: a boss that gives 10,000 souls in its arena gives 5,000 as a roaming boss.
+* **Disabled or warned when:**
+  * `enemiesOff`: Turn on Enemy randomization to change this option.
+  * `needsRoamingMode`: Set "Replace regular enemies with" to "Only bosses" or "Bosses or regular enemies".
+  * `regularEnemiesOff`: Turn on Regular enemies to change this option.
+  * `samplingOnly`: Only used with the placement method "Pick a replacement for every spot".
+* **Seed Code and presets:** part of the world (Seed Code, preset, history); exported and imported.
+* **Neutral value (an old record without the key means this):** `50`.
+* **Evidence:** read from the code that does it.
+* **Implemented in (found by search, validated in apps/backend/src/core/configValidation.ts):** `apps/backend/src/core/enemyPlacement.ts`, `engines/combined/vendor/src/core/generator.js`, `engines/combined/vendor/src/core/placement.js`.
+
+### Roaming bosses stay dead (`enemies.roamingDead`)
+
+* **Mechanic:** On: a boss in a regular spot does not come back after you rest or the area resets (played in the game: it stayed dead). Off: it comes back like a regular enemy (written to the game's data; not yet confirmed in a playthrough).
+* **Affects:** Whether roaming bosses respawn.
+* **Limits:** Needs "Replace regular enemies with" set to "Only bosses" or "Bosses or regular enemies".
+* **Disabled or warned when:**
+  * `enemiesOff`: Turn on Enemy randomization to change this option.
+  * `needsRoamingMode`: Set "Replace regular enemies with" to "Only bosses" or "Bosses or regular enemies".
+  * `regularEnemiesOff`: Turn on Regular enemies to change this option.
+  * `samplingOnly`: Only used with the placement method "Pick a replacement for every spot".
+* **Seed Code and presets:** part of the world (Seed Code, preset, history); exported and imported.
+* **Neutral value (an old record without the key means this):** `false`.
+* **Evidence:** read from the code that does it.
+* **Implemented in (found by search, validated in apps/backend/src/core/configValidation.ts):** `apps/backend/src/core/enemyPlacement.ts`, `engines/combined/vendor/src/core/generator.js`, `engines/combined/vendor/src/core/placement.js`.
+
 ### Boss randomization (`enemies.bosses`)
 
 * **Mechanic:** Bosses are replaced according to Boss replacement. Some boss fights (the dragons, the multi-body bosses) are exchanged only as whole groups.
@@ -499,7 +610,7 @@ The view (Basic or Advanced), the language and the help are interface state: the
 * **Disabled or warned when:**
   * `bossesOff`: Turn on Boss randomization to change this option.
   * `enemiesOff`: Turn on Enemy randomization to change this option.
-  * `needsBossBothMode`: Needs "Boss replacement" set to "Bosses or regular enemies".
+  * `needsBossBothMode`: Set "Boss replacement" to "Bosses or regular enemies".
   * `samplingOnly`: Only used with the placement method "Pick a replacement for every spot".
 * **Seed Code and presets:** part of the world (Seed Code, preset, history); exported and imported.
 * **Neutral value (an old record without the key means this):** `90`.
@@ -514,123 +625,12 @@ The view (Basic or Advanced), the language and the help are interface state: the
 * **Disabled or warned when:**
   * `bossesOff`: Turn on Boss randomization to change this option.
   * `enemiesOff`: Turn on Enemy randomization to change this option.
-  * `needsBossDraw`: Needs "Boss replacement" set to "Random bosses" or "Bosses or regular enemies".
+  * `needsBossDraw`: Set "Boss replacement" to "Random bosses" or "Bosses or regular enemies".
   * `samplingOnly`: Only used with the placement method "Pick a replacement for every spot".
 * **Seed Code and presets:** part of the world (Seed Code, preset, history); exported and imported.
 * **Neutral value (an old record without the key means this):** `false`.
 * **Evidence:** read from the code that does it.
 * **Implemented in (found by search, validated in apps/backend/src/core/configValidation.ts):** `apps/backend/src/core/enemyPlacement.ts`, `engines/combined/vendor/src/core/placement.js`, `engines/combined/vendor/src/core/sampling.js`.
-
-### Boss chance in regular enemy spots (`enemies.bossChanceNormal`)
-
-* **Mechanic:** Of the regular enemy spots that take part, this share receives a boss (a roaming boss) instead of a regular enemy.
-* **Affects:** Regular enemy spots.
-* **Limits:** Needs "Replace regular enemies with" set to "Bosses or regular enemies".
-* **Disabled or warned when:**
-  * `enemiesOff`: Turn on Enemy randomization to change this option.
-  * `needsBothNormalMode`: Needs "Replace regular enemies with" set to "Bosses or regular enemies".
-  * `regularEnemiesOff`: Turn on Regular enemies to change this option.
-  * `samplingOnly`: Only used with the placement method "Pick a replacement for every spot".
-* **Seed Code and presets:** part of the world (Seed Code, preset, history); exported and imported.
-* **Neutral value (an old record without the key means this):** `10`.
-* **Evidence:** read from the code that does it.
-* **Implemented in (found by search, validated in apps/backend/src/core/configValidation.ts):** `apps/backend/src/core/enemyPlacement.ts`, `engines/combined/vendor/src/core/generator.js`, `engines/combined/vendor/src/core/placement.js`.
-
-### Roaming boss souls (`enemies.roamingSouls`)
-
-* **Mechanic:** The share of the souls a boss gives in its own arena that it drops when it stands in a regular enemy spot.
-* **Affects:** The souls dropped by roaming bosses.
-* **Limits:** Needs "Replace regular enemies with" set to "Only bosses" or "Bosses or regular enemies".
-* **Example:** 50%: a boss that gives 10,000 souls in its arena gives 5,000 as a roaming boss.
-* **Disabled or warned when:**
-  * `enemiesOff`: Turn on Enemy randomization to change this option.
-  * `needsRoamingMode`: Needs "Replace regular enemies with" set to "Only bosses" or "Bosses or regular enemies".
-  * `regularEnemiesOff`: Turn on Regular enemies to change this option.
-  * `samplingOnly`: Only used with the placement method "Pick a replacement for every spot".
-* **Seed Code and presets:** part of the world (Seed Code, preset, history); exported and imported.
-* **Neutral value (an old record without the key means this):** `50`.
-* **Evidence:** read from the code that does it.
-* **Implemented in (found by search, validated in apps/backend/src/core/configValidation.ts):** `apps/backend/src/core/enemyPlacement.ts`, `engines/combined/vendor/src/core/generator.js`, `engines/combined/vendor/src/core/placement.js`.
-
-### Roaming bosses stay dead (`enemies.roamingDead`)
-
-* **Mechanic:** On: a boss in a regular spot does not come back after you rest or the area resets (played in the game: it stayed dead). Off: it comes back like a regular enemy (written to the game's data; not yet confirmed in a playthrough).
-* **Affects:** Whether roaming bosses respawn.
-* **Limits:** Needs "Replace regular enemies with" set to "Only bosses" or "Bosses or regular enemies".
-* **Disabled or warned when:**
-  * `enemiesOff`: Turn on Enemy randomization to change this option.
-  * `needsRoamingMode`: Needs "Replace regular enemies with" set to "Only bosses" or "Bosses or regular enemies".
-  * `regularEnemiesOff`: Turn on Regular enemies to change this option.
-  * `samplingOnly`: Only used with the placement method "Pick a replacement for every spot".
-* **Seed Code and presets:** part of the world (Seed Code, preset, history); exported and imported.
-* **Neutral value (an old record without the key means this):** `false`.
-* **Evidence:** read from the code that does it.
-* **Implemented in (found by search, validated in apps/backend/src/core/configValidation.ts):** `apps/backend/src/core/enemyPlacement.ts`, `engines/combined/vendor/src/core/generator.js`, `engines/combined/vendor/src/core/placement.js`.
-
-### Replace Mimics (`enemies.mimics`)
-
-* **Mechanic:** On, Mimics are replaced like other enemies and can turn up elsewhere. Off, the nine Mimic spots keep their Mimic and no Mimic is placed anywhere else.
-* **Affects:** The nine Mimic spots.
-* **Limits:** Needs Regular enemies turned on.
-* **Disabled or warned when:**
-  * `enemiesOff`: Turn on Enemy randomization to change this option.
-  * `regularEnemiesOff`: Turn on Regular enemies to change this option.
-* **Seed Code and presets:** part of the world (Seed Code, preset, history); exported and imported.
-* **Evidence:** read from the code that does it.
-* **Implemented in (found by search, validated in apps/backend/src/core/configValidation.ts):** `engines/combined/vendor/src/core/config.js`, `engines/combined/vendor/src/core/generator.js`.
-
-### Hostile NPCs (`enemies.hostileNpcs`)
-
-* **Mechanic:** The Undead Merchant, Andre of Astora and Vamos can stand in place of regular enemies as hostile fighters. The real NPCs are never touched and nothing they sell or teach changes.
-* **Affects:** Regular enemy spots (at most twelve hostile NPCs per map).
-* **Limits:** Needs the placement method "Pick a replacement for every spot" with "Replace regular enemies with" set to "Only regular enemies" or "Bosses or regular enemies". Not available with a custom enemy pool.
-* **Disabled or warned when:**
-  * `customPoolActive`: Not available together with a custom enemy pool.
-  * `enemiesOff`: Turn on Enemy randomization to change this option.
-  * `needsNormalEnemiesMode`: Needs "Replace regular enemies with" set to "Only regular enemies" or "Bosses or regular enemies".
-  * `regularEnemiesOff`: Turn on Regular enemies to change this option.
-  * `samplingOnly`: Only used with the placement method "Pick a replacement for every spot".
-* **Seed Code and presets:** part of the world (Seed Code, preset, history); exported and imported.
-* **Neutral value (an old record without the key means this):** `false`.
-* **Evidence:** read from the code that does it.
-* **Implemented in (found by search, validated in apps/backend/src/core/configValidation.ts):** `apps/backend/src/core/enemyPlacement.ts`, `engines/combined/vendor/src/core/generator.js`, `engines/combined/vendor/src/core/placement.js`.
-
-### Replace respawning mosquitoes (`enemies.mosquitoes`)
-
-* **Mechanic:** On, the six respawning mosquitoes of the Blighttown swamp are replaced like other enemies. Off, they stay where they are and are not used elsewhere.
-* **Affects:** Those six mosquitoes only.
-* **Limits:** Needs Regular enemies turned on.
-* **Disabled or warned when:**
-  * `enemiesOff`: Turn on Enemy randomization to change this option.
-  * `regularEnemiesOff`: Turn on Regular enemies to change this option.
-* **Seed Code and presets:** part of the world (Seed Code, preset, history); exported and imported.
-* **Evidence:** read from the code that does it.
-* **Implemented in (found by search, validated in apps/backend/src/core/configValidation.ts):** `engines/combined/vendor/src/core/config.js`, `engines/combined/vendor/src/core/generator.js`.
-
-### No replacement by the same kind (`enemies.sameEnemy`)
-
-* **Mechanic:** A regular enemy is never replaced by an enemy of its own kind. Bosses are never replaced by the same boss anyway.
-* **Affects:** Regular enemy spots.
-* **Limits:** Needs Regular enemies turned on.
-* **Example:** A Hollow never becomes a Hollow.
-* **Disabled or warned when:**
-  * `enemiesOff`: Turn on Enemy randomization to change this option.
-  * `regularEnemiesOff`: Turn on Regular enemies to change this option.
-* **Seed Code and presets:** part of the world (Seed Code, preset, history); exported and imported.
-* **Evidence:** read from the code that does it.
-* **Implemented in (found by search, validated in apps/backend/src/core/configValidation.ts):** `engines/combined/vendor/src/core/config.js`, `engines/combined/vendor/src/core/generator.js`.
-
-### Keep Pinwheel, replace its clones (`enemies.pinwheel`)
-
-* **Mechanic:** On: the main Pinwheel in the Catacombs is not replaced and is not used as a boss elsewhere; its fourteen one-hit clones are replaced by regular enemies that have their normal health. Off: the main Pinwheel is replaced like any boss and its clones are left out.
-* **Affects:** The Pinwheel fight in the Catacombs.
-* **Limits:** Needs Regular enemies turned on.
-* **Disabled or warned when:**
-  * `enemiesOff`: Turn on Enemy randomization to change this option.
-  * `regularEnemiesOff`: Turn on Regular enemies to change this option.
-* **Seed Code and presets:** part of the world (Seed Code, preset, history); exported and imported.
-* **Evidence:** read from the code that does it.
-* **Implemented in (found by search, validated in apps/backend/src/core/configValidation.ts):** `engines/combined/vendor/src/core/config.js`, `engines/combined/vendor/src/core/generator.js`.
 
 ### Second Bell Gargoyle (`enemies.gargoyle`)
 

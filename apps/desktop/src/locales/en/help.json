@@ -12,7 +12,8 @@
     "recommended": "Recommended",
     "evidencePartial": "Based on how the fog randomizer's own code treats this option; the exact effect in the game was not observed here.",
     "selected": "Selected",
-    "unavailable": "Not available"
+    "unavailable": "Not available",
+    "jumpToSetting": "Go to: {{setting}}"
   },
   "reasons": {
     "itemsOff": "Turn on Item randomization to change this option.",
@@ -27,11 +28,11 @@
     "racePlusFair": "Race Mode + is always Fair.",
     "samplingOnly": "Only used with the placement method \"Pick a replacement for every spot\".",
     "needsCurve": "Only used when Difficulty matching is one of the difficulty curve modes.",
-    "needsRoamingMode": "Needs \"Replace regular enemies with\" set to \"Only bosses\" or \"Bosses or regular enemies\".",
-    "needsBothNormalMode": "Needs \"Replace regular enemies with\" set to \"Bosses or regular enemies\".",
-    "needsBossDraw": "Needs \"Boss replacement\" set to \"Random bosses\" or \"Bosses or regular enemies\".",
-    "needsBossBothMode": "Needs \"Boss replacement\" set to \"Bosses or regular enemies\".",
-    "needsNormalEnemiesMode": "Needs \"Replace regular enemies with\" set to \"Only regular enemies\" or \"Bosses or regular enemies\".",
+    "needsRoamingMode": "Set \"Replace regular enemies with\" to \"Only bosses\" or \"Bosses or regular enemies\".",
+    "needsBothNormalMode": "Set \"Replace regular enemies with\" to \"Bosses or regular enemies\".",
+    "needsBossDraw": "Set \"Boss replacement\" to \"Random bosses\" or \"Bosses or regular enemies\".",
+    "needsBossBothMode": "Set \"Boss replacement\" to \"Bosses or regular enemies\".",
+    "needsNormalEnemiesMode": "Set \"Replace regular enemies with\" to \"Only regular enemies\" or \"Bosses or regular enemies\".",
     "customPoolActive": "Not available together with a custom enemy pool.",
     "dlcWithFog": "The fog randomizer always includes the DLC areas, so this stays on while it is on.",
     "warnKeysNeedWorldItems": "Key placement needs \"Items lying in the world\": turn it on, or the world cannot be made.",

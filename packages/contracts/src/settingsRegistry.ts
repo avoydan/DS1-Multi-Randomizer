@@ -16,8 +16,12 @@ import { DEFAULT_GENERATION_SETTINGS } from './smokeTests.js';
 export type SettingKind = 'toggle' | 'select' | 'range' | 'pool';
 
 /** The sections of the advanced view, in the order they are shown. */
-export const SECTION_IDS = ['items', 'enemies', 'bosses', 'transitions', 'keys', 'classic', 'other'] as const;
+export const SECTION_IDS = ['items', 'combat', 'transitions', 'keys', 'classic', 'other'] as const;
 export type SectionId = (typeof SECTION_IDS)[number];
+
+/** Subsections inside the combined enemy and boss settings panel. */
+export const COMBAT_SUBSECTION_IDS = ['regularEnemies', 'enemySlots', 'arenaBosses'] as const;
+export type CombatSubsectionId = (typeof COMBAT_SUBSECTION_IDS)[number];
 
 /** The three cards of the basic view. */
 export type BasicGroup = 'main' | 'common' | 'world';
@@ -29,6 +33,8 @@ export interface SettingDef {
   path: string;
   kind: SettingKind;
   section: SectionId;
+  /** Related enemy and boss placement controls grouped inside the combat section. */
+  subsection?: CombatSubsectionId;
   /** The serialized values of a select, in the order shown. */
   choices?: readonly string[];
   /** A switch that turns a whole category on or off. */
@@ -74,34 +80,32 @@ export const SETTINGS: readonly SettingDef[] = [
   select('items.soulItems', 'items.soulItems', 'classic', ['shuffled', 'replaced', 'transposed'] satisfies SoulItemsMode[]),
   toggle('items.fashionSouls', 'items.fashionSouls', 'classic'),
   toggle('items.laundromat', 'items.laundromat', 'classic'),
-  // --- Enemies
-  toggle('enemies.enabled', 'enemies.enabled', 'enemies', { master: true, basic: 'main' }),
-  toggle('enemies.regular', 'enemies.randomizeRegularEnemies', 'enemies'),
-  select('enemies.scaling', 'enemies.scaling', 'enemies', ['vanilla', 'area', 'progressive']),
-  select('enemies.algorithm', 'enemies.placement.algorithm', 'enemies', ['sampling-v1', 'permutation-v1'] satisfies EnemyPlacementAlgorithm[]),
-  range('enemies.replacementChance', 'enemies.placement.replacementChance', 'enemies'),
-  select('enemies.normalReplacement', 'enemies.placement.normalReplacement', 'enemies', ['none', 'normals', 'bosses', 'both'] satisfies NormalEnemyReplacementMode[]),
-  select('enemies.fit', 'enemies.placement.fit', 'enemies', ['fits', 'anywhere', 'anywhere-except-npcs']),
-  select('enemies.difficultyMode', 'enemies.placement.difficultyMode', 'enemies', ['curve-easy-asylum', 'curve', 'random-easy-asylum', 'random']),
-  select('enemies.strictness', 'enemies.placement.difficultyStrictness', 'enemies', ['strict', 'loose', 'very-loose']),
-  select('enemies.typeReplacement', 'enemies.placement.typeReplacement', 'enemies', ['enabled', 'enabled-except-roaming-bosses', 'disabled']),
-  { id: 'enemies.customPool', path: 'enemies.placement.customPool', kind: 'pool', section: 'enemies', evidence: 'verified' },
-  // --- Bosses
-  toggle('enemies.bosses', 'enemies.randomizeBosses', 'bosses', { basic: 'main' }),
-  select('enemies.bossReplacement', 'enemies.placement.bossReplacement', 'bosses', ['classic', 'bosses', 'normals', 'both'] satisfies BossReplacementMode[]),
-  range('enemies.bossChanceBoss', 'enemies.placement.bossChanceInBossSlots', 'bosses'),
-  toggle('enemies.uniqueBosses', 'enemies.placement.uniqueBosses', 'bosses'),
-  range('enemies.bossChanceNormal', 'enemies.placement.bossChanceInNormalSlots', 'bosses'),
-  range('enemies.roamingSouls', 'enemies.placement.roamingBossSouls', 'bosses'),
-  toggle('enemies.roamingDead', 'enemies.placement.roamingBossesStayDead', 'bosses'),
-  // --- Classic enemy options
-  toggle('enemies.mimics', 'enemies.replaceMimics', 'classic'),
-  toggle('enemies.hostileNpcs', 'enemies.placement.hostileNpcs', 'classic'),
-  toggle('enemies.mosquitoes', 'enemies.replaceRespawningMosquitoes', 'classic'),
-  toggle('enemies.sameEnemy', 'enemies.preventSameEnemy', 'classic'),
-  toggle('enemies.pinwheel', 'enemies.pinwheelChaos', 'classic'),
-  select('enemies.gargoyle', 'enemies.secondGargoyle', 'classic', ['replace', 'keep', 'single-boss'] satisfies SecondGargoyleMode[]),
-  select('enemies.gwyn', 'enemies.gwynNerf', 'classic', ['strong', 'medium', 'none'] satisfies GwynNerfMode[]),
+  // --- Enemies and bosses. Keep shared placement dependencies in one panel, with separate subsections for ordinary slots and boss arenas.
+  toggle('enemies.enabled', 'enemies.enabled', 'combat', { master: true, basic: 'main' }),
+  toggle('enemies.regular', 'enemies.randomizeRegularEnemies', 'combat', { subsection: 'regularEnemies' }),
+  select('enemies.scaling', 'enemies.scaling', 'combat', ['vanilla', 'area', 'progressive'], { subsection: 'regularEnemies' }),
+  select('enemies.algorithm', 'enemies.placement.algorithm', 'combat', ['sampling-v1', 'permutation-v1'] satisfies EnemyPlacementAlgorithm[], { subsection: 'regularEnemies' }),
+  range('enemies.replacementChance', 'enemies.placement.replacementChance', 'combat', { subsection: 'regularEnemies' }),
+  select('enemies.fit', 'enemies.placement.fit', 'combat', ['fits', 'anywhere', 'anywhere-except-npcs'], { subsection: 'regularEnemies' }),
+  select('enemies.difficultyMode', 'enemies.placement.difficultyMode', 'combat', ['curve-easy-asylum', 'curve', 'random-easy-asylum', 'random'], { subsection: 'regularEnemies' }),
+  select('enemies.strictness', 'enemies.placement.difficultyStrictness', 'combat', ['strict', 'loose', 'very-loose'], { subsection: 'regularEnemies' }),
+  select('enemies.typeReplacement', 'enemies.placement.typeReplacement', 'combat', ['enabled', 'enabled-except-roaming-bosses', 'disabled'], { subsection: 'regularEnemies' }),
+  { id: 'enemies.customPool', path: 'enemies.placement.customPool', kind: 'pool', section: 'combat', subsection: 'regularEnemies', evidence: 'verified' },
+  toggle('enemies.mimics', 'enemies.replaceMimics', 'combat', { subsection: 'regularEnemies' }),
+  toggle('enemies.mosquitoes', 'enemies.replaceRespawningMosquitoes', 'combat', { subsection: 'regularEnemies' }),
+  toggle('enemies.sameEnemy', 'enemies.preventSameEnemy', 'combat', { subsection: 'regularEnemies' }),
+  toggle('enemies.pinwheel', 'enemies.pinwheelChaos', 'combat', { subsection: 'regularEnemies' }),
+  toggle('enemies.hostileNpcs', 'enemies.placement.hostileNpcs', 'combat', { subsection: 'regularEnemies' }),
+  select('enemies.normalReplacement', 'enemies.placement.normalReplacement', 'combat', ['none', 'normals', 'bosses', 'both'] satisfies NormalEnemyReplacementMode[], { subsection: 'enemySlots' }),
+  range('enemies.bossChanceNormal', 'enemies.placement.bossChanceInNormalSlots', 'combat', { subsection: 'enemySlots' }),
+  range('enemies.roamingSouls', 'enemies.placement.roamingBossSouls', 'combat', { subsection: 'enemySlots' }),
+  toggle('enemies.roamingDead', 'enemies.placement.roamingBossesStayDead', 'combat', { subsection: 'enemySlots' }),
+  toggle('enemies.bosses', 'enemies.randomizeBosses', 'combat', { subsection: 'arenaBosses', basic: 'main' }),
+  select('enemies.bossReplacement', 'enemies.placement.bossReplacement', 'combat', ['classic', 'bosses', 'normals', 'both'] satisfies BossReplacementMode[], { subsection: 'arenaBosses' }),
+  range('enemies.bossChanceBoss', 'enemies.placement.bossChanceInBossSlots', 'combat', { subsection: 'arenaBosses' }),
+  toggle('enemies.uniqueBosses', 'enemies.placement.uniqueBosses', 'combat', { subsection: 'arenaBosses' }),
+  select('enemies.gargoyle', 'enemies.secondGargoyle', 'combat', ['replace', 'keep', 'single-boss'] satisfies SecondGargoyleMode[], { subsection: 'arenaBosses' }),
+  select('enemies.gwyn', 'enemies.gwynNerf', 'combat', ['strong', 'medium', 'none'] satisfies GwynNerfMode[], { subsection: 'arenaBosses' }),
   // --- Transitions and fog gates
   toggle('fog.enabled', 'fog.enabled', 'transitions', { master: true, basic: 'main' }),
   toggle('fog.traversable', 'fog.traversableFogs', 'transitions'),
@@ -134,6 +138,7 @@ export const settingById = (id: string): SettingDef => {
 export const VISIBLE_SETTINGS: readonly SettingDef[] = SETTINGS.filter((setting) => !setting.hidden);
 
 export const settingsOfSection = (section: SectionId): SettingDef[] => VISIBLE_SETTINGS.filter((setting) => setting.section === section);
+export const settingsOfSubsection = (subsection: CombatSubsectionId): SettingDef[] => VISIBLE_SETTINGS.filter((setting) => setting.subsection === subsection);
 
 // --- reading and writing the configuration by path (immutable) -------------------------------------------------------------------------------------------------
 
