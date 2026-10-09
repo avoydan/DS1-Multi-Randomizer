@@ -12,12 +12,12 @@ Nothing below is automatic past the draft: **publishing is always a human click*
 
 ## Every release
 
-1. [ ] Bump the versions (desktop, and backend/contracts when they changed), update the notes in `docs/IMPLEMENTATION_STATUS.md`; optional notes file `docs/release-notes/vX.Y.Z.md`. Commit.
+1. [ ] Bump the versions (desktop, and backend/contracts when they changed), update the notes in `docs/IMPLEMENTATION_STATUS.md`; notes file `docs/release-notes/vX.Y.Z.md` (copy the previous one: it opens with the Recommended = Setup / Portable names and one line on each). Commit.
 2. [ ] Working tree clean; `npm test -w @ds1tr/backend`, `npm test -w @ds1tr/desktop`, `npm run typecheck` pass locally.
 3. [ ] Golden fixtures on your computer: `node apps/backend/scripts/goldenCompatibility.mjs verify` is all PASS (a clean game copy; never the live Steam folder).
 4. [ ] Push the commit.
 5. [ ] GitHub > Actions > **Release (draft)** > Run workflow: `version` = `X.Y.Z` (must equal `apps/desktop/package.json`), `golden_attestation` = first 7 characters of the commit from step 3.
-6. [ ] The run is green. Download the draft's files: `DS1-Multi-Randomizer-Setup-X.Y.Z.exe`, `.blockmap`, `DS1-Multi-Randomizer-X.Y.Z-x64.exe`, `latest.yml`, `release-manifest.json`, `SHA256SUMS.txt`; compare the hashes.
+6. [ ] The run is green. Download the draft's files: `DS1-Multi-Randomizer-X.Y.Z-Setup-x64.exe`, its `.blockmap`, `DS1-Multi-Randomizer-X.Y.Z-Portable-x64.exe`, `latest.yml`, `release-manifest.json`, `SHA256SUMS.txt`; compare the hashes.
 7. [ ] Install the draft's installer on a test machine or scratch folder; generate, check About shows X.Y.Z; try the portable once.
 8. [ ] Read the release notes on the draft; the release is **not** marked "pre-release".
 9. [ ] Press **Publish release** (this creates the tag `vX.Y.Z` and makes it "Latest").

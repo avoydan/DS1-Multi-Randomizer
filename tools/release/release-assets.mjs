@@ -23,8 +23,8 @@ const fail = (message) => problems.push(message);
 if (!tag) fail('--tag vX.Y.Z is required: a release is made for a version that was asked for');
 else if (versionOfTag(tag) !== version) fail(`the tag ${tag} is not v${version}, the version of the packaged application`);
 
-const installerName = `DS1-Multi-Randomizer-Setup-${version}.exe`;
-const portableName = `DS1-Multi-Randomizer-${version}-x64.exe`;
+const installerName = `DS1-Multi-Randomizer-${version}-Setup-x64.exe`;
+const portableName = `DS1-Multi-Randomizer-${version}-Portable-x64.exe`;
 const sources = {
   installer: path.join(releaseDirectory, installerName),
   blockmap: path.join(releaseDirectory, `${installerName}.blockmap`),

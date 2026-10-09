@@ -44,15 +44,15 @@ test('the application, the installer and the reports carry the new name', () => 
   assert.match(read('apps/desktop/electron-builder.yml'), /^productName: DS1 Multi Randomizer$/mu);
   assert.match(read('apps/desktop/electron-builder.yml'), /shortcutName: DS1 Multi Randomizer/u);
   assert.match(read('apps/desktop/electron-builder.yml'), /uninstallDisplayName: DS1 Multi Randomizer/u);
-  assert.match(read('apps/desktop/electron-builder.yml'), /artifactName: DS1-Multi-Randomizer-Setup-\$\{version\}\.\$\{ext\}/u);
-  assert.match(read('apps/desktop/electron-builder.yml'), /artifactName: DS1-Multi-Randomizer-\$\{version\}-x64\.\$\{ext\}/u);
+  assert.match(read('apps/desktop/electron-builder.yml'), /artifactName: DS1-Multi-Randomizer-\$\{version\}-Setup-x64\.\$\{ext\}/u);
+  assert.match(read('apps/desktop/electron-builder.yml'), /artifactName: DS1-Multi-Randomizer-\$\{version\}-Portable-x64\.\$\{ext\}/u);
   assert.match(read('apps/desktop/index.html'), /<title>DS1 Multi Randomizer<\/title>/u);
   assert.match(read('apps/desktop/electron/main.ts'), /title: 'DS1 Multi Randomizer'/u);
   const policy = JSON.parse(read('tools/release/release-policy.json'));
   assert.equal(policy.product, NAME);
   assert.ok(policy.ds1trExecutables.some((file) => file.path === `${NAME}.exe`), 'the application executable follows productName');
   assert.ok(policy.installedExtras.some((file) => file.path === `Uninstall ${NAME}.exe`), 'the uninstaller follows productName');
-  assert.deepEqual(policy.ds1trArtifacts.map((entry) => entry.pattern), ['DS1-Multi-Randomizer-Setup-*.exe', 'DS1-Multi-Randomizer-*-x64.exe']);
+  assert.deepEqual(policy.ds1trArtifacts.map((entry) => entry.pattern), ['DS1-Multi-Randomizer-*-Setup-x64.exe', 'DS1-Multi-Randomizer-*-Portable-x64.exe']);
   for (const language of ['en', 'pl']) {
     const app = JSON.parse(read(`apps/desktop/src/locales/${language}/app.json`));
     assert.equal(app.header.title, 'Multi Randomizer', `${language}: the sidebar heading (the "DS1" mark is drawn above it)`);

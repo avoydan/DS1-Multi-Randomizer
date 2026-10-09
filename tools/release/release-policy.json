@@ -8,8 +8,8 @@
     { "path": "resources/runtime/tools/fog-host/FogHost.exe", "role": "FogHost: runs the fog randomizer (FogMod) on the prepared data (self-contained .NET, single file, not compressed)", "launchedAs": "child process of the backend, arguments array, no shell" }
   ],
   "ds1trArtifacts": [
-    { "pattern": "DS1-Multi-Randomizer-Setup-*.exe", "role": "the installer (recommended download)" },
-    { "pattern": "DS1-Multi-Randomizer-*-x64.exe", "role": "the portable build (secondary download)" }
+    { "pattern": "DS1-Multi-Randomizer-*-Setup-x64.exe", "role": "the installer (recommended download)" },
+    { "pattern": "DS1-Multi-Randomizer-*-Portable-x64.exe", "role": "the portable build (secondary download)" }
   ],
   "installedExtras": [
     { "path": "Uninstall DS1 Multi Randomizer.exe", "role": "the uninstaller the installer writes (checked after an install, not inside the unpacked folder)" }

@@ -57,24 +57,24 @@ test('the configuration check refuses every way the update source can drift or l
 test('latest.yml must describe the installer it was generated with, byte for byte', async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), 'ds1tr-update-lib-'));
   try {
-    const installer = path.join(directory, 'DS1-Multi-Randomizer-Setup-0.36.0.exe');
+    const installer = path.join(directory, 'DS1-Multi-Randomizer-0.36.0-Setup-x64.exe');
     const bytes = Buffer.from('not a real installer but with stable content');
     await writeFile(installer, bytes);
     const sha512 = await sha512Base64(installer);
     assert.equal(sha512, createHash('sha512').update(bytes).digest('base64'));
     const text = [
-      'version: 0.36.0', 'files:', '  - url: DS1-Multi-Randomizer-Setup-0.36.0.exe', `    sha512: ${sha512}`, `    size: ${bytes.length}`,
-      'path: DS1-Multi-Randomizer-Setup-0.36.0.exe', `sha512: ${sha512}`, "releaseDate: '2026-10-10T10:00:00.000Z'", '',
+      'version: 0.36.0', 'files:', '  - url: DS1-Multi-Randomizer-0.36.0-Setup-x64.exe', `    sha512: ${sha512}`, `    size: ${bytes.length}`,
+      'path: DS1-Multi-Randomizer-0.36.0-Setup-x64.exe', `sha512: ${sha512}`, "releaseDate: '2026-10-10T10:00:00.000Z'", '',
     ].join('\n');
     const latest = parseFlatYaml(text);
-    const base = { latest, version: '0.36.0', installerName: 'DS1-Multi-Randomizer-Setup-0.36.0.exe', installerSha512: sha512, installerSize: bytes.length, tag: 'v0.36.0', blockmapPresent: true };
+    const base = { latest, version: '0.36.0', installerName: 'DS1-Multi-Randomizer-0.36.0-Setup-x64.exe', installerSha512: sha512, installerSize: bytes.length, tag: 'v0.36.0', blockmapPresent: true };
     assert.deepEqual(checkLatestYml(base), []);
     const failing = (patch) => checkLatestYml({ ...base, ...patch }).map((entry) => entry.message).join(' | ');
     assert.match(failing({ installerSha512: 'other' }), /sha512 of the installer does not match/u);
     assert.match(failing({ installerSize: bytes.length + 1 }), /size .* is not the installer size/u);
     assert.match(failing({ version: '0.36.1' }), /says version 0\.36\.0/u);
     assert.match(failing({ tag: 'v0.35.1' }), /requested tag v0\.35\.1 is not v0\.36\.0/u);
-    assert.match(failing({ installerName: 'DS1-Multi-Randomizer-Setup-0.36.1.exe' }), /lists no file named/u);
+    assert.match(failing({ installerName: 'DS1-Multi-Randomizer-0.36.1-Setup-x64.exe' }), /lists no file named/u);
     assert.match(failing({ blockmapPresent: false }), /blockmap.*missing/u);
     assert.match(failing({ latest: { ...latest, releaseDate: undefined } }), /no valid releaseDate/u);
   } finally { await rm(directory, { recursive: true, force: true }); }

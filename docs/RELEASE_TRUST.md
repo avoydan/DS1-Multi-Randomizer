@@ -23,9 +23,9 @@ Everything that Windows can execute and that DS1TR ships or writes. Paths are re
 | `DS1 Multi Randomizer.exe` | the Electron application (renamed `electron.exe`, DS1TR icon and version resource) | the person (shortcut, Start menu) | yes |
 | `resources/runtime/engines/combined/vendor/tools/DsrDataTool/DsrDataTool.exe` | reads and patches the game files into a workspace (self-contained .NET 8, one file, **not compressed**) | the backend, a child process, argument array, no shell | yes |
 | `resources/runtime/tools/fog-host/FogHost.exe` | runs the fog randomizer (FogMod) on prepared data (self-contained .NET 8, one file, not compressed) | the backend, same way | yes |
-| `DS1-Multi-Randomizer-Setup-<version>.exe` | the installer (NSIS, per-user) - the **recommended** download | the person | yes |
+| `DS1-Multi-Randomizer-<version>-Setup-x64.exe` | the installer (NSIS, per-user) - the **recommended** download | the person | yes |
 | `Uninstall DS1 Multi Randomizer.exe` | the uninstaller the installer writes | the person (Windows Settings) | yes (electron-builder signs it with the installer; not separately verified here) |
-| `DS1-Multi-Randomizer-<version>-x64.exe` | the portable build - the **secondary** download | the person | yes |
+| `DS1-Multi-Randomizer-<version>-Portable-x64.exe` | the portable build - the **secondary** download | the person | yes |
 | `d3dcompiler_47.dll` | Direct3D shader compiler, already signed by Microsoft | Chromium | not re-signed |
 | `ffmpeg.dll`, `libEGL.dll`, `libGLESv2.dll`, `vk_swiftshader.dll`, `vulkan-1.dll` | Electron / Chromium libraries, shipped as their authors built them | Chromium | not re-signed (the pipeline never alters third-party binaries) |
 

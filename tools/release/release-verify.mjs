@@ -64,8 +64,8 @@ note('structure', `${files.length} files, ${binaries.length} executables or libr
 // ---- artifacts ---------------------------------------------------------------------------------------------------------------------
 const artifactNames = await readdir(releaseDirectory);
 const pick = (pattern) => artifactNames.filter((name) => new RegExp(`^${pattern.replace(/[.+^${}()|[\]\\]/gu, '\\$&').replace(/\*/gu, '.*')}$`, 'u').test(name));
-const installerName = values.get('installer') ?? pick(`DS1-Multi-Randomizer-Setup-${version}.exe`)[0];
-const portableName = values.get('portable') ?? pick(`DS1-Multi-Randomizer-${version}-x64.exe`)[0];
+const installerName = values.get('installer') ?? pick(`DS1-Multi-Randomizer-${version}-Setup-x64.exe`)[0];
+const portableName = values.get('portable') ?? pick(`DS1-Multi-Randomizer-${version}-Portable-x64.exe`)[0];
 const artifacts = [];
 for (const [kind, name] of [['installer', installerName], ['portable', portableName]]) {
   if (!name) { (kind === 'installer' ? fail : warn)('artifacts', `no ${kind} for version ${version} in ${releaseDirectory}`); continue; }
