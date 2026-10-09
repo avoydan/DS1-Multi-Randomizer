@@ -5,10 +5,10 @@ artifactName: DS1-Multi-Randomizer-${version}-${arch}.${ext}
 # Updates (docs/AUTO_UPDATE.md). The update source is explicit: installed clients get new versions from the public GitHub Releases of this repository and from nowhere else.
 # electron-builder writes it into resources/app-update.yml and generates latest.yml (+ the .blockmap) from the SAME build as the installer; nothing is uploaded by the
 # builder (package-win.mjs passes --publish never): the release workflow creates a DRAFT release and the owner publishes it. The same three values are in
-# electron/updateSource.ts; tools/release/release-verify.mjs fails when they differ. REPLACE_WITH_GITHUB_OWNER means "not chosen yet": such a build has no update source.
+# electron/updateSource.ts; tools/release/release-verify.mjs fails when they differ. The placeholder REPLACE_WITH_GITHUB_OWNER would mean "not chosen yet": such a build has no update source.
 publish:
   provider: github
-  owner: REPLACE_WITH_GITHUB_OWNER
+  owner: remohomer
   repo: DS1-Multi-Randomizer
   releaseType: release
 directories:
