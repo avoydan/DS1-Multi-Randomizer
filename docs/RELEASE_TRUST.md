@@ -67,6 +67,8 @@ Entropy of the executable (bits per byte, `shannon entropy of the file`): compre
 | `npm run package:win -w @ds1tr/desktop -- --channel=public --unsigned-release` | **publication build without a signature**: what the GitHub release workflow builds today. Public channel, update checks become failures (update source set, `latest.yml` matches the installer), reported as `unsigned-release`, never as signed. See [AUTO_UPDATE.md](AUTO_UPDATE.md). |
 | `node tools/release/release-gate.mjs [--public --expected-publisher "<text>"]` | the hard-fail checklist of section 7 (public mode refuses a dirty tree, a skipped golden check and any unsigned artifact) |
 
+The default unsigned development package is on the **internal** channel. That channel displays internal test tools and opts into GitHub prereleases for controlled updater QA. `--channel=public` disables that opt-in; every publishable package is forced to public by the release workflow and verifier.
+
 Credentials come **only from the environment** and are never read from, written to or committed in the repository (`.gitignore` also excludes `*.pfx`, `*.p12`, `*.pem`, `*.key`; the verifier fails when such a file is inside a package):
 
 | Variable | Meaning |

@@ -75,6 +75,7 @@ export function checkUpdateConfiguration({ sourceTs, builderPublish, updaterText
   for (const [pattern, why] of [
     [/autoInstallOnAppQuit\s*=\s*false/u, 'autoInstallOnAppQuit is not switched off: an update could install silently when the application closes'],
     [/allowPrerelease\s*=\s*false/u, 'allowPrerelease is not switched off: a stable client could follow a prerelease'],
+    [/if\s*\(this\.#options\.buildChannel\s*===\s*'internal'\)\s*updater\.allowPrerelease\s*=\s*true/u, 'the prerelease opt-in is not limited to internal builds'],
     [/autoDownload\s*=\s*false/u, 'autoDownload is not switched off: an update could download without being asked'],
     [/allowDowngrade\s*=\s*false/u, 'allowDowngrade is not switched off'],
   ]) if (!pattern.test(updaterText)) fail('updates', why);

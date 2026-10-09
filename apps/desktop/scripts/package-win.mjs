@@ -15,8 +15,8 @@ import { stageRuntimeDependencies } from './stage-dependencies.mjs';
 //                                                          release verification runs with --publication. It is never reported as signed; the owner decides whether to publish it.
 const releaseMode = process.argv.includes('--release');
 const unsignedRelease = process.argv.includes('--unsigned-release');
-// The CHANNEL decides what the interface shows (docs/RELEASE_TRUST.md): `public` hides the internal test worlds, `internal` shows them. It is independent of signing: a --release build is always
-// public; without --release a build is internal unless --channel=public asks for the public interface (to look at what a player will see). The channel never reaches a world.
+// The CHANNEL decides what internal tools the interface shows and which GitHub releases the updater can inspect (docs/AUTO_UPDATE.md): `public` hides internal test worlds and ignores prereleases; `internal` shows them and opts into prerelease checks for QA. It is independent of signing: a --release build is always
+// public; unsigned publication builds must also pass --channel=public. The channel never reaches a world.
 const channelFlag = process.argv.find((argument) => argument.startsWith('--channel='))?.slice('--channel='.length);
 if (channelFlag !== undefined && channelFlag !== 'public' && channelFlag !== 'internal') throw new Error('--channel must be public or internal.');
 if (releaseMode && channelFlag === 'internal') throw new Error('A --release build is a public build: it cannot use the internal channel.');

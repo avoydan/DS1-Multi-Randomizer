@@ -1,5 +1,13 @@
 # Decisions
 
+## GitHub prerelease updates are limited to the internal build channel
+
+Date: 2026-10-09
+
+The updater remains stable-only in every public build (`allowPrerelease = false`). A packaged internal build may inspect GitHub prereleases for controlled N to N+1 QA; missing or unreadable build metadata defaults to public. The main process must load the packaged channel before it constructs the updater. Public release tags remain numeric `X.Y.Z`; GitHub's prerelease flag is separate from a semver suffix, which the application continues to reject. After an internal N installation updates to public N+1, the installed app returns to stable-only behavior; repeat QA from a fresh internal N build.
+
+This reuses the existing `public` / `internal` build-channel distinction and adds no user setting, server, telemetry or persistent QA enrollment. The release workflow continues to package only `--channel=public`.
+
 ## Enemy placement: a second, explicit sampling algorithm beside a frozen permutation
 
 Date: 2026-10-05

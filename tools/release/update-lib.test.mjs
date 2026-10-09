@@ -16,7 +16,7 @@ import { repositoryRoot, windowsPowerShellEnvironment } from './release-lib.mjs'
 const read = (...parts) => readFile(path.join(repositoryRoot, ...parts), 'utf8');
 const requireFromRoot = createRequire(path.join(repositoryRoot, 'package.json'));
 const SOURCE = { provider: 'github', owner: 'ds1-owner', repo: 'DS1-Multi-Randomizer' };
-const UPDATER = 'updater.autoDownload = false; updater.autoInstallOnAppQuit = false; updater.allowPrerelease = false; updater.allowDowngrade = false;';
+const UPDATER = "updater.autoDownload = false; updater.autoInstallOnAppQuit = false; updater.allowPrerelease = false; if (this.#options.buildChannel === 'internal') updater.allowPrerelease = true; updater.allowDowngrade = false;";
 
 test('the committed update source is explicit, matches electron-builder.yml, and is still the placeholder until the owner chooses (a development build warns, a publication fails)', async () => {
   const sourceTs = parseUpdateSourceTs(await read('apps', 'desktop', 'electron', 'updateSource.ts'));
@@ -45,6 +45,7 @@ test('the configuration check refuses every way the update source can drift or l
   assert.match(failures({ builderPublish: null }), /no publish block/u);
   assert.match(failures({ updaterText: UPDATER.replace('autoInstallOnAppQuit = false', 'autoInstallOnAppQuit = true') }), /autoInstallOnAppQuit/u);
   assert.match(failures({ updaterText: UPDATER.replace('allowPrerelease = false', '') }), /allowPrerelease/u);
+  assert.match(failures({ updaterText: UPDATER.replace("if (this.#options.buildChannel === 'internal') updater.allowPrerelease = true;", '') }), /not limited to internal/u);
   assert.match(failures({ updaterText: UPDATER.replace('autoDownload = false', '') }), /autoDownload/u);
   assert.match(failures({ appUpdate: { provider: 'github', owner: 'someone-else', repo: 'DS1-Multi-Randomizer' } }), /app-update\.yml says owner/u);
   assert.match(failures({ appUpdate: { provider: 'github', owner: 'ds1-owner', repo: 'DS1-Multi-Randomizer', token: 'abc' } }), /credential field/u);
@@ -52,6 +53,18 @@ test('the configuration check refuses every way the update source can drift or l
   // The unsigned state is stated, not hidden.
   const notes = checkUpdateConfiguration({ ...ok, appUpdate: { provider: 'github', owner: 'ds1-owner', repo: 'DS1-Multi-Randomizer' } }).map((entry) => entry.message).join(' | ');
   assert.match(notes, /no publisherName/u);
+});
+
+test('build metadata is loaded before the updater is created, and only its internal channel enables prerelease checks', async () => {
+  const main = await read('apps', 'desktop', 'electron', 'main.ts');
+  const updater = await read('apps', 'desktop', 'electron', 'updater.ts');
+  const channel = await read('apps', 'desktop', 'electron', 'channel.ts');
+  const startup = main.slice(main.indexOf('app.whenReady()'));
+  assert.ok(startup.indexOf('await loadBuildChannel()') >= 0, 'startup reads the packaged channel');
+  assert.ok(startup.indexOf('await loadBuildChannel()') < startup.indexOf('updates = createUpdates()'), 'channel is known before updater setup');
+  assert.match(main, /buildChannel,\s*source:\s*UPDATE_SOURCE/u, 'the loaded channel is passed to the update controller');
+  assert.match(updater, /updater\.allowPrerelease = false;\s*if \(this\.#options\.buildChannel === 'internal'\) updater\.allowPrerelease = true;/u);
+  assert.match(channel, /return 'public'/u, 'missing or malformed build metadata defaults to public');
 });
 
 test('latest.yml must describe the installer it was generated with, byte for byte', async () => {

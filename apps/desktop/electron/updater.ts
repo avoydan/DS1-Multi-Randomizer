@@ -5,9 +5,11 @@
  * without Electron and without GitHub (updater.test.mjs). main.ts wires the real parts and exposes the narrow IPC surface below to the renderer.
  *
  * What the updater is NOT allowed to do, by construction: install without a click (autoInstallOnAppQuit is off, nothing here restarts the application unless the
- * person asked and the backend reported no running operation), follow a prerelease, downgrade, or touch the game (an update replaces this application only;
+ * person asked and the backend reported no running operation), let a public build follow a prerelease, downgrade, or touch the game (an update replaces this application only;
  * it never restores, re-applies or edits game files).
  */
+
+import type { BuildChannel } from './channel.js';
 
 export const UPDATE_PROVIDER = 'github' as const;
 
@@ -87,6 +89,8 @@ export interface UpdateControllerOptions {
   createUpdater: () => UpdaterLike;
   currentVersion: string;
   mode: InstallMode;
+  /** Public builds stay on stable releases. Internal builds may inspect GitHub prereleases for controlled QA. */
+  buildChannel?: BuildChannel;
   source: UpdateSource;
   prefs: { get(): UpdatePrefs; set(patch: Partial<UpdatePrefs>): Promise<void> };
   /** True while the backend is generating, applying, restoring or otherwise working on files. */
@@ -163,13 +167,14 @@ export class UpdateController {
     if (this.capability !== 'none') this.#configure();
   }
 
-  /** The one place the real updater is configured: stable releases only, nothing downloaded or installed unless asked, the source set explicitly. */
+  /** The one place the real updater is configured: stable by default, internal QA may follow GitHub prereleases, nothing downloads or installs without a request. */
   #configure(): void {
     const updater = this.#options.createUpdater();
     this.#updater = updater;
     updater.autoDownload = false;
     updater.autoInstallOnAppQuit = false;
     updater.allowPrerelease = false;
+    if (this.#options.buildChannel === 'internal') updater.allowPrerelease = true;
     updater.allowDowngrade = false;
     const { owner, repo } = this.#options.source;
     updater.setFeedURL({ provider: UPDATE_PROVIDER, owner, repo });
@@ -236,7 +241,8 @@ export class UpdateController {
         return this.getState();
       }
       const version = result.updateInfo.version;
-      // The updater's own comparison and ours must both say "newer": a prerelease or an older version published by mistake is never offered.
+      // The updater's own comparison and ours must both say "newer": an older version or a semver-suffixed prerelease is never offered. GitHub's prerelease flag
+      // on a plain X.Y.Z tag is separate and can be inspected by an internal QA build.
       if (result.isUpdateAvailable !== false && isNewerStable(version, this.#options.currentVersion)) {
         this.#set({ phase: 'available', availableVersion: version, releaseDate: result.updateInfo.releaseDate ?? null, releaseUrl: releaseUrlFor(this.#options.source, version) });
         this.#options.log?.('info', `update ${version} is available (current ${this.#options.currentVersion})`);

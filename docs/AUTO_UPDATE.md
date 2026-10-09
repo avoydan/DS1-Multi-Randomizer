@@ -66,7 +66,9 @@ The owner/repository pair is baked into every installed copy. If that repository
 | Offers instead | | "Open the download page": the trusted release page (built from the update source, never read from release metadata) |
 | Text | "DS1 Multi Randomizer X.Y.Z is available." | "... Portable version must be updated manually: download the new version, then replace this file." |
 
-A development run (`npm run dev`) and a build without an update source do not update at all ("unsupported"). Only the **stable** channel exists: the updater is forced to `allowPrerelease = false` and `allowDowngrade = false`, and the application additionally refuses any version with a prerelease suffix.
+A development run (`npm run dev`) and a build without an update source do not update at all ("unsupported"). A **public** build is stable-only: `allowPrerelease = false`, `allowDowngrade = false`, and semver-suffixed versions are refused. An **internal** build opts into GitHub prereleases for controlled QA; it still refuses downgrades and semver suffixes.
+
+The GitHub **pre-release** checkbox is separate from a semver suffix. Release tags and `latest.yml` stay numeric (`vX.Y.Z` / `X.Y.Z`); marking that GitHub release as a prerelease keeps it out of the stable `/releases/latest` feed. Public artifacts are always built with `--channel=public`. Internal QA packages (`--channel=internal`) may read the newest GitHub release feed. Missing or unreadable build metadata defaults to `public`, and the updater loads the channel before it is configured. A public N+1 update replaces the internal N test build with a public build, so later prerelease checks require installing a fresh internal baseline.
 
 ## 4. Checking policy
 
@@ -137,15 +139,15 @@ The project has no trusted code-signing certificate yet. An unsigned release the
 4. **Settings > Actions > General > Workflow permissions:** "Read repository contents and packages permissions" is enough (the workflow requests its own `contents: write`). Leave "Allow GitHub Actions to create pull requests" off.
 5. **Separate release repository only:** create a fine-grained personal access token limited to that repository (Contents: read and write), store it as the Actions secret `RELEASE_REPO_TOKEN`, and set the Actions variable `RELEASE_REPOSITORY` to `owner/repo`.
 6. Turn on two-factor authentication for the account and consider branch protection for `main`.
-7. Run the QA of section 11 once against a **test repository** (or a draft you never publish) before the first public release.
+7. Run and record the QA of section 11 before calling the updater end-to-end verified. It uses an internal build and a public prerelease; it never requires a stable release.
 
 ## 9. Normal release procedure
 
-See [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md). In short: bump the versions and commit, verify the golden fixtures locally, run the workflow with the version and the commit hash, test the draft, press **Publish release**.
+See [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md). In short: bump the versions and commit, verify the golden fixtures locally, run the workflow with the version and commit hash, review the draft, then publish it as a prerelease by default. Publish stable only when explicitly requested.
 
 ## 10. After publication, and when something goes wrong
 
-* **Publishing** creates the tag `vX.Y.Z` and makes the release "Latest". Installed clients see it on their next check (within about a day, or at once by hand).
+* **Publishing** creates the tag `vX.Y.Z`. A prerelease stays out of the stable "Latest" release; public clients ignore it. A stable release becomes "Latest" and is visible to public clients on their next check (within about a day, or at once by hand).
 * **A bad release was published:** do not edit the files. In GitHub, delete the release (or mark it as a prerelease, which hides it from stable clients, whose updater follows only the "Latest" non-prerelease release) and publish a fixed version with a higher number. A client that already installed the bad version moves forward to the next one; the updater never downgrades.
 * **A draft is wrong:** delete the draft and run the workflow again (it refuses to run when a release with the same tag exists).
 * **GitHub is unreachable or rate-limits:** checks fail quietly ("Unable to check for updates. You can keep using the app."), the next automatic check is tried after an hour.
@@ -153,18 +155,16 @@ See [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md). In short: bump the versions an
 
 ## 11. QA: proving that N updates to N+1
 
-A real updater cannot be called verified by unit tests alone. The procedure that proves it, without touching the public channel:
+A real updater cannot be called verified by unit tests alone. Release N+1 as a **public GitHub prerelease**; never publish it briefly as stable just to test it.
 
-1. Create a **private or throwaway test repository** (or use the real one before the first public release; a draft is invisible to clients). Put its owner and name into `updateSource.ts` and `electron-builder.yml` **in a test branch**.
-2. Build version N (for example 0.36.0) with `npm run package:win -w @ds1tr/desktop -- --channel=public --unsigned-release`, then N+1 (0.36.1) the same way. Keep both installers, their `latest.yml` and blockmaps.
-3. Install N silently into a scratch folder (`DS1-Multi-Randomizer-0.36.0-Setup-x64.exe /S /D=<folder>`), start it.
-4. Publish a **release** (not a draft, not a prerelease) of N+1 in the test repository with the assets of section 7. (Publishing in a repository nobody else follows is safe.)
-5. In the installed N: App settings > Check for updates. Expect "DS1 Multi Randomizer 0.36.1 is available.", then **Download update** (progress), then **Restart and update**. Expect the new version to start (About says 0.36.1) with the same settings and history.
-6. Repeat with an operation running (start a generation, press Restart and update): expect "Finish the current operation before updating." and no restart.
-7. Portable: run the portable N; Check for updates: expect the message that a manual update is needed and **Open the download page** opening the release page. Expect no download and no restart.
-8. Delete the test release and restore `updateSource.ts` / `electron-builder.yml`.
+1. Build N for the scratch test installation with `npm run package:win -w @ds1tr/desktop -- --channel=internal`. Confirm the build info says `channel: internal`, then install the Setup artifact in a scratch folder and start it. This channel alone enables prerelease checks; it does not alter the public release build.
+2. Build N+1 through the normal workflow, review the draft, and publish it with GitHub's **Set as a pre-release** option enabled. The assets still use numeric `X.Y.Z` version tags and the files listed in section 7.
+3. In the internal N installation, confirm About says N and preserve test settings, history and game path. Check for updates; expect N+1, then **Download update** with progress.
+4. While a generation, Apply or Restore is active, press **Restart and update**. Expect the operation warning and no restart. Finish the operation, press it again and expect N+1 to start.
+5. Confirm About says N+1, the app opens normally, and settings, history, game path and user data remain. Confirm the game files were not changed by updating.
+6. Separately install public N and check for updates while N+1 is a prerelease. The public build must not offer it. A portable build remains manual and only opens the release page.
 
-The steps that can be done without GitHub (an installed build against a local web server that serves `latest.yml` and the installer) test the same installer and relaunch path but **not** the GitHub provider; they are recorded as such in section 12.
+The published N+1 app is a public build and returns to stable-only updates after restart. To repeat QA, install a fresh internal N build. A local `latest.yml` test can check the installer and relaunch path, but it is not a GitHub-provider E2E result.
 
 ## 12. Verification status
 
@@ -172,11 +172,11 @@ See the table at the end of this file, kept current by whoever changes the updat
 
 | What | Status |
 |---|---|
-| Update policy (states, throttle, portable, prerelease, operation block, errors, IPC surface, translations) | AUTOMATED VERIFIED: `electron/updater.test.mjs` (26 tests), `tools/release/update-lib.test.mjs` (9), backend `activity.test.mjs` (3) and the integration test |
+| Update policy (states, throttle, portable, prerelease, operation block, errors, IPC surface, translations) | AUTOMATED VERIFIED: `electron/updater.test.mjs`, `tools/release/update-lib.test.mjs`, backend `activity.test.mjs` and the integration test |
 | Release configuration, workflow structure, update-source agreement | AUTOMATED VERIFIED (`update-lib.test.mjs`) |
 | electron-updater and its dependencies are packaged; `app-update.yml` and `latest.yml` / blockmap are generated by the installed electron-builder | PACKAGED VERIFIED: see "Packaged build" below (the asar contents are also checked by every release verification) |
 | Workflow run on GitHub, draft creation, asset upload | GITHUB VERIFIED (2026-10-09, run on commit `d29c1c7`; see "The first real draft") |
-| Installed N updates to N+1 from the update source | DEFERRED: section 11 |
+| Internal installed N updates to public GitHub prerelease N+1; public N ignores it | DEFERRED: section 11 |
 | Authenticode publisher verification of updates | DEFERRED: needs a trusted certificate |
 | Self-updating portable | UNSUPPORTED by design |
 
@@ -199,24 +199,14 @@ Repository `github.com/remohomer/DS1-Multi-Randomizer` (public, default branch `
 * **Verifier fix found on the way:** `release-verify` read `latest.yml` from the local build folder even when `--installer` pointed at downloaded files; it now reads the `latest.yml` next to the given installer.
 * **Not done on purpose:** the draft is not published; no tag exists.
 
+### The 0.37.0 public prerelease (GitHub-verified, 2026-10-09)
+
+The earlier draft was subsequently published as a **public prerelease** at `https://github.com/remohomer/DS1-Multi-Randomizer/releases/tag/v0.37.0` (not a draft; `v0.38.0` is still unused at this point). GitHub reports six uploaded assets: the canonical Setup and Portable executables, Setup blockmap, `latest.yml`, `release-manifest-0.37.0.json`, and `SHA256SUMS.txt`. This gives the internal QA channel a published prerelease to find; it does not make a stable release available.
+
 ### Asset names (since 0.37.0)
 
 The two downloads are named by their kind first, so that nobody reads "x64" as a property of only one of them: `DS1-Multi-Randomizer-X.Y.Z-Setup-x64.exe` (installer, recommended, in-app updates) and `DS1-Multi-Randomizer-X.Y.Z-Portable-x64.exe` (no installation, manual updates). The names live in `electron-builder.yml` (`nsis.artifactName`, `portable.artifactName`); electron-builder derives `latest.yml` (`url`, `path`) and `<Setup name>.blockmap` from them, and `release-policy.json`, `release-verify.mjs`, `release-assets.mjs` and the tests expect exactly these patterns. The earlier drafts of 0.37.0 used `DS1-Multi-Randomizer-Setup-0.37.0.exe` and `DS1-Multi-Randomizer-0.37.0-x64.exe`.
 
-## 13. The first real update test: 0.37.0 to 0.37.1 (DEFERRED until executed)
+## 13. Current end-to-end status
 
-Nothing below has been run. It needs two PUBLISHED releases, so it is the owner's decision when to start it.
-
-1. Review the draft `v0.37.0`, then press **Publish release** (this creates the tag `v0.37.0` and makes it Latest). Until then no client can see it.
-2. Install `DS1-Multi-Randomizer-0.37.0-Setup-x64.exe` (a normal install; do not use a game folder you care about for the later generation steps). Start it, change a setting, generate or save something so there is history, note About = 0.37.0 and that Check for updates answers "up to date".
-3. Prepare 0.37.1 on `main`: a small real change, bump desktop `0.37.0` to `0.37.1` (`apps/desktop/package.json`, `package-lock.json`), run the golden check locally and push.
-4. Run the workflow with `version = 0.37.1` and the first 7 characters of the commit; test the draft; press **Publish release** for `v0.37.1`.
-5. Start the installed 0.37.0 (still running 0.37.0). App settings or About > **Check for updates**: expect "DS1 Multi Randomizer 0.37.1 is available."
-6. **Download update**: expect a progress bar and "Update downloaded".
-7. (Optional safety check) start a generation and press **Restart and update**: expect "Finish the current operation before installing the update." and no restart.
-8. When idle press **Restart and update**: the installer runs and the application starts again.
-9. About reports 0.37.1; the installed folder holds 0.37.1.
-10. The settings, presets and history from step 2 are still there (they live in the user data folder, which the update never touches); the game folder was not modified.
-11. Portable (secondary): run `DS1-Multi-Randomizer-0.37.0-Portable-x64.exe` while 0.37.1 is published: expect the manual-update message and **Open the download page** opening the release page; no download and no restart.
-
-Record the result here and in `docs/IMPLEMENTATION_STATUS.md`. Only when steps 5-10 succeed on a real installed copy is the status END-TO-END VERIFIED. The updater is not to be called production-ready before that.
+The real installed N to N+1 test remains **DEFERRED** until two numeric-version GitHub releases exist and N+1 is published as a public prerelease. Follow section 11, then record the exact installed versions, checks, progress, operation guard, preserved user data, restart result and public-build prerelease refusal here and in `docs/IMPLEMENTATION_STATUS.md`. Unit tests and a green release workflow do not count as that E2E result.

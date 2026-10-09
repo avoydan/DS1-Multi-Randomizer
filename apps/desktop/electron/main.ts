@@ -154,6 +154,7 @@ function createUpdates(): UpdateController {
     createUpdater: () => electronUpdater.autoUpdater as unknown as UpdaterLike,
     currentVersion: app.getVersion(),
     mode: installModeOf(app.isPackaged, process.env),
+    buildChannel,
     source: UPDATE_SOURCE,
     prefs: {
       get: () => ({ autoCheck: settings.updates?.autoCheck !== false, lastCheckAt: settings.updates?.lastCheckAt ?? null, lastCheckOk: settings.updates?.lastCheckOk === true }),
@@ -282,6 +283,7 @@ ipcMain.handle('game:launch', (_event, gamePath: string) => launchGame(typeof ga
 }));
 
 app.whenReady().then(async () => {
+  await loadBuildChannel();
   await loadSettings();
   desktopLog.write('info', `DS1 Multi Randomizer ${app.getVersion()} started (${installModeOf(app.isPackaged, process.env)}, ${buildChannel} channel), language ${currentLanguage()}`);
   await startBackend();

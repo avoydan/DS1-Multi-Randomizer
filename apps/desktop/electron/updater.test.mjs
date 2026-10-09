@@ -49,6 +49,7 @@ function harness(overrides = {}) {
     createUpdater: () => updater,
     currentVersion: overrides.currentVersion ?? '0.36.0',
     mode: overrides.mode ?? 'installed',
+    buildChannel: overrides.buildChannel,
     source: overrides.source ?? SOURCE,
     prefs: { get: () => ({ ...stored }), set: async (patch) => { stored = { ...stored, ...patch }; } },
     isOperationActive: overrides.isOperationActive ?? (async () => false),
@@ -97,6 +98,16 @@ test('13. a prerelease is never offered by a stable client (semver and the updat
   assert.equal(isNewerStable('0.36.0', '0.36.0-rc.1'), true, 'the stable release of a prerelease is newer');
   assert.equal(isNewerStable('0.36.1', '0.36.0'), true);
   assert.equal(isNewerStable('0.10.0', '0.9.0'), true, 'numeric, not alphabetic');
+});
+
+test('only an internal build opts in to GitHub prereleases', () => {
+  const publicBuild = harness({ buildChannel: 'public' });
+  const internalBuild = harness({ buildChannel: 'internal' });
+  const missingMetadata = harness();
+  assert.equal(publicBuild.updater.allowPrerelease, false);
+  assert.equal(internalBuild.updater.allowPrerelease, true);
+  assert.equal(missingMetadata.updater.allowPrerelease, false, 'missing metadata uses the safe public policy');
+  for (const kit of [publicBuild, internalBuild, missingMetadata]) assert.equal(kit.updater.allowDowngrade, false);
 });
 
 test('the updater is configured explicitly: the source, no automatic download, no install on quit', () => {

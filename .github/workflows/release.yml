@@ -1,7 +1,7 @@
 # DS1 Multi Randomizer - release workflow (docs/AUTO_UPDATE.md).
 #
 # It is started BY HAND (workflow_dispatch) and it NEVER publishes: at most it creates a DRAFT GitHub release. Nobody sees a draft except people with write access to the
-# repository, and installed clients only follow PUBLISHED, non-prerelease releases. The owner downloads the draft, tests it, and clicks "Publish release" himself.
+# repository. After review, publish it as a GitHub prerelease by default; public clients remain stable-only while internal QA builds can inspect prereleases.
 #
 # Nothing here runs on push, on a pull request, on a schedule or on a tag. Hosted runners have no copy of Dark Souls Remastered, so the golden fixtures
 # (goldenCompatibility.mjs verify, which need a clean game copy) are verified by the owner on his computer; the workflow asks for the short hash of the commit he verified
@@ -17,7 +17,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to release, for example 0.36.0. It must equal "version" in apps/desktop/package.json (stable releases only: no prerelease suffix).'
+        description: 'Numeric version to release, for example 0.36.0. It must equal "version" in apps/desktop/package.json; GitHub prerelease status is chosen when publishing the draft.'
         required: true
         type: string
       golden_attestation:
@@ -56,7 +56,7 @@ jobs:
         env:
           ATTESTATION: ${{ inputs.golden_attestation }}
         run: |
-          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::The version must look like 0.36.0: three numbers, no leading v, no prerelease suffix."; exit 1; }
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::The version must look like 0.36.0: three numbers, no leading v, no suffix."; exit 1; }
           [[ "$ATTESTATION" =~ ^[0-9a-f]{7}$ ]] || { echo "::error::golden_attestation must be the first 7 characters of a commit hash."; exit 1; }
           [ "${ATTESTATION}" = "${GITHUB_SHA:0:7}" ] || { echo "::error::golden_attestation ${ATTESTATION} is not the commit being built (${GITHUB_SHA:0:7}). Verify the golden fixtures on THIS commit first."; exit 1; }
 
