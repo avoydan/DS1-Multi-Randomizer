@@ -224,7 +224,7 @@
     "check": "Check for updates",
     "checking": "Checking...",
     "upToDate": "You're up to date.",
-    "noStableRelease": "No stable updates are available. Test versions are not installed automatically.",
+    "noStableRelease": "No stable updates are available. Prerelease versions are not installed automatically.",
     "neverChecked": "Not checked yet.",
     "lastChecked": "Last checked: {{when}}",
     "available": "DS1 Multi Randomizer {{version}} is available.",

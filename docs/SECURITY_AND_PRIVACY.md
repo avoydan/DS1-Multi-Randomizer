@@ -1,31 +1,33 @@
 # Security and privacy
 
-What DS1 Multi Randomizer does with your computer, your files and the network. The signing and antivirus side is in `docs/RELEASE_TRUST.md`.
+This page describes the network and local-file behavior of DS1 Multi Randomizer. See [Release trust](RELEASE_TRUST.md) and [Code signing](CODE_SIGNING.md) for distribution and signing status.
 
-## Privacy
+## Network behavior
 
-* **No telemetry, no accounts, no analytics, no crash reporting, no update check.** The application never sends information about you, your game, your settings or your runs anywhere. There is no server of ours.
-* **One network request, only if you switch the world randomizer (Fog) on:** a one-time HTTPS download of 40 data files from the pinned FogMod commit on `raw.githubusercontent.com`. Each file is checked against a built-in SHA-256 before it is used; the files are cached in the user data folder and the app works offline afterwards. GitHub sees an ordinary download request from your address. Nothing is uploaded.
-* **Seed Codes are not secret and contain no personal data:** they hold the options and the master seed. Run history, settings and the game path are stored only on your computer, in the user data folder (`%APPDATA%\ds1-triple-randomizer-desktop`, the same for the installed and the portable build).
-* **The local API** the interface talks to listens on `127.0.0.1` only, on a random port, and every request needs a per-session token that only the application's own window has. It is not reachable from other computers.
+- **No telemetry, accounts, analytics, crash reporting, or automatic support uploads.** The project has no application server. The app does not send the user's game files, settings, seeds, run history, or support bundle to the project.
+- **Update checks contact GitHub Releases.** Automatic checks are enabled by default and can be disabled in the app's Updates settings; a manual check remains available. A check reads public release metadata. It does not download an update until the user chooses **Download update**. Installation requires a later **Restart and update** action. GitHub can see ordinary connection metadata such as the source IP address and request timing.
+- **Fog data is fetched only when needed.** When Fog/world randomization is used and its cache is missing, the backend downloads 40 data files over HTTPS from the pinned `thefifthmatt/FogMod` commit on `raw.githubusercontent.com`. Every file is checked against a built-in SHA-256 before use. The files are cached locally; subsequent runs can work offline. GitHub can see ordinary connection metadata for these requests.
+- **Support bundles are user initiated.** Export creates a local ZIP at a location chosen by the user. It is not uploaded by the application.
+- **Local state stays on this computer.** Settings, run history, presets, and game path are stored under `%APPDATA%\ds1-triple-randomizer-desktop`. Seed Codes contain settings and a master seed, not personal information.
 
-## What it changes on your computer
+## Changes to the computer
 
-* **Your Dark Souls Remastered installation, and only when you press Apply:** the managed data files of the game are replaced by the generated package. Before the first run the application imports a **pristine snapshot** of the original files and keeps it as the single restore authority; **Restore original game** puts the original files back. Generation happens in a separate workspace and never touches the game folder; activation is refused when the game folder, `DarkSoulsRemastered.exe` or the pristine snapshot cannot be verified, or when the state is unknown. The application's tests and the packaged-app checks use copies of the game, not your installation.
-* **Nothing else:** no registry entries (the installer adds one per-user uninstall entry and shortcuts), no services, no scheduled tasks, no startup entries, no drivers, no firewall rules. The application never asks for administrator rights.
-* **Play offline.** Modified game data and online play do not mix; the application recommends offline play and does not touch the game's online components.
+- Generation uses a separate workspace. The application imports a pristine snapshot and only replaces managed Dark Souls Remastered files when the user chooses **Apply to game**. **Restore original game** uses that snapshot as the single restore source.
+- The application does not install services, scheduled tasks, startup entries, drivers, firewall rules, or registry configuration beyond the installer's per-user uninstall entry and shortcuts. It runs as the current user and does not request administrator access.
+- The app recommends offline play when the game contains randomized data.
 
 ## Process model
 
-* The window (renderer) is sandboxed with context isolation and no Node integration; it can only call the typed backend API and pick folders through a small preload bridge. It cannot read or write game files, run programs or import code.
-* The backend (Node code run by Electron) owns all file operations. It starts two helpers with argument arrays and no shell: `DsrDataTool.exe` (reads and patches game data in the workspace) and `FogHost.exe` (the fog randomizer). It also uses `reg query` (find Steam), `tasklist` (is the game running) and `taskkill` (stop its own children), each with fixed arguments. No PowerShell, `cmd.exe` or scripting host is used by the application. The release tooling (`tools/release`) uses Windows PowerShell only on the build machine, to read Authenticode signatures, and never ships.
-* Everything runs as the user who started it (`asInvoker`).
+The Electron renderer is sandboxed, has context isolation enabled, and has no Node integration. It cannot write game files, start processes, or choose arbitrary network destinations. The backend owns game-file operations and starts `DsrDataTool.exe` and `FogHost.exe` with fixed executable paths and argument arrays, without a shell. It also uses fixed Windows commands (`reg query`, `tasklist`, and `taskkill`) for game detection and child-process cleanup. The application does not invoke PowerShell, `cmd.exe`, or a scripting host.
 
-## Supply chain
+The local backend API listens on `127.0.0.1` on a random port and checks a per-session token. It is not exposed to other computers on the network.
 
-* The generated worlds depend only on the code in this repository, the vendored engines (GPL combined engine, FogMod under Apache-2.0, pinned commits listed in the `UPSTREAM_PIN.md` files) and the packages in the lock file. Release builds record the commit, the versions and the SHA-256 of every executable (`release-manifest.json`).
-* Builds are **not code-signed yet**; check the published SHA-256. See `docs/RELEASE_TRUST.md` for what that means and for the plan.
+## Releases and verification
 
-## Reporting a problem
+Public releases are currently **unsigned**. A valid SHA-256 match proves that a file matches the published checksum; it does not prove who built it or certify that it is safe. The release manifest and `SHA256SUMS.txt` are published beside the files. Follow [the verification instructions](ANTIVIRUS_FALSE_POSITIVES.md) and do not disable security software or add exclusions.
 
-If you think a build was tampered with or flagged wrongly, keep the file, note its SHA-256 and compare it with the published manifest; do not disable your antivirus. Open an issue in the project repository with the hash and the product that flagged it.
+The source repository is public under GPL-3.0-only. The release workflow records the source commit and checks package contents, versions, update source, and hashes. See [Release trust](RELEASE_TRUST.md) for the current limits of those checks.
+
+## Reporting an issue
+
+For a suspected tampered release, preserve the file, calculate its SHA-256, and compare it with the checksum for the same version. For a detection that appears incorrect, record the security product, detection name, alert identifier, file version, release URL, and hash, then use that vendor's official submission process. Never share private game files or a support bundle unless you have reviewed it and chosen to do so.

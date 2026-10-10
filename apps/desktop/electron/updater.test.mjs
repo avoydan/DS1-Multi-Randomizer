@@ -4,9 +4,10 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import {
   AUTO_CHECK_INTERVAL_MS, AUTO_CHECK_RETRY_MS, UPDATE_INVOKE_CHANNELS, UPDATE_STATE_EVENT, UpdateController, UNSET_OWNER,
-  isNewerStable, isNoStableReleaseError, isUpdateSourceConfigured, releaseUrlFor,
+  isNewerStable, isNoStableReleaseCandidateError, isUpdateSourceConfigured, releaseUrlFor,
 } from '../dist-electron/updater.js';
 import { normalizeUpdateSettings, migrateSettings } from '../dist-electron/settings.js';
+import { confirmNoStableReleaseViaGitHubApi } from '../dist-electron/githubReleaseApi.js';
 
 // The updater policy (docs/AUTO_UPDATE.md), tested without Electron, without a network and without GitHub: the real updater, the clock, the settings and the backend are
 // replaced by small fakes. Nothing in this file contacts anything.
@@ -58,6 +59,7 @@ function harness(overrides = {}) {
     mode: overrides.mode ?? 'installed',
     buildChannel: overrides.buildChannel,
     source: overrides.source ?? SOURCE,
+    confirmNoStableRelease: overrides.confirmNoStableRelease,
     prefs: { get: () => ({ ...stored }), set: async (patch) => { stored = { ...stored, ...patch }; } },
     isOperationActive: overrides.isOperationActive ?? (async () => false),
     openExternal: async (url) => { opened.push(url); },
@@ -139,7 +141,11 @@ test('4. a failed check is non-fatal, is reported with a code, and can be repeat
 });
 
 test('a public check treats GitHub 404 for /releases/latest as informational when only prereleases exist', async () => {
-  const { controller, updater, prefs, logs } = harness({ buildChannel: 'public', currentVersion: '0.38.0' });
+  let confirmedSource = null;
+  const { controller, updater, prefs, logs } = harness({
+    buildChannel: 'public', currentVersion: '0.38.0',
+    confirmNoStableRelease: async (source) => { confirmedSource = source; return true; },
+  });
   updater.checkError = missingStableReleaseError();
   const state = await controller.check({ manual: true });
   assert.equal(state.phase, 'noStableRelease');
@@ -150,7 +156,43 @@ test('a public check treats GitHub 404 for /releases/latest as informational whe
   assert.equal(prefs().lastCheckOk, true, 'absence of a stable release is a successful check');
   assert.equal(updater.allowPrerelease, false, 'public builds still ignore prereleases');
   assert.ok(logs.some((entry) => entry.level === 'info' && entry.code === 'NO_STABLE_RELEASE'));
-  assert.equal(isNoStableReleaseError(missingStableReleaseError(), SOURCE), true);
+  assert.deepEqual(confirmedSource, SOURCE);
+  assert.equal(isNoStableReleaseCandidateError(missingStableReleaseError(), SOURCE), true);
+});
+
+test('a transferred old-owner 406 is informational only after GitHub confirms the canonical repo has no stable release', async () => {
+  const oldSource = { provider: 'github', owner: 'remohomer', repo: 'DS1-Multi-Randomizer' };
+  const canonicalBase = 'https://api.github.com/repos/avoydan/DS1-Multi-Randomizer';
+  const requests = [];
+  const { controller, updater } = harness({
+    buildChannel: 'public', source: oldSource, currentVersion: '0.38.1',
+    confirmNoStableRelease: (source) => confirmNoStableReleaseViaGitHubApi(source, async (url) => {
+      requests.push(String(url));
+      if (requests.length === 1) return { status: 200, url: 'https://api.github.com/repositories/1411430877', json: async () => ({ full_name: 'avoydan/DS1-Multi-Randomizer', private: false }) };
+      return { status: 404, url: `${canonicalBase}/releases/latest` };
+    }),
+  });
+  updater.checkError = missingStableReleaseError(oldSource, '406 Not Acceptable');
+  const state = await controller.check({ manual: true });
+  assert.equal(state.phase, 'noStableRelease');
+  assert.equal(state.error, null);
+  assert.equal(updater.allowPrerelease, false);
+  assert.equal(isNoStableReleaseCandidateError(updater.checkError, oldSource), true);
+  assert.deepEqual(requests, [
+    'https://api.github.com/repos/remohomer/DS1-Multi-Randomizer',
+    `${canonicalBase}/releases/latest`,
+  ]);
+});
+
+test('a latest endpoint candidate remains an error when API confirmation is false, unavailable, or fails', async () => {
+  for (const confirmNoStableRelease of [async () => false, async () => { throw new Error('API timeout'); }, undefined]) {
+    const { controller, updater, prefs } = harness({ buildChannel: 'public', confirmNoStableRelease });
+    updater.checkError = missingStableReleaseError(SOURCE, '406 Not Acceptable');
+    const state = await controller.check({ manual: true });
+    assert.equal(state.phase, 'error');
+    assert.equal(state.error.code, 'CHECK_FAILED');
+    assert.equal(prefs().lastCheckOk, false);
+  }
 });
 
 test('a network failure or a different HTTP/API failure remains an updater error', async () => {
@@ -167,8 +209,48 @@ test('a network failure or a different HTTP/API failure remains an updater error
     assert.equal(state.phase, 'error', failure.message);
     assert.equal(state.error.code, 'CHECK_FAILED');
     assert.equal(prefs().lastCheckOk, false);
-    assert.equal(isNoStableReleaseError(failure, SOURCE), false);
+    assert.equal(isNoStableReleaseCandidateError(failure, SOURCE), false);
   }
+});
+
+test('GitHub API confirmation follows an old-owner repository transfer and only accepts a canonical public repo plus latest 404', async () => {
+  const calls = [];
+  const canonicalBase = 'https://api.github.com/repos/avoydan/DS1-Multi-Randomizer';
+  const fetchMock = async (url, options) => {
+    calls.push({ url: String(url), options });
+    if (calls.length === 1) return { status: 200, url: 'https://api.github.com/repositories/1411430877', json: async () => ({ full_name: 'avoydan/DS1-Multi-Randomizer', private: false }) };
+    return { status: 404, url: `${canonicalBase}/releases/latest` };
+  };
+  assert.equal(await confirmNoStableReleaseViaGitHubApi({ provider: 'github', owner: 'remohomer', repo: 'DS1-Multi-Randomizer' }, fetchMock), true);
+  assert.deepEqual(calls.map(({ url }) => url), [
+    'https://api.github.com/repos/remohomer/DS1-Multi-Randomizer',
+    `${canonicalBase}/releases/latest`,
+  ]);
+  assert.equal(calls.every(({ options }) => options.headers.Accept === 'application/vnd.github+json'), true);
+});
+
+test('GitHub API confirmation rejects a stable release, wrong repo identity, private repo, API/network errors, and untrusted source', async () => {
+  const canonicalBase = 'https://api.github.com/repos/avoydan/DS1-Multi-Randomizer';
+  const source = { provider: 'github', owner: 'avoydan', repo: 'DS1-Multi-Randomizer' };
+  const metadata = { status: 200, url: canonicalBase, json: async () => ({ full_name: 'avoydan/DS1-Multi-Randomizer', private: false }) };
+  for (const latestResponse of [
+    { status: 200, url: `${canonicalBase}/releases/latest` },
+    { status: 403, url: `${canonicalBase}/releases/latest` },
+    { status: 500, url: `${canonicalBase}/releases/latest` },
+  ]) {
+    let count = 0;
+    assert.equal(await confirmNoStableReleaseViaGitHubApi(source, async () => (++count === 1 ? metadata : latestResponse)), false);
+  }
+  assert.equal(await confirmNoStableReleaseViaGitHubApi(source, async () => { throw new Error('network down'); }), false);
+  for (const identity of [
+    { full_name: 'avoydan/other-repo', private: false },
+    { full_name: 'avoydan/DS1-Multi-Randomizer', private: true },
+  ]) {
+    assert.equal(await confirmNoStableReleaseViaGitHubApi(source, async () => ({ ...metadata, json: async () => identity })), false);
+  }
+  let called = false;
+  assert.equal(await confirmNoStableReleaseViaGitHubApi({ ...source, owner: 'someone-else' }, async () => { called = true; throw new Error('unexpected'); }), false);
+  assert.equal(called, false);
 });
 
 test('a stable release follows the normal update flow', async () => {

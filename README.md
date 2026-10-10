@@ -1,130 +1,53 @@
 # DS1 Multi Randomizer
 
-DS1 Multi Randomizer is a Windows desktop application for generating one
-deterministic Dark Souls Remastered randomization from item, enemy/boss, and
-FogMod settings.
+DS1 Multi Randomizer is a Windows desktop app for creating one deterministic Dark Souls Remastered world with randomized items, enemies and bosses, and world transitions.
 
 ## Download
 
-[Download latest release (v0.38.2)](https://github.com/avoydan/DS1-Multi-Randomizer/releases/tag/v0.38.2) · [All releases](https://github.com/avoydan/DS1-Multi-Randomizer/releases)
+[Download latest release — v0.38.3](https://github.com/avoydan/DS1-Multi-Randomizer/releases/tag/v0.38.3) · [All releases](https://github.com/avoydan/DS1-Multi-Randomizer/releases)
 
-## For players
+The release is a **public prerelease**. The recommended file is `DS1-Multi-Randomizer-0.38.3-Setup-x64.exe`. A portable executable is also provided; it extracts to a temporary folder each time it starts, which can trigger more antivirus warnings.
 
-1. Download the **installer** (`DS1-Multi-Randomizer-<version>-Setup-x64.exe`) and run it. It installs for your user only and never asks for administrator rights. A **portable** build (`DS1-Multi-Randomizer-<version>-Portable-x64.exe`) is also offered: it unpacks itself to a temporary folder every time it starts, which some antivirus products dislike, so the installer is the recommended one.
-2. Choose your settings. New settings start with the recommended **Sampling** enemy placement; older Seed Codes and saved settings keep the algorithm they were made with.
-3. Click **Randomize**, then **Apply to game**.
-4. Click **Launch game** (or start Dark Souls Remastered from Steam) and play offline.
+## What it does
 
-Every run gets a **Seed Code** (it starts with `DS1TR`). Share it with a friend: they click **Load seed**, paste it, and get
-exactly the same world. Seed Codes include the randomizer settings needed to reproduce the same world, and they keep working in
-later versions of the app. The app also remembers your settings and lists your earlier runs in **History**, where you can apply,
-copy any of them, or create their files again. After **Apply to game** you can start Dark Souls Remastered with **Launch game**.
+- Combines item, ordinary enemy, boss, and Fog/world-transition randomization in one run.
+- Uses one master seed. A Seed Code records the settings needed to reproduce the same world and can be loaded by another player.
+- Keeps run history, presets, and a spoiler hint sheet; supports English and Polish.
+- Generates into a workspace and can restore the original managed game files from its pristine snapshot.
 
-**Language.** The app speaks **English** and **Polish**. It follows your Windows language by default (*Automatic*); change it any time with **Language** in the header (Automatic / English / Polski). The choice is remembered and never changes a world: the same Seed Code gives the same world in either language. The installer also follows your Windows language.
+## Requirements and safe use
 
-**Hints.** After a world exists, **… → View hints** opens a read-only **hint sheet** with three spoiler levels (*Low spoilers*, *Progression*, *Full spoilers*); you can switch the level, search, and export it as **HTML**, **TXT** or **JSON** in English or Polish. It works for any world in **Run history** too (the **…** menu of its row) and changes nothing in the game.
+- 64-bit Windows and your own installed copy of Dark Souls Remastered.
+- No separate Node.js or .NET installation is needed for the packaged app.
+- Back up important saves before using mods. The app edits managed game data only after **Apply to game**; use **Restore original game** to put back the pristine files.
+- Play offline while randomized game data is active. The project is unofficial and is not affiliated with FromSoftware or Bandai Namco Entertainment.
 
-**DLC.** **DLC content** (on by default) decides whether the Artorias of the Abyss areas, enemies, bosses and items take part in the randomization. Turn it off and they stay out of it: the DLC itself stays in your game exactly as it is, it is only not randomized (see `docs/DLC_AUDIT.md`). The fog randomizer always includes the DLC areas, so the switch is locked on while it is on.
+## Verify a download
 
-**Something went wrong?** Open **Advanced → Diagnostics and support**. **Copy diagnostics** gives a short summary; **Export support bundle** saves one ZIP (summary, diagnostics, manifest, the newest log lines) to a place you choose. It contains **no game files** and no personal folders: your Windows user name, computer name, folders and any password or token are removed before it is saved. Nothing is sent anywhere; you decide who gets the file.
+Each release includes `SHA256SUMS.txt` and a versioned release manifest. In PowerShell, calculate a file's hash with:
 
-**Builds are not code-signed yet** (`docs/RELEASE_TRUST.md`): Windows SmartScreen and some antivirus products may warn about an unrecognised publisher. Check the SHA-256 of your download against the one published with the release. Nothing is uploaded or collected by the app (`docs/SECURITY_AND_PRIVACY.md`). The installed app can check GitHub Releases for a newer version and, only when you press the buttons, download and install it (`docs/AUTO_UPDATE.md`); the release steps are in `docs/RELEASE_CHECKLIST.md`.
-
-You need Windows and your own copy of Dark Souls Remastered on Steam. Nothing else has to be installed or downloaded by
-hand: the app finds the game, prepares everything it needs (the world randomizer fetches a small set of data files once
-and then works offline) and can put your original game files back at any time with **Restore original game**.
-
-## Architecture
-
-```text
-Electron + React renderer
-        |
-        v
-typed local HTTP API
-        |
-        v
-Node/TypeScript backend
-   |             |
-   v             v
-combined DSR   FogMod host
-items/enemies  world/fog
-        \       /
-         workspace
-            |
-      validation/package
-            |
-        activation
+```powershell
+Get-FileHash .\DS1-Multi-Randomizer-0.38.3-Setup-x64.exe -Algorithm SHA256
 ```
 
-The renderer never modifies game files and never imports randomizer code.
-Generation, workspace management, validation, activation, restore, and run
-manifests belong to the backend.
+Compare the `Hash` value with the line for that exact filename in `SHA256SUMS.txt`. A matching hash shows that the file matches the published checksum; it is not a code signature or a safety certification.
 
-## Engine strategy
+## Code signing and antivirus
 
-The primary Items + Enemies candidate is a pinned GPL-3.0-only fork of
-[kellernz1/ds-randomizer](https://github.com/kellernz1/ds-randomizer).
+**v0.38.3 is unsigned.** No SignPath application has been approved and no trusted code-signing certificate is active. Windows SmartScreen or antivirus software may warn about the download. We do not recommend disabling protection or adding an exclusion. See [false-positive reporting and verification](docs/ANTIVIRUS_FALSE_POSITIVES.md), [release trust](docs/RELEASE_TRUST.md), and the [code-signing preparation](docs/CODE_SIGNING.md).
 
-Fog generation will use a dedicated headless host around
-[thefifthmatt/FogMod](https://github.com/thefifthmatt/FogMod).
+## Privacy and network use
 
-The legacy Python randomizers are behavior references only. Their repositories
-do not currently declare redistribution licenses, so their source and binaries
-must not be included without written permission.
+There is no telemetry, analytics, account, crash reporting, or automatic support-bundle upload. Update checks contact GitHub Releases; automatic checks can be turned off, and update files are downloaded only after the user requests them. Fog/world randomization downloads 40 checksum-verified data files from a pinned FogMod commit when needed and caches them locally. Network requests expose ordinary connection metadata to GitHub. Read the full [privacy and security statement](docs/SECURITY_AND_PRIVACY.md).
 
-See [the option matrix](docs/OPTION_MATRIX.md) for native settings and planned
-independent compatibility extensions.
+## Source and license
 
-## Current v0.2 status
+The source code for this release is available in this repository at the matching `v0.38.3` tag. DS1 Multi Randomizer is licensed under [GPL-3.0-only](LICENSE). See [third-party notices](THIRD_PARTY_NOTICES.md) and the [licensing policy](docs/LICENSING.md) for upstream components and distribution terms.
 
-Implemented:
+Issues: [GitHub issue tracker](https://github.com/avoydan/DS1-Multi-Randomizer/issues).
 
-- Electron, React, TypeScript, and Vite desktop scaffold;
-- separate Node/TypeScript backend;
-- shared typed contracts;
-- Dark Souls Remastered installation validation;
-- deterministic combined/Fog seed derivation;
-- one combined Items + Enemies pipeline stage;
-- executable settings model for combined/FogMod plus a visible, disabled
-  catalog of planned legacy-parity extensions;
-- GPL-3.0-only project licensing and third-party policy.
+## Further information
 
-Not implemented yet:
-
-- pinned combined-engine fork;
-- transactional workspace and pristine snapshot;
-- combined adapter execution;
-- FogMod compatibility bridge and headless host;
-- final validation, activation, and restore;
-- independent implementation of legacy-only option behavior.
-
-## Development
-
-Requirements:
-
-- Node.js 22 or newer;
-- npm;
-- Windows for Electron and Dark Souls Remastered integration;
-- .NET tooling for the future FogMod host.
-
-```bash
-npm install
-npm run dev
-```
-
-Build and type-check:
-
-```bash
-npm run build
-npm run typecheck
-```
-
-## Legal boundaries
-
-The application operates on a user's own game installation. Do not commit or
-redistribute Dark Souls binaries, assets, extracted catalogs, or generated game
-packages. The project is unofficial and is not affiliated with FromSoftware or
-Bandai Namco Entertainment.
-
-See [LICENSE](LICENSE), [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), and
-[docs/LICENSING.md](docs/LICENSING.md).
+- [Installation, updates, and release process](docs/AUTO_UPDATE.md)
+- [Release trust and executable inventory](docs/RELEASE_TRUST.md)
+- [Nexus Mods publication draft and review status](docs/NEXUS_MODS.md)

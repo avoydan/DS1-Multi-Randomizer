@@ -30,7 +30,7 @@ Developer ── version commit ──> GitHub repository
                           NSIS installer replaces the application (settings, history and the game are untouched)
 ```
 
-No VPS, no custom API, no database, no update server. The only network address an installed client contacts for updates is `github.com/<owner>/<repo>/releases` (the same host serves the files). Nothing is sent about the person or the computer except what any HTTPS request to github.com carries.
+No project-owned VPS, custom service, or database. Normal update discovery uses `github.com/<owner>/<repo>/releases.atom` and `/releases/latest`; only when a public stable-only check gets the exact wrapped 404/406 from that configured `/releases/latest` URL does the app query the GitHub REST API to confirm repository identity and absence of a stable release. Update files are served by GitHub. These requests expose ordinary connection metadata, but the app does not send game or user data.
 
 ## 2. Where updates come from: the update source
 
@@ -54,7 +54,11 @@ Either way the application contains **no token** and a normal user never authent
 
 ### Treat the update source as infrastructure
 
-The owner/repository pair is baked into every installed copy. The repository has now moved to `avoydan/DS1-Multi-Randomizer`; v0.38.2 is the first release configured with that destination. At migration verification, the old `releases.atom` URL redirected to the new repository. Earlier clients can use that redirect while GitHub maintains it; keep the transferred repository available and direct users to the current [v0.38.2 release](https://github.com/avoydan/DS1-Multi-Randomizer/releases/tag/v0.38.2) if an older client cannot follow it. For future owner or repository changes, coordinate a release whose update source points to the new destination before relying on the old feed being retired.
+The owner/repository pair is baked into every installed copy. The repository moved to `avoydan/DS1-Multi-Randomizer`; v0.38.2 was the first release configured with that destination. Live release manifests for 0.37.0, 0.38.0, and 0.38.1 confirm that each is a public unsigned build with source `remohomer/DS1-Multi-Randomizer`; their source commits pin `electron-updater` 6.8.9. On 2026-10-10, live requests from the old path confirmed: `releases.atom` returned 200 at the new owner's URL; `/releases/latest` with the `Accept: application/json` header used by electron-updater returned 406 after redirecting; the old path for v0.38.2 `latest.yml`, Setup, and Setup blockmap each returned 200. The old-owner GitHub API repository request returned the canonical repository identity, and the canonical REST `/releases/latest` returned 404. The API helper in 0.38.3 also returned true for that old-owner source.
+
+When a future stable release exists, old clients should be able to follow the same redirect chain for Atom/latest, `latest.yml`, Setup, and blockmap URLs. `electron-updater` 6.8.9 builds its requests from the baked owner/repo, and the live requests above confirmed those old paths resolve after the transfer. The old versions are therefore **not stranded for a future stable update**, provided the old namespace remains unclaimed. However, 0.37.0/0.38.0/0.38.1 cannot receive the 0.38.3 prerelease because public builds intentionally ignore prereleases; until a stable release exists, those versions may still show the old 406 error. This is not a live N→N+1 proof: we cannot test an actual old installed client downloading and applying a future stable installer without publishing one. GitHub documents that reusing the old location can remove transfer redirects. See [GitHub's repository transfer guidance](https://docs.github.com/en/enterprise-cloud@latest/repositories/creating-and-managing-repositories/transferring-a-repository).
+
+**No-stable behavior (0.38.3 onward).** Public clients continue to set `allowPrerelease = false`. The app treats an updater error as an informational no-stable state only when it is `ERR_UPDATER_INVALID_RELEASE_FEED` for the exact configured `/releases/latest` endpoint, its status is 404 or 406, the Atom feed contains a release entry, and a follow-up API check confirms that the source path resolves to the canonical public repository `avoydan/DS1-Multi-Randomizer` and its REST `/releases/latest` returns 404. GitHub's API defines that endpoint as the latest non-draft, non-prerelease release. A stable response, wrong repository, empty/malformed feed, API error, timeout, 403/429/5xx, unrelated HTTP error, or unrelated endpoint remains an updater error. Internal QA prerelease opt-in is unchanged and does not use this confirmation path.
 
 ## 3. What the clients do
 
@@ -75,7 +79,7 @@ The GitHub **pre-release** checkbox is separate from a semver suffix. Release ta
 * **Automatic checks are ON by default**, set in App settings > Updates ("Automatic update checks"). The first one runs about 20 seconds after the window is up (never on the first paint), and a session left open checks again every 6 hours **but** the throttle lets a real request through at most **once per 24 hours after a successful check and once per hour after a failed one**. The time of the last check is kept in the settings file (`updates.lastCheckAt`, `updates.lastCheckOk`).
 * **Check for updates** (App settings and About) always checks, ignoring the throttle.
 * Changing pages never triggers a request. Concurrent requests share one.
-* The updater uses `github.com/<owner>/<repo>/releases/latest` and `releases.atom`, not the REST API, so there is no API rate limit for anonymous users.
+* Normal checks use `github.com/<owner>/<repo>/releases/latest` and `releases.atom`. The narrow no-stable confirmation uses the anonymous GitHub REST API only for an exact latest-release 404/406 candidate, so that rare path is subject to GitHub's anonymous API rate limits; any API failure leaves the original updater error visible.
 
 ## 5. The user experience
 
@@ -116,7 +120,7 @@ The project has no trusted code-signing certificate yet. An unsigned release the
 * **Permissions:** `contents: read` for the workflow, `contents: write` for the single job (to create the draft and upload files). Nothing else.
 * **Secrets:** none for the single-repository setup (`GITHUB_TOKEN` suffices). Only `RELEASE_REPO_TOKEN` (and the variable `RELEASE_REPOSITORY`) for a separate release repository. Never put a secret anywhere else.
 * **Golden fixtures cannot run on a hosted runner**, because they need a clean Dark Souls Remastered copy (`goldenCompatibility.mjs verify`, `DS1TR_GOLDEN_GAME_SOURCE`). They are part of the owner's checklist; the workflow forces the step by requiring the commit hash in `golden_attestation` (a human gate, not a proof).
-* **Action versions** are pinned by major tag (`@v4`). Pinning by full commit SHA is the stricter practice and a possible hardening once the repository exists.
+* **Action versions** are pinned by full commit SHA; update each pin only after verifying the intended official upstream action release.
 
 ### The assets of a release
 
@@ -209,4 +213,6 @@ The two downloads are named by their kind first, so that nobody reads "x64" as a
 
 ## 13. Current end-to-end status
 
-The real installed N to N+1 test remains **DEFERRED** until two numeric-version GitHub releases exist and N+1 is published as a public prerelease. Follow section 11, then record the exact installed versions, checks, progress, operation guard, preserved user data, restart result and public-build prerelease refusal here and in `docs/IMPLEMENTATION_STATUS.md`. Unit tests and a green release workflow do not count as that E2E result.
+The transfer behavior and 0.38.3 no-stable classification are tested separately: unit tests cover candidate errors, REST confirmation outcomes, stable update flow, internal QA prerelease opt-in, and failures; public old-owner URLs are checked against GitHub redirects. These do **not** replace the installed N→N+1 test.
+
+The current repository has no stable release, so a real old public installation cannot discover a stable N+1 today. Do not temporarily mark a prerelease stable to test it. When the owner intentionally publishes the first stable release, test one untouched old-owner build (0.37.0, 0.38.0, or 0.38.1) against that stable release: confirm it offers the version, retrieves `latest.yml`, downloads Setup/blockmap, completes the ordinary update, and preserves settings/history. Record that actual result in `docs/IMPLEMENTATION_STATUS.md`. GitHub redirects make this expected to work while the old namespace remains unclaimed; only a real stable N→N+1 run proves the complete updater and installer path.

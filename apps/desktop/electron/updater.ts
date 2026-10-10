@@ -92,6 +92,8 @@ export interface UpdateControllerOptions {
   /** Public builds stay on stable releases. Internal builds may inspect GitHub prereleases for controlled QA. */
   buildChannel?: BuildChannel;
   source: UpdateSource;
+  /** Confirms an exact GitHub latest-release error against the canonical public repository before it becomes informational. */
+  confirmNoStableRelease?: (source: UpdateSource) => Promise<boolean>;
   prefs: { get(): UpdatePrefs; set(patch: Partial<UpdatePrefs>): Promise<void> };
   /** True while the backend is generating, applying, restoring or otherwise working on files. */
   isOperationActive: () => Promise<boolean>;
@@ -134,11 +136,11 @@ export function releaseUrlFor(source: UpdateSource, version: string | null): str
 }
 
 /**
- * electron-updater 6.8.9 wraps GitHub's `/releases/latest` 404 in `ERR_UPDATER_INVALID_RELEASE_FEED`.
- * Only that exact endpoint/status combination means the public repository has no stable release; other HTTP/API/network
- * failures must remain errors.
+ * electron-updater 6.8.9 wraps GitHub's `/releases/latest` 404/406 in `ERR_UPDATER_INVALID_RELEASE_FEED`.
+ * This recognizes only a candidate: the caller must also confirm the canonical public repository and its REST
+ * `/releases/latest` 404 before showing the informational no-stable state. Atom tags do not encode prerelease status.
  */
-export function isNoStableReleaseError(error: unknown, source: UpdateSource): boolean {
+export function isNoStableReleaseCandidateError(error: unknown, source: UpdateSource): boolean {
   if (!isUpdateSourceConfigured(source) || !error || typeof error !== 'object') return false;
   const candidate = error as { code?: unknown; message?: unknown };
   if (candidate.code !== 'ERR_UPDATER_INVALID_RELEASE_FEED' || typeof candidate.message !== 'string') return false;
@@ -146,9 +148,11 @@ export function isNoStableReleaseError(error: unknown, source: UpdateSource): bo
   const markerIndex = candidate.message.indexOf(marker);
   if (markerIndex < 0) return false;
   const nestedError = candidate.message.slice(markerIndex + marker.length, markerIndex + marker.length + 256);
-  if (!/\bHttpError:\s*404(?:\s|$)/u.test(nestedError)) return false;
+  if (!/\bHttpError:\s*(?:404|406)(?:\s|$)/u.test(nestedError)) return false;
   const feed = /(?:^|\n)XML:\s*([\s\S]*)$/u.exec(candidate.message)?.[1];
-  return typeof feed === 'string' && /<(?:[\w.-]+:)?entry(?:\s|>)/u.test(feed);
+  return typeof feed === 'string'
+    && /<(?:[\w.-]+:)?feed(?:\s|>)/u.test(feed)
+    && /<(?:[\w.-]+:)?entry(?:\s|>)/u.test(feed);
 }
 
 export type UpdateListener = (state: UpdateState) => void;
@@ -268,7 +272,15 @@ export class UpdateController {
         this.#set({ phase: 'upToDate', availableVersion: null, releaseDate: null, releaseUrl: null });
       }
     } catch (error) {
-      if (this.#options.buildChannel !== 'internal' && isNoStableReleaseError(error, this.#options.source)) {
+      let confirmedNoStableRelease = false;
+      if (this.#options.buildChannel !== 'internal' && isNoStableReleaseCandidateError(error, this.#options.source)) {
+        try {
+          confirmedNoStableRelease = await (this.#options.confirmNoStableRelease?.(this.#options.source) ?? Promise.resolve(false));
+        } catch {
+          // Confirmation is deliberately fail-closed: an unavailable API leaves the original updater error visible.
+        }
+      }
+      if (confirmedNoStableRelease) {
         await this.#options.prefs.set({ lastCheckAt: stamp, lastCheckOk: true }).catch(() => undefined);
         this.#options.log?.('info', 'no stable GitHub release is available; public prereleases remain disabled', 'NO_STABLE_RELEASE');
         this.#set({ phase: 'noStableRelease', availableVersion: null, releaseDate: null, releaseUrl: null, lastCheckAt: stamp, error: null, progress: null });

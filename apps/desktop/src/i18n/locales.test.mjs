@@ -49,7 +49,7 @@ test('every English key exists in Polish and Polish has no extra keys (plural fo
 });
 
 test('the no-stable-release update state is a clear informational message in both languages', () => {
-  assert.equal(en.app.update.noStableRelease, 'No stable updates are available. Test versions are not installed automatically.');
+  assert.equal(en.app.update.noStableRelease, 'No stable updates are available. Prerelease versions are not installed automatically.');
   assert.equal(pl.app.update.noStableRelease, 'Brak dostępnych stabilnych aktualizacji. Wersje testowe nie są instalowane automatycznie.');
 });
 

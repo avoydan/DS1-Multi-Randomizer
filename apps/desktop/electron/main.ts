@@ -11,6 +11,7 @@ import { DesktopLog, installModeOf } from './appLog.js';
 import { MAX_SAVE_BYTES, SAVE_KINDS, parseSaveRequest, saveBytes } from './saveFile.js';
 import { isDevToolsShortcut, parseBuildChannel, type BuildChannel } from './channel.js';
 import { UPDATE_SOURCE } from './updateSource.js';
+import { confirmNoStableReleaseViaGitHubApi } from './githubReleaseApi.js';
 import { PERIODIC_CHECK_MS, STARTUP_CHECK_DELAY_MS, UPDATE_STATE_EVENT, UpdateController, type UpdaterLike } from './updater.js';
 import { mainMessage, normalizeLanguageSetting, resolveLanguage, type AppLanguage, type LanguageSetting, type MainMessageKey } from './language.js';
 
@@ -156,6 +157,7 @@ function createUpdates(): UpdateController {
     mode: installModeOf(app.isPackaged, process.env),
     buildChannel,
     source: UPDATE_SOURCE,
+    confirmNoStableRelease: confirmNoStableReleaseViaGitHubApi,
     prefs: {
       get: () => ({ autoCheck: settings.updates?.autoCheck !== false, lastCheckAt: settings.updates?.lastCheckAt ?? null, lastCheckOk: settings.updates?.lastCheckOk === true }),
       set: async (patch) => {
