@@ -30,6 +30,14 @@ The package also includes source notices and license texts for GPL-3.0-only code
 - Fog/world randomization downloads 40 pinned data files from `raw.githubusercontent.com` if the local cache is absent. The updater contacts GitHub Releases for manual checks and, when enabled, automatic checks; it downloads only after the user requests an update. No application data is uploaded to the project.
 - Applying a generated world replaces managed game data only after the user chooses **Apply to game**. The app imports a pristine snapshot for **Restore original game**. Those game-file writes, large self-contained .NET helpers, lack of a signing identity, portable extraction, and HTTPS downloads are expected product behavior, not AV workarounds to remove.
 
+## Dependency audit and renderer boundary
+
+`npm audit --package-lock-only` on 2026-10-10 reported 14 advisories in the lockfile (2 critical, 4 high, 8 moderate). The count includes build and development dependencies; it is not a count of vulnerabilities in the shipped application. The installed Electron runtime is `34.5.8`, and the audit reports multiple Electron advisories. Electron's release schedule no longer lists that major in a supported line.
+
+The app's packaged window uses `contextIsolation: true`, `nodeIntegration: false`, and `sandbox: true`; it loads the bundled local `index.html`, exposes a narrow Promise-returning preload API, and does not register custom protocols, use `<webview>`, or install permission handlers. The GPL license link was the one external page requested in a child window. v0.38.3 now sends only that exact URL to the system browser, denies every Electron child window, and blocks renderer navigation or redirects away from the app document. Unit tests cover the URL policy and that guards are installed before loading content.
+
+The audit's critical `concurrently`/`shell-quote` findings and high `extract-zip`, `http-cache-semantics`, and `source-map-js` findings are in development/build tooling rather than code paths shipped as app features; no untrusted command input or untrusted archive extraction path is exposed by this app. This focused mitigation does not make Electron 34.5.8 vulnerability-free and is not a substitute for moving the packaged runtime to a currently supported Electron line. A major Electron upgrade was not mixed into this updater patch because it needs its own compatibility and packaged-app verification.
+
 ## File metadata and integrity checks
 
 The application and helpers use truthful project metadata: `DS1 Multi Randomizer` product name, `DS1 Multi Randomizer project` company/publisher text where the format requires a value, file descriptions, version, and copyright. No game publisher is named as the software publisher. `release-verify.mjs` checks the executable metadata and expected product versions. The project does not claim that “DS1 Multi Randomizer project” is a registered company.

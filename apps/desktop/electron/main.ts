@@ -4,7 +4,7 @@ import { spawn, execFile, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { readFile, writeFile, mkdir, access } from 'node:fs/promises';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { migrateSettings, normalizeGamePath, type StoredSettings } from './settings.js';
 import { launchGame } from './launchGame.js';
 import { DesktopLog, installModeOf } from './appLog.js';
@@ -12,6 +12,7 @@ import { MAX_SAVE_BYTES, SAVE_KINDS, parseSaveRequest, saveBytes } from './saveF
 import { isDevToolsShortcut, parseBuildChannel, type BuildChannel } from './channel.js';
 import { UPDATE_SOURCE } from './updateSource.js';
 import { confirmNoStableReleaseViaGitHubApi } from './githubReleaseApi.js';
+import { handleWindowOpenRequest, isAllowedRendererNavigation } from './windowSecurity.js';
 import { PERIODIC_CHECK_MS, STARTUP_CHECK_DELAY_MS, UPDATE_STATE_EVENT, UpdateController, type UpdaterLike } from './updater.js';
 import { mainMessage, normalizeLanguageSetting, resolveLanguage, type AppLanguage, type LanguageSetting, type MainMessageKey } from './language.js';
 
@@ -207,6 +208,18 @@ async function createWindow(): Promise<void> {
     },
   });
   mainWindow = win;
+  const developmentRendererUrl = process.env.VITE_DEV_SERVER_URL ?? 'http://127.0.0.1:5173';
+  const packagedRendererPath = path.join(currentDirectory, '..', 'dist', 'index.html');
+  const allowedRendererUrl = app.isPackaged ? pathToFileURL(packagedRendererPath).href : developmentRendererUrl;
+  win.webContents.setWindowOpenHandler(({ url }) => handleWindowOpenRequest(url, (externalUrl) => {
+    void shell.openExternal(externalUrl).catch(() => desktopLog.write('error', 'Could not open the GPL license page', 'EXTERNAL_PAGE_OPEN_FAILED'));
+  }));
+  win.webContents.on('will-navigate', (event, url) => {
+    if (!isAllowedRendererNavigation(url, allowedRendererUrl)) event.preventDefault();
+  });
+  win.webContents.on('will-redirect', (event, url, _isInPlace, isMainFrame) => {
+    if (isMainFrame && !isAllowedRendererNavigation(url, allowedRendererUrl)) event.preventDefault();
+  });
   win.on('closed', () => { if (mainWindow === win) mainWindow = null; });
   win.webContents.on('before-input-event', (event, input) => {
     if (!isDevToolsShortcut(input)) return;
@@ -214,8 +227,8 @@ async function createWindow(): Promise<void> {
     devToolsShown = !devToolsShown;
     win.webContents.send('dev-tools:changed', devToolsShown);
   });
-  if (!app.isPackaged) await win.loadURL(process.env.VITE_DEV_SERVER_URL ?? 'http://127.0.0.1:5173');
-  else await win.loadFile(path.join(currentDirectory, '..', 'dist', 'index.html'));
+  if (!app.isPackaged) await win.loadURL(developmentRendererUrl);
+  else await win.loadFile(packagedRendererPath);
 }
 
 ipcMain.handle('dialog:select-game-directory', async () => {
