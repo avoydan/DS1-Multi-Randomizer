@@ -33,6 +33,7 @@ export function useUpdates() {
     download: () => run(window.desktop?.updates.download),
     setAutoCheck: (enabled: boolean) => run(() => window.desktop?.updates.setAutoCheck(enabled) ?? Promise.resolve(null)),
     openReleasePage: () => { void window.desktop?.updates.openReleasePage().catch(() => undefined); },
+    openNexusPage: () => { void window.desktop?.updates.openNexusPage().catch(() => undefined); },
     install: async () => {
       setRefused(null);
       try {

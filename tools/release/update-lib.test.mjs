@@ -61,9 +61,11 @@ test('build metadata is loaded before the updater is created, and only its inter
   const updater = await read('apps', 'desktop', 'electron', 'updater.ts');
   const channel = await read('apps', 'desktop', 'electron', 'channel.ts');
   const startup = main.slice(main.indexOf('app.whenReady()'));
-  assert.ok(startup.indexOf('await loadBuildChannel()') >= 0, 'startup reads the packaged channel');
-  assert.ok(startup.indexOf('await loadBuildChannel()') < startup.indexOf('updates = createUpdates()'), 'channel is known before updater setup');
-  assert.match(main, /buildChannel,\s*source:\s*UPDATE_SOURCE/u, 'the loaded channel is passed to the update controller');
+  assert.ok(startup.indexOf('await loadBuildInfo()') >= 0, 'startup reads the packaged channel and distribution');
+  assert.ok(startup.indexOf('await loadBuildInfo()') < startup.indexOf('updates = await createUpdates()'), 'immutable build metadata is known before updater setup');
+  assert.match(main, /buildChannel,\s*distribution:\s*'github',\s*source:\s*UPDATE_SOURCE/u, 'the loaded channel is passed to the GitHub update controller');
+  assert.match(main, /initializeGithubUpdates\(buildDistribution, async \(\) =>/u, 'only GitHub metadata enters the updater bootstrap');
+  assert.doesNotMatch(main, /^\s*import\s+(?!type\b).*?(?:electron-updater|githubReleaseApi|updateSource|updater\.js)/mu, 'updater networking code is not eagerly imported');
   assert.match(updater, /updater\.allowPrerelease = false;\s*if \(this\.#options\.buildChannel === 'internal'\) updater\.allowPrerelease = true;/u);
   assert.match(channel, /return 'public'/u, 'missing or malformed build metadata defaults to public');
 });

@@ -53,6 +53,15 @@ test('the no-stable-release update state is a clear informational message in bot
   assert.equal(pl.app.update.noStableRelease, 'Brak dostępnych stabilnych aktualizacji. Wersje testowe nie są instalowane automatycznie.');
 });
 
+test('Nexus distribution update guidance and installed version are translated in both languages', () => {
+  assert.match(en.app.update.nexus.note, /distributed through Nexus Mods/u);
+  assert.match(pl.app.update.nexus.note, /pobrana z Nexus Mods/u);
+  assert.ok(en.app.update.nexus.openPage && pl.app.update.nexus.openPage);
+  assert.ok(en.app.update.installedVersion.includes('{{version}}'));
+  assert.ok(pl.app.update.installedVersion.includes('{{version}}'));
+  assert.ok(en.app.update.metadataUnavailable && pl.app.update.metadataUnavailable);
+});
+
 test('plural forms are complete: English one/other, Polish one/few/many/other', () => {
   for (const [name, entry] of groupBases(enFlat)) if (entry.plural) assert.deepEqual([...entry.forms].sort(), ['one', 'other'], `English ${name}`);
   for (const [name, entry] of groupBases(plFlat)) if (entry.plural) assert.deepEqual([...entry.forms].sort(), ['few', 'many', 'one', 'other'], `Polish ${name}`);

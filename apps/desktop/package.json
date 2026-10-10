@@ -1,6 +1,6 @@
 {
   "name": "@ds1tr/desktop",
-  "version": "0.38.4",
+  "version": "0.39.0",
   "license": "GPL-3.0-only",
   "private": true,
   "type": "module",
@@ -9,8 +9,10 @@
     "dev": "concurrently -k \"vite\" \"tsc -p electron/tsconfig.json --watch\" \"wait-on http://127.0.0.1:5173 && electron .\"",
     "build": "vite build --configLoader runner && tsc -p electron/tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p electron/tsconfig.json --noEmit",
-    "test": "node --test electron/settings.test.mjs electron/language.test.mjs electron/saveFile.test.mjs src/i18n/locales.test.mjs electron/launchGame.test.mjs electron/channel.test.mjs electron/updater.test.mjs electron/windowSecurity.test.mjs electron/gameDirectoryDialog.test.mjs src/ui/settingsCoverage.test.mjs src/ui/branding.test.mjs ../../tools/release/release-tools.test.mjs ../../tools/release/update-lib.test.mjs",
-    "package:win": "node scripts/package-win.mjs"
+    "test": "node --test electron/settings.test.mjs electron/language.test.mjs electron/saveFile.test.mjs src/i18n/locales.test.mjs electron/launchGame.test.mjs electron/channel.test.mjs electron/updater.test.mjs electron/updateRuntime.test.mjs electron/windowSecurity.test.mjs electron/gameDirectoryDialog.test.mjs src/ui/settingsCoverage.test.mjs src/ui/branding.test.mjs ../../tools/release/release-tools.test.mjs ../../tools/release/update-lib.test.mjs",
+    "package:win": "node scripts/package-win.mjs",
+    "package:win:github": "node scripts/package-win.mjs --distribution=github",
+    "package:win:nexus": "node scripts/package-win.mjs --distribution=nexus"
   },
   "dependencies": {
     "@ds1tr/contracts": "*",

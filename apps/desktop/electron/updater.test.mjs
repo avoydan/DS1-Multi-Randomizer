@@ -471,8 +471,8 @@ test('an installer that fails to start is reported and the application stays usa
   assert.equal(state.error.code, 'INSTALL_FAILED');
 });
 
-test('14. the renderer gets six invoke channels and one event, and the preload exposes nothing else about updates', () => {
-  assert.deepEqual([...UPDATE_INVOKE_CHANNELS], ['updates:get', 'updates:check', 'updates:download', 'updates:install', 'updates:open-release', 'updates:set-auto-check']);
+test('14. the renderer gets only the declared update invoke channels and one event, and the preload exposes no updater internals', () => {
+  assert.deepEqual([...UPDATE_INVOKE_CHANNELS], ['updates:get', 'updates:check', 'updates:download', 'updates:install', 'updates:open-release', 'updates:open-nexus-page', 'updates:set-auto-check']);
   assert.equal(UPDATE_STATE_EVENT, 'updates:state');
   const preload = readFileSync(fileURLToPath(new URL('./preload.cts', import.meta.url)), 'utf8');
   const used = [...preload.matchAll(/'(updates:[a-z-]+)'/gu)].map((match) => match[1]);

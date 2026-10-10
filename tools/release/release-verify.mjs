@@ -27,10 +27,13 @@ const { flags, values } = parseArguments(process.argv.slice(2));
 const requireSignature = flags.has('require-signature');
 const allowUntrustedRoot = flags.has('allow-untrusted-root');
 const publication = requireSignature || flags.has('publication');
+const distribution = values.get('distribution') ?? 'github';
+if (!['github', 'nexus'].includes(distribution)) throw new Error('--distribution must be github or nexus.');
 const requestedTag = values.get('tag') ?? null;
 const expectedPublisher = values.get('expected-publisher') ?? process.env.DS1TR_EXPECTED_PUBLISHER ?? '';
 const releaseDirectory = path.join(repositoryRoot, 'apps', 'desktop', 'release');
 const unpacked = path.resolve(values.get('unpacked') ?? path.join(releaseDirectory, 'win-unpacked'));
+const artifactDirectory = distribution === 'nexus' ? path.dirname(unpacked) : releaseDirectory;
 const policy = await readJson(path.join(repositoryRoot, 'tools', 'release', 'release-policy.json'));
 const desktopPackage = await readJson(path.join(repositoryRoot, 'apps', 'desktop', 'package.json'));
 const version = desktopPackage.version;
@@ -39,6 +42,7 @@ const findings = [];
 const fail = (area, message) => findings.push({ level: 'FAIL', area, message });
 const warn = (area, message) => findings.push({ level: 'WARN', area, message });
 const note = (area, message) => findings.push({ level: 'INFO', area, message });
+if (distribution === 'nexus' && publication) fail('distribution', 'Nexus staging builds must not be marked for GitHub publication.');
 
 // ---- structure ---------------------------------------------------------------------------------------------------------------------
 if (!(await exists(unpacked))) {
@@ -62,16 +66,21 @@ for (const entry of policy.ds1trExecutables) if (!has(entry.path)) fail('structu
 note('structure', `${files.length} files, ${binaries.length} executables or libraries (${policy.ds1trExecutables.length} authored by DS1TR, ${policy.thirdPartyBinaries.length} third-party)`);
 
 // ---- artifacts ---------------------------------------------------------------------------------------------------------------------
-const artifactNames = await readdir(releaseDirectory);
+const artifactNames = await readdir(artifactDirectory);
 const pick = (pattern) => artifactNames.filter((name) => new RegExp(`^${pattern.replace(/[.+^${}()|[\]\\]/gu, '\\$&').replace(/\*/gu, '.*')}$`, 'u').test(name));
-const installerName = values.get('installer') ?? pick(`DS1-Multi-Randomizer-${version}-Setup-x64.exe`)[0];
-const portableName = values.get('portable') ?? pick(`DS1-Multi-Randomizer-${version}-Portable-x64.exe`)[0];
+const installerSuffix = distribution === 'nexus' ? 'Nexus-Setup' : 'Setup';
+const portableSuffix = distribution === 'nexus' ? 'Nexus-Portable' : 'Portable';
+const installerName = values.get('installer') ?? pick(`DS1-Multi-Randomizer-${version}-${installerSuffix}-x64.exe`)[0];
+const portableName = values.get('portable') ?? pick(`DS1-Multi-Randomizer-${version}-${portableSuffix}-x64.exe`)[0];
 const artifacts = [];
 for (const [kind, name] of [['installer', installerName], ['portable', portableName]]) {
   if (!name) { (kind === 'installer' ? fail : warn)('artifacts', `no ${kind} for version ${version} in ${releaseDirectory}`); continue; }
-  const full = path.isAbsolute(name) ? name : path.join(releaseDirectory, name);
+  const full = path.isAbsolute(name) ? name : path.join(artifactDirectory, name);
   if (!(await exists(full))) { fail('artifacts', `${kind} not found: ${full}`); continue; }
-  artifacts.push({ kind, file: full, relative: path.basename(full) });
+  const relative = path.basename(full);
+  const expected = `DS1-Multi-Randomizer-${version}-${kind === 'installer' ? installerSuffix : portableSuffix}-x64.exe`;
+  if (distribution === 'nexus' && relative !== expected) fail('artifacts', `Nexus ${kind} name must be ${expected}, found ${relative}`);
+  artifacts.push({ kind, file: full, relative });
 }
 
 // ---- versions and metadata -------------------------------------------------------------------------------------------------------
@@ -106,21 +115,53 @@ if (shippedPin && (await readFile(path.join(unpacked, shippedPin), 'utf8')).repl
 // The channel (docs/RELEASE_TRUST.md): a public release must be a public-channel build (the internal test worlds hidden); development builds report theirs.
 const buildInfoFile = path.join(unpacked, 'resources', 'runtime', 'build-info.json');
 let channel = null;
-if (await exists(buildInfoFile)) { try { channel = JSON.parse(await readFile(buildInfoFile, 'utf8')).channel ?? null; } catch { channel = null; } }
+let buildDistribution = 'unavailable';
+let buildMode = null;
+if (await exists(buildInfoFile)) {
+  try {
+    const info = JSON.parse(await readFile(buildInfoFile, 'utf8'));
+    channel = info.channel ?? null;
+    buildMode = info.mode ?? null;
+    buildDistribution = info.distribution === undefined ? 'github' : info.distribution;
+  } catch { channel = null; }
+}
 if (requireSignature && channel !== 'public') fail('channel', `a public release must be a public-channel build; build-info.json says ${channel ?? 'nothing'}`);
+if (buildDistribution !== distribution) fail('distribution', `requested ${distribution} verification but build-info.json says ${buildDistribution}`);
+if (distribution === 'nexus' && channel !== 'public') fail('channel', `a Nexus package must use the public channel; build-info.json says ${channel ?? 'nothing'}`);
 // The packaged application has no menu bar and no telemetry: checked in the source it was built from.
 const main = await readFile(path.join(repositoryRoot, 'apps', 'desktop', 'electron', 'main.ts'), 'utf8');
 if (!/setApplicationMenu\(null\)|removeMenu\(\)|autoHideMenuBar/u.test(main)) fail('ui', 'the Electron menu is no longer removed in the packaged application (main.ts)');
 const builderConfig = await readFile(path.join(repositoryRoot, 'apps', 'desktop', 'electron-builder.yml'), 'utf8');
 if (!/requestedExecutionLevel:\s*asInvoker/u.test(builderConfig)) fail('privilege', 'electron-builder.yml no longer pins requestedExecutionLevel: asInvoker');
 if (!/perMachine:\s*false/u.test(builderConfig)) fail('privilege', 'the installer is no longer per-user (nsis.perMachine: false)');
+if (distribution === 'nexus') {
+  const nexusConfig = await readFile(path.join(repositoryRoot, 'apps', 'desktop', 'electron-builder.nexus.yml'), 'utf8');
+  if (!/^publish:\s*null\s*$/mu.test(nexusConfig)) fail('distribution', 'the Nexus builder config must clear GitHub publishing metadata');
+  if (buildMode !== 'nexus-local-unsigned') fail('distribution', `Nexus build mode must be nexus-local-unsigned, build-info.json says ${buildMode ?? 'nothing'}`);
+}
 
 // ---- updates (docs/AUTO_UPDATE.md) ---------------------------------------------------------------------------------------------------
 const sourceTs = parseUpdateSourceTs(await readFile(path.join(repositoryRoot, 'apps', 'desktop', 'electron', 'updateSource.ts'), 'utf8'));
 const appUpdateFile = path.join(unpacked, 'resources', 'app-update.yml');
 const appUpdate = (await exists(appUpdateFile)) ? parseFlatYaml(await readFile(appUpdateFile, 'utf8')) : null;
-if (!appUpdate) (publication ? fail : warn)('updates', 'resources/app-update.yml is missing from the package: an installed copy would not know where to look for updates');
-for (const finding of checkUpdateConfiguration({ sourceTs, builderPublish: parseBuilderPublish(builderConfig), updaterText: await readFile(path.join(repositoryRoot, 'apps', 'desktop', 'electron', 'updater.ts'), 'utf8'), appUpdate, publication })) findings.push(finding);
+if (distribution === 'github') {
+  if (!appUpdate) (publication ? fail : warn)('updates', 'resources/app-update.yml is missing from the package: an installed copy would not know where to look for updates');
+  for (const finding of checkUpdateConfiguration({ sourceTs, builderPublish: parseBuilderPublish(builderConfig), updaterText: await readFile(path.join(repositoryRoot, 'apps', 'desktop', 'electron', 'updater.ts'), 'utf8'), appUpdate, publication })) findings.push(finding);
+} else {
+  if (appUpdate) fail('updates', 'Nexus package contains resources/app-update.yml, which would advertise the GitHub update source');
+  const mainSource = await readFile(path.join(repositoryRoot, 'apps', 'desktop', 'electron', 'main.ts'), 'utf8');
+  if (/^\s*import\s+(?!type\b).*?(?:electron-updater|githubReleaseApi|updateSource|updater\.js)/mu.test(mainSource)) fail('updates', 'the Electron main process eagerly imports GitHub updater code');
+  if (!/initializeGithubUpdates\(buildDistribution, async \(\) =>/u.test(mainSource)) fail('updates', 'the GitHub updater is not behind the distribution gate');
+  if (!/shouldScheduleUpdateChecks\(buildDistribution, updates !== null\)/u.test(mainSource)) fail('updates', 'update timers are not gated by the distribution and updater availability');
+  const nexusAsarPath = path.join(unpacked, 'resources', 'app.asar');
+  if (await exists(nexusAsarPath)) {
+    const nexusAsar = createRequire(path.join(repositoryRoot, 'package.json'))('@electron/asar');
+    const packagedMain = nexusAsar.extractFile(nexusAsarPath, 'dist-electron/main.js').toString('utf8');
+    if (/^\s*import\s+.*?\s+from\s+['"](?:electron-updater|\.\/githubReleaseApi\.js|\.\/updateSource\.js|\.\/updater\.js)['"]/mu.test(packagedMain)) fail('updates', 'the packaged Nexus main process eagerly imports GitHub updater code');
+    else note('updates', 'the packaged Nexus main entry has no eager updater or GitHub API imports');
+  }
+  note('updates', 'Nexus application updates are disabled: updater modules are lazy-loaded only for GitHub builds, timers are gated, and app-update.yml is absent');
+}
 if (requestedTag !== null && versionOfTag(requestedTag) !== version) fail('version', `the requested tag ${requestedTag} is not v${version}: a release must carry the version that is packaged`);
 if (publication && channel !== 'public') fail('channel', `a build to be published must be a public-channel build; build-info.json says ${channel ?? 'nothing'}`);
 const buildInfoText = (await exists(buildInfoFile)) ? await readFile(buildInfoFile, 'utf8') : '';
@@ -138,12 +179,16 @@ if (installerArtifact && (await exists(latestFile))) {
   for (const finding of checkLatestYml({ latest, version, installerName: installerArtifact.relative, installerSha512, installerSize: (await stat(installerArtifact.file)).size, tag: requestedTag, blockmapPresent })) findings.push(finding);
   updateAssets.latest = { version: latest.version, path: latest.path, sha512: latest.sha512, releaseDate: latest.releaseDate };
   updateAssets.blockmap = blockmapPresent ? `${installerArtifact.relative}.blockmap` : null;
-} else if (publication) {
+} else if (distribution === 'github' && publication) {
   fail('updates', installerArtifact ? 'latest.yml was not produced next to the installer: installed clients could not see this release' : 'no installer, so no latest.yml to check');
-} else {
+} else if (distribution === 'github') {
   warn('updates', 'no latest.yml next to the installer (electron-builder writes it with the installer; a development run without the publish block does not)');
+} else if (await exists(latestFile)) {
+  note('updates', 'Nexus package has inert electron-builder latest.yml metadata but no app-update.yml or runtime updater initialization');
+} else {
+  note('updates', 'Nexus package has no latest.yml update metadata');
 }
-// The shell imports electron-updater at start-up: it must be inside app.asar together with everything it requires.
+// electron-updater remains bundled for the GitHub flavor; Nexus code never initializes or imports it at run time.
 const asarFile = path.join(unpacked, 'resources', 'app.asar');
 if (await exists(asarFile)) {
   const asar = createRequire(path.join(repositoryRoot, 'package.json'))('@electron/asar');
@@ -205,15 +250,21 @@ const manifest = {
   version,
   generationProfile: /CURRENT_GENERATION_PROFILE\s*=\s*([A-Z0-9_]+)/u.test(await readFile(path.join(repositoryRoot, 'packages', 'contracts', 'src', 'generation.ts'), 'utf8')) ? 'ds1tr-gen-v1 (the profile of every Seed Code made so far; later profiles stay runnable)' : 'unknown',
   mode: requireSignature ? 'public' : publication ? 'unsigned-release' : 'development',
+  buildMode,
   channel,
   signatureState: overall,
   expectedPublisher: expectedPublisher || null,
   versions: { desktop: version, backend: (await readJson(path.join(repositoryRoot, 'apps', 'backend', 'package.json'))).version, contracts: (await readJson(path.join(repositoryRoot, 'packages', 'contracts', 'package.json'))).version, foghost: fogVersion, randomizer: randomizerVersion },
   fogPin: { foghostPinnedCommit: pinCommit, worldDataCommit },
-  updates: {
+  distribution,
+  electron: desktopPackage.devDependencies.electron,
+  updates: distribution === 'github' ? {
     provider: sourceTs.provider, owner: sourceTs.owner, repo: sourceTs.repo, sourceConfigured: sourceTs.owner !== 'REPLACE_WITH_GITHUB_OWNER',
-    tag: requestedTag, publication, latestYml: updateAssets.latest, blockmap: updateAssets.blockmap,
+    networkDisabled: false, tag: requestedTag, publication, latestYml: updateAssets.latest, blockmap: updateAssets.blockmap,
     appUpdate: appUpdate ? { provider: appUpdate.provider ?? null, owner: appUpdate.owner ?? null, repo: appUpdate.repo ?? null, publisherName: appUpdate.publisherName ?? null } : null,
+  } : {
+    provider: null, owner: null, repo: null, sourceConfigured: false, networkDisabled: true,
+    tag: null, publication: false, latestYml: null, blockmap: null, appUpdate: null,
   },
   provenance: await provenance(),
   artifacts: [],
@@ -234,6 +285,7 @@ for (const entry of thirdParty) manifest.thirdPartyBinaries.push({ path: entry.l
 if (flags.has('json')) console.log(JSON.stringify({ manifest, findings, missingBeforePublic }, null, 2));
 else {
   console.log(`DS1 Multi Randomizer ${version} - release verification (${manifest.mode} mode)`);
+  console.log(`Distribution: ${distribution}; channel: ${channel ?? 'unknown'}; Electron: ${desktopPackage.devDependencies.electron}`);
   console.log(`Signature state: ${overall}`);
   for (const [label, state] of states) console.log(`  ${state.padEnd(30)} ${label}`);
   for (const artifact of manifest.artifacts) console.log(`  ${artifact.kind.padEnd(10)} ${artifact.file}  ${artifact.size} bytes  sha256 ${artifact.sha256}`);

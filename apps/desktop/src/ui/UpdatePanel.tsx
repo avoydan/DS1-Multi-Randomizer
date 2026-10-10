@@ -30,7 +30,7 @@ function useUpdateWords(state: UpdateState | null, refused: string | null) {
 function UpdateActions({ updates, later }: { updates: UpdatesApi; later?: () => void }) {
   const { t } = useTranslation();
   const { state } = updates;
-  if (!state || state.phase === 'unsupported') return null;
+  if (!state || state.distribution !== 'github' || state.phase === 'unsupported') return null;
   const manual = state.capability === 'manual';
   const working = state.phase === 'checking' || state.phase === 'downloading' || state.phase === 'installing';
   return (
@@ -56,7 +56,26 @@ export function UpdateCard({ updates, showAutoCheck }: { updates: UpdatesApi; sh
   const { state } = updates;
   const words = useUpdateWords(state, updates.refused);
   const working = state?.phase === 'checking' || state?.phase === 'downloading' || state?.phase === 'installing';
-  const canCheck = state !== null && state.phase !== 'unsupported';
+  if (state?.distribution === 'nexus') {
+    return (
+      <section className="card update-card" aria-label={t('app.update.title')}>
+        <h2>{t('app.update.title')}</h2>
+        <p>{t('app.update.nexus.note')}</p>
+        <p className="update-line" role="status">{t('app.update.installedVersion', { version: state.currentVersion })}</p>
+        {state.nexusPageUrl && <div className="run-actions"><button type="button" className="secondary" onClick={updates.openNexusPage}>{t('app.update.nexus.openPage')}</button></div>}
+      </section>
+    );
+  }
+  if (state?.distribution === 'unavailable') {
+    return (
+      <section className="card update-card" aria-label={t('app.update.title')}>
+        <h2>{t('app.update.title')}</h2>
+        <p className="update-line" role="status">{t('app.update.metadataUnavailable')}</p>
+        <p>{t('app.update.installedVersion', { version: state.currentVersion })}</p>
+      </section>
+    );
+  }
+  const canCheck = state !== null && state.distribution === 'github' && state.phase !== 'unsupported';
   return (
     <section className="card update-card" aria-label={t('app.update.title')}>
       <h2>{t('app.update.title')}</h2>
@@ -85,7 +104,7 @@ export function UpdateNotice({ updates, hidden }: { updates: UpdatesApi; hidden:
   const [dismissed, setDismissed] = useState<string | null>(null);
   const { state } = updates;
   const words = useUpdateWords(state, updates.refused);
-  if (hidden || !state || !['available', 'downloading', 'downloaded'].includes(state.phase) || state.availableVersion === null) return null;
+  if (hidden || !state || state.distribution !== 'github' || !['available', 'downloading', 'downloaded'].includes(state.phase) || state.availableVersion === null) return null;
   const key = `${state.phase}:${state.availableVersion}`;
   if (dismissed === key) return null;
   return (

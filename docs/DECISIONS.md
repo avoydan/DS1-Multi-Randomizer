@@ -1,5 +1,15 @@
 # Decisions
 
+## Distribution is an immutable build capability, independent of update channel
+
+Date: 2026-10-10
+
+Represent `distribution: github | nexus` separately from `channel: public | internal` in packaged build metadata. GitHub remains the default for schema-valid legacy metadata with no distribution field. Missing or malformed metadata and an explicitly invalid distribution fail closed: the app reports updates unavailable and does not load updater code.
+
+Only a positively identified GitHub distribution dynamically loads `electron-updater`, the GitHub source, and the no-stable-release API confirmation helper, then configures the existing channel policy and schedules its checks. Nexus uses a local inert IPC implementation, keeps the user's saved `autoCheck` preference untouched, and exposes no update controls. An optional Nexus page URL is build-time configuration validated against the official HTTPS Nexus host and DSR mod-page path; unset means no button.
+
+The variants share `appId`, product metadata, user-data identity, runtime, and source tree. Nexus packaging clears electron-builder's publish configuration and uses separate local artifact names and output path; the GitHub artifact contract stays unchanged. This gate covers application updates only. The Fog data downloader remains a separate subsystem and is unchanged.
+
 ## GitHub prerelease updates are limited to the internal build channel
 
 Date: 2026-10-09

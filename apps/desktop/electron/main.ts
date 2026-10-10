@@ -1,5 +1,4 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, shell, type IpcMainInvokeEvent } from 'electron';
-import electronUpdater from 'electron-updater';
 import { spawn, execFile, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { readFile, writeFile, mkdir, access } from 'node:fs/promises';
@@ -9,12 +8,11 @@ import { migrateSettings, normalizeGamePath, type StoredSettings } from './setti
 import { launchGame } from './launchGame.js';
 import { DesktopLog, installModeOf } from './appLog.js';
 import { MAX_SAVE_BYTES, SAVE_KINDS, parseSaveRequest, saveBytes } from './saveFile.js';
-import { isDevToolsShortcut, parseBuildChannel, type BuildChannel } from './channel.js';
-import { UPDATE_SOURCE } from './updateSource.js';
-import { confirmNoStableReleaseViaGitHubApi } from './githubReleaseApi.js';
+import { isDevToolsShortcut, parseRuntimeBuildInfo, type BuildChannel, type BuildDistribution } from './channel.js';
 import { handleWindowOpenRequest, isAllowedRendererNavigation } from './windowSecurity.js';
 import { createGameDirectoryPicker } from './gameDirectoryDialog.js';
-import { PERIODIC_CHECK_MS, STARTUP_CHECK_DELAY_MS, UPDATE_STATE_EVENT, UpdateController, type UpdaterLike } from './updater.js';
+import type { UpdateController, UpdateState, UpdaterLike } from './updater.js';
+import { createInertUpdateOperations, initializeGithubUpdates, shouldScheduleUpdateChecks, unavailableUpdateState, UPDATE_STATE_EVENT } from './updateRuntime.js';
 import { mainMessage, normalizeLanguageSetting, resolveLanguage, type AppLanguage, type LanguageSetting, type MainMessageKey } from './language.js';
 
 const currentDirectory = path.dirname(fileURLToPath(import.meta.url));
@@ -29,6 +27,10 @@ let quitting = false;
 let mainWindow: BrowserWindow | null = null;
 /** Application updates (docs/AUTO_UPDATE.md): the policy lives in updater.ts; this file only wires the real parts. */
 let updates: UpdateController | null = null;
+let buildDistribution: BuildDistribution = 'github';
+let nexusPageUrl: string | null = null;
+let updateTiming: { PERIODIC_CHECK_MS: number; STARTUP_CHECK_DELAY_MS: number } | null = null;
+let inertUpdates: ReturnType<typeof createInertUpdateOperations> | null = null;
 /** Whether the internal test tools are shown: always in an internal or development build, and in a public build only after the optional shortcut (this session only). */
 let buildChannel: BuildChannel = 'public';
 let devToolsShown = false;
@@ -48,9 +50,14 @@ async function saveSettings(): Promise<void> {
   } catch { /* settings are a convenience; the app works without them */ }
 }
 
-async function loadBuildChannel(): Promise<void> {
-  if (!app.isPackaged) { buildChannel = 'internal'; devToolsShown = true; return; }
-  try { buildChannel = parseBuildChannel(await readFile(path.join(runtimeRoot, 'build-info.json'), 'utf8')); } catch { buildChannel = parseBuildChannel(null); }
+async function loadBuildInfo(): Promise<void> {
+  if (!app.isPackaged) { buildChannel = 'internal'; buildDistribution = 'github'; devToolsShown = true; return; }
+  let buildInfoText: string | null = null;
+  try { buildInfoText = await readFile(path.join(runtimeRoot, 'build-info.json'), 'utf8'); } catch { /* invalid metadata disables application update behavior */ }
+  const buildInfo = parseRuntimeBuildInfo(buildInfoText);
+  buildChannel = buildInfo.channel;
+  buildDistribution = buildInfo.distribution;
+  nexusPageUrl = buildInfo.nexusPageUrl;
   devToolsShown = buildChannel === 'internal';
 }
 
@@ -152,38 +159,48 @@ async function backendHasActivity(): Promise<boolean> {
   } catch { return true; }
 }
 
-function createUpdates(): UpdateController {
-  const controller = new UpdateController({
-    createUpdater: () => electronUpdater.autoUpdater as unknown as UpdaterLike,
-    currentVersion: app.getVersion(),
-    mode: installModeOf(app.isPackaged, process.env),
-    buildChannel,
-    source: UPDATE_SOURCE,
-    confirmNoStableRelease: confirmNoStableReleaseViaGitHubApi,
-    prefs: {
-      get: () => ({ autoCheck: settings.updates?.autoCheck !== false, lastCheckAt: settings.updates?.lastCheckAt ?? null, lastCheckOk: settings.updates?.lastCheckOk === true }),
-      set: async (patch) => {
-        const next = { ...settings.updates };
-        if ('autoCheck' in patch) { if (patch.autoCheck === false) next.autoCheck = false; else delete next.autoCheck; }
-        if (patch.lastCheckAt !== undefined) next.lastCheckAt = patch.lastCheckAt ?? undefined;
-        if (patch.lastCheckOk !== undefined) next.lastCheckOk = patch.lastCheckOk;
-        const { updates: _previous, ...rest } = settings;
-        settings = Object.keys(next).length > 0 ? { ...rest, updates: next } : rest;
-        await saveSettings();
+async function createUpdates(): Promise<UpdateController | null> {
+  return initializeGithubUpdates(buildDistribution, async () => {
+    // Keep every updater/network module behind the immutable build metadata gate. A Nexus or invalid-metadata process does not load electron-updater or GitHub API code.
+    const [{ default: electronUpdater }, { UPDATE_SOURCE }, { confirmNoStableReleaseViaGitHubApi }, updaterModule] = await Promise.all([
+      import('electron-updater'), import('./updateSource.js'), import('./githubReleaseApi.js'), import('./updater.js'),
+    ]);
+    updateTiming = { PERIODIC_CHECK_MS: updaterModule.PERIODIC_CHECK_MS, STARTUP_CHECK_DELAY_MS: updaterModule.STARTUP_CHECK_DELAY_MS };
+    const controller = new updaterModule.UpdateController({
+      createUpdater: () => electronUpdater.autoUpdater as unknown as UpdaterLike,
+      currentVersion: app.getVersion(),
+      mode: installModeOf(app.isPackaged, process.env),
+      buildChannel,
+      distribution: 'github',
+      source: UPDATE_SOURCE,
+      confirmNoStableRelease: confirmNoStableReleaseViaGitHubApi,
+      prefs: {
+        get: () => ({ autoCheck: settings.updates?.autoCheck !== false, lastCheckAt: settings.updates?.lastCheckAt ?? null, lastCheckOk: settings.updates?.lastCheckOk === true }),
+        set: async (patch) => {
+          const next = { ...settings.updates };
+          if ('autoCheck' in patch) { if (patch.autoCheck === false) next.autoCheck = false; else delete next.autoCheck; }
+          if (patch.lastCheckAt !== undefined) next.lastCheckAt = patch.lastCheckAt ?? undefined;
+          if (patch.lastCheckOk !== undefined) next.lastCheckOk = patch.lastCheckOk;
+          const { updates: _previous, ...rest } = settings;
+          settings = Object.keys(next).length > 0 ? { ...rest, updates: next } : rest;
+          await saveSettings();
+        },
       },
-    },
-    isOperationActive: backendHasActivity,
-    openExternal: (url) => shell.openExternal(url),
-    log: (level, message, code) => desktopLog.write(level, message, code),
+      isOperationActive: backendHasActivity,
+      openExternal: (url) => shell.openExternal(url),
+      log: (level, message, code) => desktopLog.write(level, message, code),
+    });
+    controller.subscribe((state) => { mainWindow?.webContents.send(UPDATE_STATE_EVENT, state); });
+    return controller;
   });
-  controller.subscribe((state) => { mainWindow?.webContents.send(UPDATE_STATE_EVENT, state); });
-  return controller;
 }
 
 /** The first automatic check waits until the window has been up for a while; a long-running session checks again every few hours (the 24-hour throttle decides whether it really runs). */
 function scheduleUpdateChecks(): void {
-  setTimeout(() => { void updates?.maybeAutoCheck(); }, STARTUP_CHECK_DELAY_MS).unref();
-  setInterval(() => { void updates?.maybeAutoCheck(); }, PERIODIC_CHECK_MS).unref();
+  if (!shouldScheduleUpdateChecks(buildDistribution, updates !== null)) return;
+  if (!updateTiming) return;
+  setTimeout(() => { void updates?.maybeAutoCheck(); }, updateTiming.STARTUP_CHECK_DELAY_MS).unref();
+  setInterval(() => { void updates?.maybeAutoCheck(); }, updateTiming.PERIODIC_CHECK_MS).unref();
 }
 
 /** The DS1TR icon: shipped next to the runtime when packaged, in build/ during development. */
@@ -282,12 +299,23 @@ ipcMain.handle('runtime:connection', () => ({
 }));
 // Updates: a narrow surface. Only the main window may call it, nothing takes a path or an address, and the renderer never touches the updater object.
 const fromMainWindow = (event: IpcMainInvokeEvent): boolean => mainWindow !== null && event.sender === mainWindow.webContents;
-ipcMain.handle('updates:get', (event) => (fromMainWindow(event) ? updates?.getState() ?? null : null));
-ipcMain.handle('updates:check', (event) => (fromMainWindow(event) ? updates?.check({ manual: true }) ?? null : null));
-ipcMain.handle('updates:download', (event) => (fromMainWindow(event) ? updates?.download() ?? null : null));
-ipcMain.handle('updates:install', async (event) => (fromMainWindow(event) && updates ? updates.install() : { ok: false, code: 'NOT_SUPPORTED' }));
-ipcMain.handle('updates:open-release', async (event) => (fromMainWindow(event) && updates ? updates.openReleasePage() : false));
-ipcMain.handle('updates:set-auto-check', async (event, enabled: unknown) => (fromMainWindow(event) && updates && typeof enabled === 'boolean' ? updates.setAutoCheck(enabled) : null));
+function currentUpdateState(): UpdateState {
+  if (updates) return updates.getState();
+  if (inertUpdates) return inertUpdates.getState();
+  const distribution = buildDistribution === 'nexus' ? 'nexus' : 'unavailable';
+  return unavailableUpdateState({ distribution, currentVersion: app.getVersion(), autoCheck: settings.updates?.autoCheck !== false, nexusPageUrl });
+}
+ipcMain.handle('updates:get', (event) => (fromMainWindow(event) ? (updates ?? inertUpdates)?.getState() ?? currentUpdateState() : null));
+ipcMain.handle('updates:check', (event) => (fromMainWindow(event) ? updates ? updates.check({ manual: true }) : inertUpdates?.check() ?? currentUpdateState() : null));
+ipcMain.handle('updates:download', (event) => (fromMainWindow(event) ? updates?.download() ?? inertUpdates?.download() ?? currentUpdateState() : null));
+ipcMain.handle('updates:install', async (event) => (fromMainWindow(event) ? updates ? updates.install() : inertUpdates?.install() ?? { ok: false, code: 'NOT_SUPPORTED', state: currentUpdateState() } : { ok: false, code: 'NOT_SUPPORTED' }));
+ipcMain.handle('updates:open-release', async (event) => (fromMainWindow(event) ? updates?.openReleasePage() ?? inertUpdates?.openReleasePage() ?? false : false));
+ipcMain.handle('updates:open-nexus-page', async (event) => {
+  if (!fromMainWindow(event) || buildDistribution !== 'nexus' || !nexusPageUrl) return false;
+  await shell.openExternal(nexusPageUrl);
+  return true;
+});
+ipcMain.handle('updates:set-auto-check', async (event, enabled: unknown) => (fromMainWindow(event) && typeof enabled === 'boolean' ? updates ? updates.setAutoCheck(enabled) : inertUpdates?.setAutoCheck(enabled) ?? currentUpdateState() : null));
 ipcMain.handle('game:launch', (_event, gamePath: string) => launchGame(typeof gamePath === 'string' ? gamePath : '', {
   openExternal: (url) => shell.openExternal(url),
   startDetached: async (executable, directory) => {
@@ -298,11 +326,15 @@ ipcMain.handle('game:launch', (_event, gamePath: string) => launchGame(typeof ga
 }));
 
 app.whenReady().then(async () => {
-  await loadBuildChannel();
+  await loadBuildInfo();
   await loadSettings();
-  desktopLog.write('info', `DS1 Multi Randomizer ${app.getVersion()} started (${installModeOf(app.isPackaged, process.env)}, ${buildChannel} channel), language ${currentLanguage()}`);
+  if (buildDistribution !== 'github') {
+    const distribution = buildDistribution === 'nexus' ? 'nexus' : 'unavailable';
+    inertUpdates = createInertUpdateOperations(unavailableUpdateState({ distribution, currentVersion: app.getVersion(), autoCheck: settings.updates?.autoCheck !== false, nexusPageUrl }));
+  }
+  desktopLog.write('info', `DS1 Multi Randomizer ${app.getVersion()} started (${installModeOf(app.isPackaged, process.env)}, ${buildChannel} channel, ${buildDistribution} distribution), language ${currentLanguage()}`);
   await startBackend();
-  updates = createUpdates();
+  updates = await createUpdates();
   await createWindow();
   scheduleUpdateChecks();
 }).catch((error) => { dialog.showErrorBox(say('startupFailedTitle'), String(error)); app.quit(); });

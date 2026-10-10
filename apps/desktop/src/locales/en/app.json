@@ -219,6 +219,12 @@
   "update": {
     "title": "Updates",
     "note": "DS1 Multi Randomizer looks for new versions on GitHub. Nothing is installed without your click, and a failed check never stops you from using the app.",
+    "nexus": {
+      "note": "This build was distributed through Nexus Mods. Updates are published on the DS1 Multi Randomizer page on Nexus Mods.",
+      "openPage": "Open Nexus Mods page"
+    },
+    "installedVersion": "Installed version: {{version}}",
+    "metadataUnavailable": "Update information is unavailable because this build's distribution metadata could not be verified.",
     "autoCheck": "Automatic update checks",
     "autoCheckNote": "Checks at most once a day while the app is open. Turn it off to check only by hand.",
     "check": "Check for updates",

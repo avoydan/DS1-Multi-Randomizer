@@ -33,6 +33,23 @@ test('the packager is per-user, never elevates, does not ship an elevation helpe
   assert.doesNotMatch(active, /(password|CSC_|\.pfx)/iu, 'no credential material in the configuration (comments only name the variables)');
 });
 
+test('Nexus packaging is a separate unsigned local target with no inherited GitHub publish metadata', async () => {
+  const packageJson = JSON.parse(await read('apps', 'desktop', 'package.json'));
+  const nexusConfig = await read('apps', 'desktop', 'electron-builder.nexus.yml');
+  const packager = await read('apps', 'desktop', 'scripts', 'package-win.mjs');
+  const verifier = await read('tools', 'release', 'release-verify.mjs');
+  assert.equal(packageJson.version, '0.39.0');
+  assert.equal(packageJson.scripts['package:win:github'], 'node scripts/package-win.mjs --distribution=github');
+  assert.equal(packageJson.scripts['package:win:nexus'], 'node scripts/package-win.mjs --distribution=nexus');
+  assert.match(nexusConfig, /^extends: electron-builder\.yml$/mu);
+  assert.match(nexusConfig, /^publish: null$/mu);
+  assert.match(packager, /mode: distribution === 'nexus' \? 'nexus-local-unsigned'/u);
+  assert.match(packager, /release\/nexus/u);
+  assert.match(packager, /Nexus-Setup-x64/u);
+  assert.match(verifier, /Nexus package contains resources\/app-update\.yml/u);
+  assert.match(verifier, /networkDisabled: true/u);
+});
+
 test('a public release build refuses to start without signing credentials, before it builds anything', async () => {
   const environment = { ...process.env };
   for (const name of Object.keys(environment)) if (/^(CSC_|WIN_CSC_|DS1TR_SIGN_|DS1TR_ARTIFACT_SIGNING|DS1TR_EXPECTED_PUBLISHER|AZURE_)/u.test(name)) delete environment[name];
@@ -56,9 +73,10 @@ test('signing material can never be committed by accident', async () => {
 });
 
 test('arguments: flags, valued options and positionals', () => {
-  const { flags, values, positional } = parseArguments(['--public', '--expected-publisher', 'ACME', 'file.exe', '--allow-untrusted-root']);
+  const { flags, values, positional } = parseArguments(['--public', '--expected-publisher', 'ACME', '--distribution', 'nexus', 'file.exe', '--allow-untrusted-root']);
   assert.ok(flags.has('public') && flags.has('allow-untrusted-root'));
   assert.equal(values.get('expected-publisher'), 'ACME');
+  assert.equal(values.get('distribution'), 'nexus');
   assert.deepEqual(positional, ['file.exe']);
 });
 

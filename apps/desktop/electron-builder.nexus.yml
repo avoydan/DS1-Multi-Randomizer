@@ -1,0 +1,4 @@
+# Nexus distribution inherits the application identity and Windows hardening from the GitHub config.
+# Clearing publish prevents electron-builder from writing a GitHub app-update.yml into this package.
+extends: electron-builder.yml
+publish: null

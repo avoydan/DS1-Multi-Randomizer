@@ -1,6 +1,6 @@
 # Nexus Mods publication draft
 
-This is copy-ready page text and a launch checklist. **Do not upload or publish the current executable yet.** Nexus Mods' current [File Submission Guidelines](https://help.nexusmods.com/article/28-file-submission-guidelines) say internet-connected executables that download or send information/files are not allowed unless that network behavior is crucial to the utility, and explicitly say auto-update functionality does not qualify as crucial. They advise developers whose functionality depends on network transfers to contact staff and provide reasoning and source code. This app checks GitHub Releases for updates and can download 40 pinned Fog data files when needed, so the owner must obtain written staff guidance for this exact behavior before hosting a binary. The [Terms of Service](https://help.nexusmods.com/article/18-terms-of-service) also grant Nexus Mods and its partners a broad, transferable license to uploaded content; the owner must review that grant against GPL and upstream component rights before accepting it. The source-code page can be prepared locally; no Nexus account action or Terms acceptance was performed.
+This is copy-ready page text and a launch checklist. **Do not upload or publish the current executable yet.** Nexus Mods' current [File Submission Guidelines](https://help.nexusmods.com/article/28-file-submission-guidelines) say internet-connected executables that download or send information/files are not allowed unless that network behavior is crucial to the utility, and explicitly say auto-update functionality does not qualify as crucial. The Nexus distribution described here removes application update checks and downloads entirely. It still downloads 40 pinned Fog data files when needed for world randomization; this is a separate data transfer and may still require written staff guidance before hosting a binary. The [Terms of Service](https://help.nexusmods.com/article/18-terms-of-service) also grant Nexus Mods and its partners a broad, transferable license to uploaded content; the owner must review that grant against GPL and upstream component rights before accepting it. The source-code page can be prepared locally; no Nexus account action or Terms acceptance was performed.
 
 The draft description was prepared with AI assistance. Nexus's current categorization identifies AI-assisted/generated mod-page descriptions as **AI Media**; include that tag if this wording or an edited version is posted. Review whether the AI assistance in this task's code change also falls under **AI Assisted** and use that tag if required by Nexus staff. The project has substantial human-led source history and can provide it for review; do not claim the page or code was created without AI assistance.
 
@@ -52,7 +52,9 @@ The installer is the recommended package. The portable build extracts to a tempo
 
 ### Updating
 
-The app checks public GitHub release metadata manually and, when enabled in settings, automatically. Automatic checks can be turned off. Update files are downloaded only after choosing **Download update**; installation requires **Restart and update**. The current build also retrieves pinned Fog data over HTTPS the first time Fog/world randomization needs files that are not already cached. Nexus Mods staff approval for this network behavior is a prerequisite to hosting a binary here.
+The Nexus distribution does not automatically check for application updates, query GitHub for newer application versions, or download application updates. Its Updates section shows the installed version and says that new versions are obtained through the DS1 Multi Randomizer page on Nexus Mods. If a canonical Nexus page URL is configured in a future build, the section may offer a button that opens that page in the system browser. The user's existing automatic-check preference is retained but ignored by the Nexus build.
+
+**Application update network and Fog data network are separate.** The Nexus build disables the first. Fog/world randomization may still retrieve pinned Fog data over HTTPS the first time it needs files that are not already cached. The app cannot perform that randomization without those files. This remaining transfer is not described as offline behavior and should be included in any staff policy request.
 
 ### Uninstall
 
@@ -68,7 +70,7 @@ Open the app and choose **Restore original game**. The app restores managed file
 - Do not use the app while the game is running or while another tool is changing the same game files.
 - Only the game files managed by the randomizer are restored; unrelated files are not changed.
 - Some settings are limited by the game's data structure and are explained in the app's tooltips.
-- An internet connection is needed for update checks and, when the Fog cache is empty, for the pinned Fog data download. Generated game files are otherwise local.
+- An internet connection is needed for the pinned Fog data download when the cache is empty. The Nexus distribution does not make application update requests. Generated game files are otherwise local.
 
 ### Online-play warning and save backups
 
@@ -84,7 +86,7 @@ Do not connect to online play with modified game data. Back up important saves b
 
 **Why does Windows show a publisher or antivirus warning?** Public releases are currently unsigned. Check the published SHA-256 and use the vendor's official false-positive process if a specific file appears incorrectly detected. Do not disable protection or add an exclusion.
 
-**Does the app send my settings, saves, or game files to the developer?** No. The app has no telemetry, analytics, account, crash reporting, or automatic support upload. GitHub receives ordinary network metadata for release checks and pinned Fog data downloads.
+**Does the app send my settings, saves, or game files to the developer?** No. The app has no telemetry, analytics, account, crash reporting, or automatic support upload. A GitHub distribution contacts GitHub Releases for application updates; the Nexus distribution does not. Both distributions may contact the pinned Fog data source when that cache is empty.
 
 ### Source code and issue tracker
 
@@ -104,7 +106,7 @@ The project source is available under GPL-3.0-only. Reuse and redistribution of 
 
 ### Version and checksums
 
-When approved for Nexus hosting, identify the exact version and link the matching public source tag. The release's `SHA256SUMS.txt` lists the checksums for the published Setup, Portable, blockmap, update metadata, and release manifest. On Windows, calculate a file hash with `Get-FileHash <filename> -Algorithm SHA256` and compare the result to the same filename in the sums file.
+When approved for Nexus hosting, identify the exact version and link the matching public source tag. The GitHub distribution includes `SHA256SUMS.txt` and `latest.yml`; the locally staged Nexus build has separate Nexus-named Setup and Portable files and a distribution-aware release manifest, with no GitHub update metadata. If Nexus publication is later approved, provide checksums for the exact files actually uploaded. On Windows, calculate a file hash with `Get-FileHash <filename> -Algorithm SHA256`.
 
 ### Changelog template
 
@@ -142,4 +144,4 @@ No official guideline reviewed here prefers an installer EXE or portable EXE for
 
 ### Suggested support request
 
-> We maintain DS1 Multi Randomizer, a GPL-3.0-only Windows tool for Dark Souls Remastered. Its source is https://github.com/avoydan/DS1-Multi-Randomizer. It performs optional GitHub release checks (automatic checks can be disabled; downloads require user action) and downloads 40 pinned, SHA-256-verified FogMod data files when the user selects Fog/world randomization and the local cache is absent. It does not upload game files, settings, saves, or support bundles. The app cannot perform Fog randomization without those external data files. Could Nexus review this exact network behavior and advise whether the tool may be hosted, and whether any changes are required? We have not uploaded a binary or published a page pending your guidance.
+> We maintain DS1 Multi Randomizer, a GPL-3.0-only Windows tool for Dark Souls Remastered. Its source is https://github.com/avoydan/DS1-Multi-Randomizer. We are preparing a Nexus distribution that does not initialize its application updater, query GitHub for application versions, or download application updates. Separately, when a user selects Fog/world randomization and the local cache is absent, the app downloads 40 pinned, SHA-256-verified FogMod data files from the FogMod source; Fog randomization cannot run without those files. The app does not upload game files, settings, saves, or support bundles. Could Nexus review this remaining data-download behavior and advise whether this exact Nexus build may be hosted, and whether any changes are required? We have not uploaded a binary or published a page pending your guidance.

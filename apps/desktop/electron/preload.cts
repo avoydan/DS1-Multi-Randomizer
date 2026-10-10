@@ -14,13 +14,14 @@ contextBridge.exposeInMainWorld('desktop', {
     ipcRenderer.on('dev-tools:changed', handler);
     return () => { ipcRenderer.removeListener('dev-tools:changed', handler); };
   },
-  /** Application updates (docs/AUTO_UPDATE.md): six narrow calls and one event. The updater itself, GitHub and the installer stay in the main process. */
+  /** Application updates (docs/AUTO_UPDATE.md): narrow calls and one event. The updater itself, GitHub and the installer stay in the main process. */
   updates: {
     state: (): Promise<UpdateState | null> => ipcRenderer.invoke('updates:get'),
     check: (): Promise<UpdateState | null> => ipcRenderer.invoke('updates:check'),
     download: (): Promise<UpdateState | null> => ipcRenderer.invoke('updates:download'),
     install: (): Promise<{ ok: boolean; code?: UpdateErrorCode; state?: UpdateState }> => ipcRenderer.invoke('updates:install'),
     openReleasePage: (): Promise<boolean> => ipcRenderer.invoke('updates:open-release'),
+    openNexusPage: (): Promise<boolean> => ipcRenderer.invoke('updates:open-nexus-page'),
     setAutoCheck: (enabled: boolean): Promise<UpdateState | null> => ipcRenderer.invoke('updates:set-auto-check', enabled === true),
     onState: (listener: (state: UpdateState) => void): (() => void) => {
       const handler = (_event: unknown, state: UpdateState) => listener(state);

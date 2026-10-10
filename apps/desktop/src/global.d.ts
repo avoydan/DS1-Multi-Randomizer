@@ -23,6 +23,7 @@ declare global {
         download(): Promise<UpdateState | null>;
         install(): Promise<{ ok: boolean; code?: UpdateErrorCode; state?: UpdateState }>;
         openReleasePage(): Promise<boolean>;
+        openNexusPage(): Promise<boolean>;
         setAutoCheck(enabled: boolean): Promise<UpdateState | null>;
         onState(listener: (state: UpdateState) => void): () => void;
       };

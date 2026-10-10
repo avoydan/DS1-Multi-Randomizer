@@ -223,6 +223,12 @@
   "update": {
     "title": "Aktualizacje",
     "note": "DS1 Multi Randomizer szuka nowych wersji w GitHubie. Nic nie instaluje się bez Twojego kliknięcia, a nieudane sprawdzenie nigdy nie przeszkadza w używaniu aplikacji.",
+    "nexus": {
+      "note": "Ta wersja została pobrana z Nexus Mods. Aktualizacje są publikowane na stronie DS1 Multi Randomizer w Nexus Mods.",
+      "openPage": "Otwórz stronę Nexus Mods"
+    },
+    "installedVersion": "Zainstalowana wersja: {{version}}",
+    "metadataUnavailable": "Informacje o aktualizacjach są niedostępne, ponieważ nie można zweryfikować metadanych dystrybucji tej wersji.",
     "autoCheck": "Automatyczne sprawdzanie aktualizacji",
     "autoCheckNote": "Sprawdza najwyżej raz na dobę, gdy aplikacja jest otwarta. Wyłącz, aby sprawdzać tylko ręcznie.",
     "check": "Sprawdź aktualizacje",

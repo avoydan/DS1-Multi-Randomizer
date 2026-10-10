@@ -32,6 +32,14 @@ Developer ── version commit ──> GitHub repository
 
 No project-owned VPS, custom service, or database. Normal update discovery uses `github.com/<owner>/<repo>/releases.atom` and `/releases/latest`; only when a public stable-only check gets the exact wrapped 404/406 from that configured `/releases/latest` URL does the app query the GitHub REST API to confirm repository identity and absence of a stable release. Update files are served by GitHub. These requests expose ordinary connection metadata, but the app does not send game or user data.
 
+### Distribution flavor
+
+`distribution: github | nexus` is written into `runtime/build-info.json` at package time and is independent from `channel: public | internal`. A GitHub build keeps the existing stable-only public updater and internal prerelease QA behavior. A Nexus build has no application update network: the main process does not load `electron-updater`, the GitHub API confirmation module, or the GitHub update source; it does not create an updater, configure a feed, or schedule startup/periodic checks. Its update IPC calls return a local unavailable state, including when called directly, and the UI shows the installed version and Nexus guidance without check/download/install controls. An optional Nexus page button is emitted only when `DS1TR_NEXUS_PAGE_URL` is set to a validated canonical DSR Nexus page at build time.
+
+The setting `updates.autoCheck` is retained when a user switches distributions. Nexus ignores it and does not rewrite it; returning to a GitHub build restores the preference. A schema-valid legacy build-info record without `distribution` is treated as GitHub so existing installations continue to update. Missing, malformed, or explicitly invalid distribution metadata disables application updates. This gate applies only to application updates; the Fog subsystem's pinned-data download is separate and unchanged.
+
+Build targets share one source tree: `npm run package:win:github -w @ds1tr/desktop` and `npm run package:win:nexus -w @ds1tr/desktop`. The latter is public-channel, local, unsigned staging only. It clears electron-builder's publish configuration and writes Nexus-named artifacts under `apps/desktop/release/nexus/`; it is never added to GitHub release assets. The existing GitHub release asset names and publication workflow remain unchanged.
+
 ## 2. Where updates come from: the update source
 
 The update source is written **explicitly** in two places that must agree, and never inferred from `.git/config` or from the CI environment:
@@ -116,7 +124,7 @@ The project has no trusted code-signing certificate yet. An unsigned release the
 * **Trigger:** only `workflow_dispatch` (Actions > Release (draft) > Run workflow). No push, pull request, schedule or tag starts it.
 * **Inputs:** `version` (X.Y.Z, must equal `apps/desktop/package.json`), `golden_attestation` (the first 7 characters of the commit whose golden fixtures **you** verified, see below), `create_draft` (untick for a dry run that only keeps the files as a workflow artifact).
 * **Runner:** `windows-latest`, Node 24 with the npm cache, .NET 8 for the two helper programs, `npm ci` (exactly the lockfile).
-* **Steps:** request check > checkout (no stored credentials) > version/source/target-repository agreement > `npm ci` > backend build and tests > typecheck > desktop build and tests > `package:win --channel=public --unsigned-release` (which runs the release verification) > `release-verify.mjs --publication --tag vX.Y.Z` > `release-assets.mjs` (stages and cross-checks the six files) > upload as workflow artifact > **create the draft**. A failing step stops everything after it; the draft is the last step.
+* **Steps:** request check > checkout (no stored credentials) > version/source/target-repository agreement > `npm ci` > backend build and tests > typecheck > desktop build and tests > `package:win:github --channel=public --unsigned-release` (which runs the release verification) > `release-verify.mjs --publication --tag vX.Y.Z` > `release-assets.mjs` (stages and cross-checks the six files) > upload as workflow artifact > **create the draft**. A failing step stops everything after it; the draft is the last step.
 * **Permissions:** `contents: read` for the workflow, `contents: write` for the single job (to create the draft and upload files). Nothing else.
 * **Secrets:** none for the single-repository setup (`GITHUB_TOKEN` suffices). Only `RELEASE_REPO_TOKEN` (and the variable `RELEASE_REPOSITORY`) for a separate release repository. Never put a secret anywhere else.
 * **Golden fixtures cannot run on a hosted runner**, because they need a clean Dark Souls Remastered copy (`goldenCompatibility.mjs verify`, `DS1TR_GOLDEN_GAME_SOURCE`). They are part of the owner's checklist; the workflow forces the step by requiring the commit hash in `golden_attestation` (a human gate, not a proof).
@@ -161,7 +169,7 @@ See [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md). In short: bump the versions an
 
 A real updater cannot be called verified by unit tests alone. Release N+1 as a **public GitHub prerelease**; never publish it briefly as stable just to test it.
 
-1. Build N for the scratch test installation with `npm run package:win -w @ds1tr/desktop -- --channel=internal`. Confirm the build info says `channel: internal`, then install the Setup artifact in a scratch folder and start it. This channel alone enables prerelease checks; it does not alter the public release build.
+1. Build N for the scratch test installation with `npm run package:win:github -w @ds1tr/desktop -- --channel=internal`. Confirm the build info says `channel: internal` and `distribution: github`, then install the Setup artifact in a scratch folder and start it. This channel alone enables prerelease checks; it does not alter the public release build.
 2. Build N+1 through the normal workflow, review the draft, and publish it with GitHub's **Set as a pre-release** option enabled. The assets still use numeric `X.Y.Z` version tags and the files listed in section 7.
 3. In the internal N installation, confirm About says N and preserve test settings, history and game path. Check for updates; expect N+1, then **Download update** with progress.
 4. While a generation, Apply or Restore is active, press **Restart and update**. Expect the operation warning and no restart. Finish the operation, press it again and expect N+1 to start.
@@ -178,7 +186,9 @@ See the table at the end of this file, kept current by whoever changes the updat
 |---|---|
 | Update policy (states, throttle, portable, prerelease, operation block, errors, IPC surface, translations) | AUTOMATED VERIFIED: `electron/updater.test.mjs`, `tools/release/update-lib.test.mjs`, backend `activity.test.mjs` and the integration test |
 | Release configuration, workflow structure, update-source agreement | AUTOMATED VERIFIED (`update-lib.test.mjs`) |
+| Distribution metadata, legacy default, updater bootstrap/timer gate, inert Nexus IPC and renderer state | AUTOMATED VERIFIED: `channel.test.mjs`, `updateRuntime.test.mjs`, `updater.test.mjs`, locale tests |
 | electron-updater and its dependencies are packaged; `app-update.yml` and `latest.yml` / blockmap are generated by the installed electron-builder | PACKAGED VERIFIED: see "Packaged build" below (the asar contents are also checked by every release verification) |
+| Nexus package metadata and disabled updater configuration | PACKAGED VERIFIED: desktop 0.39.0 local Nexus Setup/Portable; the verifier checks `distribution=nexus`, `channel=public`, Electron 44.7.0, no `app-update.yml`, no `latest.yml`, and no eager updater/GitHub API import in packaged `main.js` |
 | Workflow run on GitHub, draft creation, asset upload | GITHUB VERIFIED (2026-10-10, run [38008781155](https://github.com/avoydan/DS1-Multi-Randomizer/actions/runs/38008781155), commit `f829c2d`; published release assets and tag rechecked) |
 | Internal installed N updates to public GitHub prerelease N+1; public N ignores it | PREPARED, NOT RUN: isolated internal 0.38.0 install and profile ready for 0.38.3; section 13 |
 | Authenticode publisher verification of updates | DEFERRED: needs a trusted certificate |

@@ -10,6 +10,7 @@
  */
 
 import type { BuildChannel } from './channel.js';
+import type { BuildDistribution } from './channel.js';
 
 export const UPDATE_PROVIDER = 'github' as const;
 
@@ -28,7 +29,7 @@ export const isUpdateSourceConfigured = (source: UpdateSource): boolean =>
 
 /** The IPC channels the renderer may use, and the one event the main process pushes. Nothing else about the updater is reachable from the page. */
 export const UPDATE_INVOKE_CHANNELS = [
-  'updates:get', 'updates:check', 'updates:download', 'updates:install', 'updates:open-release', 'updates:set-auto-check',
+  'updates:get', 'updates:check', 'updates:download', 'updates:install', 'updates:open-release', 'updates:open-nexus-page', 'updates:set-auto-check',
 ] as const;
 export const UPDATE_STATE_EVENT = 'updates:state' as const;
 
@@ -36,6 +37,7 @@ export type UpdatePhase = 'idle' | 'checking' | 'upToDate' | 'noStableRelease' |
 /** auto: an installed build downloads and installs by itself on request; manual: a portable build only learns that a version exists; none: no update at all. */
 export type UpdateCapability = 'auto' | 'manual' | 'none';
 export type UpdateUnsupportedReason = 'development' | 'no-update-source';
+export type UpdateAvailabilityReason = 'nexus-distribution' | 'invalid-build-info';
 export type UpdateErrorCode = 'CHECK_FAILED' | 'DOWNLOAD_FAILED' | 'INSTALL_FAILED' | 'OPERATION_ACTIVE' | 'INVALID_STATE' | 'NOT_SUPPORTED';
 export type InstallMode = 'installed' | 'portable' | 'development';
 
@@ -55,6 +57,9 @@ export interface UpdateState {
   error: UpdateErrorInfo | null;
   capability: UpdateCapability;
   unsupportedReason: UpdateUnsupportedReason | null;
+  distribution: BuildDistribution;
+  availabilityReason: UpdateAvailabilityReason | null;
+  nexusPageUrl: string | null;
   autoCheck: boolean;
   /** When the last check ended (success or failure), ISO 8601. */
   lastCheckAt: string | null;
@@ -91,6 +96,7 @@ export interface UpdateControllerOptions {
   mode: InstallMode;
   /** Public builds stay on stable releases. Internal builds may inspect GitHub prereleases for controlled QA. */
   buildChannel?: BuildChannel;
+  distribution?: BuildDistribution;
   source: UpdateSource;
   /** Confirms an exact GitHub latest-release error against the canonical public repository before it becomes informational. */
   confirmNoStableRelease?: (source: UpdateSource) => Promise<boolean>;
@@ -181,6 +187,9 @@ export class UpdateController {
       error: null,
       capability: this.capability,
       unsupportedReason,
+      distribution: options.distribution ?? 'github',
+      availabilityReason: null,
+      nexusPageUrl: null,
       autoCheck: prefs.autoCheck,
       lastCheckAt: prefs.lastCheckAt,
       releaseUrl: null,

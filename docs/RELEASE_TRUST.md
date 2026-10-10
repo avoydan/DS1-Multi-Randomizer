@@ -6,6 +6,12 @@
 - An unsigned download can show “Unknown publisher” in Windows SmartScreen and can receive heuristic antivirus warnings. A checksum match establishes file integrity against the published checksum; it does not authenticate the publisher or certify that the program is safe.
 - We do not advise disabling antivirus, adding exclusions, bypassing SmartScreen, packing/obfuscating executables, or using UPX.
 
+## Distribution variants (desktop 0.39.0)
+
+`distribution` is a build-time capability separate from the public/internal `channel`. The GitHub distribution retains its existing updater policy. The Nexus distribution is built for the public channel, remains unsigned, and does not initialize `electron-updater`, configure an update feed, request GitHub release metadata, or schedule application update checks. Its update UI shows the installed version and Nexus guidance; the Nexus page button is absent unless an exact canonical URL is configured at build time. Both variants keep the same `appId`, product identity, and Electron user-data path, so settings, history, presets, and worlds stay in the existing user profile. The saved `autoCheck` preference is ignored, not deleted, by Nexus builds.
+
+Valid legacy `build-info.json` records without a `distribution` field resolve to `github`. Missing or malformed metadata, or a present but unknown distribution value, disables updater behavior. This protects against accidentally treating an unknown package as a GitHub build. The distribution setting does not change Electron 44.7.0, the updater policy for GitHub builds, or SignPath status.
+
 ## What is distributed
 
 The source of truth is [`tools/release/release-policy.json`](../tools/release/release-policy.json). Paths below are relative to the installed/unpacked app unless noted.
@@ -27,7 +33,7 @@ The package also includes source notices and license texts for GPL-3.0-only code
 - The installer is per-user and does not request elevation. It creates shortcuts and a per-user uninstall entry. There are no services, scheduled tasks, startup entries, drivers, firewall changes, or hidden persistence.
 - The portable build extracts to a temporary folder when it starts. This is an electron-builder behavior and can attract heuristic attention; it remains available as a secondary download, while the installer is recommended.
 - The app starts the two .NET helpers with fixed paths and argument arrays, without a shell. It also uses fixed `reg query`, `tasklist`, and `taskkill` commands. The app does not call PowerShell, `cmd.exe`, `wscript`, `mshta`, `rundll32`, or `certutil`.
-- Fog/world randomization downloads 40 pinned data files from `raw.githubusercontent.com` if the local cache is absent. The updater contacts GitHub Releases for manual checks and, when enabled, automatic checks; it downloads only after the user requests an update. No application data is uploaded to the project.
+- Fog/world randomization downloads 40 pinned data files from `raw.githubusercontent.com` if the local cache is absent. Application update traffic depends on the distribution: GitHub builds use GitHub Releases for manual and optional automatic checks, while Nexus builds make no application update requests or downloads. These are separate network paths. No application data is uploaded to the project.
 - Applying a generated world replaces managed game data only after the user chooses **Apply to game**. The app imports a pristine snapshot for **Restore original game**. Those game-file writes, large self-contained .NET helpers, lack of a signing identity, portable extraction, and HTTPS downloads are expected product behavior, not AV workarounds to remove.
 
 ## Dependency audit and renderer boundary

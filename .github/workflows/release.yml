@@ -108,7 +108,7 @@ jobs:
           npm test -w @ds1tr/desktop
 
       - name: Package (public channel, unsigned)
-        run: npm run package:win -w @ds1tr/desktop -- --channel=public --unsigned-release
+        run: npm run package:win:github -w @ds1tr/desktop -- --channel=public --unsigned-release
 
       - name: Verify the release and stage its files
         shell: bash

@@ -5,7 +5,45 @@
  */
 export type BuildChannel = 'public' | 'internal';
 
-/** `build-info.json` is written by the packaging script. A packaged app that cannot read it is treated as public: the safe side is to show less. */
+export type BuildDistribution = 'github' | 'nexus' | 'unavailable';
+
+export interface RuntimeBuildInfo {
+  channel: BuildChannel;
+  distribution: BuildDistribution;
+  nexusPageUrl: string | null;
+}
+
+/** Nexus links are a build-time capability. Accept only the canonical DSR mod page form on the official HTTPS host. */
+export function parseNexusPageUrl(value: unknown): string | null {
+  if (typeof value !== 'string' || value.length === 0) return null;
+  try {
+    const url = new URL(value);
+    if (url.protocol !== 'https:' || url.origin !== 'https://www.nexusmods.com' || url.username || url.password || url.search || url.hash) return null;
+    if (!/^\/darksoulsremastered\/mods\/\d+\/?$/u.test(url.pathname)) return null;
+    return url.href;
+  } catch { return null; }
+}
+
+/**
+ * Reads the immutable build flavor. A schema-valid legacy record with no distribution is a GitHub build;
+ * malformed metadata or an explicit unknown distribution disables update behavior.
+ */
+export function parseRuntimeBuildInfo(buildInfoText: string | null): RuntimeBuildInfo {
+  const safe: RuntimeBuildInfo = { channel: 'public', distribution: 'unavailable', nexusPageUrl: null };
+  if (buildInfoText === null) return safe;
+  try {
+    const parsed = JSON.parse(buildInfoText) as { schema?: unknown; channel?: unknown; distribution?: unknown; nexusPageUrl?: unknown };
+    if (!parsed || typeof parsed !== 'object' || parsed.schema !== 'ds1tr-build-info-1') return safe;
+    if (parsed.channel !== undefined && parsed.channel !== 'public' && parsed.channel !== 'internal') return safe;
+    const channel = parsed.channel === 'internal' ? 'internal' : 'public';
+    if (parsed.distribution === undefined) return { channel, distribution: 'github', nexusPageUrl: null };
+    if (parsed.distribution === 'github') return { channel, distribution: 'github', nexusPageUrl: null };
+    if (parsed.distribution === 'nexus') return { channel, distribution: 'nexus', nexusPageUrl: parseNexusPageUrl(parsed.nexusPageUrl) };
+    return { ...safe, channel };
+  } catch { return safe; }
+}
+
+/** Legacy channel-only parser. Runtime startup also uses parseRuntimeBuildInfo, which separately fails updater behavior closed on invalid metadata. */
 export function parseBuildChannel(buildInfoText: string | null): BuildChannel {
   if (buildInfoText === null) return 'public';
   try {

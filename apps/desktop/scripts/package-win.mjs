@@ -15,6 +15,9 @@ import { stageRuntimeDependencies } from './stage-dependencies.mjs';
 //                                                          release verification runs with --publication. It is never reported as signed; the owner decides whether to publish it.
 const releaseMode = process.argv.includes('--release');
 const unsignedRelease = process.argv.includes('--unsigned-release');
+const distributionFlag = process.argv.find((argument) => argument.startsWith('--distribution='))?.slice('--distribution='.length);
+if (distributionFlag !== undefined && distributionFlag !== 'github' && distributionFlag !== 'nexus') throw new Error('--distribution must be github or nexus.');
+const distribution = distributionFlag ?? 'github';
 // The CHANNEL decides what internal tools the interface shows and which GitHub releases the updater can inspect (docs/AUTO_UPDATE.md): `public` hides internal test worlds and ignores prereleases; `internal` shows them and opts into prerelease checks for QA. It is independent of signing: a --release build is always
 // public; unsigned publication builds must also pass --channel=public. The channel never reaches a world.
 const channelFlag = process.argv.find((argument) => argument.startsWith('--channel='))?.slice('--channel='.length);
@@ -22,7 +25,19 @@ if (channelFlag !== undefined && channelFlag !== 'public' && channelFlag !== 'in
 if (releaseMode && channelFlag === 'internal') throw new Error('A --release build is a public build: it cannot use the internal channel.');
 if (unsignedRelease && releaseMode) throw new Error('--unsigned-release and --release exclude each other: --release signs, --unsigned-release is the honest name of a public build without a signature.');
 if (unsignedRelease && channelFlag !== 'public') throw new Error('--unsigned-release is a public build: pass --channel=public.');
-const channel = releaseMode ? 'public' : (channelFlag ?? 'internal');
+if (distribution === 'nexus' && (releaseMode || unsignedRelease)) throw new Error('Nexus packages are local unsigned staging artifacts and cannot use GitHub publication modes.');
+if (distribution === 'nexus' && channelFlag !== undefined && channelFlag !== 'public') throw new Error('Nexus distribution currently supports only --channel=public.');
+const channel = distribution === 'nexus' ? 'public' : releaseMode ? 'public' : (channelFlag ?? 'internal');
+const configuredNexusPageUrl = distribution === 'nexus' ? process.env.DS1TR_NEXUS_PAGE_URL?.trim() || null : null;
+let nexusPageUrl = null;
+if (configuredNexusPageUrl) {
+  let parsedNexusUrl;
+  try { parsedNexusUrl = new URL(configuredNexusPageUrl); } catch { throw new Error('DS1TR_NEXUS_PAGE_URL must be a canonical Nexus Mods DSR page URL.'); }
+  if (parsedNexusUrl.protocol !== 'https:' || parsedNexusUrl.origin !== 'https://www.nexusmods.com' || parsedNexusUrl.username || parsedNexusUrl.password || parsedNexusUrl.search || parsedNexusUrl.hash || !/^\/darksoulsremastered\/mods\/\d+\/?$/u.test(parsedNexusUrl.pathname)) {
+    throw new Error('DS1TR_NEXUS_PAGE_URL must be an official https://www.nexusmods.com/darksoulsremastered/mods/<id> URL without query or fragment.');
+  }
+  nexusPageUrl = parsedNexusUrl.href;
+}
 const appVersion = JSON.parse(await readFile(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'package.json'), 'utf8')).version;
 const desktop = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const root = path.resolve(desktop, '../..');
@@ -119,7 +134,9 @@ const fogHostProject = /<Version>([^<]+)<\/Version>/u.exec(await readFile(path.j
 let commit = null;
 try { commit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, windowsHide: true }).toString().trim(); } catch { commit = null; }
 await writeFile(path.join(runtime, 'build-info.json'), `${JSON.stringify({
-  schema: 'ds1tr-build-info-1', version: appVersion, commit, mode: releaseMode ? 'public' : unsignedRelease ? 'unsigned-release' : 'development', channel,
+  schema: 'ds1tr-build-info-1', version: appVersion, commit,
+  mode: distribution === 'nexus' ? 'nexus-local-unsigned' : releaseMode ? 'public' : unsignedRelease ? 'unsigned-release' : 'development',
+  channel, distribution, nexusPageUrl: distribution === 'nexus' ? nexusPageUrl : null,
   versions: { desktop: appVersion, backend: await readVersion('apps/backend/package.json'), contracts: await readVersion('packages/contracts/package.json'), foghostProject: fogHostProject },
   builtAt: new Date().toISOString(),
 }, null, 2)}\n`);
@@ -148,7 +165,22 @@ const signingOverrides = !releaseMode ? [] : [
     `-c.win.azureSignOptions.endpoint=${process.env.DS1TR_ARTIFACT_SIGNING_ENDPOINT}`, `-c.win.azureSignOptions.codeSigningAccountName=${process.env.DS1TR_ARTIFACT_SIGNING_ACCOUNT}`,
     `-c.win.azureSignOptions.certificateProfileName=${process.env.DS1TR_ARTIFACT_SIGNING_PROFILE}`] : []),
 ];
-await run(process.execPath, [path.join(root, 'node_modules', 'electron-builder', 'cli.js'), '--win', '--x64', '--config', 'electron-builder.yml', '--publish', 'never', ...signingOverrides], desktop,
+const builderConfig = distribution === 'nexus' ? 'electron-builder.nexus.yml' : 'electron-builder.yml';
+const nexusBuilderOverrides = distribution === 'nexus' ? [
+  '-c.directories.output=release/nexus',
+  '-c.artifactName=DS1-Multi-Randomizer-${version}-Nexus-${arch}.${ext}',
+  '-c.nsis.artifactName=DS1-Multi-Randomizer-${version}-Nexus-Setup-x64.${ext}',
+  '-c.portable.artifactName=DS1-Multi-Randomizer-${version}-Nexus-Portable-x64.${ext}',
+] : [];
+await run(process.execPath, [path.join(root, 'node_modules', 'electron-builder', 'cli.js'), '--win', '--x64', '--config', builderConfig, '--publish', 'never', ...nexusBuilderOverrides, ...signingOverrides], desktop,
   { ...process.env, ELECTRON_BUILDER_CACHE: path.join(desktop, 'release', 'builder-cache') });
 // Whatever was built is verified at once: structure, versions, metadata, and (public mode) the signatures. Development builds report UNSIGNED and pass.
-await run(process.execPath, [path.join(root, 'tools', 'release', 'release-verify.mjs'), '--manifest', path.join(desktop, 'release', 'release-manifest.json'), ...(releaseMode ? ['--require-signature'] : []), ...(unsignedRelease ? ['--publication'] : [])], root);
+if (distribution === 'nexus') {
+  const nexusOutput = path.join(desktop, 'release', 'nexus');
+  await run(process.execPath, [path.join(root, 'tools', 'release', 'release-verify.mjs'), '--distribution', 'nexus', '--unpacked', path.join(nexusOutput, 'win-unpacked'),
+    '--installer', path.join(nexusOutput, `DS1-Multi-Randomizer-${appVersion}-Nexus-Setup-x64.exe`),
+    '--portable', path.join(nexusOutput, `DS1-Multi-Randomizer-${appVersion}-Nexus-Portable-x64.exe`),
+    '--manifest', path.join(nexusOutput, `release-manifest-${appVersion}-nexus.json`)], root);
+} else {
+  await run(process.execPath, [path.join(root, 'tools', 'release', 'release-verify.mjs'), '--manifest', path.join(desktop, 'release', 'release-manifest.json'), ...(releaseMode ? ['--require-signature'] : []), ...(unsignedRelease ? ['--publication'] : [])], root);
+}
