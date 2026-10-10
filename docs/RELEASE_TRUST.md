@@ -2,7 +2,7 @@
 
 ## Current status
 
-- Public Windows releases are **unsigned**. v0.38.3 is published unsigned. No trusted certificate or approved SignPath project is active.
+- Public Windows releases are **unsigned**. No trusted certificate or approved SignPath project is active. SignPath status is unchanged by the Electron upgrade.
 - An unsigned download can show “Unknown publisher” in Windows SmartScreen and can receive heuristic antivirus warnings. A checksum match establishes file integrity against the published checksum; it does not authenticate the publisher or certify that the program is safe.
 - We do not advise disabling antivirus, adding exclusions, bypassing SmartScreen, packing/obfuscating executables, or using UPX.
 
@@ -18,7 +18,7 @@ The source of truth is [`tools/release/release-policy.json`](../tools/release/re
 | `DS1-Multi-Randomizer-<version>-Setup-x64.exe` | Project's electron-builder/NSIS installer | Unsigned | Possible project package candidate, subject to SignPath acceptance of the artifact configuration and its embedded executables. |
 | `DS1-Multi-Randomizer-<version>-Portable-x64.exe` | electron-builder portable wrapper/package | Unsigned | Possible project package candidate, subject to the same review. |
 | `Uninstall DS1 Multi Randomizer.exe` | Generated as part of the NSIS installation | Unsigned | Approval-dependent generated executable; not currently submitted for signing. |
-| Electron/Chromium DLLs and `d3dcompiler_47.dll` | Upstream runtime files; Microsoft signs `d3dcompiler_47.dll` | Retained as provided by their respective publishers | Never sign third-party binaries with this project's certificate. Preserve any upstream signature. |
+| Electron/Chromium and DirectX runtime DLLs | Upstream runtime files; Microsoft signs `d3dcompiler_47.dll` and `dxil.dll`; Electron's `dxcompiler.dll` is an unsigned Dawn custom build | Retained as provided by Electron; no project signing | Never sign third-party binaries with this project's certificate. Preserve any upstream signature. |
 
 The package also includes source notices and license texts for GPL-3.0-only code, Apache-2.0 FogMod/SoulsIds, and MIT NuGet dependencies. The combined engine and FogHost pin documents list pinned commits, modified files, and third-party terms. Dark Souls Remastered files and FogMod's game-derived `dist/` data are not included. The user supplies their own game files and the backend downloads the required pinned Fog data on demand with SHA-256 checks. See [`THIRD_PARTY_NOTICES.md`](../THIRD_PARTY_NOTICES.md), [`docs/LICENSING.md`](LICENSING.md), and the two `UPSTREAM_PIN.md` files.
 
@@ -32,11 +32,23 @@ The package also includes source notices and license texts for GPL-3.0-only code
 
 ## Dependency audit and renderer boundary
 
-`npm audit --package-lock-only` on 2026-10-10 reported 14 advisories in the lockfile (2 critical, 4 high, 8 moderate). The count includes build and development dependencies; it is not a count of vulnerabilities in the shipped application. The installed Electron runtime is `34.5.8`, and the audit reports multiple Electron advisories. Electron's release schedule no longer lists that major in a supported line.
+Before the 0.38.4 change, `npm audit --package-lock-only` on 2026-10-10 reported 14 advisories in the lockfile (2 critical, 4 high, 8 moderate), including Electron `34.5.8`. After the upgrade it reported 17 (2 critical, 12 high, 3 moderate); the increase is in the build/development dependency tree. `npm audit --package-lock-only --omit=dev` reported 0 production dependency advisories. The post-upgrade full-lockfile report has no Electron runtime advisory. These counts describe the lockfile and npm's advisory data at the time of the run; they do not establish that the application is secure.
+
+The packaged Electron version is now `44.7.0`, the current stable supported line on the [official release schedule](https://releases.electronjs.org/schedule) as of 2026-10-10. `electron-updater` remains `6.8.9` and `electron-builder` remains `26.15.3`; the upgrade did not change the app ID, package name, user-data path, updater policy, or signing setup.
+
+## Electron 34 to 44 compatibility notes
+
+- Electron 42 stopped downloading the Electron binary during npm `postinstall`; the packaging command now invokes the Electron CLI and downloads the exact lockfile-pinned runtime as part of packaging. The Windows package completed with Electron `44.7.0`.
+- Electron 43 changed the native folder dialog's default path behavior. The game-folder picker now passes an explicit starting folder (saved game path or Documents) and remembers the last visited parent during repeated selections. The selected game path and settings format are unchanged.
+- Electron 44 no longer exposes the Electron clipboard module to renderer code. The renderer already uses the standard `navigator.clipboard` API, so no adaptation was needed.
+- Electron 44 statically links ANGLE and no longer includes `libEGL.dll` or `libGLESv2.dll`. Those files were removed from the release inventory. The same runtime includes `dxcompiler.dll` (unsigned Electron/Dawn custom build) and `dxil.dll` (valid Microsoft signature); both are now explicitly inventoried.
+- The Windows x64 product does not use the removed Windows ia32 target; the macOS 12 minimum-version change is outside this Windows-only product.
+
+The packaged window keeps `contextIsolation: true`, `nodeIntegration: false`, and `sandbox: true`. Its preload continues to expose only the existing narrow IPC boundary. Window-open, navigation and redirect guards remain in place. The backend child still uses the existing `ELECTRON_RUN_AS_NODE=1` launch path; no Electron fuse or updater behavior changed.
 
 The app's packaged window uses `contextIsolation: true`, `nodeIntegration: false`, and `sandbox: true`; it loads the bundled local `index.html`, exposes a narrow Promise-returning preload API, and does not register custom protocols, use `<webview>`, or install permission handlers. The GPL license link was the one external page requested in a child window. v0.38.3 now sends only that exact URL to the system browser, denies every Electron child window, and blocks renderer navigation or redirects away from the app document. Unit tests cover the URL policy and that guards are installed before loading content.
 
-The audit's critical `concurrently`/`shell-quote` findings and high `extract-zip`, `http-cache-semantics`, and `source-map-js` findings are in development/build tooling rather than code paths shipped as app features; no untrusted command input or untrusted archive extraction path is exposed by this app. This focused mitigation does not make Electron 34.5.8 vulnerability-free and is not a substitute for moving the packaged runtime to a currently supported Electron line. A major Electron upgrade was not mixed into this updater patch because it needs its own compatibility and packaged-app verification.
+The remaining full-lockfile findings are in build/development tools, including `concurrently`/`shell-quote`, Electron Builder's `app-builder-lib`/`@electron/get` chain, and Vite/PostCSS dependencies. They are not included in the production dependency tree. They were not bulk-updated as part of this runtime migration; no `npm audit fix` was run.
 
 ## File metadata and integrity checks
 

@@ -4,9 +4,9 @@ DS1 Multi Randomizer is a Windows desktop app for creating one deterministic Dar
 
 ## Download
 
-[Download latest release — v0.38.3](https://github.com/avoydan/DS1-Multi-Randomizer/releases/tag/v0.38.3) · [All releases](https://github.com/avoydan/DS1-Multi-Randomizer/releases)
+[Download latest release — v0.38.4](https://github.com/avoydan/DS1-Multi-Randomizer/releases/tag/v0.38.4) · [All releases](https://github.com/avoydan/DS1-Multi-Randomizer/releases)
 
-The release is a **public prerelease**. The recommended file is `DS1-Multi-Randomizer-0.38.3-Setup-x64.exe`. A portable executable is also provided; it extracts to a temporary folder each time it starts, which can trigger more antivirus warnings.
+The release is a **public prerelease**. The recommended file is `DS1-Multi-Randomizer-0.38.4-Setup-x64.exe`. A portable executable is also provided; it extracts to a temporary folder each time it starts, which can trigger more antivirus warnings.
 
 ## What it does
 
@@ -27,14 +27,14 @@ The release is a **public prerelease**. The recommended file is `DS1-Multi-Rando
 Each release includes `SHA256SUMS.txt` and a versioned release manifest. In PowerShell, calculate a file's hash with:
 
 ```powershell
-Get-FileHash .\DS1-Multi-Randomizer-0.38.3-Setup-x64.exe -Algorithm SHA256
+Get-FileHash .\DS1-Multi-Randomizer-0.38.4-Setup-x64.exe -Algorithm SHA256
 ```
 
 Compare the `Hash` value with the line for that exact filename in `SHA256SUMS.txt`. A matching hash shows that the file matches the published checksum; it is not a code signature or a safety certification.
 
 ## Code signing and antivirus
 
-**v0.38.3 is unsigned.** No SignPath application has been approved and no trusted code-signing certificate is active. Windows SmartScreen or antivirus software may warn about the download. We do not recommend disabling protection or adding an exclusion. See [false-positive reporting and verification](docs/ANTIVIRUS_FALSE_POSITIVES.md), [release trust](docs/RELEASE_TRUST.md), and the [code-signing preparation](docs/CODE_SIGNING.md).
+**v0.38.4 is unsigned.** No SignPath application has been approved and no trusted code-signing certificate is active. Windows SmartScreen or antivirus software may warn about the download. We do not recommend disabling protection or adding an exclusion. See [false-positive reporting and verification](docs/ANTIVIRUS_FALSE_POSITIVES.md), [release trust](docs/RELEASE_TRUST.md), and the [code-signing preparation](docs/CODE_SIGNING.md).
 
 ## Privacy and network use
 
@@ -42,7 +42,7 @@ There is no telemetry, analytics, account, crash reporting, or automatic support
 
 ## Source and license
 
-The source code for this release is available in this repository at the matching `v0.38.3` tag. DS1 Multi Randomizer is licensed under [GPL-3.0-only](LICENSE). See [third-party notices](THIRD_PARTY_NOTICES.md) and the [licensing policy](docs/LICENSING.md) for upstream components and distribution terms.
+The source code for this release is available in this repository at the matching `v0.38.4` tag. DS1 Multi Randomizer is licensed under [GPL-3.0-only](LICENSE). See [third-party notices](THIRD_PARTY_NOTICES.md) and the [licensing policy](docs/LICENSING.md) for upstream components and distribution terms.
 
 Issues: [GitHub issue tracker](https://github.com/avoydan/DS1-Multi-Randomizer/issues).
 

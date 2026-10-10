@@ -16,9 +16,9 @@
   ],
   "thirdPartyBinaries": [
     { "path": "d3dcompiler_47.dll", "owner": "Microsoft (already signed)" },
+    { "path": "dxcompiler.dll", "owner": "Electron / Chromium (Dawn custom build; unsigned in Electron 44.7.0)" },
+    { "path": "dxil.dll", "owner": "Microsoft (already signed)" },
     { "path": "ffmpeg.dll", "owner": "Electron / Chromium" },
-    { "path": "libEGL.dll", "owner": "Electron / Chromium (ANGLE)" },
-    { "path": "libGLESv2.dll", "owner": "Electron / Chromium (ANGLE)" },
     { "path": "vk_swiftshader.dll", "owner": "Electron / Chromium (SwiftShader)" },
     { "path": "vulkan-1.dll", "owner": "Electron / Chromium (Vulkan loader)" }
   ],

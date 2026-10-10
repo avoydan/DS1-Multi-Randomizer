@@ -13,6 +13,7 @@ import { isDevToolsShortcut, parseBuildChannel, type BuildChannel } from './chan
 import { UPDATE_SOURCE } from './updateSource.js';
 import { confirmNoStableReleaseViaGitHubApi } from './githubReleaseApi.js';
 import { handleWindowOpenRequest, isAllowedRendererNavigation } from './windowSecurity.js';
+import { createGameDirectoryPicker } from './gameDirectoryDialog.js';
 import { PERIODIC_CHECK_MS, STARTUP_CHECK_DELAY_MS, UPDATE_STATE_EVENT, UpdateController, type UpdaterLike } from './updater.js';
 import { mainMessage, normalizeLanguageSetting, resolveLanguage, type AppLanguage, type LanguageSetting, type MainMessageKey } from './language.js';
 
@@ -231,12 +232,11 @@ async function createWindow(): Promise<void> {
   else await win.loadFile(packagedRendererPath);
 }
 
-ipcMain.handle('dialog:select-game-directory', async () => {
-  const result = await dialog.showOpenDialog({ title: say('selectGameFolder'), properties: ['openDirectory'] });
-  if (result.canceled) return null;
-  // Only the choice is returned: the folder is remembered once the installation check accepted it (game:remember-path).
-  return result.filePaths[0];
-});
+const selectGameDirectory = createGameDirectoryPicker(
+  (defaultPath) => dialog.showOpenDialog({ title: say('selectGameFolder'), defaultPath, properties: ['openDirectory'] }),
+  () => settings.gamePath ?? app.getPath('documents'),
+);
+ipcMain.handle('dialog:select-game-directory', selectGameDirectory);
 ipcMain.handle('language:get', () => ({ setting: languageSetting(), resolved: currentLanguage() }));
 ipcMain.handle('language:set', async (_event, value: unknown) => {
   const next = normalizeLanguageSetting(value);
