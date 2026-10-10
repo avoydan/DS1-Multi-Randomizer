@@ -2,7 +2,7 @@
 
 ## Current status
 
-- Public Windows releases are **unsigned**. No trusted certificate or approved SignPath project is active. The planned v0.38.3 release remains unsigned unless a future, separately verified signing setup is approved.
+- Public Windows releases are **unsigned**. v0.38.3 is published unsigned. No trusted certificate or approved SignPath project is active.
 - An unsigned download can show “Unknown publisher” in Windows SmartScreen and can receive heuristic antivirus warnings. A checksum match establishes file integrity against the published checksum; it does not authenticate the publisher or certify that the program is safe.
 - We do not advise disabling antivirus, adding exclusions, bypassing SmartScreen, packing/obfuscating executables, or using UPX.
 
