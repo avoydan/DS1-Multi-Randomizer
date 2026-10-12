@@ -1,12 +1,18 @@
 # Implementation status
 
-# CURRENT TASK: OFFLINE FOG DATA RECONSTRUCTION — BLOCKED AT ADDED EVENT (2026-10-10; baseline 0.39.0 retained)
+## Fog annotation reconstruction update (2026-10-12)
 
-Implemented development-only canonical semantic comparison, a Fog recipe extractor, and the repeated Talk/ESD compatibility transform. Verified all 178 ESD entries across 17 reference archives are semantically identical after transformation (73 scripts required compatibility edits); synthetic comparer/transform self-tests pass. The 19 pristine Fog base files and all 59 pinned reference files were verified. The requested earlier `docs/FOG_OFFLINE_RECONSTRUCTION_ANALYSIS.md` was not present.
+The 16 project-owned custom starts now resolve to named pristine DSR spawn regions and match the reference locations, stable ordering, and logical-area assignments (16/16 for each). Runtime inspection confirms that a selected custom start sets the reachability origin, resolves a spawn region, and supplies the in-game return label. The Depths start additionally sets ObjAct entity 11000120's ObjActParamID to -1 to bypass its entrance key; no other start has an event/flag prerequisite. Two display labels are reviewed as representation-only (R). Six start-area records now have explicit, independently reviewed area semantics (ordinary progression region, no area-static links or scaling-base override); the Lost Izalith pre-lava node has a fact-anchored `trivial` connector tag. A comparison-only audit reports 6/16 complete consumed area records, 16/16 tag matches, 16/16 scaling-base matches, and 16 reference links across the ten remaining start nodes. This reduces unresolved Areas from 131 to 125; full graph connectivity remains open. Clean Darkroot EMEVD tracing separates the Crest-sensitive `11200100`/`11200110` gate interactions from the distinct two-sided `11200090` CP1 short-warp wall; their logical-area endpoints and relationship to the start node's static link remain unassigned. The cross-map candidate audit indexes 249 name-marked transition regions; a focused pass over seven unresolved start maps characterized 74 of them and added yaw/shape extents to the evidence report. These remain candidates, not authored graph edges. The typed model separates project area IDs from FogMod projection keys and resolves references consistently across categories. The Asylum `h0016B1` boss flag now resolves through a named project rule linking its pristine `HandleBossDefeat` event to common event 970's flag read; `DefaultFlagCols` is 1 project-policy, 1 unused, and 106 unresolved. All 16 starts resolve to a declared node with matching pristine map membership. `FogDsrFacts` labels EMEVD provenance and reads pristine EMEVD when the clean game path is supplied, after byte-checking all maps and GameParam. FogHost full tests passed with the pinned data root and clean QA copy: 117/117, including the spatial-anchor assertion. The production downloader/data root remain unchanged, with no version bump or release.
 
-**Concrete blocker:** `dist/DS1R/event/common.emevd.dcx`, added event `5700`. It is absent from all 32 EMEVD archives in the clean DSR snapshot. The complete pristine corpus has no exact event-body match; the closest candidates have 16 instructions each and share only 14 of the target's 59 instructions, with different parameter mappings. The reference event has 39 parameter records and 556 bytes of instruction arguments. In the pinned FogMod code vendored by this project, `GameDataWriter` only emits `InitializeEvent(..., 5700, ...)` call records (`AddWarpEvent`, around line 491); none of the inspected engine source constructs the event body. Reproducing exact EMEVD semantic parity would therefore require embedding/transcribing this full body from the Fog reference data. The provenance inventory classifies the containing `common.emevd.dcx` as modified FromSoftware-derived content and not safe to bundle (`docs/FOG_DATA_PROVENANCE.md`, row 62), and does not establish separate provenance for this event. No source-authored recipe or vanilla derivation was found, so reconstruction cannot proceed without adding an opaque event body from that game-derived archive.
+**Area inventory audit (2026-10-12):** added a development-only `audit-area-catalog` report. It resolves the existing 16 start-area anchors from pristine DSR and emits each project field, evidence, completeness status, and per-entry R/E/B/U classification across the 131-entry comparison inventory; it does not emit or import oracle graph fields. The current report is 16 derived anchors, 16 partial project policies, 6 complete records, and 125 unresolved (R=6, E=0, B=0, U=125). FogReconstruction self-tests pass, including checks for unresolved inventory and representation-only differences. A separate EMEVD candidate scan covers all 17 maps: 249 name-marked regions, 985 nearby-object associations, and 950 aligned raw-int32 candidate uses in its initial run. The scanner now checks every byte offset; those matches remain untyped leads and have not been assigned to project areas or entrances. The local .NET 8 SDK is available at `C:\Users\Adam\dn8sdk\dotnet.exe`; the global `dotnet` command does not find it.
 
-No production downloader, data root, generation path, version, or release was changed. **0.40.0 was not created or published.** The runtime reconstruction and release gates remain incomplete. Focused verification: reconstruction tool self-tests pass; input verification passes; Talk semantic parity is 178/178. Full EMEVD parity, generation matrix, and offline proof were not run because the added event blocks exact reconstruction under the provenance constraint.
+# CURRENT TASK: OFFLINE FOG DATA RECONSTRUCTION — IN PROGRESS (2026-10-11; baseline 0.39.0 retained)
+
+**Annotation follow-up (2026-10-12):** the pinned DS1 annotation-consumption audit is recorded in `docs/FOG_ANNOTATION_CONSUMPTION.md`. The typed semantic model now separates warp sides from ordinary entrance sides, records logical-area map membership and validates active entrance/warp endpoint map ownership, adapts to fresh FogMod DTOs, and has consumed-field and per-category fingerprints (v2 now includes the in-game custom-start return label). The development-only category comparer emits exact/unresolved/reviewed classifications and is covered by synthetic self-tests; it has not been run against a populated catalog. The DSR fact index reads all 17 supported maps, objects/collisions/enemies, 3,755 region IDs/transforms/shapes (Point=2,123, Box=1,191, Cylinder=177, Sphere=264), spawn points, direct `SetEventFlag` writes from map/common EMEVD (including the shared Darkroot archive mapping), and treasure-part transforms; 427/558 treasure events and 407/534 slot-1 ItemLot references have unique part transforms. It also reads GameParam item rows/slots and, when given the clean game path, English item names from FMG. The name resolver supports an explicit DSR item category, requires all four English FMG item tables, rejects duplicate table IDs plus wrong-category and unknown names, and resolves goods `3:384` to Peculiar Doll. A typed `FogKeyItemPolicy` resolver now maps authored semantic names plus English DSR item names to GameParam IDs while retaining policy order, default area and tags. A typed custom-start policy similarly resolves an authored map/region name to the DSR spawn-point ID and rejects absent or ambiguous regions. A project-owned 16-entry custom-start policy now resolves named DSR spawn regions, passes pristine fact validation, and matches the development oracle location set and authored order exactly. All 16 start area IDs and graph memberships now match the reference and validate against pristine MSB facts. FogMod starts reachability from that area and consumes the start display label in its return message; the project adapter now supplies it. Two clearer labels are reviewed as R (Anor Londo building and Painted World), with all IDs, areas, respawns, and ordering exact. The Depths start explicitly bypasses the entrance key requirement at ObjAct entity 11000120, while the other 15 starts have no per-start event/flag prerequisite. Full area topology remains unresolved, and the catalog is not connected to production. `FogTreasureCollisionAreaPolicy` groups slot-1 lot locations by authored map/collision rules, preserves rule order, rejects conflicting assignments, and reports unresolved references. A fact-backed enemy-scaling resolver now validates authored map/collision assignments and included enemy part names against pristine MSB facts, applies a map-wide default to otherwise-unassigned collisions, and reports still-unassigned groups; this is resolver infrastructure only, not a complete policy. A dev-only oracle audit found 286 map/collision groups: 273 with one annotated area, 11 spanning multiple areas and 2 with no annotated area; this is comparison evidence, not copied policy. A separate development-only query matched all 108 DefaultFlagCols entries to DSR collisions, but none of the assigned boss flags equal the collision PlayRegionID or DisableBonfireEntityID; all 108 source PlayRegionIDs are below 10, so those MSB fields alone do not derive the boss-flag association. Direct map-archive `SetEventFlag` scanning found same-map writers for 25/27 raw map/flag pairs (106/108 collision rows); the `firelink/h0017B2_0000` sentinel row is shadowed by an earlier writer special case, while `asylum/h0016B1` → `11810900` has no literal `SetEventFlag` writer. The clean-source trace links its collision enemy to `HandleBossDefeat` event `11810900`; common event 0 passes that ID to event 970, whose mapped conditions read the parameter as an event flag before its item-lot award instructions. This association is implemented and tested as project policy; see the C classification below. The development-only FogDsrSpatialIndex tests point containment for all four MSB shapes, including yaw-rotated boxes; its geometric candidates do not establish logical-area semantics. A verified-QA report covered 543 positive treasure slots: 412 have part transforms, 216 positioned references match no region volume, 72 match multiple regions, the maximum overlap was 10 regions for one reference. It distinguishes all five MSB treasure slots: 534 positive slot-1 references include 421 ItemLotParam matches and 113 distinct unmatched IDs; nine positive values are in slots 2-5. The unmatched IDs are absent from the pinned oracle's active `LotLocations`, so they are preserved as map facts but excluded from the consumed annotation model. The dev-only oracle scope is 131 areas, 27 keys, 15 warps, 109 entrances, 16 custom starts, 127 costs, 392 enemy rules, 440 lot starts and 108 default collision flags. The synthetic catalog test passes, but no complete project-owned policy has been authored yet. There is no production runtime switch, backend migration, or new-catalog/reference generation comparison. The production data root remains 58/59 and the downloader is still required. The existing oracle/oracle matrices do not validate the new catalog. Current verification: .NET 8 SDK 8.0.425 FogHost build and tests passed (117/117); FogReconstruction build and self-test passed (14 existing obsolete API warnings, 0 errors). Next: author the independent policy from verified DSR facts and project semantics, connect all consumers, then run new-vs-reference matrices and cold-offline verification. No release or version bump is authorized before those gates pass.
+
+The previous “blocked at event 5700” status is superseded. FogHost now uses a named-instruction Event 5700 builder with a bounded contract harness and an eight-profile call matrix (1,335 initializers, four modes, 12 call shapes). All 20 added event bodies now have project-authored implementations: Event 5700 is checked for behavioral contract parity; the other 19 are checked against the pinned reference's operation and parameter semantics. This includes the eight Anor Londo/Battle of Stoicism events. Common events 5690, 8900, 8901 and 8950 and two Bed of Chaos helpers were already covered; Bed of Chaos helpers are derived from the pristine archive only when `noFallBedOfChaos` is enabled. Event 8960 reconstructs class-gated starting rewards, the one-time guard, delayed optional rewards and fixed Estus lot. The current temporary runtime verifier passes all 13 small added-event builders, including all eight Anor Londo events. Talk/ESD normalization now reaches 178/178 semantic parity across 17 archives; raw-model parity is 105/178. The full FogHost suite passes 143 tests (0 failed, 0 skipped) against a clean DSR staging copy. The current environment has the .NET 8 runtime but no SDK, so I compiled to a temporary directory with the installed Roslyn compiler and ran the suite on the .NET 8 runtime; standard dotnet build was unavailable.
+
+Added/removed caller audit scanned all 18 reference archives: 20 added events (12 with direct reference callers; 8 with no static archive caller) and 96 removed events (zero remaining direct callers, including cross-archive candidates). Added-event reconstruction is complete. One hundred sixty-six of the 174 modified bodies now have project-authored transforms matching pinned-reference event semantics; 8 remain unresolved, all protected BossOverlay bodies (including 11810310 and 11815382). Common event 0 now reconstructs its randomized-start initializers under full source/target fingerprints and preserves the generated dynamic suffix when the known Fog target body is the exact prefix. M10 Parish event 0 removes the obsolete object/SFX and initializer sequences and corrects three skip spans, also preserving generated suffix instructions. The last ordinary body, m12_01 event 11210700, is now reconstructed exactly at the semantic level with named PvP arena mode, participant, prompt, watcher and gate initializers under strict source and target fingerprints. M12 event 0 restores exact object/SFX and skip changes; M13 base event 0 restores exact object/initializer removals and condition changes; M15 DLC event 0 restores exact object/initializer, skip and object/SFX changes; M14 DLC event 0 restores exact gate condition, object/SFX and initializer changes. They use full source/target fingerprints; M14 additionally accepts only the validated skip-count and entity-remap variants. DLC elevator state watchers 11210110, 11210120, 11210130 and 11210140 now receive their exact state guards and zero-frame delay under anchor/count guards; event 11210831 reconstructs its exact DLC message check and five parameter bindings; event 11210837 reconstructs its exact 16-instruction message watcher body; event 11210840 reconstructs its exact 30-instruction DLC event and 11 parameter bindings under a strict full-body/parameter guard; event 11210850 replaces its message block and reindexes eight bindings to five under a strict full-body/parameter guard; event 11210800 reconstructs its exact six-instruction body and reindexes four parameter bindings to three under a strict full-body/parameter guard; event 11210890 reconstructs its exact nine-instruction body and adds two parameter bindings under a strict full-body/parameter guard; event 11210849 reconstructs its exact activation and cleanup body under a strict full-body guard; event 11210900 removes an exact obsolete 11-instruction condition block while preserving its event parameter; event 11210886 reconstructs its exact message checks and six parameter bindings; event 11210839 now rebuilds its six-group multiplayer area watcher with named conditions and flag operations under full source/target semantic fingerprints. Common event 840 removes its exact eight flag conditions and reindexes seven parameter bindings to six under a strict full-body/parameter guard. The 23 explicit EndUnconditionally edits, ten conditional watcher prefixes, and 37 exact adjacent DeactivateObject plus DeleteMapSFX/SpawnMapSFX removals across 27 events have parser/diff verification showing only the expected operation changes. M11 event `11100000` now removes its exact object/SFX pair; event `11100710` reconstructs its exact progression body under a strict full-body guard; event 50 removes only the reference-omitted initializer for event 11105030; event-50 cleanup now removes 30 exact omitted initializer calls across 11 map archives; M13-2 event 0 removes its exact four-instruction omitted initializer block; M18 event 0 removes its exact multiplayer-state/object/SFX setup sequence; M11 event 0 removes exact Fog-omitted initializers and object/SFX operations while correcting the affected skip span under full source/target semantic fingerprints; M15 event 0 removes its exact multiplayer/object-SFX block and initializer calls and shortens the remaining skip span. M10 event 0 now restores its exact three initializer calls, removes omitted object/SFX and initializer operations, and adjusts its two affected skip operands under strict source/target semantic fingerprints. M12 DLC event 11210875 now reconstructs its complete multiplayer-area watcher body and clears its obsolete parameter table under exact source/target body and parameter checks. Event 11210100 now reconstructs its complete area-state watcher body under strict source/target semantic fingerprints. Events 11210830 and 11210870 now reconstruct their exact DLC area-enemy and guidance bodies; 11210870 restores all 31 ordered parameter records from its 115-instruction pristine body under strict source/target fingerprints; 11210435 restores its 72-instruction seven-state watcher and all 49 ordered parameter records from its pristine body under full semantic fingerprints. M18 DLC event 0 now applies its two exact flag replacements and removes the pinned object/SFX and initializer operations under full source/target fingerprints. M13 DLC event 0 removes its exact condition, object/SFX and initializer operations and changes one skip target under strict source/target fingerprints. M14 event 0 removes its exact gate, object/SFX and initializer operations and corrects one skip condition under strict source/target fingerprints. M10 Parish events `11010001` and `11010901` each remove their exact sequence of two object/SFX pairs; Depths event `11200000` removes its two exact object/SFX operations; M12 event `11200900` removes its exact two-pair object/SFX sequence; gate condition/object-state edits are reconstructed in `11005030`, `11005033`, `11015100` and `11015103`; `11005391` also gets the reference's leading common operation and condition conversion; `11005392` removes its exact two conditions and adjacent skip; `11010000` removes the Parish condition/skip block; and `m10_02` event 50 now reconstructs its exact event flag and initializer changes under full source/target semantic fingerprints; events `11020001`, transition `11020021` plus DLC event `11020899` are now reconstructed; event `11020001` removes its exact conditional skip block and related flag check; the latter removes the exact area conditions and reindexes both parameter bindings. M12 event `11200005` reconstructs its exact guarded body; event `11200006` reconstructs its exact progression body under a strict full-body guard; DLC event `11210401` reconstructs its exact region, delay, event-call and wait changes; event `11210404` removes three obsolete condition instructions, corrects the initial flag check and reindexes eight parameter bindings under a strict full-body/parameter guard; event `11210430` reconstructs its exact 15-instruction body and reindexes six parameter bindings to three under a strict full-body/parameter guard; event `11210701` reconstructs its exact 34-instruction progression body and remaps five condition parameters to nine under a strict full-body/parameter guard; event `11210434` reconstructs two exact area checks and removes the known obsolete condition block under a strict full-body guard; event `11210831` reconstructs its exact message check and five parameter bindings under a strict full-body/parameter guard; event `11210835` removes five duplicate checks and reindexes four parameters under a strict full-body/parameter guard; event `11210836` reconstructs its exact conditions and sound sequence under a strict full-body guard; event `11210837` reconstructs its exact 16-instruction DLC message watcher body under a strict full-body guard; event `11210840` reconstructs its exact 30-instruction body and 11 parameter bindings under a strict full-body/parameter guard; event `11210850` replaces its message block and reindexes eight bindings to five under a strict full-body/parameter guard; event `11210849` reconstructs the exact DLC event activation/cleanup body under a strict full-body guard; event `11210900` removes an exact obsolete 11-instruction condition block while preserving its event parameter; DLC events `11210000`, `11210838`, `11210439`, `11210407`, `11210878` and `11210402` remove exact operation/condition sequences; M12 event `11200900` removes its two object/SFX pairs; events `11215007` and `11215009` prepend the exact missing map condition. M13 event 50 removes its two exact obsolete initializer calls, and event `11305000` reconstructs its exact watcher and cleanup body under a strict full-body guard; M13 DLC event 50 removes only the reference-omitted initializer for event 11315030; events `11310052`, `11315393`, `11315394` and `11315398` now reconstruct their exact flag-state, delay, area-check and object-operation changes; the latter three use full-body guards because their changes affect control flow or object operations. M10 event `11005150` replaces its exact 15-instruction prefix with the reference skip, removes two exact flag writes, and remaps ten parameter bindings under full source/target semantic fingerprints while preserving the reference skip operand; M17 event `11700000` now replaces its exact first object/SFX pair with an unconditional end and removes its second exact pair; M14 events `11400001`, `11410410` and `11410901` each remove two exact adjacent object/SFX pairs; M14 DLC event `11410001` restores the gate-control body and removes two obsolete waits under an exact full-body guard; `11400200` reconstructs the operation removal and `11415373` one-frame wait, while `11415380` accepts only its exact validated FogMod runtime form. M15 DLC event `11510001` removes its exact three-pair object/SFX sequence; event `11510900` reconstructs its exact delay and cleanup body under a strict full-body guard; event `11500210` reconstructs the exact Demon Ruins progression watcher body under a strict full-body guard; events `11510502` and `11510240` reconstruct the exact parameterized flag-write removal and gate-area transition respectively; event `11510543` removes six exact adjacent sound-effect pairs and reindexes four parameter bindings under a strict full-body/parameter guard; `11515381` reconstructs two exact operation substitutions under a full-body guard; the former reindexes its following parameter record. Common event `260` now removes its exact flag condition and reindexes both remaining parameter references. M18 DLC event `11815394` now restores the exact final flag write before its event end. The real-data FogHost parity test covers all 166 implemented event bodies and passes against the pinned reference; the full test executable also passes 143/143 tests, including deterministic writes across representative seeds and option profiles. Complete offline-root parity and network-blocked generation proof are outstanding. Production downloader, data root, generation version, Seed Code, and release remain unchanged; baseline stays 0.39.0 and 0.40.0 is not created or published.
 
 # CURRENT TASK: BUILD-TIME NEXUS DISTRIBUTION (desktop 0.39.0; 2026-10-10)
 
@@ -1173,3 +1179,536 @@ Task 5 extended the focused combined bridge tests (commit
   unproven. Blockers 2, 3, and 6 were resolved by Task 6 (see
   `docs/COMBINED_ENGINE_INTEGRATION.md`, "Blocker resolution"); the public
   GPL fork remains open.
+
+## Fog offline reconstruction task — 2026-10-11
+
+- Project-authored reconstruction was verified against the pinned FogMod
+  reference using a clean local DSR copy: **174/174 modified EMEVD bodies**,
+  **96/96 removed event IDs**, and semantic parity across all 18 event
+  archives; 20 added events have project-authored builders/replacements.
+- Talk reconstruction passed all **17/17 archives** and **178/178 scripts**;
+  Layout reconstruction passed all **4/4 ParamDef layouts** and decoded and
+  re-encoded all four GameParam tables. Fresh reruns were byte-deterministic:
+  EMEVD 18/18, Talk 17/17, Layouts 4/4.
+- The development-only root assembled from pristine game data and those
+  reconstructions contains **58/59 required files**. The only missing file is
+  `dist/fog.txt`. Its license scope is unresolved; see
+  `docs/FOG_DATA_PROVENANCE.md`. No reference cache file or generated binary
+  has been added to the repository.
+- FogHost self-tests against the pinned reference root: **113 passed, 0
+  failed, 0 skipped**. This validates the existing host and generated event
+  builders with the reference root; it does not establish operation from a
+  cold network-blocked start.
+- The user declined contacting the FogMod maintainer and chose a project-owned
+  independent equivalent for `fog.txt`. That equivalent has not been authored
+  yet. The development root still contains the reference annotation solely as
+  a comparison oracle; it is not a candidate product file.
+- Old/new generation comparison passed **100/100 baseline seeds** and an
+  additional **100/100 seeds across five option profiles**. Each compared 54
+  output files; EMEVD and Talk were compared semantically, and other outputs by
+  size/hash. Deterministic reruns passed for the baseline seeds and one sample
+  in each of the five option profiles.
+- A separate graph/progression comparison passed **100/100 seeds across five
+  profiles**, including key-item area assignment, randomized connections and
+  reachability. Each world had 131 graph areas, 27 key items, and no required
+  areas left unreachable. Five profile samples were deterministic. These
+  comparisons still use the same reference `fog.txt` in both roots and do not
+  satisfy the independent-annotation parity gate.
+- `FogReconstruction self-test` passed. Root `npm run typecheck` passed.
+  Backend tests reported **577 passed, 1 failed, 2 skipped**; the isolated
+  failure is `supportBundle.test.mjs`, where `os.userInfo()` returns Windows
+  `uv_os_get_passwd: ENOMEM`. Desktop tests reported **121 passed, 1 failed**;
+  the failure is the existing settings-inventory snapshot mismatch in
+  `docs/SETTINGS_INVENTORY.json`. The desktop production build passed.
+- The pinned progression verifier rejects the reconstructed root's changed
+  reference hashes, as intended; production verification was not weakened.
+  The production downloader and strict validation remain in place. The root is
+  still **58/59 files**, missing the independent `dist/fog.txt`. Cold
+  network-blocked generation, zero-fetch proof, standard SDK build, packaging,
+  golden, release verifier and release gates therefore remain pending. No
+  version bump, commit, push or release was made.
+
+### Offline annotation continuation — area map membership
+
+- The area inventory audit now applies the project-owned area-ID namespace
+  policy to an explicit, ordered 131-ID project inventory and validates its
+  identity/order against the comparison inventory. Every resolved map exists
+  in the byte-verified pristine DSR map set, all compatibility projections are
+  unique, `burg_*` maps to Parish, and unknown namespaces fail closed.
+- This resolves only source-map membership. The Areas gate remains open:
+  125 records still lack complete tags, scaling-base policy, or static graph
+  semantics, so the audit remains U=125 and does not mark them complete.
+- `FogReconstruction self-test` passed, including 29 area-audit assertions;
+  the real-data audit against the clean DSR copy validated all 131 map
+  memberships. No production provider, downloader, version, or release state
+  changed.
+- The audit now emits aggregate reference shape only (without field values):
+  59 areas carry active tags (24 `boss`, 4 `optional`, 35 `trivial`), 9 have
+  scaling bases, and 85 static links span 57 areas (38 conditioned links).
+  This narrows the remaining graph reconstruction surface and does not import
+  those annotations into project policy.
+- A focused pristine-MSB pass found 9 name-marked transition candidates in
+  Depths. Raw event matching associates the two CP1 regions with map event 0's
+  generic initialization instruction; without schema-confirmed runtime use,
+  those matches do not establish a logical endpoint or static edge. No edge
+  was authored from these candidates.
+- Added a development-only pristine boss-event evidence audit. It found 28
+  `HandleBossDefeat` rows, 27 with a unique matching MSB enemy part; one
+  New Londo event has no matching enemy part and remains unresolved. The audit
+  writes only to an external report and assigns no area tags or edges.
+
+### Offline annotation continuation — area classification policy
+
+- Authored explicit project-owned classifications for all active Area tags:
+  24 boss encounter areas are validated against their exact pristine
+  `HandleBossDefeat` event and MSB enemy parts; 35 trivial connector areas and
+  four optional branches use named project balancing rules, with every area
+  checked against its verified DSR map owner. Optional and trivial overlap on
+  four areas, matching their combined runtime roles.
+- The external area audit resolves all 59 tag-bearing area identities
+  (`boss=24`, `optional=4`, `trivial=35`) and, as a comparison-only check,
+  reports **59/59 tag matches and 0 differences** without emitting reference
+  field values. Overall Areas remain open:
+  6 complete, 125 unresolved, `R=6/E=0/B=0/U=125`. The ten custom-start nodes
+  still have 16 static links without independently established endpoints or
+  conditions; the other 115 areas still need complete graph/scaling records.
+- The clean DSR FogHost suite passed **117/117**. `FogReconstruction self-test`
+  passed, including **30 area-audit assertions**. The audit report and oracle
+  comparison remain outside the repository; no reference field values were
+  imported into runtime policy.
+
+### Offline annotation continuation — typed transition-gate evidence
+
+- Added a development-only EMEVD/MSB audit for typed `IfPlayerHasItem`,
+  `IfActionButton`, `IfActionButtonLineSegment`, event-flag and warp operations.
+  It resolves parameterized event values per `InitializeEvent` call site and
+  associates action IDs only through exact same-map MSB entity identity.
+- On clean DSR it found **53 item-check observations**, **175 action-target
+  observations**, and **13 call-site rows containing both an item check and an
+  action target** across 17 maps. Three rows retain unresolved parameter
+  values and are not used to infer policy.
+- The known Crest-of-Artorias event resolves to item `Goods 2002` and its two
+  Darkroot gate regions. Depths event `11000110` ties Blighttown Key `Goods
+  2007` to object `o1309` / entity `1001200`; event `11000120` checks Sewer
+  Chamber Key `Goods 2018`. These are transition/gate facts for later category
+  assignment, not evidence of an `Area.To` edge. No area topology was inferred
+  from them.
+- `FogReconstruction self-test` passes with a known pristine Crest-item
+  argument-layout fixture. The full EMEVD/MSB evidence JSON remains in the
+  system temp directory and is not added to the repository.
+
+### Offline annotation continuation — first static Area link
+
+- Added one independently authored static route: `depths` to `depths_gaping`,
+  tagged `hard` and without a condition. The project rationale is the
+  hazardous same-map drop into the Gaping Dragon encounter; the destination
+  resolves to the pristine boss-defeat event `11000001` and MSB enemy part
+  `c5260_0000`. This is separate from the arena fog-gate Entrance and from the
+  Depths key-door EMEVD observations. The existing Race+ skip whitelist
+  continues to exclude this FogMod hard edge, preserving its current behavior.
+- The area catalog now includes route endpoints and compares only consumed
+  static-link tags. The comparison confirms the route's destination,
+  condition, and active `hard` behavior; the record is classified R because
+  the reference also carries an unconsumed `drop` label, which is not copied.
+  Overall Areas move to 7 complete and 124 unresolved, `R=7/E=0/B=0/U=124`;
+  all 59 project-owned tag identities still match the comparison inventory.
+- Verification: FogHost build and data-backed tests pass **117/117** against
+  the clean DSR copy; `FogReconstruction` build succeeds with 14 existing
+  SoulsFormats obsolete-API warnings and zero errors; self-test passes with
+  30 area-audit assertions. Real area audit confirms 131 inventory entries,
+  `B=0`, and `U=124`. Reports remain outside the repository. Production data,
+  generation behavior/version, and release state are unchanged.
+
+### Offline annotation continuation — explicit glitch-link policy
+
+- The resolver now distinguishes ordinary `Static` routes from project-owned
+  `CrossMapGlitch` graph routes. Ordinary routes must stay within one verified
+  map; only explicit CrossMapGlitch routes require the consumed `hard` tag and
+  may connect two verified maps. Same-map hard routes remain ordinary Static
+  links. Both endpoints, condition operators, condition areas, and resolved
+  key-item records backed by pristine GameParam are validated. This
+  classification is policy-only and is not emitted to the FogMod DTO;
+  Entrances and Warps remain the physical transition records.
+- The regression fixture allows a documented-shape Darkroot-to-DLC wrong-warp
+  only when marked `CrossMapGlitch` and `hard`; it rejects the same cross-map
+  edge as ordinary `Static`, a missing key fact, a non-hard crossing, and a
+  same-map CrossMapGlitch. The
+  fixture is not itself an authored catalog edge. The real project policy
+  still contains only the separately verified Depths-to-Gaping route.
+- FogHost build and clean-DSR tests pass **117/117**. `FogReconstruction`
+  builds with 14 existing obsolete-API warnings and zero errors; self-test
+  passes (30 area-audit assertions). Re-running the external area report keeps
+  the Depths route validated and the aggregate at `R=7/E=0/B=0/U=124`.
+- The full Area tag policy now assigns a reviewed state to all 131 IDs: special
+  boss/optional/trivial tags are explicit and the project default is an ordinary
+  progression node. The oracle comparison confirms 131/131 tag sets matched.
+  The project intentionally emits no `ScalingBase` overrides: the shipped
+  option contract never enables FogMod's debug-only `scalingbase` or `dumpdist`
+  flags, and a graph test confirms those fields are ignored with shipped
+  options. The audit records this rationale and classifies a scaling-base-only
+  difference as behavior-equivalent. The report's `ProjectPolicy` count now
+  covers the full 131-entry inventory; `Derived` counts the catalog nodes with
+  supporting project evidence in the current slice. Topology remains open at
+  124 U.
+
+### Offline annotation continuation — full Area model inventory
+
+- The development Area audit now constructs all 131 typed Area nodes in the
+  stable project order, validates their map memberships against the pristine
+  DSR facts, applies the complete tag policy, and validates the catalog before
+  comparison. A data-backed FogHost test also constructs a 131-node FogMod
+  graph from this model; this checks graph construction only, not route
+  reachability.
+- Each audit entry now reports `UnresolvedFields`. All 124 open records name
+  `staticLinks` as the remaining unresolved field; the other project fields
+  are present and have documented policy. The external report is at
+  `C:\Users\Adam\AppData\Local\Temp\ds1tr-area-catalog-continuation.json`.
+- Latest Area audit: 131 total, 40 with pristine-source anchors, 131 under
+  project policy, 131/131 tag matches, 7 complete, 124 unresolved,
+  `R=7/E=0/B=0/U=124`. Only the independently authored Depths-to-Gaping route
+  is present; no oracle edge values were emitted or imported.
+- Verification after this slice: FogHost build and clean-DSR tests passed
+  **117/117**; FogReconstruction build passed with 14 existing SoulsFormats
+  obsolete-API warnings and 0 errors; self-test passed with 30 Area audit
+  assertions; focused `git diff --check` passed. Areas remain open and phases B
+  and C have not started.
+
+### Offline annotation continuation — ToTG route evidence (2026-10-12)
+
+- The `totg -> totg_lower` hard route now has a clean-source anchor: pristine
+  MSB region `1313400` is the Patches kick trigger and region `1312121` is the
+  post-kick landing point. Pristine ToTG event `11310002` references the trigger
+  at instruction 7 and the landing region in its movement operations at
+  instructions 24, 32, and 39. A regression test verifies the map regions,
+  event archive, opcode identities, and argument values from the clean DSR
+  copy. The route remains a project-owned hard-only static edge, separate from
+  fog-wall/door transitions.
+- The custom-start fixture now includes the `totg_lower` route endpoint as a
+  graph node without incorrectly declaring it a custom start.
+- Refreshed Area audit: 131 total, 40 with pristine-source anchors, all 131
+  under project policy, 131/131 tag matches, 8 complete, 123 unresolved,
+  `R=8/E=0/B=0/U=123`. The additional route is comparison class R due an
+  unconsumed reference tag; no reference endpoint or condition was imported.
+- Area report format 6 includes only each row's comparison link count, never
+  destinations or conditions: 74 areas have zero, 38 have one, 13 have two,
+  and 9 have three or four (85 total). This is a review-priority signal only;
+  it does not populate project route policy.
+- Verification: FogHost tests pass **117/117**; FogHost test build and
+  FogReconstruction build passes with 14 existing SoulsFormats obsolete-API
+  warnings and 0 errors; FogReconstruction
+  self-test passes (31 Area audit assertions); the external Area report was
+  regenerated. Entrances, Warps, KeyItems, and LotLocations remain untouched.
+
+### Offline annotation continuation — Depths transition evidence (2026-10-12)
+
+- The pristine EMEVD/MSB regression now also verifies the Depths object
+  `o1309` / entity `1001200` against event `11000110`: the event checks the
+  English DSR Goods item `Blighttown Key` (`3:2007`), accepts interaction with
+  that object, and issues the short-warp request. This is recorded as a
+  physical transition candidate for the later Entrance model, never as an
+  `Area.To` edge.
+- FogHost test build passed with 0 warnings/errors; clean-DSR FogHost tests
+  passed **117/117**. The Area inventory remains at 131 total, 8 complete and
+  123 unresolved; no route policy was inferred from the new candidate alone.
+
+### Offline annotation continuation — Area edge ownership review (2026-10-12)
+
+- Source review of the pinned FogMod `Graph.Construct` and `GraphConnector`
+  confirms that `Area.To` creates fixed graph edges, while Entrances and Warps
+  create a separate set of edges that may be shuffled. A physical boundary
+  therefore needs exactly one project-owned representation; the later presence
+  of an Entrance/Warp cannot by itself justify omitting a required static Area
+  route.
+- The Depths key-door event `11000110` remains an Entrance candidate, separate
+  from the already verified hard-only `depths -> depths_gaping` drop. ToTG's
+  Patches descent remains the independently verified hard-only Area route.
+  Neither candidate adds an Area edge solely from proximity or a name marker.
+- Current Area audit remains 131 total, 8 complete and 123 unresolved
+  (`R=8/E=0/B=0/U=123`). This is a design/evidence review only; no production
+  generation, data-root, version, or release behavior changed.
+
+### Offline annotation continuation — Area graph behavior audit (2026-10-12)
+
+- Added a development-only Area graph behavior audit that runs the pinned FogMod
+  Graph, ItemReader, GraphConnector, and GraphChecker with reference Areas and
+  with the project Area projection while holding all other categories equal.
+  It writes aggregate results only and never serializes reference edge
+  endpoints or conditions. The report is outside the repository at
+  `C:\Users\Adam\AppData\Local\Temp\ds1tr-area-graph-behavior-audit.json`.
+- The 15-case sample (three profiles by five fixed seeds) has 15/15 reference
+  connector passes and 15/15 project connector failures with the current
+  two-route project Area policy. In the fixed-default profile, the project
+  graph reports 125 areas without a connector route. This confirms that the
+  current Area model is incomplete; it is not an equivalence result.
+- FogReconstruction builds with 14 existing SoulsFormats obsolete-API warnings
+  and zero errors. Its self-test passes, including the new unreachable-count
+  parser assertion. No application generation, production data root, version,
+  package, or release state changed.
+
+### Offline annotation continuation — boss-area static-route policy (2026-10-12)
+
+- Authored an explicit empty-static-route policy for 23 boss encounter Areas.
+  Each entry is validated against its project boss Area, pristine HandleBossDefeat
+  event, and exact MSB enemy-part set. These nodes use the separate
+  Entrance/Warp boundary model. Catacombs Pinwheel is intentionally excluded
+  because its post-boss cave passage remains a static Area route to reconstruct.
+  Static route resolution rejects a source that also has a no-static-links
+  disposition.
+- Refreshed Area audit: 131 total, 40 derived, all 131 under project policy,
+  131/131 active tags matched, 31 complete, 100 unresolved,
+  `R=31/E=0/B=0/U=100`. The report still contains aggregate reference counts
+  only; no oracle endpoints or conditions were emitted.
+- Release/runtime data is unchanged. FogHost Release build passed with 0
+  warnings/errors; clean-DSR FogHost tests passed **117/117**. The latest
+  FogReconstruction build passed with 14 pre-existing SoulsFormats
+  obsolete-API warnings and 0 errors. The 15-case Area graph comparison still
+  shows the partial project route inventory cannot connect the full graph; this
+  no-static policy is a classification step, not an Area closure claim.
+
+### Offline annotation continuation — project-unreachable graph diagnostics (2026-10-12)
+
+- The development-only Area graph behavior report now includes the sorted set
+  of project-owned Area IDs left unreachable by the project graph. It still
+  excludes all reference edge endpoints and conditions. This makes connector
+  failures actionable without copying oracle topology.
+- The same 15 fixed profile/seed cases still fail project graph connection;
+  the project model reports 125 unreachable Areas in the fixed-default case.
+  Area completeness remains 31 complete / 100 unresolved (`R=31/E=0/B=0/U=100`);
+  no route policy was inferred from the diagnostic IDs.
+- FogReconstruction Release build passed with 14 existing SoulsFormats
+  obsolete-API warnings and 0 errors. Its self-test passed, including the new
+  unreachable-ID parser test. Fresh clean-DSR area-gate and transition-event
+  evidence reports were written outside the repository. Production data,
+  generation behavior, version, and release state are unchanged.
+
+### Offline annotation continuation — boss route neighborhood evidence (2026-10-12)
+
+- The pristine boss-fact report now includes up to 40 nearby entity-backed MSB
+  objects/regions per matched boss, ordered by 3D distance. It remains
+  evidence-only and writes to an external development report.
+- The Pinwheel anchor resolves to pristine M13 enemy part `c3320_0000` in
+  collision `h0036B0`; its local region set includes boss warp points and the
+  boss-room logic region. This confirms the encounter anchor but does not prove
+  an independent static exit to another Area, so `catacombs_pinwheel` remains
+  unresolved pending route evidence. No Area policy was changed.
+- The Release build and real-data report generation passed. The report is at
+  `C:\Users\Adam\AppData\Local\Temp\ds1tr-boss-facts-continuation.json`.
+
+### Offline annotation continuation — Pinwheel gate ownership (2026-10-12)
+
+- The empty-static-route policy now covers all 24 boss encounter Areas. For
+  `catacombs_pinwheel`, it is anchored to pristine Catacombs object entity
+  `1301990` and trigger region `1302998`; the boss event still anchors the
+  encounter Area. Project semantics assign this boss-gate boundary to the
+  Entrance model instead of duplicating it in `Area.To`.
+- Typed EMEVD inspection resolved event `11305350`'s nearby short-warp requests
+  to skeleton enemies `c3320_0001/0002`; those are enemy movement, not a player
+  exit. No additional static return route was inferred from them.
+- Refreshed Area audit: 131 total, 40 derived, 131 under project policy,
+  131/131 tag matches, 32 complete, 99 unresolved; structural comparison is
+  `R=31/E=0/B=0/U=100`. The Pinwheel row is complete by project policy but
+  retains structural `U` until combined Entrance behavior is compared.
+- FogHost test build passed with 0 warnings/errors; the full clean-DSR FogHost
+  test harness passed. FogReconstruction Release build passed with 14 existing
+  SoulsFormats obsolete-API warnings and 0 errors; self-test passed.
+  Production data, version, package, and release state are unchanged.
+
+### Offline annotation continuation — Pinwheel approach ownership (2026-10-12)
+
+- The same pristine Catacombs fog-gate boundary is now assigned to the Entrance
+  model from both `catacombs_prepinwheel` and `catacombs_pinwheel`. The policy
+  validates map-local object entity `1301990`, trigger region `1302998`, and
+  interaction event `11305391`; it rejects a static Area route from either
+  side. Boss-event evidence remains required for the arena node.
+- Area inventory audit: 131 total, 40 derived, 131 under project policy,
+  33 complete, 98 unresolved. Structural comparison remains
+  `R=31/E=0/B=0/U=100`; the gate-side link differences await the combined
+  Entrance comparison.
+- FogHost Release build and test build passed with zero warnings/errors. The
+  full clean-DSR FogHost suite passed 117/117. FogReconstruction Release build
+  passed with 14 existing SoulsFormats obsolete-API warnings and zero errors;
+  self-test passed, including all 31 Area catalog assertions. No production
+  data, generation behavior, version, packaging, or release state changed.
+
+### Offline annotation continuation — pristine ObjAct evidence (2026-10-12)
+
+- The pristine DSR fact index now records MSB ObjAct object-part identity,
+  action entity, parameter, event flag, and state. The development-only Area
+  gate report includes those rows alongside typed EMEVD evidence. The clean
+  audit found 147 ObjActs across 17 maps; the report is outside the repo at
+  `C:\Users\Adam\AppData\Local\Temp\ds1tr-area-gates-objacts.json`.
+- In Catacombs, candidate objects `o3020_0000` and `o3021_0000` have no
+  corresponding ObjAct row. This does not prove they are not transitions, so
+  no Area route was inferred from their names or proximity. Area inventory
+  remains 33 complete / 98 unresolved; structural comparison remains
+  `R=31/E=0/B=0/U=100`.
+- FogHost Release/test builds passed with zero warnings/errors; the full
+  clean-DSR suite passed 117/117, including MSB ObjAct/object identity checks.
+  FogReconstruction Release build passed with 14 existing SoulsFormats
+  obsolete-API warnings and zero errors; self-test passed. No production data,
+  generation behavior, version, packaging, or release state changed.
+
+### Offline annotation continuation — ObjAct flag correlation (2026-10-12)
+
+- The gate-evidence report now includes all 940 map-local EMEVD event/flag
+  writes so ObjAct enable flags can be compared to pristine script writers.
+  Of 147 ObjActs, 43 have a positive event flag and 4 have a direct writer in
+  that same map archive. This is a correlation index only; it does not equate
+  an enable flag with a door-state transition.
+- Catacombs' candidate objects `o3020_0000` and `o3021_0000` still have no
+  ObjAct record and no route was inferred from that absence. Areas remain
+  33 complete / 98 unresolved; structural comparison remains
+  `R=31/E=0/B=0/U=100`. Version stays 0.39.0; production and release remain
+  unchanged.
+
+### Offline annotation continuation — combined transition inventory (2026-10-12)
+
+- The work order now treats Areas, Entrances, and Warps as one world-transition
+  model. Added a development-only inventory command that reads current project
+  policies and byte-verified pristine DSR facts without reading reference
+  transition endpoints or conditions.
+- The current authored inventory contains two static Area routes, two
+  Entrance boundary candidates (the Depths-to-Blighttown key door and the
+  Pinwheel fog gate), no Warp policies, 23 explicit no-static-link Area
+  dispositions, and 104 unresolved Area dispositions. No duplicate physical
+  owners were found. These counts are an inventory checkpoint, not a closure
+  result; Entrance runtime projections and all Warp policies remain open.
+- The Depths-to-Blighttown boundary policy is anchored to pristine map object
+  `o1309` / entity `1001200`, event `11000110`, and Goods `3:2007` (Blighttown
+  Key). The existing clean-source event test verifies that the item check and
+  object action belong to the same event; the inventory resolver separately
+  checks the exact object, event, item identity, and project Area/map owners.
+  Its item appears in pristine ItemLotParam rows `2500` and `4006`, with no
+  MSB treasure or NpcParam enemy-drop source. Pristine common EMEVD event 970
+  also awards lot `2500` through instruction `2003[36]`; common event 0
+  instruction 42 supplies that lot ID. Row `4006` still has no identified
+  consumer. The fact index now records typed `2003[4]`/`2003[36]` item-lot
+  awards and resolves their `InitializeEvent` arguments per caller. The
+  key-door Entrance DTO is now authored as a fixed, two-sided FogMod door with
+  the logical `blighttown_key` requirement. Its KeyItem policy and the other
+  Entrance/Warps remain open.
+- Verification: FogHost test build passed with zero warnings/errors; the full
+  clean-DSR FogHost suite passed **148/148** with both `DS1TR_TEST_GAME_ROOT`
+  and `DS1TR_PRISTINE_DSR_ROOT` set to the QA copy. FogReconstruction Release
+  build passed with 14 existing SoulsFormats obsolete-API warnings and zero
+  errors; self-test passed, including three new duplicate-anchor inventory
+  assertions. The external report is
+  `C:\Users\Adam\AppData\Local\Temp\ds1tr-world-transition-inventory.json`.
+  Production data, generation behavior, version, packaging, and release state
+  are unchanged.
+
+### Offline annotation continuation — boss reward lot provenance (2026-10-12)
+
+- Confirmed from pristine EMEVD bytes that common event 970's `2003[36]` item
+  award receives ItemLot `2500` from event 0's initializer at instruction 42.
+  That row contains the Blighttown Key. The same initializer passes completion
+  flag `2`; Depths boss event `11000001` sets that flag and is anchored to the
+  Gaping Dragon area, supporting `depths_gaping` as the key's later default-area
+  policy. The numerically separate row `4006` still has no confirmed runtime
+  consumer; it is not treated as a second key placement.
+- Added a typed item-lot award fact index for `2003[4]` and `2003[36]`, resolving
+  integer arguments from same-archive `InitializeEvent` callers. The clean DSR
+  integration test now guards the event-970/lot-2500 mapping.
+- FogHost.Tests Release build passed with zero warnings/errors; the full
+  clean-DSR suite passed **148/148**. FogReconstruction Release build passed
+  with 14 existing SoulsFormats obsolete-API warnings and zero errors;
+  self-test passed. The clean-DSR test builds the key-door catalog and confirms
+  FogMod constructs fixed entrance edges gated by the resolved key. The
+  regenerated external inventory shows the event-970 reward source and keeps
+  `4006` unresolved; combined transition counts remain 2 static links, 2
+  Entrance candidates, 0 Warps, 23 no-static Area dispositions, and 104
+  unresolved Area dispositions. No version, production data, packaging,
+  release, or commit changes were made.
+
+### Offline annotation continuation — key-door family and short-warp facts (2026-10-12)
+
+- Added the Darkroot Crest gate to the project-owned `FIXED_KEY_DOOR` policy
+  family. Clean DSR anchors are object `o2908_0000` / entity `1201986`, event
+  `11200100`, action region `1202500`, and Goods `3:2002` (Crest of Artorias).
+  The authored project sides are `darkroot` and `darkroot_forest`; the clean
+  test checks the item check and resolves the paired event's region parameter.
+  FogMod constructs a fixed, bidirectional, Crest-gated edge. This does not
+  resolve Darkroot's separate static Area relation.
+- Corrected the development area-gate reader's `IssueShortWarpRequest`
+  argument layout: entity ID, warp type and destination entity ID are aligned
+  Int32 fields at offsets 0, 4 and 8. Offset 5 had produced bogus destination
+  values. A focused self-test uses pristine Sen's event `11500102` and expects
+  player destination object `o5301_0000` / entity `1501011`.
+- The clean-data short-warp report now yields 62 unique player targets: 39
+  type 1, 23 type 0; 59 target a unique MSB region/object, and 3 use destination
+  ID 0. These are evidence candidates, not 62 authored Warp policies.
+- Current combined inventory: 2 static Area routes, 3 Entrance boundary entries
+  (including the Pinwheel candidate), 0 authored Warps, 23 no-static Area
+  dispositions, 104 unresolved Area dispositions, 0 duplicate owners. Phase 1
+  is still open; Phase 2 has not started.
+- Verification: clean-DSR FogHost suite **148 passed, 0 failed, 0 skipped**;
+  FogReconstruction self-test passed. The reconstruction build retains 14
+  pre-existing SoulsFormats obsolete-API warnings. Desktop version and
+  production runtime/data root remain unchanged; no commit or push.
+
+### Offline annotation continuation — combined transition comparison (2026-10-12)
+
+- Added a comparison-only graph audit that constructs the pinned FogMod graph
+  for combined `Area.To + Entrances + Warps` behavior in fixed-default and hard
+  profiles. It compares traversable directed routes and conditions, ignores
+  the annotation category when evaluating route equivalence, and emits counts
+  only; reference endpoints and conditions are not written to the report.
+- Added regression cases proving that reciprocal static routes and one fixed
+  two-sided Door compare as behavior-equivalent, a fixed Warp participates as
+  a directed edge, and a one-way static route versus a bidirectional Door
+  remains behavior-changing. The area-catalog audit
+  now includes this combined graph result and projects the two independently
+  validated key-door policies into its graph comparison.
+- Current partial-model comparison: fixed-default has 286 reference routes
+  and 4 project routes (1 shared); hard has 298 reference routes and 6 project
+  routes (3 shared, including 2 category-only equivalents). Both profiles
+  still show behavior-changing differences; this is a measurement gate, not
+  Phase 1 closure. The separate Area field inventory remains unresolved and
+  no Warp policy has been authored.
+- FogReconstruction Release self-test passes, including the combined graph
+  fixtures. The release build has 14 existing SoulsFormats obsolete-API
+  warnings and zero errors. No production catalog, generator, version,
+  package, release, or Git history changes were made.
+
+### Offline Fog checkpoint — fixed-transition graph audit (2026-10-12)
+
+- Closed the current comparator-correctness fragment. Combined fixed-profile
+  routes now use `Graph.Edge.LinkedExpr`, which is the condition evaluated by
+  FogMod's progression checker and includes both sides of a connection. The
+  graph clone preserves `Entrance.Area`. The audit separately compares node
+  inventories and marks a profile U when nodes differ or named exits remain
+  unlinked. Exact condition-string comparison is intentionally conservative;
+  this is a fixed-default/fixed-hard diagnostic, not proof for randomized
+  entrance/warp behavior or executable warp targets.
+- Added fixtures for a conditional fixed Entrance, a conditional fixed Warp,
+  paired `dnofts` door conditions, a missing isolated node, and unclassified
+  unlinked endpoints. Existing reciprocal-route, one-way-route, and Warp
+  fixtures remain. FogReconstruction self-test passes.
+- Latest Area audit: **33/131 complete**, 40 with resolved DSR identity facts,
+  project tag policy on 131/131, and 98 unresolved. Per-area classes are
+  R=31/E=0/B=0/U=100; U includes the two Pinwheel Area records whose fields are
+  complete but whose combined Entrance behavior is still open. The combined
+  fixed-profile comparison is B in both profiles: default 288 reference routes
+  versus 4 project routes, hard 300 versus 6. Both have zero node differences
+  and zero unlinked named endpoints. These counts do not close Phase 1.
+- Current annotation inventory: Areas 33/131 complete; Entrances 0/109
+  category-complete (2 authored fixed-key-door DTO policies and one anchored
+  Pinwheel candidate, with the rest of the category open); Warps 0/15;
+  CustomStarts 16/16 CLOSED (R=2/E=14); KeyItems 0/27; LotLocations 0/440;
+  DefaultFlagCols 1 project-policy, 1 unused, 106 unresolved; Enemies 0/392
+  policy-complete (resolver infrastructure only); DefaultCost 0/127; Options
+  11/11 unused and CLOSED. No Entrances category-level R/E/B/U comparison has
+  run; the combined graph result above is B in both fixed profiles. The current
+  world inventory reports 2 static Area routes, 3 Entrance candidates, 0 Warp
+  policies, 23 no-static dispositions, 104 unresolved transition-owner
+  dispositions and 0 duplicate project physical owners. Phase 2 remains
+  NOT STARTED.
+- Verification on the available local .NET SDK **8.0.425**:
+  FogHost Release build passed (0 warnings/errors); the FogHost self-test
+  console passed **148/148** against the clean QA DSR and verified Fog data;
+  FogReconstruction Release build passed (14 existing SoulsFormats obsolete-API
+  warnings, 0 errors); FogReconstruction self-test passed. `dotnet test` is not
+  the test runner for FogHost.Tests (the project is a console self-test); the
+  documented `dotnet run` workflow was used instead. No game launch, seed
+  matrix, production data/downloader change, version bump, package, release or
+  push was made.

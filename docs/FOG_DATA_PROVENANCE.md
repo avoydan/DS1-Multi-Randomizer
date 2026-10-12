@@ -37,10 +37,17 @@ version.
 
 ## Redistribution decision
 
+On 2026-10-11, the user declined contacting the FogMod maintainer and directed
+the project to author an independent equivalent for `fog.txt`. Until that
+source exists and passes parity checks, the license scope remains unresolved,
+the reference annotation stays development-only, and the production fetch path
+is unchanged.
+
 - DS1TR bundles **none** of the 59 files. Event and talk scripts are FromSoftware-derived and are not ours to redistribute.
-  `fog.txt` is FogMod's own annotation data in a repository under Apache-2.0, but nothing is gained by bundling a single
-  file when the rest has to be fetched anyway, and the authorship of the layout XML files is not separately stated, so they
-  are treated like the rest.
+  `fog.txt` is annotation data stored at `dist/fog.txt`. The repository has an Apache-2.0 license under the sibling
+  `FogMod/` directory, but the available evidence does not establish that this license covers `dist/fog.txt`; its
+  redistribution status is unresolved. The authorship and license scope for the layout XML files are also not separately
+  stated, so they are not bundled.
 - The 40 non-derivable files are fetched by the player's own computer, once, over HTTPS, from the FogMod repository itself
   (`https://raw.githubusercontent.com/thefifthmatt/FogMod/<pinned commit>/<path>`), each checked against its pinned SHA-256
   with a size bound, assembled in a temporary folder, verified as a whole and moved into the application cache atomically.
@@ -113,4 +120,4 @@ version.
 | `dist/DS1R/script/talk/m17_00_00_00.talkesdbnd.dcx` | 12685 | `8104041480975defcfe2af1883272ff97697a13decda4b4e5b9cfddda6ce922b` | C (modified) | Talk script archive (ESD) FogMod reads | FromSoftware talk scripts as stored in the FogMod repository, edited by its author. 4 of 8 scripts differ against the clean installation | no (differs from the installation) | no (FromSoftware-derived) | fetched from upstream |
 | `dist/DS1R/script/talk/m18_00_00_00.talkesdbnd.dcx` | 22955 | `9c48aec325b97b3ff07f52d8a1d5ebe50816f58c0778278d30d86b8f6cf2b0eb` | C (modified) | Talk script archive (ESD) FogMod reads | FromSoftware talk scripts as stored in the FogMod repository, edited by its author. 4 of 8 scripts differ against the clean installation | no (differs from the installation) | no (FromSoftware-derived) | fetched from upstream |
 | `dist/DS1R/script/talk/m18_01_00_00.talkesdbnd.dcx` | 7974 | `1ea5f79f174bfd183a04a36a11d60120f8e8e5084b8fef276bef3ec2a01d62f5` | C (modified) | Talk script archive (ESD) FogMod reads | FromSoftware talk scripts as stored in the FogMod repository, edited by its author. 2 of 6 scripts differ against the clean installation | no (differs from the installation) | no (FromSoftware-derived) | fetched from upstream |
-| `dist/fog.txt` | 147516 | `77a10b4015c51bdfbe1499f38344c85540a63bfa1ef6370ad9c1ebdc9a2d2af6` (LF-normalized) | A | FogMod annotation data (gates, areas, items) | FogMod repository, pinned commit; Apache-2.0 repository licence | no | not needed (fetched) | fetched from upstream |
+| `dist/fog.txt` | 147516 | `77a10b4015c51bdfbe1499f38344c85540a63bfa1ef6370ad9c1ebdc9a2d2af6` (LF-normalized) | A | FogMod annotation data (gates, areas, items) | FogMod repository, pinned commit; explicit coverage by the sibling Apache-2.0 license is not established | no | unresolved | fetched from upstream |

@@ -22,6 +22,7 @@ namespace FogReconstruction
             int semanticMismatchCount = 0;
             int rawMismatchCount = 0;
             var examples = new List<string>();
+            var normalizationPlan = new List<string>();
             foreach (string targetPath in targets)
             {
                 string sourcePath = Path.Combine(sourceDirectory, Path.GetFileName(targetPath));
@@ -45,6 +46,7 @@ namespace FogReconstruction
                     if (changedByFog)
                     {
                         changedScriptsBefore++;
+                        normalizationPlan.Add(Path.GetFileName(targetPath) + "|" + name);
                         normalizedExpressions += TalkBytecodeNormalizer.Normalize(source);
                     }
                     string normalizedFingerprint = CanonicalSemantics.EsdFingerprint(CanonicalSemantics.Esd(source, name, normalizeBytecode: false));
@@ -64,6 +66,7 @@ namespace FogReconstruction
             }
 
             Console.WriteLine($"Talk normalization: {scripts} ESD entries across {targets.Length} archives; {changedScriptsBefore} entries differ before normalization; {normalizedExpressions} expressions/compatibility edits changed; {scripts - semanticMismatchCount}/{scripts} semantic parity; {scripts - rawMismatchCount}/{scripts} raw-model parity.");
+            Console.WriteLine("Project-owned normalization entry plan: " + string.Join(",", normalizationPlan.OrderBy(value => value, StringComparer.Ordinal)));
             foreach (string example in examples) Console.WriteLine($"Mismatch: {example}");
             if (semanticMismatchCount != 0) throw new InvalidDataException($"Talk semantic canonicalization did not match the reference for {semanticMismatchCount} ESD entries.");
         }

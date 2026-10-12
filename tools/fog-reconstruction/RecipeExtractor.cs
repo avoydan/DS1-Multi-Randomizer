@@ -42,7 +42,7 @@ namespace FogReconstruction
             Console.WriteLine($"Verified inputs: 19 pristine Fog base files match the pinned SHA-256 inventory; ParamDef is present; reference Fog root passes all {FogHost.DataRoot.Manifest.Count} pinned hashes and inventories; pristine EMEVD={sourceEvents}, Talk={sourceTalks}; reference EMEVD={events}, Talk={talks}.");
         }
 
-        private static void VerifyPristineBaseFiles(string pristineRoot)
+        internal static void VerifyPristineBaseFiles(string pristineRoot)
         {
             const string prefix = "dist/DS1R/";
             int verified = 0;

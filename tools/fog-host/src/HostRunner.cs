@@ -136,7 +136,61 @@ namespace FogHost
 
             Enter("write-game-data", request.DryRun ? "Computing game data (dry run)." : "Writing game data to staging.");
             var merge = new EmevdMerge(mergeInputs);
-            var hooks = new FogHostHooks { EventMerger = merge.Merge };
+            var hooks = new FogHostHooks
+            {
+                EventMerger = (fileName, output) =>
+                {
+                    FogAddedEventBuilder.ReplaceReconstructedAddedEvents(fileName, output);
+                    if (string.Equals(fileName, "common.emevd.dcx", StringComparison.Ordinal))
+                    {
+                        FogCommonEventBuilder.ReplaceAuthoredCommonEvents(output);
+                        FogModifiedEventBuilder.ReconstructKnownCommonEvents(output);
+                        Event5700Builder.ReplaceExisting(output);
+                    }
+                    if (string.Equals(fileName, "m10_00_00_00.emevd.dcx", StringComparison.Ordinal))
+                        FogModifiedEventBuilder.ReconstructKnownM10Events(output);
+                    if (string.Equals(fileName, "m10_01_00_00.emevd.dcx", StringComparison.Ordinal))
+                        FogModifiedEventBuilder.ReconstructKnownM10ParishEvents(output);
+                    if (string.Equals(fileName, "m10_02_00_00.emevd.dcx", StringComparison.Ordinal))
+                        FogModifiedEventBuilder.ReconstructKnownM10NewLondoEvents(output);
+                    if (string.Equals(fileName, "m11_00_00_00.emevd.dcx", StringComparison.Ordinal))
+                        FogModifiedEventBuilder.ReconstructKnownM11Events(output);
+                    if (string.Equals(fileName, "m12_00_00_00.emevd.dcx", StringComparison.Ordinal))
+                        FogModifiedEventBuilder.ReconstructKnownM12Events(output);
+                    if (string.Equals(fileName, "m12_01_00_00.emevd.dcx", StringComparison.Ordinal))
+                        FogModifiedEventBuilder.ReconstructKnownM12DlcEvents(output);
+                    if (string.Equals(fileName, "m13_00_00_00.emevd.dcx", StringComparison.Ordinal))
+                        FogModifiedEventBuilder.ReconstructKnownM13Events(output);
+                    if (string.Equals(fileName, "m13_01_00_00.emevd.dcx", StringComparison.Ordinal))
+                        FogModifiedEventBuilder.ReconstructKnownM13DlcEvents(output);
+                    if (string.Equals(fileName, "m14_00_00_00.emevd.dcx", StringComparison.Ordinal))
+                        FogModifiedEventBuilder.ReconstructKnownM14Events(output);
+                    if (string.Equals(fileName, "m14_01_00_00.emevd.dcx", StringComparison.Ordinal))
+                        FogModifiedEventBuilder.ReconstructKnownM14DlcEvents(output);
+                    if (string.Equals(fileName, "m15_00_00_00.emevd.dcx", StringComparison.Ordinal))
+                        FogModifiedEventBuilder.ReconstructKnownM15Events(output);
+                    if (string.Equals(fileName, "m15_01_00_00.emevd.dcx", StringComparison.Ordinal))
+                        FogModifiedEventBuilder.ReconstructKnownM15DlcEvents(output);
+                    if (string.Equals(fileName, "m16_00_00_00.emevd.dcx", StringComparison.Ordinal))
+                        FogModifiedEventBuilder.ReconstructKnownM16Events(output);
+                    if (string.Equals(fileName, "m17_00_00_00.emevd.dcx", StringComparison.Ordinal))
+                        FogModifiedEventBuilder.ReconstructKnownM17Events(output);
+                    if (string.Equals(fileName, "m18_00_00_00.emevd.dcx", StringComparison.Ordinal))
+                        FogModifiedEventBuilder.ReconstructKnownM18Events(output);
+                    if (string.Equals(fileName, "m18_01_00_00.emevd.dcx", StringComparison.Ordinal))
+                        FogModifiedEventBuilder.ReconstructKnownM18DlcEvents(output);
+                    FogModifiedEventBuilder.ReconstructKnownMapEventInitializers(fileName, output);
+                    if (request.Options["noFallBedOfChaos"]
+                        && string.Equals(fileName, "m14_01_00_00.emevd.dcx", StringComparison.Ordinal))
+                    {
+                        EMEVD pristine = mergeInputs.TryGetValue(fileName, out var bedOfChaosInput)
+                            ? bedOfChaosInput.Item1
+                            : EMEVD.Read(Resolve(staging, Path.Combine("event", fileName)));
+                        FogVanillaEventBuilder.ReplaceBedOfChaosHelpers(pristine, output);
+                    }
+                    merge.Merge(fileName, output);
+                },
+            };
             hooks.PreservedNpcParams.UnionWith(preserved);
             new GameDataWriter { Hooks = hooks }.Write(opt, ann, graph, staging, FromGame.DS1R);
             merge.ThrowIfConflicts();
