@@ -4,6 +4,7 @@ import type { GenerationSettings } from '@ds1tr/contracts';
 import { LanguageSelect } from '../LanguageSelect';
 import { SeedPanel, SummaryChips, type LoadedSeed } from '../SeedPanel';
 import { UpdateCard } from './UpdatePanel';
+import { GameConvenienceSettings } from './GameConvenienceSettings';
 import type { UpdatesApi } from './useUpdates';
 
 /** The destinations of the sidebar other than "Your game". They show and move text; none of them changes how a world is made. */
@@ -95,6 +96,7 @@ export function AppSettingsView({ children, updates }: { children: ReactNode; up
       <ViewHeader title={t('app.views.settings.title')} note={t('app.views.settings.note')} />
       <section className="card"><h2>{t('app.views.settings.languageTitle')}</h2><p>{t('app.views.settings.languageNote')}</p><LanguageSelect /></section>
       <UpdateCard updates={updates} showAutoCheck />
+      <GameConvenienceSettings />
       {children}
     </>
   );

@@ -213,7 +213,11 @@
       "title": "Ustawienia aplikacji",
       "note": "Język i narzędzia.",
       "languageTitle": "Język",
-      "languageNote": "Język tej aplikacji. Nigdy nie zmienia świata i nie jest częścią Seed Code."
+      "languageNote": "Język tej aplikacji. Nigdy nie zmienia świata i nie jest częścią Seed Code.",
+      "gameConveniencesTitle": "Udogodnienia gry",
+      "gameConveniencesNote": "Lokalne ustawienia launchera. Nie wpływają na losowanie świata ani Seed Code.",
+      "freeCursorLabel": "Swobodny kursor w menu gry",
+      "freeCursorDescription": "Pozwala przesunąć kursor poza okno Dark Souls Remastered, gdy menu gry jest otwarte. Przydatne przy wielu monitorach."
     },
     "about": {
       "title": "O programie",

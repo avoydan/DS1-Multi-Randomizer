@@ -209,7 +209,11 @@
       "title": "App settings",
       "note": "Language and tools.",
       "languageTitle": "Language",
-      "languageNote": "The language of this app. It never changes a world and is not part of a Seed Code."
+      "languageNote": "The language of this app. It never changes a world and is not part of a Seed Code.",
+      "gameConveniencesTitle": "Game conveniences",
+      "gameConveniencesNote": "Local launcher settings. They do not affect world generation or Seed Codes.",
+      "freeCursorLabel": "Free cursor in game menus",
+      "freeCursorDescription": "Lets you move the cursor outside the Dark Souls Remastered window while a game menu is open. Useful with multiple monitors."
     },
     "about": {
       "title": "About",

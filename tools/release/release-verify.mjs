@@ -87,16 +87,20 @@ for (const [kind, name] of [['installer', installerName], ['portable', portableN
 const mainExe = path.join(unpacked, policy.ds1trExecutables[0].path);
 const dataToolExe = path.join(unpacked, policy.ds1trExecutables[1].path);
 const fogHostExe = path.join(unpacked, policy.ds1trExecutables[2].path);
-const present = [mainExe, dataToolExe, fogHostExe, ...artifacts.map((artifact) => artifact.file)].filter((file) => files.length > 0);
+const gameCursorHelperExe = path.join(unpacked, policy.ds1trExecutables[3].path);
+const present = [mainExe, dataToolExe, fogHostExe, gameCursorHelperExe, ...artifacts.map((artifact) => artifact.file)].filter((file) => files.length > 0);
 const infos = await readVersionInfo(present.filter((file) => /\.exe$/iu.test(file)));
 const infoOf = (file) => infos.find((entry) => entry.file === file);
 const fogCsproj = await readFile(path.join(repositoryRoot, 'tools', 'fog-host', 'FogHost.csproj'), 'utf8');
 const fogVersion = /<Version>([^<]+)<\/Version>/u.exec(fogCsproj)?.[1];
+const cursorHelperCsproj = await readFile(path.join(repositoryRoot, 'tools', 'game-cursor-helper', 'GameCursorHelper.csproj'), 'utf8');
+const cursorHelperVersion = /<Version>([^<]+)<\/Version>/u.exec(cursorHelperCsproj)?.[1];
 const randomizerVersion = (await readJson(path.join(repositoryRoot, 'engines', 'combined', 'vendor', 'package.json'))).version;
 const fileVersionOf = (info) => (info?.fileVersion ?? '').split('.').slice(0, 3).join('.');
 if (infoOf(mainExe) && fileVersionOf(infoOf(mainExe)) !== version) fail('versions', `the application executable says ${infoOf(mainExe).fileVersion}, package.json says ${version}`);
 if (infoOf(fogHostExe) && fileVersionOf(infoOf(fogHostExe)) !== fogVersion) fail('versions', `FogHost.exe says ${infoOf(fogHostExe).fileVersion}, FogHost.csproj says ${fogVersion}`);
-for (const [label, file] of [['application', mainExe], ['DsrDataTool', dataToolExe], ['FogHost', fogHostExe]]) {
+if (infoOf(gameCursorHelperExe) && fileVersionOf(infoOf(gameCursorHelperExe)) !== cursorHelperVersion) fail('versions', `GameCursorHelper.exe says ${infoOf(gameCursorHelperExe).fileVersion}, GameCursorHelper.csproj says ${cursorHelperVersion}`);
+for (const [label, file] of [['application', mainExe], ['DsrDataTool', dataToolExe], ['FogHost', fogHostExe], ['GameCursorHelper', gameCursorHelperExe]]) {
   const info = infoOf(file);
   if (!info) continue;
   if (/GitHub, Inc\.|^$/u.test(info.company ?? '')) fail('metadata', `${label}: the company name is "${info.company ?? ''}" (it must name this project, not the toolchain)`);

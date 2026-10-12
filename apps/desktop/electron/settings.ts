@@ -8,6 +8,8 @@ export interface StoredSettings {
   language?: LanguageSetting;
   /** Application updates (docs/AUTO_UPDATE.md). Absent means the defaults: automatic checks ON, nothing checked yet. Never part of a world. */
   updates?: StoredUpdateSettings;
+  /** Local launcher convenience; never used by generation, presets, or Seed Codes. Absent means off. */
+  freeCursorInMenus?: boolean;
 }
 
 export interface StoredUpdateSettings {
@@ -56,6 +58,7 @@ export function migrateSettings(raw: unknown): { settings: StoredSettings; chang
   if (language && language !== 'auto') settings.language = language;
   const updates = normalizeUpdateSettings(source.updates);
   if (updates) settings.updates = updates;
+  if (typeof source.freeCursorInMenus === 'boolean') settings.freeCursorInMenus = source.freeCursorInMenus;
   const keptKeys = Object.keys(settings);
   const changed = Object.keys(source).length !== keptKeys.length || Object.keys(source).some((key) => !keptKeys.includes(key));
   return { settings, changed };

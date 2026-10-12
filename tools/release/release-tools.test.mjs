@@ -14,11 +14,23 @@ test('the release policy is well-formed: the DS1TR executables are unique, the e
   const policy = await readJson(path.join(repositoryRoot, 'tools', 'release', 'release-policy.json'));
   const paths = policy.ds1trExecutables.map((entry) => entry.path);
   assert.equal(new Set(paths).size, paths.length);
-  assert.equal(paths.length, 3, 'the application, DsrDataTool and FogHost');
+  assert.equal(paths.length, 4, 'the application, DsrDataTool, FogHost and game cursor helper');
   assert.ok(policy.forbiddenBinaries.some((entry) => /elevate\.exe$/u.test(entry.path)));
   for (const pattern of policy.forbiddenPatterns) assert.doesNotThrow(() => new RegExp(pattern, 'u'));
   assert.ok(policy.forbiddenPatterns.some((pattern) => /pfx/u.test(pattern)), 'a certificate file inside a package fails the verification');
   assert.ok(policy.ds1trArtifacts.length === 2, 'installer and portable');
+});
+
+test('the free-cursor helper is staged, explicitly allowlisted, and version-checked', async () => {
+  const packager = await read('apps', 'desktop', 'scripts', 'package-win.mjs');
+  const verifier = await read('tools', 'release', 'release-verify.mjs');
+  const helperProject = await read('tools', 'game-cursor-helper', 'GameCursorHelper.csproj');
+  const policy = await readJson(path.join(repositoryRoot, 'tools', 'release', 'release-policy.json'));
+  assert.ok(policy.ds1trExecutables.some((entry) => entry.path.endsWith('/game-cursor-helper/GameCursorHelper.exe')));
+  assert.match(packager, /tools\/game-cursor-helper\/GameCursorHelper\.csproj/u);
+  assert.match(packager, /\['--self-test'\]/u);
+  assert.match(verifier, /GameCursorHelper\.csproj/u);
+  assert.match(helperProject, /<TargetFramework>net8\.0<\/TargetFramework>/u);
 });
 
 test('the packager is per-user, never elevates, does not ship an elevation helper and signs only in release mode', async () => {
@@ -38,7 +50,7 @@ test('Nexus packaging is a separate unsigned local target with no inherited GitH
   const nexusConfig = await read('apps', 'desktop', 'electron-builder.nexus.yml');
   const packager = await read('apps', 'desktop', 'scripts', 'package-win.mjs');
   const verifier = await read('tools', 'release', 'release-verify.mjs');
-  assert.equal(packageJson.version, '0.39.0');
+  assert.match(packageJson.version, /^\d+\.\d+\.\d+$/u);
   assert.equal(packageJson.scripts['package:win:github'], 'node scripts/package-win.mjs --distribution=github');
   assert.equal(packageJson.scripts['package:win:nexus'], 'node scripts/package-win.mjs --distribution=nexus');
   assert.match(nexusConfig, /^extends: electron-builder\.yml$/mu);

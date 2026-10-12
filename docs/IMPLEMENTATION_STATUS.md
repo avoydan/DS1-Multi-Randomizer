@@ -1,5 +1,10 @@
 # Implementation status
 
+## Local game convenience: free cursor in menus (desktop 0.40.0; 2026-10-12)
+
+Added the default-off **Free cursor in game menus / Swobodny kursor w menu gry** app setting in a separate Game conveniences category. The setting is persisted in Electron's local `userData/settings.json`, independent from generation configuration and Seed Codes. On Windows, Electron owns a self-contained `GameCursorHelper.exe` child; the helper polls every 40 ms, verifies the foreground window's PID maps to `DarkSoulsRemastered.exe`, and calls `ClipCursor(NULL)` only while DSR is foreground and the cursor is visible. It releases a clip on verified DSR focus loss and exits through a private stdin stop command or EOF. No game files, saves, injection, admin rights, or randomization behavior are involved.
+**Verification:** desktop typecheck passed; desktop tests 128 passed / 1 skipped; Windows Setup and Portable packaging plus unsigned release verification passed. The backend suite had 576 passing and 3 skipped tests; one test file could not load in this local sandbox because Node ` + String.raw`os.userInfo()` + ` returned ` + String.raw`uv_os_get_passwd ENOMEM` + `. The release workflow runs the full backend suite on its Windows runner.
+
 # CURRENT TASK: BUILD-TIME NEXUS DISTRIBUTION (desktop 0.39.0; 2026-10-10)
 
 Added an immutable `distribution: github | nexus` build field, independent from `channel: public | internal`. Valid legacy build-info without `distribution` remains GitHub; malformed metadata or an explicit invalid value disables updater behavior. GitHub builds retain stable-only public updates and internal prerelease QA. Nexus builds do not eagerly load the updater or GitHub API code, instantiate an updater, configure a feed, or schedule update checks. Update IPC remains local and unavailable; the EN/PL Updates card shows the installed version and Nexus guidance, with no check/download/install controls. `autoCheck` is retained without being rewritten. A future Nexus link can be provided through validated `DS1TR_NEXUS_PAGE_URL`; none is configured currently.

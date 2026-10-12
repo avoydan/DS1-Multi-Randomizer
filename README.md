@@ -4,9 +4,9 @@ DS1 Multi Randomizer is a Windows desktop app for creating one deterministic Dar
 
 ## Download
 
-[Download latest release — v0.38.4](https://github.com/avoydan/DS1-Multi-Randomizer/releases/tag/v0.38.4) · [All releases](https://github.com/avoydan/DS1-Multi-Randomizer/releases)
+[Download latest release — v0.40.0](https://github.com/avoydan/DS1-Multi-Randomizer/releases/tag/v0.40.0) · [All releases](https://github.com/avoydan/DS1-Multi-Randomizer/releases)
 
-The release is a **public prerelease**. The recommended file is `DS1-Multi-Randomizer-0.38.4-Setup-x64.exe`. A portable executable is also provided; it extracts to a temporary folder each time it starts, which can trigger more antivirus warnings.
+The release is a **public prerelease**. The recommended file is `DS1-Multi-Randomizer-0.40.0-Setup-x64.exe`. A portable executable is also provided; it extracts to a temporary folder each time it starts, which can trigger more antivirus warnings.
 
 ## What it does
 

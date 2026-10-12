@@ -62,6 +62,15 @@ test('Nexus distribution update guidance and installed version are translated in
   assert.ok(en.app.update.metadataUnavailable && pl.app.update.metadataUnavailable);
 });
 
+test('the local game convenience and free-cursor setting are translated in both languages', () => {
+  assert.equal(en.app.views.settings.gameConveniencesTitle, 'Game conveniences');
+  assert.equal(pl.app.views.settings.gameConveniencesTitle, 'Udogodnienia gry');
+  assert.equal(en.app.views.settings.freeCursorLabel, 'Free cursor in game menus');
+  assert.equal(pl.app.views.settings.freeCursorLabel, 'Swobodny kursor w menu gry');
+  assert.ok(en.app.views.settings.freeCursorDescription.includes('multiple monitors'));
+  assert.equal(pl.app.views.settings.freeCursorDescription, 'Pozwala przesunąć kursor poza okno Dark Souls Remastered, gdy menu gry jest otwarte. Przydatne przy wielu monitorach.');
+});
+
 test('plural forms are complete: English one/other, Polish one/few/many/other', () => {
   for (const [name, entry] of groupBases(enFlat)) if (entry.plural) assert.deepEqual([...entry.forms].sort(), ['one', 'other'], `English ${name}`);
   for (const [name, entry] of groupBases(plFlat)) if (entry.plural) assert.deepEqual([...entry.forms].sort(), ['few', 'many', 'one', 'other'], `Polish ${name}`);

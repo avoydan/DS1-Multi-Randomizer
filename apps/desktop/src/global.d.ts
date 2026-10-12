@@ -13,6 +13,10 @@ declare global {
       launchGame(gamePath: string): Promise<{ ok: boolean; method: 'steam' | 'executable' | 'none'; message: string; technical?: string }>;
       language(): Promise<{ setting: 'auto' | 'en' | 'pl'; resolved: 'en' | 'pl' }>;
       setLanguage(setting: 'auto' | 'en' | 'pl'): Promise<{ setting: 'auto' | 'en' | 'pl'; resolved: 'en' | 'pl' }>;
+      gameConveniences: {
+        freeCursorInMenus(): Promise<boolean>;
+        setFreeCursorInMenus(enabled: boolean): Promise<boolean>;
+      };
       saveFile(request: { kind: 'html' | 'txt' | 'json' | 'zip'; defaultName: string; content: string }): Promise<{ ok: boolean; canceled: boolean; name?: string; code?: string }>;
       devTools(): Promise<boolean>;
       onDevTools(listener: (shown: boolean) => void): () => void;

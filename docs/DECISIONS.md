@@ -1,5 +1,11 @@
 # Decisions
 
+## Free cursor is a local launcher preference with an owned Windows watcher
+
+Date: 2026-10-12
+
+The free-cursor option is stored only in Electron's `userData/settings.json`; it is never added to the world configuration, generation profiles, presets, or Seed Codes. A separate self-contained .NET Windows helper is started only while the option is enabled. It verifies that the visible foreground window belongs to the `DarkSoulsRemastered.exe` process and checks system cursor visibility before removing a clip. It polls at 40 ms because the game may reapply its clip rectangle. On a verified DSR focus loss, it releases clipping once even if the cursor was hidden during normal gameplay, then rechecks the foreground to reduce the unavoidable race from the global `ClipCursor` API. The renderer controls the helper through narrow main-process IPC; the app stops it on disable and shutdown. It does not inject code, patch the game, change saves, or require elevation.
+
 ## Distribution is an immutable build capability, independent of update channel
 
 Date: 2026-10-10

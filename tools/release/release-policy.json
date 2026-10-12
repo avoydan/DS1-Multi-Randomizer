@@ -5,7 +5,8 @@
   "ds1trExecutables": [
     { "path": "DS1 Multi Randomizer.exe", "role": "the Electron application (renamed electron.exe, DS1TR resources and icon)", "launchedAs": "the application itself" },
     { "path": "resources/runtime/engines/combined/vendor/tools/DsrDataTool/DsrDataTool.exe", "role": "DsrDataTool: reads and patches the game files into a workspace (self-contained .NET, single file, not compressed)", "launchedAs": "child process of the backend, arguments array, no shell" },
-    { "path": "resources/runtime/tools/fog-host/FogHost.exe", "role": "FogHost: runs the fog randomizer (FogMod) on the prepared data (self-contained .NET, single file, not compressed)", "launchedAs": "child process of the backend, arguments array, no shell" }
+    { "path": "resources/runtime/tools/fog-host/FogHost.exe", "role": "FogHost: runs the fog randomizer (FogMod) on the prepared data (self-contained .NET, single file, not compressed)", "launchedAs": "child process of the backend, arguments array, no shell" },
+    { "path": "resources/runtime/tools/game-cursor-helper/GameCursorHelper.exe", "role": "optional Windows game cursor watcher, only when enabled (self-contained .NET, single file, not compressed)", "launchedAs": "child process of Electron main, piped stdin, no shell" }
   ],
   "ds1trArtifacts": [
     { "pattern": "DS1-Multi-Randomizer-*-Setup-x64.exe", "role": "the installer (recommended download)" },

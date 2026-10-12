@@ -15,6 +15,13 @@ test('a current settings file is left alone; malformed content is discarded', ()
   assert.deepEqual(migrateSettings({ gamePath: 7, extra: true }), { settings: {}, changed: true });
 });
 
+test('the local free-cursor convenience defaults off and a saved boolean survives migration', () => {
+  assert.deepEqual(migrateSettings({}), { settings: {}, changed: false });
+  assert.deepEqual(migrateSettings({ freeCursorInMenus: true }), { settings: { freeCursorInMenus: true }, changed: false });
+  assert.deepEqual(migrateSettings({ freeCursorInMenus: false }), { settings: { freeCursorInMenus: false }, changed: false });
+  assert.deepEqual(migrateSettings({ freeCursorInMenus: 'yes' }), { settings: {}, changed: true });
+});
+
 test('a chosen game folder is stored in one canonical form; anything that is not an absolute folder is not remembered', () => {
   assert.equal(normalizeGamePath('D:/Games/Dark Souls Remastered/'), String.raw`D:\Games\Dark Souls Remastered`);
   assert.equal(normalizeGamePath(String.raw`  C:\Games\DSR\\ `), String.raw`C:\Games\DSR`);

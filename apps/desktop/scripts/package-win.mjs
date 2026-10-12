@@ -87,9 +87,11 @@ const publishArgs = ['-c', 'Release', '-r', 'win-x64', '--self-contained', 'true
   '-p:PublishSingleFile=true', '-p:DebugType=None', '-p:DebugSymbols=false'];
 const dataTool = path.join(runtime, 'engines', 'combined', 'vendor', 'tools', 'DsrDataTool');
 const fogHost = path.join(runtime, 'tools', 'fog-host');
+const gameCursorHelper = path.join(runtime, 'tools', 'game-cursor-helper');
 for (const [project, output, probe] of [
   ['engines/combined/vendor/tools/DsrDataTool/DsrDataTool.csproj', dataTool, ['--help']],
   ['tools/fog-host/FogHost.csproj', fogHost, []],
+  ['tools/game-cursor-helper/GameCursorHelper.csproj', gameCursorHelper, ['--self-test']],
 ]) {
   await run(dotnet, ['restore', project, '-r', 'win-x64', '--configfile', nugetConfig, '--ignore-failed-sources'], root, dotnetEnv);
   await run(dotnet, ['publish', project, ...publishArgs, '-o', output], root, dotnetEnv);
