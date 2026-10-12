@@ -31,3 +31,5 @@ engines/combined/tests/**/obj/
 *.key
 .env
 .env.*
+tools/game-cursor-helper/bin/
+tools/game-cursor-helper/obj/
