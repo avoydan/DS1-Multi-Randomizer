@@ -1,10 +1,12 @@
 # Implementation status
 
-## Profile-scoped roaming-boss fit compatibility fix (desktop 0.39.2 candidate; 2026-10-15)
+## Profile-scoped roaming-boss fit compatibility fix (desktop 0.39.2; 2026-10-15)
 
 The owner-approved roaming-boss candidate and fit rules now select generation profile `ds1tr-gen-v4`. Existing `gen-v1`, `gen-v2`, and `gen-v3` explicitly restore the pre-change behavior; v4 inherits v3's Compact Fog runtime unchanged. Three original v2 golden outputs had drifted under the transient global rules; their existing fixtures remain untouched. A separate v4 golden fixture records the corresponding owner-approved outputs.
 
-Verification so far: root typecheck passed; focused generation profile/pipeline/Seed Code/history/API tests passed **56/56**; combined config mapping passed **15/15**; roaming-boss engine regressions passed **28/28**; golden metadata/code tests passed **4/4** with the optional end-to-end test skipped there. Real package-hash regeneration passed for **all 4 v2 fixtures**, **the v3 Compact fixture**, and **all 3 new v4 cases**. Four additional v1 roaming-boss cases matched; two v1 cases requiring the unavailable local legacy Fog cache stopped with `WORLD_DATA_LEGACY_UNAVAILABLE` before generation. Release packaging and publication follow after the commit.
+Verification: root typecheck passed; focused generation profile/pipeline/Seed Code/history/API tests passed **56/56**; combined config mapping passed **15/15**; roaming-boss engine regressions passed **28/28**; golden metadata/code tests passed **4/4** with the optional end-to-end test skipped there. Real package-hash regeneration passed for **all 4 v2 fixtures**, **the v3 Compact fixture**, and **all 3 new v4 cases**. Four additional v1 roaming-boss cases matched; two v1 cases requiring the unavailable local legacy Fog cache stopped with `WORLD_DATA_LEGACY_UNAVAILABLE` before generation.
+
+Release: [v0.39.2 public prerelease](https://github.com/avoydan/DS1-Multi-Randomizer/releases/tag/v0.39.2), tag commit `8ab421c45ab4a1d61d2cdc83f3dd26ccff3b08e1`. GitHub reports `draft=false`, `prerelease=true`, and six assets. The Setup and Portable package verification passed unsigned-release mode. All six assets were downloaded from GitHub; five entries in `SHA256SUMS.txt` matched independently calculated SHA-256 values, and the manifest, repository identity, profile, and updater metadata were verified. The release remains unsigned; no trusted signature is claimed.
 
 ## Compact Full Fog V1 production path (2026-10-14; desktop 0.39.0 retained)
 
