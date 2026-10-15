@@ -1,4 +1,4 @@
-// World-randomizer data ("Fog data root") that DS1TR prepares itself. Nothing here is chosen by the user.
+﻿// World-randomizer data ("Fog data root") that DS1TR prepares itself. Nothing here is chosen by the user.
 //
 // FogHost reads exactly 59 files from a data root (tools/fog-host/src/DataRoot.cs is the authority and verifies every
 // one of them on every run). Where they come from, established by comparing them with a clean Dark Souls Remastered
@@ -14,6 +14,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { copyFile, mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { COMPACT_FOG_CATALOG_FINGERPRINT, COMPACT_FOG_CATALOG_VERSION } from './compactFogProjection.js';
 
 export const worldDataSourceCommit = '6e6dc7886d0f8bcc53c1800d95c9e859d1f2f87f';
 export const worldDataBaseUrl = `https://raw.githubusercontent.com/thefifthmatt/FogMod/${worldDataSourceCommit}/`;
@@ -29,7 +30,7 @@ export interface WorldDataEntry {
   /** Size of the file as the upstream repository serves it (used as a download bound). */
   size: number;
   kind: WorldDataKind;
-  origin: 'game' | 'upstream';
+  origin: 'game' | 'upstream' | 'reconstructed';
   /** For origin 'game': the path inside the clean installation. */
   gamePath?: string;
 }
@@ -101,6 +102,60 @@ export const worldDataId = createHash('sha256')
   .update(`${worldDataSourceCommit}\n${worldDataManifest.map((entry) => `${entry.path}:${entry.sha256}`).join('\n')}`)
   .digest('hex').slice(0, 16);
 
+const compactReconstructionVersion = 'ds1tr-local-fog-data-v1';
+const compactReconstructedFiles: Readonly<Record<string, { sha256: string; size: number }>> = Object.freeze({
+  'dist/DS1R/Layouts/GAME_AREA_PARAM_ST.xml': { sha256: '64a5ffd5130a344e7eb3ee0947ce5a5a866d97e7c2b36544142510e978ada09b', size: 1401 },
+  'dist/DS1R/Layouts/ITEMLOT_PARAM_ST.xml': { sha256: 'ea98c357ae09a40f54ced8e8f7c476b031d726fa2bddf046a07093258fad7bdd', size: 6925 },
+  'dist/DS1R/Layouts/NPC_PARAM_ST.xml': { sha256: 'dc4ebec7d63e47210c4279c2d0cb2ccff380d586fbc3556ec1558b62619d4eee', size: 15654 },
+  'dist/DS1R/Layouts/SP_EFFECT_PARAM_ST.xml': { sha256: '9930eebeae7a99639b6973c27093dc8e0e946765ae15f78983ec4efda4db39fe', size: 17715 },
+  'dist/DS1R/event/common.emevd.dcx': { sha256: 'd51d5631267a274536880c26815776f7bffc2ccbdda5041856eb36183acc93f1', size: 8643 },
+  'dist/DS1R/event/m10_00_00_00.emevd.dcx': { sha256: '670472f47a5c1e0f37509a5f6aec70b14a6379983616813df369414f80cfad4c', size: 4915 },
+  'dist/DS1R/event/m10_01_00_00.emevd.dcx': { sha256: 'c2889304eec4153349472835c81b6c29b031a17b60c59f15e7a5ec6f8e995dd9', size: 13395 },
+  'dist/DS1R/event/m10_02_00_00.emevd.dcx': { sha256: 'd58500ac944fbe4c7a7c17303150c5c5c2e1f7ff50c3c9b8925ff1928eceb8cb', size: 8813 },
+  'dist/DS1R/event/m11_00_00_00.emevd.dcx': { sha256: '38380e3b1e3108f2e1d7e44168fe5eb334c0d2284078b9085d0a1e4296b58527', size: 8092 },
+  'dist/DS1R/event/m12_00_00_00.emevd.dcx': { sha256: 'd45d9fa1e1db5865271ee454e41cf9d4277064db12968b502ef532eda67e3ebc', size: 8577 },
+  'dist/DS1R/event/m12_01_00_00.emevd.dcx': { sha256: '8e02a387634ab87a3a5f69b5f73b7df48dbc8830eca1309298ab38b39328cf40', size: 24708 },
+  'dist/DS1R/event/m13_00_00_00.emevd.dcx': { sha256: '71709b1bd8e6a0b4e78bd4ca82e90c08b0b8de056ed3a72e925f1a7a4b6bcb6b', size: 8222 },
+  'dist/DS1R/event/m13_01_00_00.emevd.dcx': { sha256: '80f5da0fe1e18f441bb5b792feafbc3396e6b92a77b8c54086050d77ef327bf6', size: 6683 },
+  'dist/DS1R/event/m13_02_00_00.emevd.dcx': { sha256: '36ad3b8d62e45b83c7e4d840fa1cf10a80ab2c6449baaeb01ce85a05eb9eb608', size: 2944 },
+  'dist/DS1R/event/m14_00_00_00.emevd.dcx': { sha256: 'e19b4994b41b924a4a68b50ebf45df0526f21c72793185d4e59223e3701b1f6e', size: 7756 },
+  'dist/DS1R/event/m14_01_00_00.emevd.dcx': { sha256: '30031aa096714856e40cb0cb7f5667097af48cc0f7e6bc4800274c50070c121d', size: 12409 },
+  'dist/DS1R/event/m15_00_00_00.emevd.dcx': { sha256: '84fab27e05f4dcb62ffd375938071277e9a4e66076edbcecdd575427f8004b23', size: 10051 },
+  'dist/DS1R/event/m15_01_00_00.emevd.dcx': { sha256: '6cee3bc20ab69d76533387f78c3925abe044961d56a25c053c0bd20805cdd8ff', size: 12784 },
+  'dist/DS1R/event/m16_00_00_00.emevd.dcx': { sha256: '5c720a3fd9f4710d8c17193eddb734785d1abf65af55f72c7b268540aa975868', size: 8972 },
+  'dist/DS1R/event/m17_00_00_00.emevd.dcx': { sha256: '60b66fef96a77dccad69cbb9d89afdd56141c0180ead490bc8d86e8dd061f38c', size: 9327 },
+  'dist/DS1R/event/m18_00_00_00.emevd.dcx': { sha256: '2f968f9d43b949b7bd1b4b7eee4cabd5e9dae13369f7b5eb1f25de0b7bd6f5ad', size: 4286 },
+  'dist/DS1R/event/m18_01_00_00.emevd.dcx': { sha256: '066e020aa85baeb9a1f3b1e52d24cf77bcd515081f153cdafac09a17ccee44b0', size: 5671 },
+  'dist/DS1R/script/talk/m10_00_00_00.talkesdbnd.dcx': { sha256: '732bcc1e0f95d9193591286c01d58bcfc39ca467458ee775acea25a5dc390010', size: 12088 },
+  'dist/DS1R/script/talk/m10_01_00_00.talkesdbnd.dcx': { sha256: 'bd452780847cfc914682f8f486678b4683b1ca4aaed0cc50e148bbad77bb2ebe', size: 36368 },
+  'dist/DS1R/script/talk/m10_02_00_00.talkesdbnd.dcx': { sha256: '14a4139250368482ca6607ff2b6448a1d7703e7b56afa2310e43fbec64155a90', size: 64037 },
+  'dist/DS1R/script/talk/m11_00_00_00.talkesdbnd.dcx': { sha256: '62129998cab6c0086d3fa7c21f6409f75421aa230cd4eb39cd537bc2b2b41c6c', size: 7718 },
+  'dist/DS1R/script/talk/m12_00_00_00.talkesdbnd.dcx': { sha256: 'c6ce9852a31d8a981f2546f03c84534ed17fdc7dd310015cecdfbf56e9d37c73', size: 16426 },
+  'dist/DS1R/script/talk/m12_01_00_00.talkesdbnd.dcx': { sha256: '140fd401c09c08f04249ae18db99af6c04a569ad1036d20eddb9a6b6caf1af86', size: 24788 },
+  'dist/DS1R/script/talk/m13_00_00_00.talkesdbnd.dcx': { sha256: 'c685db36224d645347ed556922cb8f15ff5a5bbbce42b0e4ee6b2fc6847465ed', size: 14926 },
+  'dist/DS1R/script/talk/m13_01_00_00.talkesdbnd.dcx': { sha256: '429312182c28b3c75bb6c30049e16a9d7ac140a4478ed6f168eb9070aa7600e5', size: 13782 },
+  'dist/DS1R/script/talk/m13_02_00_00.talkesdbnd.dcx': { sha256: '1ffdd723328504081205dc5fb307e33560982212e477a448f47f01c4a6cb29f0', size: 10108 },
+  'dist/DS1R/script/talk/m14_00_00_00.talkesdbnd.dcx': { sha256: 'ae86882c85149257d59564445cf4ad5ec4bd4ad6c3304dc0625af9ffff8daf4f', size: 28998 },
+  'dist/DS1R/script/talk/m14_01_00_00.talkesdbnd.dcx': { sha256: '4e457ba88940b6863caa4318d5db776a881e96e77eeff365517c849ca7050032', size: 12638 },
+  'dist/DS1R/script/talk/m15_00_00_00.talkesdbnd.dcx': { sha256: '83c7d0d37488afd4721d63637b1335f4828333bd3ce0168d511777a062947c96', size: 11677 },
+  'dist/DS1R/script/talk/m15_01_00_00.talkesdbnd.dcx': { sha256: 'd7be8152ed8d223a5ec27031a92ed5e00012d070c569a7bb86953191e4a7ec52', size: 26544 },
+  'dist/DS1R/script/talk/m16_00_00_00.talkesdbnd.dcx': { sha256: '17c80606b59de1de3410acb12ac1c5bc3c20364836fae54e996e8185b30fe212', size: 21391 },
+  'dist/DS1R/script/talk/m17_00_00_00.talkesdbnd.dcx': { sha256: '3e2673ecfbb18943c7dd4dc3f8f7344a209591e851eabdac8afc82083d6b9d31', size: 12800 },
+  'dist/DS1R/script/talk/m18_00_00_00.talkesdbnd.dcx': { sha256: '3102b17babc2d3687d1132be03e099259cd5b44e7ec225b86aa013f21ab7bf5f', size: 22902 },
+  'dist/DS1R/script/talk/m18_01_00_00.talkesdbnd.dcx': { sha256: 'fa2e5c0a3b7d540b1b7cf73e9c6b33495159d6cb796d9aa6c22dcafa15db7477', size: 7473 },
+});
+
+/** Compact runtime omits the legacy YAML and reconstructs game-derived inputs locally; profiles v1/v2 keep the original 59-file manifest. */
+export const compactRuntimeWorldDataManifest = worldDataManifest
+  .filter((entry) => entry.path !== 'dist/fog.txt')
+  .map((entry) => {
+    const reconstructed = compactReconstructedFiles[entry.path];
+    return reconstructed ? { ...entry, ...reconstructed, origin: 'reconstructed' as const } : entry;
+  });
+export const compactRuntimeWorldDataId = createHash('sha256')
+  .update(`${COMPACT_FOG_CATALOG_VERSION}\n${COMPACT_FOG_CATALOG_FINGERPRINT}\n${compactReconstructionVersion}\n${worldDataSourceCommit}\n${compactRuntimeWorldDataManifest.map((entry) => `${entry.path}:${entry.sha256}`).join('\n')}`)
+  .digest('hex').slice(0, 16);
+
 export function hashWorldDataContent(bytes: Uint8Array, text: boolean): string {
   const hash = createHash('sha256');
   if (!text) return hash.update(bytes).digest('hex');
@@ -110,6 +165,8 @@ export function hashWorldDataContent(bytes: Uint8Array, text: boolean): string {
 export type WorldDataFailureCode =
   | 'WORLD_DATA_GAME_VERSION'
   | 'WORLD_DATA_GAME_FILES'
+  | 'WORLD_DATA_RECONSTRUCTION_FAILED'
+  | 'WORLD_DATA_LEGACY_UNAVAILABLE'
   | 'WORLD_DATA_OFFLINE'
   | 'WORLD_DATA_DOWNLOAD_CORRUPT'
   | 'WORLD_DATA_WRITE_FAILED';
@@ -139,6 +196,10 @@ export interface WorldDataOptions {
   id?: string;
   /** Replaceable for tests; the default uses HTTPS `fetch` with a timeout. */
   fetchBytes?: (url: string, maxBytes: number) => Promise<Uint8Array>;
+  /** Only an explicitly identified GitHub distribution may fetch legacy upstream data. */
+  allowUpstreamDownloads?: boolean;
+  /** Builds Compact EMEVD, talk and layout inputs from the verified pristine game snapshot. */
+  reconstructFiles?: (pristineDirectory: string, outputRoot: string) => Promise<void>;
   onProgress?: (progress: WorldDataProgress) => void;
   attempts?: number;
 }
@@ -188,10 +249,11 @@ const pending = new Map<string, Promise<WorldDataResult>>();
  * installation is never touched. Concurrent calls for the same cache share one run.
  */
 export function prepareWorldData(options: WorldDataOptions): Promise<WorldDataResult> {
-  const key = path.resolve(options.cacheRoot, options.id ?? worldDataId);
+  const allowUpstreamDownloads = options.allowUpstreamDownloads ?? process.env.DS1TR_DISTRIBUTION === 'github';
+  const key = `${path.resolve(options.cacheRoot, options.id ?? worldDataId)}|upstream=${allowUpstreamDownloads}`;
   const running = pending.get(key);
   if (running) return running;
-  const promise = assemble(options).finally(() => pending.delete(key));
+  const promise = assemble({ ...options, allowUpstreamDownloads }).finally(() => pending.delete(key));
   pending.set(key, promise);
   return promise;
 }
@@ -216,6 +278,17 @@ async function assemble(options: WorldDataOptions): Promise<WorldDataResult> {
     return { ok: true, root, reused: true, downloaded: 0, derived: 0 };
   }
 
+  if (options.allowUpstreamDownloads !== true && manifest.some((entry) => entry.origin === 'upstream')) {
+    const problems = [
+      ...current.missing.map((entry) => `missing ${entry}`),
+      ...current.altered.map((entry) => `altered ${entry}`),
+      ...current.unexpected.map((entry) => `unexpected ${entry}`),
+    ];
+    return failure('WORLD_DATA_LEGACY_UNAVAILABLE',
+      'This Seed Code needs legacy Fog data that is not available in the local cache. This distribution does not download legacy Fog files; use a GitHub build to prepare this Seed Code.',
+      `Legacy Fog cache is incomplete or invalid (${problems.join('; ') || 'verification failed'}); upstream download is disabled for this distribution.`);
+  }
+
   const staging = path.join(options.cacheRoot, `.preparing-${randomBytes(6).toString('hex')}`);
   try {
     await mkdir(staging, { recursive: true });
@@ -232,6 +305,12 @@ async function assemble(options: WorldDataOptions): Promise<WorldDataResult> {
     // Files that are still good in an old cache are kept; only the rest is rebuilt.
     const bad = new Set([...current.missing, ...current.altered]);
     const reusable = new Set(manifest.filter((entry) => !bad.has(entry.path)).map((entry) => entry.path));
+    const reconstructedEntries = manifest.filter((entry) => entry.origin === 'reconstructed');
+    const reconstructLocally = reconstructedEntries.some((entry) => !reusable.has(entry.path));
+    if (reconstructLocally) {
+      // The local builder emits its complete deterministic set; don't copy stale reconstructed files into staging first.
+      for (const entry of reconstructedEntries) reusable.delete(entry.path);
+    }
     for (const entry of manifest) {
       if (!reusable.has(entry.path)) continue;
       const target = path.join(staging, ...entry.path.split('/'));
@@ -256,6 +335,22 @@ async function assemble(options: WorldDataOptions): Promise<WorldDataResult> {
       await place(entry, content);
       derived += 1;
       done += 1;
+    }
+
+    if (reconstructLocally) {
+      if (!options.reconstructFiles) {
+        return failure('WORLD_DATA_RECONSTRUCTION_FAILED', 'The fog randomizer data could not be prepared. Try again, or check the game files.',
+          'Compact world-data files are missing or altered, but no local reconstruction command is available.');
+      }
+      report(0.2 + 0.55 * (done / needed), 'Building fog randomizer data locally...');
+      try {
+        await options.reconstructFiles(options.pristineDirectory, staging);
+      } catch (error) {
+        return failure('WORLD_DATA_RECONSTRUCTION_FAILED', 'The fog randomizer data could not be prepared. Try again, or check the game files.',
+          error instanceof Error ? error.message : String(error));
+      }
+      derived += reconstructedEntries.length;
+      done += reconstructedEntries.length;
     }
 
     const toDownload = manifest.filter((candidate) => candidate.origin === 'upstream' && !reusable.has(candidate.path));

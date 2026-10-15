@@ -1,0 +1,31 @@
+diff --git a/src/core/generator.js b/src/core/generator.js
+--- a/src/core/generator.js
++++ b/src/core/generator.js
+@@ -285,3 +285,2 @@ const roamingExcludedModels = new Set([
+   "c5250", // Ceaseless Discharge: immobile, 10 m tall lava body
+-  "c5320", // Dark Sun Gwyndolin: neutral team, stationary, scripted
+   "c5370", // Lord Gwyn: scripted entrance, arena-bound
+@@ -306,3 +305,8 @@ const roamingSizeClassOverrides = new Map([
+ const roamingSizeClassOverrides = new Map([
++  ["c2240", 0], // Owner-approved minimum destination class: Capra Demon.
++  ["c2250", 2], // Owner-approved minimum destination class: Taurus Demon.
+   ["c3230", 3], // Preserve the authored Moonlight Butterfly body-size override.
++  ["c3320", 0], // Owner-approved minimum destination class: Pinwheel.
++  ["c4100", 0], // Owner-approved minimum destination class: Knight Artorias.
++  ["c5320", 0], // Owner-approved minimum destination class: Dark Sun Gwyndolin.
+ ]);
+@@ -1847,3 +1851,3 @@ function shuffledPortableBosses(rng, archetypeKeys, archetypes, excludedModels =
+ // The single-body boss slots that are both the destinations and the archetype sources of the boss planners.
+-function bossSourceSlots(config, catalog, dragonPlan) {
++function bossSourceSlots(config, catalog, dragonPlan, { includePinwheelChaosMain = false } = {}) {
+   return effectiveBossSlots(catalog).filter(
+@@ -1851,3 +1855,3 @@ function bossSourceSlots(config, catalog, dragonPlan) {
+       !dragonPlan.reservedSlotIds.has(slot.id) &&
+-      !(config.pinwheelChaos && config.randomizeEnemies && slot.id === pinwheelMainSlot) &&
++      (includePinwheelChaosMain || !(config.pinwheelChaos && config.randomizeEnemies && slot.id === pinwheelMainSlot)) &&
+       slot.id !== "m14_01_00_00:c5230_0000" &&
+@@ -1862,3 +1866,3 @@ function roamingBossCandidates(config, catalog, dragonPlan) {
+   const byKey = new Map();
+-  for (const slot of bossSourceSlots(config, catalog, dragonPlan)) {
++  for (const slot of bossSourceSlots(config, catalog, dragonPlan, { includePinwheelChaosMain: true })) {
+     const key = bossArchetypeKey(slot);

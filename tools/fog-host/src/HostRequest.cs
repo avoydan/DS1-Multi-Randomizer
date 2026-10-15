@@ -11,10 +11,12 @@ namespace FogHost
 
     public sealed record PreservedNpcParam(int Id, int BaseId);
 
-    /// <summary>Schema-v2 request (apps/backend/src/adapters/fogHostProcess.ts `FogHostRequest`).</summary>
+    /// <summary>Schema-v3 request (apps/backend/src/adapters/fogHostProcess.ts `FogHostRequest`).</summary>
     public sealed class HostRequest
     {
-        public const int SchemaVersion = 2;
+        public const int SchemaVersion = 3;
+        public const string LegacyFogModAnnotations = "legacy-fogmod";
+        public const string CompactAnnotations = "compact-v1";
 
         /// <summary>Contract option key -> FogMod option flag (docs/FOGHOST_INTEGRATION.md).</summary>
         public static readonly IReadOnlyList<(string Key, string Flag)> OptionFlags = new[]
@@ -53,6 +55,9 @@ namespace FogHost
         public string FogDataRoot { get; private set; }
         public string StagingDirectory { get; private set; }
         public string LogPath { get; private set; }
+        public string AnnotationSource { get; private set; }
+        public string PristineGameDirectory { get; private set; }
+        public string ExpectedAnnotationFingerprint { get; private set; }
         public string BaseDirectory { get; private set; }
         public IReadOnlyList<CombinedFile> CombinedFiles { get; private set; }
         public IReadOnlyList<PreservedNpcParam> PreservedNpcParams { get; private set; }
@@ -72,7 +77,8 @@ namespace FogHost
             {
                 JsonElement root = document.RootElement;
                 ExpectKeys(root, "request", "schemaVersion", "game", "mode", "seed", "options", "language",
-                    "fogDataRoot", "stagingDirectory", "logPath", "compatibility");
+                    "fogDataRoot", "stagingDirectory", "logPath", "annotationSource", "pristineGameDirectory",
+                    "expectedAnnotationFingerprint", "compatibility");
                 if (!root.GetProperty("schemaVersion").TryGetInt32(out int schema) || schema != SchemaVersion)
                     throw Invalid($"request.schemaVersion must be {SchemaVersion}.");
                 if (String(root, "game") != "DS1R") throw Invalid("request.game must be \"DS1R\"; FogHost supports Dark Souls Remastered only.");
@@ -106,7 +112,17 @@ namespace FogHost
                     FogDataRoot = AbsolutePath(root, "fogDataRoot"),
                     StagingDirectory = AbsolutePath(root, "stagingDirectory"),
                     LogPath = AbsolutePath(root, "logPath"),
+                    AnnotationSource = String(root, "annotationSource"),
+                    PristineGameDirectory = AbsolutePath(root, "pristineGameDirectory"),
+                    ExpectedAnnotationFingerprint = String(root, "expectedAnnotationFingerprint"),
                 };
+
+                if (request.AnnotationSource != LegacyFogModAnnotations && request.AnnotationSource != CompactAnnotations)
+                    throw Invalid($"request.annotationSource must be \"{LegacyFogModAnnotations}\" or \"{CompactAnnotations}\".");
+                if (request.AnnotationSource == CompactAnnotations && !Sha256.IsMatch(request.ExpectedAnnotationFingerprint))
+                    throw Invalid("request.expectedAnnotationFingerprint must be a lowercase SHA-256 for Compact annotations.");
+                if (request.AnnotationSource == LegacyFogModAnnotations && request.ExpectedAnnotationFingerprint.Length != 0)
+                    throw Invalid("request.expectedAnnotationFingerprint must be empty for legacy FogMod annotations.");
 
                 JsonElement compatibility = root.GetProperty("compatibility");
                 ExpectKeys(compatibility, "request.compatibility", "baseDirectory", "combinedFiles", "preservedNpcParams");

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { migrateSettings, normalizeGamePath } from '../dist-electron/settings.js';
+import { migrateSettings, normalizeFreeCursorShortcut, normalizeGamePath } from '../dist-electron/settings.js';
 
 test('an old settings file with a Fog data folder is migrated: the folder is dropped, the file is marked for rewriting', () => {
   assert.deepEqual(migrateSettings({ fogDataRoot: 'C:\\Users\\x\\fog-data' }), { settings: {}, changed: true });
@@ -13,6 +13,23 @@ test('a current settings file is left alone; malformed content is discarded', ()
   assert.deepEqual(migrateSettings(null), { settings: {}, changed: false });
   assert.deepEqual(migrateSettings(['x']), { settings: {}, changed: false });
   assert.deepEqual(migrateSettings({ gamePath: 7, extra: true }), { settings: {}, changed: true });
+});
+
+test('the local free-cursor convenience defaults off and a saved boolean survives migration', () => {
+  assert.deepEqual(migrateSettings({}), { settings: {}, changed: false });
+  assert.deepEqual(migrateSettings({ freeCursorInMenus: true }), { settings: { freeCursorInMenus: true }, changed: false });
+  assert.deepEqual(migrateSettings({ freeCursorInMenus: false }), { settings: { freeCursorInMenus: false }, changed: false });
+  assert.deepEqual(migrateSettings({ freeCursorInMenus: 'yes' }), { settings: {}, changed: true });
+});
+
+test('the local cursor shortcut defaults to F10 and accepts modifier combinations', () => {
+  assert.equal(normalizeFreeCursorShortcut(undefined), null);
+  assert.equal(normalizeFreeCursorShortcut('Ctrl+Shift+F8'), 'Ctrl+Shift+F8');
+  assert.equal(normalizeFreeCursorShortcut('ctrl+f10'), 'Ctrl+F10');
+  assert.equal(normalizeFreeCursorShortcut(''), null);
+  assert.equal(normalizeFreeCursorShortcut('Ctrl'), null);
+  assert.deepEqual(migrateSettings({ freeCursorShortcut: 'ctrl+shift+f8' }), { settings: { freeCursorShortcut: 'Ctrl+Shift+F8' }, changed: false });
+  assert.deepEqual(migrateSettings({ freeCursorShortcut: 'Alt' }), { settings: {}, changed: true });
 });
 
 test('a chosen game folder is stored in one canonical form; anything that is not an absolute folder is not remembered', () => {

@@ -1,5 +1,39 @@
 # Decisions
 
+## Compact Fog uses a new offline generation profile
+
+Date: 2026-10-14
+
+Compact Fog is the production path for new runs. Its 58-file world-data set is assembled from verified DSR files and deterministic local reconstruction; it has no upstream annotation files and does not read or package `fog.txt`. Profiles v1/v2 retain their original 59-file data manifest and frozen item-tracking rules.
+
+The Compact catalog contains 22 key-item identities, but only its 9 `required` items constrain backend item placement before Fog runs. `RandomOnly` and `Hard` entries remain in the Fog catalog but are omitted from that backend-required set. The current catalog has 13 RandomOnly and no Hard entries; FogMod's reader excludes RandomOnly entries from its item hash and handles their multiple source lots as optional, while Hard entries remain controlled by Fog's hard-logic option. Applying the old `required:false => shop-only` backend rule made a valid full run fail for Eye of Death when its source was a world lot or enemy drop. This policy is isolated to `ds1tr-gen-v3`; v1/v2 behavior and fixtures remain frozen.
+
+The v3 generation profile pins FogHost 0.6.0, the Compact catalog fingerprint, offline world-data identity, and Compact item tracking. The current worktree remains app version 0.39.0; no release or commit is included in this task.
+
+## Nexus packages do not download legacy Fog data
+
+Date: 2026-10-14
+
+The Nexus build receives its immutable distribution from packaged build metadata and passes it to the backend at process start. Only the explicit `github` distribution may download missing upstream Fog inputs. Nexus reuses a complete, hash-verified v1/v2 legacy cache when present; if that cache is cold or invalid, the request fails with a localized explanation and leaves the cache untouched. It never substitutes Compact v3 data for an older Seed Code. V3 remains fully local through its 58-input reconstruction path. This preserves old-profile behavior while honoring the Nexus no-download requirement; cold Nexus installs cannot run v1/v2 Fog codes unless a valid legacy cache already exists.
+
+## Compact Fog catalog reuses the typed adapter and fails closed until complete
+
+Date: 2026-10-13 (development decision; superseded 2026-10-14)
+
+Compact Full Fog V1 compiles pristine DSR facts and project-owned rules into the existing `FogAnnotationCatalog`; it does not introduce another runtime DTO architecture or use `fog.txt` as a source. This was the gate while category coverage was incomplete. The catalog and production gates have since passed; the current runtime decision is recorded above.
+
+## Free cursor is a local launcher preference with an owned Windows watcher
+
+Date: 2026-10-12
+
+The free-cursor option is stored only in Electron's `userData/settings.json`; it is never added to the world configuration, generation profiles, presets, or Seed Codes. A separate self-contained .NET Windows helper is started only while the option is enabled. It verifies that the visible foreground window belongs to the `DarkSoulsRemastered.exe` process and checks system cursor visibility before removing a clip. It polls at 40 ms because the game may reapply its clip rectangle. On a verified DSR focus loss, it releases clipping once even if the cursor was hidden during normal gameplay, then rechecks the foreground to reduce the unavoidable race from the global `ClipCursor` API. The renderer controls the helper through narrow main-process IPC; the app stops it on disable and shutdown. It does not inject code, patch the game, change saves, or require elevation.
+
+## Roaming-boss safety changes use a new generation profile
+
+Date: 2026-10-12
+
+The roaming-boss modes were already available in public prerelease 0.38.4, so changing their output under `ds1tr-gen-v1` would break the published Seed Code contract. New runs use `ds1tr-gen-v2`; v1 explicitly retains its protected destination set. V2 enables the four audited safe destination handlers and avoids making a discarded normal assignment before `both` at 100% boss chance. The Seed Code envelope and format stay the same, and the combined engine's 0.5.66 seed-stream salt stays pinned. Profile compatibility is selected by a validated internal engine config field, not a user setting. Evidence and frozen fixtures are recorded in `docs/GENERATION_COMPATIBILITY.md` and `docs/BOSSES_ONLY_AUDIT.md`.
+
 ## Distribution is an immutable build capability, independent of update channel
 
 Date: 2026-10-10
@@ -1277,3 +1311,32 @@ Full evidence: `docs/BOSSES_ONLY_AUDIT.md`.
 4. **No production switch or release yet.** The typed model and fact index are foundations only. A complete catalog, FogHost/backend migration, new-vs-reference generation proof and cold-offline validation remain required before removing the downloader, changing the external data manifest, bumping to 0.40.0, or publishing.
 5. **Classify graph links separately from physical transitions.** `Entrance` and `Warp` remain the models for physical randomized transitions. An ordinary static `Area.To` route must stay within one verified map; only an explicitly classified `CrossMapGlitch` route may cross maps, and it must carry the consumed `hard` tag, have a rationale, and resolve both map endpoints. Same-map hard routes are valid static links because `hard` describes availability, not the route mechanism. Conditions are checked against known project area IDs and resolved key-item records whose game IDs exist in pristine GameParam. This permits a project-owned cross-map route when gameplay evidence supports it without allowing an unmarked physical crossing to be authored as a graph shortcut. The classification exists only in reconstruction policy and is not emitted to FogMod.
 6. **Use explicit Area tag defaults and omit inactive scaling overrides.** Untagged Areas are ordinary progression nodes unless a verified boss or authored optional/trivial rule overrides that default. The project leaves every `ScalingBase` unset: the shipped DS1TR option contract does not enable FogMod's debug-only `scalingbase`/`dumpdist` flags, and a graph test verifies that these overrides are ignored under shipped options. A reference-only scaling-base difference is therefore behavior-equivalent for production generation and is not imported as balancing policy.
+
+## Fog project-policy authoring V1 (in progress, 2026-10-13; desktop 0.39.0 retained)
+
+1. **Policy membership and values are project-owned.** Pristine MSB/EMEVD/GameParam/English FMG facts validate authored values; `fog.txt` is consulted only after the project inventory is fixed. A mismatch with the reference is not by itself a reason to remove a valid project rule.
+2. **Promote boss collision mappings only with explicit stable anchors.** `DefaultFlagCols` entries name the expected completion event and declare whether the anchor is the same-collision boss enemy, the encoded negative `PlayRegionID`, or both. The resolver validates the unique event-970 completion flag. The 3 independently anchored project-only collision cases are retained as intentional B policy; no event is guessed when an anchor is ambiguous.
+3. **Separate item identity from progression placement.** A typed identity with exact GameParam ID, FMG name, and pristine possession-check events is useful progress, but does not make a full Fog `KeyItem`; default Area and required/random-only/hard intent are separate authored fields. ESD/ObjAct progression inventory remains open.
+4. **Keep Area V1 complete as a per-ID policy record while exposing unknown routes.** All 131 stable IDs receive a map-family owner, classification, rationale and at least a map-membership anchor. Existing boss, start, gate and static-link anchors are added where established. The current two `Area.To` links are explicit; an empty link collection is not treated as proof that a physical route does not exist. Unresolved transition ownership stays explicit until the Entrance/Warp families are authored.
+5. **No production catalog or compatibility switch follows from these foundations.** The `FogProjectAreaPolicyV1` and item identities are development policy inputs; they do not change the current catalog profile, generation semantics, Seed Codes, backend projection, downloader or public behavior. Production migration remains gated on complete consumers, progression matrix, deterministic reruns, understood semantic B cases and compatibility review.
+
+## Nexus generation preflight and frozen Fog profiles (2026-10-14)
+
+1. `/api/world-data/prepare` resolves the generation profile from a supplied Seed Code; without one it uses the current profile. This keeps prerequisite preparation aligned with the exact Fog data/provider selected for the run.
+2. Nexus does not download upstream Fog data. The current v3 path reconstructs its 58 inputs from the verified local DSR snapshot. Legacy v1/v2 still require their hash-verified Fog data cache.
+3. Keep the v1/v2 FogHost compatibility gate at 0.5.0. Golden verification found output drift with 0.6.0, so the newer host must not be admitted under frozen Seed Codes. The current Nexus package contains only 0.6.0; legacy Fog support is a release blocker until a separately verified compatible host path is packaged. Do not rewrite fixtures or disguise a changed host as 0.5.0.
+
+## Frozen FogHost runtime routing (2026-10-15)
+
+1. Keep the exact historical FogHost 0.5.0 tree as a pinned build input, not as a hand-maintained source fork. The source identity is commit `b2ba7d6148810b367bd01d955688364cad30c845`, subtree `tools/fog-host`, tree `438b66455982060760419a755283acaa23997979`; `tools/fog-host-legacy/source-pin.json` is the versioned identity record.
+2. Select the generation executable and wire schema from the frozen Seed Code profile components. `ds1tr-gen-v1/v2` use 0.5.0/schema 2 and the legacy 59-file world data plus legacy item tracking. `ds1tr-gen-v3` uses 0.6.0/schema 3 and Compact data plus Compact item tracking. Missing selected hosts fail closed; there is no cross-version fallback.
+3. FogHost 0.5.0 predates `progression-model`. For key-placement runs only, 0.6.0 may export the read-only model from the legacy data root. The generation executable remains 0.5.0, and this helper does not write or transform Fog outputs. The package still requires both hosts; Compact reconstruction and Compact projection remain on 0.6.0.
+4. Nexus does not download or bundle legacy Fog data. A v1/v2 Fog run there requires a complete hash-verified local 59-file cache. V3 remains independently reconstructable from the player's verified DSR files with zero downloads.
+
+# Owner-authored roaming boss minimum fit classes (2026-10-15)
+
+1. Keep the existing class-based fit model and interpret a boss class as its minimum destination class. The owner sets Artorias, Capra Demon, Pinwheel, and Dark Sun Gwyndolin to class 0, and Taurus Demon to class 2. No other boss classification or explicit exclusion changes; Moonlight Butterfly keeps its authored class-3 override.
+2. The old local classification is preserved before mutation in `docs/placement-audits/boss-fit-classification-pre-nexus-2026-10-15.md` and `.json`, with the real-catalog before/after evidence in `boss-fit-validation-2026-10-15.json`. Do not treat this local pre-Nexus snapshot as a generation input.
+3. Pinwheel Chaos remains an arena encounter option. Its gate still applies to arena boss sources, but roaming boss candidate construction includes Pinwheel independently of that gate.
+4. Gwyndolin uses the generic roaming implementation: destination-team override, scaled NpcParam, cloned destination-perception ThinkParam, generated wake-up event, ordinary soul scaling and stay-dead policy. No arena EMEVD or arena object dependency was found in the output path. In-game movement/collision safety is unproven until owner QA.
+5. No geometry engine is introduced. No Seed Code or profile encoding changes; the RNG salt is unchanged. Since this is before the first Nexus release and the old fit behavior has no external Nexus users, the current worktree applies the corrected classes without retaining the old local output as a compatibility mode.

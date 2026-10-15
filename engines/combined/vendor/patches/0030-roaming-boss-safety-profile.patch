@@ -1,0 +1,118 @@
+diff --git a/src/core/config.js b/src/core/config.js
+index a366d81..b107663 100644
+--- a/src/core/config.js
++++ b/src/core/config.js
+@@ -86,6 +86,8 @@ export const defaultConfig = Object.freeze({
+   enemyBossChanceNormalSlots: 10,
+   enemyRoamingBossSouls: 50,
+   enemyRoamingBossesStayDead: false,
++  // Profile-controlled routing: old Seed Codes retain the v1 destination guards; new codes use dedicated safe handlers.
++  enemyRoamingBossDestinationPolicy: "safe-handlers-v2",
+   // Items that the world randomizer (FogMod) follows by lot: null (no world randomizer) or
+   // { items: [{ equipType, itemId, required }], lotStarts: [itemLotRowId] }. FogMod needs exactly one copy of each required
+   // item in the lots it annotates (a start row or the rows that follow it without a gap) and at most one of any other;
+@@ -142,6 +144,9 @@ export function normalizeConfig(input = {}) {
+   config.outputDirectory = String(config.outputDirectory || "output").trim();
+   config.lastPackageDirectory = String(config.lastPackageDirectory || "").trim();
+   config.progressionModel = config.progressionModel && typeof config.progressionModel === "object" ? config.progressionModel : null;
++  if (!["protected-v1", "safe-handlers-v2"].includes(config.enemyRoamingBossDestinationPolicy)) {
++    config.enemyRoamingBossDestinationPolicy = defaultConfig.enemyRoamingBossDestinationPolicy;
++  }
+   config.enemyScaling = ["vanilla", "area", "progressive"].includes(config.enemyScaling)
+     ? config.enemyScaling
+     : defaultConfig.enemyScaling;
+diff --git a/src/core/generator.js b/src/core/generator.js
+index f1ad7de..2dbd867 100644
+--- a/src/core/generator.js
++++ b/src/core/generator.js
+@@ -338,7 +338,7 @@ const encounterBodyModels = new Map([
+  * with the model's base brain (think row model*100), otherwise the most common one; ties by the lowest key, then the lowest slot id.
+  */
+ function encounterBodySources(catalog) {
+-  const protectedIds = roamingProtectedSlotIds(catalog.enemySlots);
++  const protectedIds = bossEncounterBodySourceSlotIds(catalog.enemySlots);
+   const sources = new Map();
+   for (const model of encounterBodyModels.keys()) {
+     const base = Number(model.slice(1)) * 100;
+@@ -442,10 +442,7 @@ function hostileNpcSources(catalog) {
+ 
+ const hostileNpcSourceIds = (catalog) => new Set([...(hostileNpcSources(catalog)?.values() ?? [])].flat().map((slot) => slot.id));
+ 
+-/**
+- * Regular slots that keep their own enemy even when bosses may roam (they have special handling that a boss would break), with the reason of each:
+- * a passive slot (the Asylum, New Londo, the Kiln knight, the Parish bonfire Titanite Demon), a slot whose events lock its model, a tangible ghost, or the Darkroot butterfly path.
+- */
++/** Slots whose authored behavior must not be selected as the body of a boss-arena encounter. */
+ function roamingProtectedReasons(slots) {
+   const reasons = new Map();
+   for (const slot of slots) {
+@@ -464,6 +461,10 @@ function roamingProtectedSlotIds(slots) {
+   return new Set(roamingProtectedReasons(slots).keys());
+ }
+ 
++function bossEncounterBodySourceSlotIds(slots) {
++  return roamingProtectedSlotIds(slots);
++}
++
+ /**
+  * The ordinary dragon-class slots (Titanite Demons, Drakes, the Bounding Demons, the Undead Dragon of the valley) that the dragon plan reserves and permutes among themselves.
+  * With roaming bosses they are ordinary destinations like any other: the roaming pass may give them a boss instead of the dragon the plan chose (the dragon is then simply not placed).
+@@ -1560,10 +1561,14 @@ function decorateEnemyPlacements(config, catalog, allSlots, assignment, pinwheel
+   const randomized = allSlots.map((slot, index) => {
+     const replacement = assignment.get(slot.id) ?? slot;
+     const isChaosPinwheelClone = pinwheelCloneIds.has(slot.id);
++    const isRoamingBoss = roamingSlotIds.has(slot.id);
++    const parishPassiveRoamingBoss = isRoamingBoss && parishBonfirePassiveSlots.has(slot.id);
+     const passiveUntilAttacked =
+       asylumPassiveSlots.has(slot.id) ||
+       newLondoPassiveSlots.has(slot.id) ||
+-      additionalPassiveSlots.has(slot.id);
++      additionalPassiveSlots.has(slot.id) ||
++      parishPassiveRoamingBoss;
++    const holdAiUntilAttacked = parishPassiveRoamingBoss;
+     const replacementThinkParamId =
+       activeReplacementThinkParams.get(replacement.modelName) ??
+       replacement.thinkParamId;
+@@ -1586,7 +1591,6 @@ function decorateEnemyPlacements(config, catalog, allSlots, assignment, pinwheel
+     const darkrootButterflyPath =
+       (slot.mapId === "m12_00_00_00" || slot.mapId === "m12_00_00_01") &&
+       slot.modelName === "c2330";
+-    const isRoamingBoss = roamingSlotIds.has(slot.id);
+     // A boss brain moved into a regular slot may wait for its arena event: the same wake-up as every portable boss gets.
+     const requiresCombatEvent =
+       forceCombatActivationModels.has(replacement.modelName) ||
+@@ -1639,6 +1643,7 @@ function decorateEnemyPlacements(config, catalog, allSlots, assignment, pinwheel
+       ...(passiveUntilAttacked
+         ? {
+             passiveUntilAttacked: true,
++            ...(holdAiUntilAttacked ? { holdAiUntilAttacked: true } : {}),
+             // The event still changes allegiance after the first hit, but the
+             // initial PARAM team prevents AI from targeting the player before
+             // the map constructor has started that event.
+@@ -1735,10 +1740,14 @@ function sampleExtractedEnemies(config, catalog, dragonPlan, bossPlan, diagnosti
+     regularEnemyContext(config, catalog, dragonPlan, bossPlan, diagnostics);
+   // Part E1: with bosses allowed in regular slots the regular sampler plans the normal enemies only ("bosses" leaves every
+   // slot to the boss pass, "both" keeps the normal draw for the slots that do not get a boss) and the roaming pass overrides slots.
++  // With a 100% boss share, every participating "both" slot is guaranteed to be overwritten, so skip that discarded normal
++  // assignment; otherwise it can consume the per-map model budget before the boss pass runs.
+   const roamingMode = ROAMING_BOSS_MODES.includes(options.normalReplacement);
++  const safeHandlers = config.enemyRoamingBossDestinationPolicy === "safe-handlers-v2";
++  const bossOnlyOutcome = safeHandlers && options.normalReplacement === "both" && options.bossChanceInNormalSlots === 100;
+   const { assignment: regularAssignment, table } = planSampledRegularEnemies({
+     seed: config.seed,
+-    options: roamingMode ? { ...options, normalReplacement: options.normalReplacement === "both" ? "normals" : "none" } : options,
++    options: roamingMode ? { ...options, normalReplacement: options.normalReplacement === "both" && !bossOnlyOutcome ? "normals" : "none" } : options,
+     preventSame: config.preventSameEnemy,
+     slots,
+     extraSlots: pinwheelClones,
+@@ -1771,8 +1780,8 @@ function sampleExtractedEnemies(config, catalog, dragonPlan, bossPlan, diagnosti
+       table,
+       bossTypes: deriveRoamingBossTypes(candidates, table, roamingSizeClassOverrides),
+       preventSame: config.preventSameEnemy,
+-      excludedSlotIds: roamingProtectedSlotIds(roamingSlots),
+-      protectedReasons: roamingProtectedReasons(roamingSlots),
++      excludedSlotIds: safeHandlers ? new Set() : roamingProtectedSlotIds(roamingSlots),
++      protectedReasons: safeHandlers ? new Map() : roamingProtectedReasons(roamingSlots),
+       diagnostics,
+     });
+     diagnostics.count("roamingCandidates", candidates.length);

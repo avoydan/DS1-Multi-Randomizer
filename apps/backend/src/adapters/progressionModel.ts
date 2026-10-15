@@ -33,11 +33,11 @@ export type ProgressionModelResult =
   | { ok: true; model: ProgressionModel; fromCache: boolean }
   | { ok: false; code: 'KEY_PLACEMENT_MODEL_UNAVAILABLE'; message: string; technical: string };
 
-const expectedAnnotationSha256 = worldDataManifest.find((entry) => entry.path === 'dist/fog.txt')?.sha256;
+const expectedLegacyAnnotationSha256 = worldDataManifest.find((entry) => entry.path === 'dist/fog.txt')?.sha256;
 
 export const KEY_PLACEMENT_MODEL_MESSAGE = 'Key placement needs the world data of the fog randomizer, which could not be prepared. Click Generate world again, or turn Key placement off.';
 
-function isModel(value: unknown, variant: ProgressionModelVariant): value is ProgressionModel {
+function isModel(value: unknown, variant: ProgressionModelVariant, expectedAnnotationSha256: string): value is ProgressionModel {
   if (!value || typeof value !== 'object') return false;
   const model = value as Partial<ProgressionModel>;
   return model.format === PROGRESSION_MODEL_FORMAT && (model.variant ?? 'vanilla') === variant && model.fogModCommit === worldDataSourceCommit && model.annotationSha256 === expectedAnnotationSha256
@@ -54,21 +54,41 @@ const runHost: HostRunner = (executable, args) => new Promise((resolve) => {
 });
 
 /** The model for a prepared world data root: from the cache when it matches the pinned annotation, otherwise exported once (no shell, argument array). */
-export async function loadProgressionModel(prerequisites: Pick<FogPrerequisites, 'executablePath' | 'dataRoot'>, run: HostRunner = runHost, variant: ProgressionModelVariant = 'vanilla'): Promise<ProgressionModelResult> {
+export async function loadProgressionModel(
+  prerequisites: Pick<FogPrerequisites, 'executablePath' | 'progressionModelExecutablePath' | 'dataRoot' | 'annotationSource' | 'pristineGameDirectory' | 'compactProjection'>,
+  run: HostRunner = runHost,
+  variant: ProgressionModelVariant = 'vanilla',
+): Promise<ProgressionModelResult> {
+  const annotationSource = prerequisites.annotationSource ?? 'legacy-fogmod';
+  const expectedAnnotationSha256 = annotationSource === 'compact-v1'
+    ? prerequisites.compactProjection?.catalogFingerprint
+    : expectedLegacyAnnotationSha256;
+  if (!expectedAnnotationSha256) return failure('The selected fog annotation source has no verified identity.');
+  if (annotationSource === 'compact-v1' && !prerequisites.pristineGameDirectory)
+    return failure('The Compact progression model requires the verified pristine game directory.');
   // One cache file per variant: a vanilla model is never served for Race Mode + (or the reverse). The vanilla name is the one of every earlier version.
-  const suffix = variant === 'vanilla' ? '' : `.${variant}`;
+  const suffix = `${annotationSource === 'compact-v1' ? '.compact-v1' : ''}${variant === 'vanilla' ? '' : `.${variant}`}`;
   const cacheFile = path.join(path.dirname(prerequisites.dataRoot), `${path.basename(prerequisites.dataRoot)}${suffix}.progression-model.json`);
   try {
     const cached = JSON.parse(await readFile(cacheFile, 'utf8')) as unknown;
-    if (isModel(cached, variant)) return { ok: true, model: cached, fromCache: true };
+    if (isModel(cached, variant, expectedAnnotationSha256)) return { ok: true, model: cached, fromCache: true };
   } catch { /* no usable cache: export it */ }
   const temporary = `${cacheFile}.${process.pid}.tmp`;
   try {
     await mkdir(path.dirname(cacheFile), { recursive: true });
-    const outcome = await run(prerequisites.executablePath, ['progression-model', '--data-root', prerequisites.dataRoot, ...(variant === 'vanilla' ? [] : ['--variant', variant]), '--out', temporary]);
+    const outcome = await run(prerequisites.progressionModelExecutablePath || prerequisites.executablePath, [
+      'progression-model', '--data-root', prerequisites.dataRoot,
+      '--annotation-source', annotationSource,
+      ...(annotationSource === 'compact-v1' ? [
+        '--pristine-root', prerequisites.pristineGameDirectory!,
+        '--expected-annotation-fingerprint', expectedAnnotationSha256,
+      ] : []),
+      ...(variant === 'vanilla' ? [] : ['--variant', variant]),
+      '--out', temporary,
+    ]);
     if (outcome.code !== 0) return failure(`FogHost progression-model exited with ${outcome.code}: ${outcome.stderr.trim().slice(0, 400)}`);
     const exported = JSON.parse(await readFile(temporary, 'utf8')) as unknown;
-    if (!isModel(exported, variant)) return failure('The exported progression model does not match the pinned world data.');
+    if (!isModel(exported, variant, expectedAnnotationSha256)) return failure('The exported progression model does not match the pinned world data.');
     await writeFile(temporary, `${JSON.stringify(exported)}\n`);
     await rename(temporary, cacheFile);
     return { ok: true, model: exported, fromCache: false };

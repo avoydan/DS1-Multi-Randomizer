@@ -40,6 +40,7 @@
     "PIPELINE_FAILED": "Coś poszło nie tak podczas tworzenia zrandomizowanej gry. Spróbuj innego seeda; szczegóły są w sekcji Zaawansowane.",
     "WORLD_DATA_GAME_VERSION": "Ta wersja Dark Souls Remastered nie jest jeszcze obsługiwana przez randomizer mgieł. Zweryfikuj pliki gry w Steam albo wyłącz randomizer mgieł.",
     "WORLD_DATA_GAME_FILES": "Nie udało się odczytać plików Dark Souls Remastered. Zweryfikuj pliki gry w Steam i spróbuj ponownie.",
+    "WORLD_DATA_LEGACY_UNAVAILABLE": "Ten Seed Code wymaga starszych danych Fog, których nie ma w lokalnej pamięci podręcznej. Ta dystrybucja ich nie pobiera; użyj wersji GitHub, aby przygotować ten Seed Code.",
     "WORLD_DATA_OFFLINE": "Nie udało się przygotować plików randomizera mgieł. Sprawdź połączenie z internetem i kliknij Ponów.",
     "WORLD_DATA_DOWNLOAD_CORRUPT": "Nie udało się zweryfikować danych randomizera mgieł. Kliknij Ponów; jeśli problem się powtarza, sprawdź połączenie z internetem.",
     "WORLD_DATA_WRITE_FAILED": "Nie udało się zapisać danych randomizera mgieł. Sprawdź, czy na dysku jest wolne miejsce, i spróbuj ponownie.",

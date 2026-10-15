@@ -209,7 +209,13 @@
       "title": "App settings",
       "note": "Language and tools.",
       "languageTitle": "Language",
-      "languageNote": "The language of this app. It never changes a world and is not part of a Seed Code."
+      "languageNote": "The language of this app. It never changes a world and is not part of a Seed Code.",
+      "gameConveniencesTitle": "Game conveniences",
+      "gameConveniencesNote": "Local launcher settings. They do not affect world generation or Seed Codes.",
+      "freeCursorLabel": "Free cursor",
+      "freeCursorDescription": "Use the shortcut to release the cursor and switch focus away from the game. Dark Souls Remastered stays visible.",
+      "freeCursorShortcutLabel": "Cursor release shortcut",
+      "freeCursorShortcutDescription": "Click the field and press a new shortcut, such as F10 or Ctrl+Shift+F8."
     },
     "about": {
       "title": "About",

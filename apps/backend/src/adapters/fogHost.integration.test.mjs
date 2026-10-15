@@ -10,6 +10,8 @@ import { defaultFogHostExecutable, resolveFogPrerequisites } from '../../dist/ad
 // The success case also needs DS1TR_FOG_DATA_ROOT; it never touches a game installation.
 const hostBuilt = await access(defaultFogHostExecutable).then(() => true, () => false);
 const dataRoot = process.env.DS1TR_FOG_DATA_ROOT;
+const legacyRuntime = { hostVersion: '0.5.0', schemaVersion: 2, annotationSource: 'legacy-fogmod' };
+const legacyContext = { pristineDirectory: path.join(os.tmpdir(), 'pristine'), fogRuntime: legacyRuntime };
 
 const options = {
   traversableFogs: true, bossFogs: true, areaWarps: true, majorPvpFogs: false, minorPvpFogs: false,
@@ -29,8 +31,9 @@ function execution(root, fogDataRoot, mode) {
     responsePath: path.join(root, 'response.json'),
     timeoutMs: 120_000,
     request: {
-      schemaVersion: 2, game: 'DS1R', mode, seed: 3141592653, options, language: 'ENGLISH',
+      schemaVersion: 3, game: 'DS1R', mode, seed: 3141592653, options, language: 'ENGLISH',
       fogDataRoot, stagingDirectory: path.join(root, 'game'), logPath: path.join(root, 'foghost.log'),
+      annotationSource: 'legacy-fogmod', pristineGameDirectory: path.join(root, 'pristine'), expectedAnnotationFingerprint: '',
       compatibility: { baseDirectory: path.join(root, 'base'), combinedFiles: [], preservedNpcParams: [] },
     },
   };
@@ -38,14 +41,14 @@ function execution(root, fogDataRoot, mode) {
 
 test('prerequisites (developer override) pass the message language into the read set', async () => temp(async (root) => {
   assert.equal(await resolveFogPrerequisites('ENGLISH', {}), null);
-  assert.equal((await resolveFogPrerequisites('ENGLISH', { DS1TR_FOG_DATA_ROOT: root, DS1TR_FOG_HOST: path.join(root, 'missing.exe') })).failure.code, 'FOG_HOST_MISSING');
+  assert.equal((await resolveFogPrerequisites('ENGLISH', { DS1TR_FOG_DATA_ROOT: root, DS1TR_FOG_HOST_LEGACY: path.join(root, 'missing.exe') }, legacyContext)).failure.code, 'FOG_HOST_MISSING');
   const host = path.join(root, 'FogHost.exe');
   await writeFile(host, 'host');
   await mkdir(path.join(root, 'dist', 'DS1R', 'event'), { recursive: true });
   await mkdir(path.join(root, 'dist', 'DS1R', 'map', 'MapStudio'), { recursive: true });
   await writeFile(path.join(root, 'dist', 'DS1R', 'event', 'common.emevd.dcx'), 'x');
   await writeFile(path.join(root, 'dist', 'DS1R', 'map', 'MapStudio', 'm10_00_00_00.msb'), 'x');
-  const ready = await resolveFogPrerequisites('POLISH', { DS1TR_FOG_DATA_ROOT: root, DS1TR_FOG_HOST: host });
+  const ready = await resolveFogPrerequisites('POLISH', { DS1TR_FOG_DATA_ROOT: root, DS1TR_FOG_HOST_LEGACY: host }, legacyContext);
   assert.deepEqual(ready.readSet, ['event/common.emevd.dcx', 'map/MapStudio/m10_00_00_00.msb',
     'msg/POLISH/menu.msgbnd.dcx', 'param/GameParam/GameParam.parambnd.dcx']);
 }));

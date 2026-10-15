@@ -12,8 +12,12 @@ import type { EnemyOptions, FogOptions, ItemOptions, RandomizerConfig } from './
 
 /** The first profile: the deterministic behavior of the application at desktop 0.16.1 / backend 0.29.1. Never edit its meaning. */
 export const GENERATION_PROFILE_V1 = 'ds1tr-gen-v1';
+/** Roaming-boss destination safety fixes; v1 remains available for published Seed Codes. */
+export const GENERATION_PROFILE_V2 = 'ds1tr-gen-v2';
+/** Compact Fog catalog and item-tracking boundary; v1/v2 keep their pinned behavior. */
+export const GENERATION_PROFILE_V3 = 'ds1tr-gen-v3';
 /** The profile new runs use. A later profile may replace it here; older profiles stay runnable. */
-export const CURRENT_GENERATION_PROFILE = GENERATION_PROFILE_V1;
+export const CURRENT_GENERATION_PROFILE = GENERATION_PROFILE_V3;
 
 export const SEED_CODE_PREFIX = 'DS1TR';
 /** Version of the Seed Code container itself (encoding, checksum, envelope layout). */

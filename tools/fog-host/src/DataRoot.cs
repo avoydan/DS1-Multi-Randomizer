@@ -83,6 +83,50 @@ namespace FogHost
             new("dist/fog.txt", "77a10b4015c51bdfbe1499f38344c85540a63bfa1ef6370ad9c1ebdc9a2d2af6", true),
         };
 
+        private static readonly IReadOnlyDictionary<string, string> CompactReconstructedHashes =
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["dist/DS1R/Layouts/GAME_AREA_PARAM_ST.xml"] = "64a5ffd5130a344e7eb3ee0947ce5a5a866d97e7c2b36544142510e978ada09b",
+                ["dist/DS1R/Layouts/ITEMLOT_PARAM_ST.xml"] = "ea98c357ae09a40f54ced8e8f7c476b031d726fa2bddf046a07093258fad7bdd",
+                ["dist/DS1R/Layouts/NPC_PARAM_ST.xml"] = "dc4ebec7d63e47210c4279c2d0cb2ccff380d586fbc3556ec1558b62619d4eee",
+                ["dist/DS1R/Layouts/SP_EFFECT_PARAM_ST.xml"] = "9930eebeae7a99639b6973c27093dc8e0e946765ae15f78983ec4efda4db39fe",
+                ["dist/DS1R/event/common.emevd.dcx"] = "d51d5631267a274536880c26815776f7bffc2ccbdda5041856eb36183acc93f1",
+                ["dist/DS1R/event/m10_00_00_00.emevd.dcx"] = "670472f47a5c1e0f37509a5f6aec70b14a6379983616813df369414f80cfad4c",
+                ["dist/DS1R/event/m10_01_00_00.emevd.dcx"] = "c2889304eec4153349472835c81b6c29b031a17b60c59f15e7a5ec6f8e995dd9",
+                ["dist/DS1R/event/m10_02_00_00.emevd.dcx"] = "d58500ac944fbe4c7a7c17303150c5c5c2e1f7ff50c3c9b8925ff1928eceb8cb",
+                ["dist/DS1R/event/m11_00_00_00.emevd.dcx"] = "38380e3b1e3108f2e1d7e44168fe5eb334c0d2284078b9085d0a1e4296b58527",
+                ["dist/DS1R/event/m12_00_00_00.emevd.dcx"] = "d45d9fa1e1db5865271ee454e41cf9d4277064db12968b502ef532eda67e3ebc",
+                ["dist/DS1R/event/m12_01_00_00.emevd.dcx"] = "8e02a387634ab87a3a5f69b5f73b7df48dbc8830eca1309298ab38b39328cf40",
+                ["dist/DS1R/event/m13_00_00_00.emevd.dcx"] = "71709b1bd8e6a0b4e78bd4ca82e90c08b0b8de056ed3a72e925f1a7a4b6bcb6b",
+                ["dist/DS1R/event/m13_01_00_00.emevd.dcx"] = "80f5da0fe1e18f441bb5b792feafbc3396e6b92a77b8c54086050d77ef327bf6",
+                ["dist/DS1R/event/m13_02_00_00.emevd.dcx"] = "36ad3b8d62e45b83c7e4d840fa1cf10a80ab2c6449baaeb01ce85a05eb9eb608",
+                ["dist/DS1R/event/m14_00_00_00.emevd.dcx"] = "e19b4994b41b924a4a68b50ebf45df0526f21c72793185d4e59223e3701b1f6e",
+                ["dist/DS1R/event/m14_01_00_00.emevd.dcx"] = "30031aa096714856e40cb0cb7f5667097af48cc0f7e6bc4800274c50070c121d",
+                ["dist/DS1R/event/m15_00_00_00.emevd.dcx"] = "84fab27e05f4dcb62ffd375938071277e9a4e66076edbcecdd575427f8004b23",
+                ["dist/DS1R/event/m15_01_00_00.emevd.dcx"] = "6cee3bc20ab69d76533387f78c3925abe044961d56a25c053c0bd20805cdd8ff",
+                ["dist/DS1R/event/m16_00_00_00.emevd.dcx"] = "5c720a3fd9f4710d8c17193eddb734785d1abf65af55f72c7b268540aa975868",
+                ["dist/DS1R/event/m17_00_00_00.emevd.dcx"] = "60b66fef96a77dccad69cbb9d89afdd56141c0180ead490bc8d86e8dd061f38c",
+                ["dist/DS1R/event/m18_00_00_00.emevd.dcx"] = "2f968f9d43b949b7bd1b4b7eee4cabd5e9dae13369f7b5eb1f25de0b7bd6f5ad",
+                ["dist/DS1R/event/m18_01_00_00.emevd.dcx"] = "066e020aa85baeb9a1f3b1e52d24cf77bcd515081f153cdafac09a17ccee44b0",
+                ["dist/DS1R/script/talk/m10_00_00_00.talkesdbnd.dcx"] = "732bcc1e0f95d9193591286c01d58bcfc39ca467458ee775acea25a5dc390010",
+                ["dist/DS1R/script/talk/m10_01_00_00.talkesdbnd.dcx"] = "bd452780847cfc914682f8f486678b4683b1ca4aaed0cc50e148bbad77bb2ebe",
+                ["dist/DS1R/script/talk/m10_02_00_00.talkesdbnd.dcx"] = "14a4139250368482ca6607ff2b6448a1d7703e7b56afa2310e43fbec64155a90",
+                ["dist/DS1R/script/talk/m11_00_00_00.talkesdbnd.dcx"] = "62129998cab6c0086d3fa7c21f6409f75421aa230cd4eb39cd537bc2b2b41c6c",
+                ["dist/DS1R/script/talk/m12_00_00_00.talkesdbnd.dcx"] = "c6ce9852a31d8a981f2546f03c84534ed17fdc7dd310015cecdfbf56e9d37c73",
+                ["dist/DS1R/script/talk/m12_01_00_00.talkesdbnd.dcx"] = "140fd401c09c08f04249ae18db99af6c04a569ad1036d20eddb9a6b6caf1af86",
+                ["dist/DS1R/script/talk/m13_00_00_00.talkesdbnd.dcx"] = "c685db36224d645347ed556922cb8f15ff5a5bbbce42b0e4ee6b2fc6847465ed",
+                ["dist/DS1R/script/talk/m13_01_00_00.talkesdbnd.dcx"] = "429312182c28b3c75bb6c30049e16a9d7ac140a4478ed6f168eb9070aa7600e5",
+                ["dist/DS1R/script/talk/m13_02_00_00.talkesdbnd.dcx"] = "1ffdd723328504081205dc5fb307e33560982212e477a448f47f01c4a6cb29f0",
+                ["dist/DS1R/script/talk/m14_00_00_00.talkesdbnd.dcx"] = "ae86882c85149257d59564445cf4ad5ec4bd4ad6c3304dc0625af9ffff8daf4f",
+                ["dist/DS1R/script/talk/m14_01_00_00.talkesdbnd.dcx"] = "4e457ba88940b6863caa4318d5db776a881e96e77eeff365517c849ca7050032",
+                ["dist/DS1R/script/talk/m15_00_00_00.talkesdbnd.dcx"] = "83c7d0d37488afd4721d63637b1335f4828333bd3ce0168d511777a062947c96",
+                ["dist/DS1R/script/talk/m15_01_00_00.talkesdbnd.dcx"] = "d7be8152ed8d223a5ec27031a92ed5e00012d070c569a7bb86953191e4a7ec52",
+                ["dist/DS1R/script/talk/m16_00_00_00.talkesdbnd.dcx"] = "17c80606b59de1de3410acb12ac1c5bc3c20364836fae54e996e8185b30fe212",
+                ["dist/DS1R/script/talk/m17_00_00_00.talkesdbnd.dcx"] = "3e2673ecfbb18943c7dd4dc3f8f7344a209591e851eabdac8afc82083d6b9d31",
+                ["dist/DS1R/script/talk/m18_00_00_00.talkesdbnd.dcx"] = "3102b17babc2d3687d1132be03e099259cd5b44e7ec225b86aa013f21ab7bf5f",
+                ["dist/DS1R/script/talk/m18_01_00_00.talkesdbnd.dcx"] = "fa2e5c0a3b7d540b1b7cf73e9c6b33495159d6cb796d9aa6c22dcafa15db7477",
+            };
+
         /// <summary>Directories FogMod enumerates; any extra file there would change its behavior.</summary>
         private static readonly (string Directory, string Pattern)[] Enumerated =
         {
@@ -99,7 +143,7 @@ namespace FogHost
             Manifest.Where(e => e.Path.StartsWith(prefix, StringComparison.Ordinal)).Select(e => e.Path.Substring(prefix.Length));
 
         /// <summary>Throws FOG_DATA_MISSING listing every missing, altered, or unexpected file.</summary>
-        public static void Verify(string root)
+        public static void Verify(string root, bool includeLegacyAnnotations = true)
         {
             var problems = new List<string>();
             if (!Directory.Exists(root))
@@ -108,13 +152,16 @@ namespace FogHost
             }
             foreach (Entry entry in Manifest)
             {
+                if (!includeLegacyAnnotations && string.Equals(entry.Path, "dist/fog.txt", StringComparison.Ordinal)) continue;
                 string file = Resolve(root, entry.Path);
                 if (!File.Exists(file))
                 {
                     problems.Add($"missing {entry.Path}");
                     continue;
                 }
-                if (!string.Equals(Hash(file, entry.Text), entry.Sha256, StringComparison.Ordinal))
+                string expectedHash = !includeLegacyAnnotations && CompactReconstructedHashes.TryGetValue(entry.Path, out string compactHash)
+                    ? compactHash : entry.Sha256;
+                if (!string.Equals(Hash(file, entry.Text), expectedHash, StringComparison.Ordinal))
                 {
                     problems.Add($"altered {entry.Path}");
                 }

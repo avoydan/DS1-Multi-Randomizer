@@ -20,6 +20,9 @@ namespace FogMod
             public Dictionary<string, float> DefaultCost { get; set; }
             public List<Enemies> Enemies { get; set; }
             public Dictionary<int, string> LotLocations { get; set; }
+            /// <summary>Optional exact DS1TR Compact lot ownership. Null keeps FogMod's legacy consecutive-row interpretation.</summary>
+            [YamlIgnore]
+            public Dictionary<int, string> CompactLotLocations { get; set; }
             public Dictionary<string, int> DefaultFlagCols { get; set; }
         }
         public class ConfigAnnotation

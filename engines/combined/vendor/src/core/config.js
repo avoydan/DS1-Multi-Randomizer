@@ -86,6 +86,8 @@ export const defaultConfig = Object.freeze({
   enemyBossChanceNormalSlots: 10,
   enemyRoamingBossSouls: 50,
   enemyRoamingBossesStayDead: false,
+  // Profile-controlled routing: old Seed Codes retain the v1 destination guards; new codes use dedicated safe handlers.
+  enemyRoamingBossDestinationPolicy: "safe-handlers-v2",
   // Items that the world randomizer (FogMod) follows by lot: null (no world randomizer) or
   // { items: [{ equipType, itemId, required }], lotStarts: [itemLotRowId] }. FogMod needs exactly one copy of each required
   // item in the lots it annotates (a start row or the rows that follow it without a gap) and at most one of any other;
@@ -142,6 +144,9 @@ export function normalizeConfig(input = {}) {
   config.outputDirectory = String(config.outputDirectory || "output").trim();
   config.lastPackageDirectory = String(config.lastPackageDirectory || "").trim();
   config.progressionModel = config.progressionModel && typeof config.progressionModel === "object" ? config.progressionModel : null;
+  if (!["protected-v1", "safe-handlers-v2"].includes(config.enemyRoamingBossDestinationPolicy)) {
+    config.enemyRoamingBossDestinationPolicy = defaultConfig.enemyRoamingBossDestinationPolicy;
+  }
   config.enemyScaling = ["vanilla", "area", "progressive"].includes(config.enemyScaling)
     ? config.enemyScaling
     : defaultConfig.enemyScaling;

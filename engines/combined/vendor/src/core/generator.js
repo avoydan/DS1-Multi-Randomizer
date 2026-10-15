@@ -283,7 +283,6 @@ const roamingExcludedModels = new Set([
   "c5230", // Bed of Chaos: immobile, floor script
   "c5401", // Bed of Chaos core
   "c5250", // Ceaseless Discharge: immobile, 10 m tall lava body
-  "c5320", // Dark Sun Gwyndolin: neutral team, stationary, scripted
   "c5370", // Lord Gwyn: scripted entrance, arena-bound
   // Multi-body bosses stay with their own planners (tails, linked parts, scripted release): they never stand in a regular slot,
   // with or without boss randomization (the dragon plan only reserves them when bosses are randomized).
@@ -303,7 +302,14 @@ const roamingExcludedModels = new Set([
  * Bosses whose hit capsule does not describe their body, with the size class (0-5, `SIZE_EDGES` in sampling.js) Placement fit uses instead:
  * the Moonlight Butterfly is a flier with a 0.4 x 0.2 capsule and a body about three meters wide.
  */
-const roamingSizeClassOverrides = new Map([["c3230", 3]]);
+const roamingSizeClassOverrides = new Map([
+  ["c2240", 0], // Owner-approved minimum destination class: Capra Demon.
+  ["c2250", 2], // Owner-approved minimum destination class: Taurus Demon.
+  ["c3230", 3], // Preserve the authored Moonlight Butterfly body-size override.
+  ["c3320", 0], // Owner-approved minimum destination class: Pinwheel.
+  ["c4100", 0], // Owner-approved minimum destination class: Knight Artorias.
+  ["c5320", 0], // Owner-approved minimum destination class: Dark Sun Gwyndolin.
+]);
 
 // ---- a regular enemy as the body of a boss encounter (Part E2, patches/0016) ------------------------------------------------
 // The encounter stays the boss's: the slot keeps its entity id, so every vanilla event that waits for that entity (the health bar, the
@@ -338,7 +344,7 @@ const encounterBodyModels = new Map([
  * with the model's base brain (think row model*100), otherwise the most common one; ties by the lowest key, then the lowest slot id.
  */
 function encounterBodySources(catalog) {
-  const protectedIds = roamingProtectedSlotIds(catalog.enemySlots);
+  const protectedIds = bossEncounterBodySourceSlotIds(catalog.enemySlots);
   const sources = new Map();
   for (const model of encounterBodyModels.keys()) {
     const base = Number(model.slice(1)) * 100;
@@ -442,10 +448,7 @@ function hostileNpcSources(catalog) {
 
 const hostileNpcSourceIds = (catalog) => new Set([...(hostileNpcSources(catalog)?.values() ?? [])].flat().map((slot) => slot.id));
 
-/**
- * Regular slots that keep their own enemy even when bosses may roam (they have special handling that a boss would break), with the reason of each:
- * a passive slot (the Asylum, New Londo, the Kiln knight, the Parish bonfire Titanite Demon), a slot whose events lock its model, a tangible ghost, or the Darkroot butterfly path.
- */
+/** Slots whose authored behavior must not be selected as the body of a boss-arena encounter. */
 function roamingProtectedReasons(slots) {
   const reasons = new Map();
   for (const slot of slots) {
@@ -462,6 +465,10 @@ function roamingProtectedReasons(slots) {
 
 function roamingProtectedSlotIds(slots) {
   return new Set(roamingProtectedReasons(slots).keys());
+}
+
+function bossEncounterBodySourceSlotIds(slots) {
+  return roamingProtectedSlotIds(slots);
 }
 
 /**
@@ -1560,10 +1567,14 @@ function decorateEnemyPlacements(config, catalog, allSlots, assignment, pinwheel
   const randomized = allSlots.map((slot, index) => {
     const replacement = assignment.get(slot.id) ?? slot;
     const isChaosPinwheelClone = pinwheelCloneIds.has(slot.id);
+    const isRoamingBoss = roamingSlotIds.has(slot.id);
+    const parishPassiveRoamingBoss = isRoamingBoss && parishBonfirePassiveSlots.has(slot.id);
     const passiveUntilAttacked =
       asylumPassiveSlots.has(slot.id) ||
       newLondoPassiveSlots.has(slot.id) ||
-      additionalPassiveSlots.has(slot.id);
+      additionalPassiveSlots.has(slot.id) ||
+      parishPassiveRoamingBoss;
+    const holdAiUntilAttacked = parishPassiveRoamingBoss;
     const replacementThinkParamId =
       activeReplacementThinkParams.get(replacement.modelName) ??
       replacement.thinkParamId;
@@ -1586,7 +1597,6 @@ function decorateEnemyPlacements(config, catalog, allSlots, assignment, pinwheel
     const darkrootButterflyPath =
       (slot.mapId === "m12_00_00_00" || slot.mapId === "m12_00_00_01") &&
       slot.modelName === "c2330";
-    const isRoamingBoss = roamingSlotIds.has(slot.id);
     // A boss brain moved into a regular slot may wait for its arena event: the same wake-up as every portable boss gets.
     const requiresCombatEvent =
       forceCombatActivationModels.has(replacement.modelName) ||
@@ -1639,6 +1649,7 @@ function decorateEnemyPlacements(config, catalog, allSlots, assignment, pinwheel
       ...(passiveUntilAttacked
         ? {
             passiveUntilAttacked: true,
+            ...(holdAiUntilAttacked ? { holdAiUntilAttacked: true } : {}),
             // The event still changes allegiance after the first hit, but the
             // initial PARAM team prevents AI from targeting the player before
             // the map constructor has started that event.
@@ -1735,10 +1746,14 @@ function sampleExtractedEnemies(config, catalog, dragonPlan, bossPlan, diagnosti
     regularEnemyContext(config, catalog, dragonPlan, bossPlan, diagnostics);
   // Part E1: with bosses allowed in regular slots the regular sampler plans the normal enemies only ("bosses" leaves every
   // slot to the boss pass, "both" keeps the normal draw for the slots that do not get a boss) and the roaming pass overrides slots.
+  // With a 100% boss share, every participating "both" slot is guaranteed to be overwritten, so skip that discarded normal
+  // assignment; otherwise it can consume the per-map model budget before the boss pass runs.
   const roamingMode = ROAMING_BOSS_MODES.includes(options.normalReplacement);
+  const safeHandlers = config.enemyRoamingBossDestinationPolicy === "safe-handlers-v2";
+  const bossOnlyOutcome = safeHandlers && options.normalReplacement === "both" && options.bossChanceInNormalSlots === 100;
   const { assignment: regularAssignment, table } = planSampledRegularEnemies({
     seed: config.seed,
-    options: roamingMode ? { ...options, normalReplacement: options.normalReplacement === "both" ? "normals" : "none" } : options,
+    options: roamingMode ? { ...options, normalReplacement: options.normalReplacement === "both" && !bossOnlyOutcome ? "normals" : "none" } : options,
     preventSame: config.preventSameEnemy,
     slots,
     extraSlots: pinwheelClones,
@@ -1771,8 +1786,8 @@ function sampleExtractedEnemies(config, catalog, dragonPlan, bossPlan, diagnosti
       table,
       bossTypes: deriveRoamingBossTypes(candidates, table, roamingSizeClassOverrides),
       preventSame: config.preventSameEnemy,
-      excludedSlotIds: roamingProtectedSlotIds(roamingSlots),
-      protectedReasons: roamingProtectedReasons(roamingSlots),
+      excludedSlotIds: safeHandlers ? new Set() : roamingProtectedSlotIds(roamingSlots),
+      protectedReasons: safeHandlers ? new Map() : roamingProtectedReasons(roamingSlots),
       diagnostics,
     });
     diagnostics.count("roamingCandidates", candidates.length);
@@ -1834,11 +1849,11 @@ function shuffledPortableBosses(rng, archetypeKeys, archetypes, excludedModels =
 }
 
 // The single-body boss slots that are both the destinations and the archetype sources of the boss planners.
-function bossSourceSlots(config, catalog, dragonPlan) {
+function bossSourceSlots(config, catalog, dragonPlan, { includePinwheelChaosMain = false } = {}) {
   return effectiveBossSlots(catalog).filter(
     (slot) =>
       !dragonPlan.reservedSlotIds.has(slot.id) &&
-      !(config.pinwheelChaos && config.randomizeEnemies && slot.id === pinwheelMainSlot) &&
+      (includePinwheelChaosMain || !(config.pinwheelChaos && config.randomizeEnemies && slot.id === pinwheelMainSlot)) &&
       slot.id !== "m14_01_00_00:c5230_0000" &&
       slot.npcParamId >= 0 &&
       slot.thinkParamId >= 0,
@@ -1849,7 +1864,7 @@ function bossSourceSlots(config, catalog, dragonPlan) {
 // "none" setting: the nerf applies to Lord Gwyn, who never roams).
 function roamingBossCandidates(config, catalog, dragonPlan) {
   const byKey = new Map();
-  for (const slot of bossSourceSlots(config, catalog, dragonPlan)) {
+  for (const slot of bossSourceSlots(config, catalog, dragonPlan, { includePinwheelChaosMain: true })) {
     const key = bossArchetypeKey(slot);
     if (byKey.has(key) || nonPortableBossReplacementModels.has(slot.modelName) || roamingExcludedModels.has(slot.modelName)) continue;
     if (!bossKillSouls.has(slot.npcParamId)) continue;

@@ -83,14 +83,16 @@ test('rejects unsupported Fog language and random-start combination', () => {
   assert.throws(() => validateRandomizerConfig(config), /random start/i);
 });
 
-test('uses effective native categories instead of section toggles', () => {
+test('allows a launcher-only configuration when every randomizer is off', () => {
   const config = validConfig();
+  config.items.enabled = false;
   config.items.randomizeWorldItems = false;
+  config.enemies.enabled = false;
   config.enemies.randomizeRegularEnemies = false;
   config.enemies.randomizeBosses = false;
   assert.equal(effectiveCombinedEnabled(config), false);
   config.fog.enabled = false;
-  assert.throws(() => validateRandomizerConfig(config), /at least one/);
+  assert.doesNotThrow(() => validateRandomizerConfig(config));
 });
 
 test('rejects wrong primitive types, missing fields, and unknown options', () => {

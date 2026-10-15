@@ -15,6 +15,7 @@ import type { RunPhase, RunHistoryEntry, GameStateReport, GenerationResult, Pipe
 import { api } from './api';
 import logo from './assets/branding/app-mark.png';
 import { HelpPanel, HelpProvider } from './ui/HelpPanel';
+import { GameConvenienceSettings } from './ui/GameConvenienceSettings';
 import { AboutView, AppSettingsView, PresetsView, SeedCodeView, TransferView } from './ui/OtherViews';
 import { UpdateNotice } from './ui/UpdatePanel';
 import { useUpdates } from './ui/useUpdates';
@@ -84,6 +85,7 @@ export function App() {
   const [message, setMessage] = useState('');
   const [gameState, setGameState] = useState<GameStateReport | null>(null);
   const [generation, setGeneration] = useState<GenerationResult | null>(null);
+  const [freeCursorEnabled, setFreeCursorEnabled] = useState(false);
   const [progress, setProgress] = useState(0);
   const [progressStage, setProgressStage] = useState('');
   const [logs, setLogs] = useState<string[]>([]);
@@ -163,6 +165,7 @@ export function App() {
     () => Number(config.items.enabled || config.enemies.enabled) + Number(config.fog.enabled),
     [config],
   );
+  const generationDisabled = !config.gamePath || (enabledCount === 0 && !freeCursorEnabled);
 
   const reportError = (error: unknown) => {
     const detail = error instanceof Error ? error.message : String(error);
@@ -315,7 +318,7 @@ export function App() {
       setBusy(true);
       setWorkLabel('preparingFog');
       try {
-        const prepared = await api.prepareWorldData(config.gamePath);
+        const prepared = await api.prepareWorldData(config.gamePath, seed.code);
         if (!prepared.ok) { setProblem({ code: prepared.code, detail: prepared.userMessage }); setBusy(false); return; }
       } catch (error) { setBusy(false); reportError(error); return; }
       setBusy(false);
@@ -416,7 +419,7 @@ export function App() {
           {notice && <div className="notice success apply-notice" role="status"><strong>{t(`app.outcome.${notice}.text`)}</strong><span>{t(`app.outcome.${notice}.sub`)}</span></div>}
           <SummaryChips settings={currentSettings} />
           <div className="run-actions stack">
-            <button className="primary big" onClick={() => void generateRun()} disabled={!config.gamePath || enabledCount === 0}><span>{t('app.run.randomize')}</span><span aria-hidden="true">→</span></button>
+            <button className="primary big" onClick={() => void generateRun()} disabled={generationDisabled}><span>{t('app.run.randomize')}</span><span aria-hidden="true">→</span></button>
             <button className="secondary" onClick={() => setView('seed')}>{t('common.loadSeed')}</button>
           </div>
         </>
@@ -437,7 +440,7 @@ export function App() {
               <button className="secondary" aria-label={t('common.moreActions')} aria-haspopup="menu" aria-expanded={runMenuOpen} onClick={() => setRunMenuOpen((open) => !open)}>…</button>
               {runMenuOpen && (
                 <div className="menu" role="menu">
-                  <button role="menuitem" onClick={() => void generateRun()} disabled={!config.gamePath || enabledCount === 0}>{t('app.run.randomizeAgain')}</button>
+                  <button role="menuitem" onClick={() => void generateRun()} disabled={generationDisabled}>{t('app.run.randomizeAgain')}</button>
                   <button role="menuitem" onClick={() => { setRunMenuOpen(false); setView('seed'); }}>{t('common.loadSeed')}</button>
                   <button role="menuitem" disabled={!generation.historyId} onClick={() => { setRunMenuOpen(false); if (generation.historyId) setHintTarget({ id: generation.historyId, exportFirst: false }); }}>{t('hints.action.view')}</button>
                 </div>
@@ -535,6 +538,7 @@ export function App() {
                   {mode === 'basic'
                     ? <BasicView config={config} onChange={changeSetting} onShowAdvanced={showAdvanced} />
                     : <AdvancedView config={config} onChange={changeSetting} onBackToBasic={() => setMode('basic')} openSections={focusSections} />}
+                  <GameConvenienceSettings onEnabledChange={setFreeCursorEnabled} />
                 </div>
                 <div className="side-column">
                   {runPanel}

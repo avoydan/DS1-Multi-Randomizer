@@ -19,7 +19,8 @@ namespace FogHost.Tests
             Assert(projection.Areas[0].To.Single().Tags == "hard shortcut", "Only active area-link tags should be projected.");
             Assert(projection.KeyItems.Single().ID == "3:123", "Game item IDs must use FogMod's lot ID form.");
             Assert(projection.KeyItems.Single().Area == "gate", "Key item area references must use the FogMod area key.");
-            Assert(projection.Warps.Single().ASide.Cutscene == 101 && projection.Warps.Single().ASide.Tags == "temp", "Warp-only cutscene and A-side tags must project from the typed warp model.");
+            Assert(projection.Warps.Single().ASide.Cutscene == 101 && projection.Warps.Single().ASide.WarpFlag == 5308
+                && projection.Warps.Single().ASide.Tags == "temp", "Warp-only cutscene, activation flag and A-side tags must project from the typed warp model.");
             Assert(projection.Warps.Single().BSide.Tags == "player" && projection.Warps.Single().BSide.Flag == 0, "Warp destinations must not expose ordinary entrance flags.");
             Assert(projection.Warps.Single().ASide.Area == "start" && projection.Warps.Single().BSide.Area == "gate", "Warp-side areas must use FogMod graph keys.");
             Assert(projection.Entrances.Single().DoorCond == "gate"
@@ -31,7 +32,15 @@ namespace FogHost.Tests
             Assert(projection.CustomStarts.Single().Area == "start", "Custom-start area references must use the FogMod area key.");
             Assert(projection.CustomStarts.Single().Respawn == "depths 1000", "Typed respawn references must be projected consistently.");
             Assert(projection.DefaultCost.Keys.Single() == "start" && projection.LotLocations[1300020] == "gate", "Cost and lot area references must use the FogMod area key.");
+            Assert(projection.CompactLotLocations == null, "Legacy catalogs must retain consecutive-lot behavior unless Compact exact rows are explicitly supplied.");
             Assert(catalog.Fingerprint.Length == 64, "Catalog identity must include a SHA-256 fingerprint.");
+            var exactLots = new FogAnnotationCatalog(catalog.Areas, catalog.KeyItems, catalog.Warps, catalog.Entrances,
+                catalog.CustomStarts, catalog.DefaultCosts, catalog.Enemies, catalog.LotLocations, catalog.DefaultFlagCols,
+                catalog.WriterSupportEntrances,
+                new[] { new FogLotRowLocation(new FogItemLotId(1300021), new FogAreaId("project-gate")) });
+            Assert(exactLots.ToFogModAnnotations().CompactLotLocations[1300021] == "gate"
+                && exactLots.Fingerprint != catalog.Fingerprint,
+                "Explicit Compact row ownership must be projected exactly and included in catalog identity.");
             FogArea[] remappedAreas = catalog.Areas.Select(area => area.Id.Value == "project-start"
                 ? area with { Maps = new[] { new FogMapId("parish") } }
                 : area).ToArray();
@@ -108,7 +117,7 @@ namespace FogHost.Tests
             new[]
             {
                 new FogWarp("home-warp", 2000, new FogMapId("depths"), "Test warp", FogWarpTags.Unique,
-                    new FogWarpSide(new FogAreaId("project-start"), 101, null, null, null, FogWarpSideTags.Temporary),
+                    new FogWarpSide(new FogAreaId("project-start"), 101, null, null, null, FogWarpSideTags.Temporary, WarpFlag: 5308),
                     new FogWarpSide(new FogAreaId("project-gate"), 0, null, null, null, FogWarpSideTags.Player)),
             }, new[]
             {

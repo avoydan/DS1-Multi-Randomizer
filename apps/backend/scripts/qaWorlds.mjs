@@ -20,36 +20,48 @@ const merge = (base, patch) => {
   for (const [key, value] of Object.entries(patch ?? {})) out[key] = value && typeof value === 'object' && !Array.isArray(value) ? merge(base[key] ?? {}, value) : value;
   return out;
 };
-const allPools = { randomizeGifts: true, randomizeEnemyDrops: true, randomizeShops: true };
-
 /** `settings` is a patch over the product defaults (what a fresh installation shows). */
 export const QA_WORLDS = [
   {
-    id: 'recommended', title: 'Recommended Triple', masterSeed: 'qa-final-recommended-1',
+    id: 'recommended-triple-v3', title: 'Recommended Triple v3', masterSeed: 'qa-v3-recommended-triple-1',
     settings: { items: { soulItems: 'transposed' } },
   },
   {
-    id: 'chaotic', title: 'Chaotic Triple', masterSeed: 'qa-final-chaotic-1',
+    id: 'heavy-fog-v3', title: 'Heavy Fog v3: bosses, PvP, Lordvessel and Warps', masterSeed: 'qa-v3-heavy-fog-1',
     settings: {
-      items: { ...allPools, soulItems: 'transposed' },
-      enemies: { placement: { algorithm: 'sampling-v1', fit: 'anywhere', difficultyMode: 'random', replacementChance: 70, normalReplacement: 'both', bossReplacement: 'both', bossChanceInNormalSlots: 10, bossChanceInBossSlots: 60, hostileNpcs: true } },
+      items: { keyPlacement: 'shuffled', randomizeLordvessel: true, randomizeLordSouls: true },
+      enemies: { randomizeBosses: true },
+      fog: { traversableFogs: true, bossFogs: true, areaWarps: true, majorPvpFogs: true, minorPvpFogs: true, lordvesselGates: true, requireLordSouls: true },
     },
   },
   {
-    id: 'fog-keys', title: 'Fog with shuffled keys', masterSeed: 'qa-final-fog-keys-1',
-    settings: { items: { keyPlacement: 'shuffled', randomizeLordvessel: true, randomizeLordSouls: true } },
+    id: 'random-start-progression-v3', title: 'Random Start + Shuffled Progression v3', masterSeed: 'qa-v3-random-start-progression-1',
+    settings: {
+      items: { keyPlacement: 'shuffled', randomizeLordvessel: true, randomizeLordSouls: true },
+      fog: { randomStart: true, traversableFogs: true, bossFogs: true, areaWarps: true, requireLordSouls: true },
+    },
   },
   {
-    id: 'race', title: 'Race Mode', masterSeed: 'qa-final-race-1',
-    settings: { fog: { enabled: false }, enemies: { enabled: false }, items: { keyPlacement: 'race', randomizeLordvessel: true, randomizeLordSouls: true, soulItems: 'transposed' } },
+    id: 'disconnected-lord-souls-v3', title: 'Disconnected Fog + Require Lord Souls v3', masterSeed: 'qa-v3-disconnected-lord-souls-1',
+    settings: {
+      items: { keyPlacement: 'shuffled', randomizeLordvessel: true, randomizeLordSouls: true },
+      fog: { traversableFogs: true, bossFogs: true, lordvesselGates: true, disconnectedFogs: true, requireLordSouls: true },
+    },
   },
   {
-    id: 'race-plus', title: 'Race Mode +', masterSeed: 'qa-final-raceplus-1',
-    settings: { fog: { enabled: false }, enemies: { enabled: false }, items: { keyPlacement: 'race-plus', randomizeLordvessel: true, randomizeLordSouls: true } },
+    id: 'roaming-bosses-fog-v3', title: 'Heavy Roaming Bosses + Fog v3', masterSeed: 'qa-v3-roaming-bosses-fog-1',
+    settings: {
+      enemies: { placement: { algorithm: 'sampling-v1', normalReplacement: 'both', bossChanceInNormalSlots: 100, roamingBossSouls: 100, roamingBossesStayDead: true } },
+      fog: { traversableFogs: true, bossFogs: true, areaWarps: true, majorPvpFogs: true },
+    },
   },
   {
-    id: 'dlc-off', title: 'DLC content left out', masterSeed: 'qa-final-dlc-off-1',
-    settings: { fog: { enabled: false }, output: { includeDlc: false }, items: { ...allPools, soulItems: 'transposed' } },
+    id: 'nasty-combined-v3', title: 'Hard Combined Configuration v3', masterSeed: 'qa-v3-hard-combined-3',
+    settings: {
+      items: { keyPlacement: 'shuffled', randomizeLordvessel: true, randomizeLordSouls: true, itemDifficulty: 'very-unfair', soulItems: 'transposed' },
+      enemies: { enabled: false },
+      fog: { traversableFogs: true, bossFogs: true, areaWarps: true, majorPvpFogs: true, minorPvpFogs: true, lordvesselGates: true, randomStart: true, disconnectedFogs: true, noFallBedOfChaos: true, glitchedLogic: true, requireLordSouls: true, pacifistMode: true },
+    },
   },
 ];
 
@@ -73,7 +85,10 @@ async function verify() {
     for (const managed of managedRoots) await cp(path.join(source, ...managed.split('/')), path.join(game, ...managed.split('/')), { recursive: true });
     const authority = new GameStateAuthority({ stateRoot: path.join(temp, 'state'), isGameRunning: async () => false });
     if (!(await authority.importPristine(game)).ok) throw new Error('pristine import failed');
-    for (const world of qaWorldCodes()) {
+    const recipes = qaWorldCodes();
+    const worlds = process.env.DS1TR_QA_ONLY ? recipes.filter((world) => world.id === process.env.DS1TR_QA_ONLY) : recipes;
+    if (worlds.length === 0) throw new Error(`No QA world matches DS1TR_QA_ONLY=${process.env.DS1TR_QA_ONLY}.`);
+    for (const world of worlds) {
       const digests = [];
       let detail = '';
       for (const attempt of [1, 2]) {
@@ -81,8 +96,13 @@ async function verify() {
         if (!prepared.ok) throw new Error(`${world.id}: ${prepared.code}`);
         const workspacePath = path.join(temp, `run-${world.id}-${attempt}`);
         await mkdir(workspacePath, { recursive: true });
-        const result = await generateRun({ config: prepared.config, workspacePath, profile: prepared.profile, seedCode: prepared.seedCode }, () => {}, { getPristineSource: (gamePath) => authority.getPristineSource(gamePath) });
-        if (!result.ok) { digests.push(`FAILED ${result.code}: ${result.message}`); break; }
+        const events = [];
+        const result = await generateRun({ config: prepared.config, workspacePath, profile: prepared.profile, seedCode: prepared.seedCode }, (event) => events.push(event), { getPristineSource: (gamePath) => authority.getPristineSource(gamePath) });
+        if (!result.ok) {
+          const diagnostics = events.filter((event) => event.type === 'log').map((event) => event.message).join(' | ');
+          digests.push(`FAILED ${result.code}: ${result.message}${diagnostics ? ` | ${diagnostics}` : ''}`);
+          break;
+        }
         digests.push((await packageDigest(result.manifest.files, result.packagePath)).digest);
         detail = `${result.manifest.files.length} files, attempts ${result.manifest.attempts.map((entry) => entry.result).join(',')}`;
       }

@@ -3019,9 +3019,7 @@
       "implementation": {
         "validatedIn": "apps/backend/src/core/configValidation.ts",
         "effect": [
-          "apps/backend/src/adapters/fogHostProcess.ts",
-          "apps/backend/src/core/configValidation.ts",
-          "apps/backend/src/core/seedCode.ts"
+          "tools/fog-host/src/HostRunner.cs"
         ]
       }
     },

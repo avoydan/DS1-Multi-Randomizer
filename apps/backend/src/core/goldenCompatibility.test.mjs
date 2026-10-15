@@ -43,6 +43,17 @@ test('the v1 golden fixtures cover every required scenario', async () => {
   assert.equal(v1.cases.find((entry) => entry.name === 'world-options').settings.fog.language, 'POLISH');
 });
 
+test('the v3 golden fixture pins a production Compact Fog full-triple run', async () => {
+  const v3 = (await fixtures()).find((fixture) => fixture.file === 'ds1tr-gen-v3.compact-fog.json');
+  assert.ok(v3, 'the ds1tr-gen-v3 Compact Fog fixture file exists');
+  assert.deepEqual(v3.cases.map((entry) => entry.name), ['v3-compact-full-triple']);
+  const [entry] = v3.cases;
+  assert.equal(entry.profile, 'ds1tr-gen-v3');
+  assert.equal(entry.settings.fog.enabled, true);
+  assert.ok(entry.expected.fileCount > 0 && Object.keys(entry.expected.files).length === entry.expected.fileCount);
+  assert.equal(entry.expected.attempts.at(-1), 'success');
+});
+
 test('every recorded Seed Code decodes to its recorded profile, master seed and canonical settings, and re-encodes identically', async () => {
   for (const fixture of await fixtures()) {
     assert.ok(resolveGenerationProfile(fixture.profile), `profile ${fixture.profile} is still supported`);

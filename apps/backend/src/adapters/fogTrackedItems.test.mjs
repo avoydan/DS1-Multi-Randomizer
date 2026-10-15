@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { loadCombinedRandomizerCore } from '../../dist/adapters/combinedRandomizerCore.js';
-import { parseFogItemRules, FogItemRulesError } from '../../dist/adapters/fogItemRules.js';
+import { trackedItemsFromCompactProjection } from '../../dist/adapters/fogItemRules.js';
+import { legacyFogTrackedItems } from '../../dist/adapters/legacyFogTrackedItems.js';
 
 // Items the world randomizer (FogMod) follows by lot may only be placed in lots it annotates (docs/FOG_ITEM_TRACKING.md).
 
@@ -191,46 +192,27 @@ test('when no annotated lot can take a tracked item the plan fails early with a 
   );
 });
 
-// ---- the rules come from fog.txt ----------------------------------------------------------------------------------------
+// ---- the rules come from the Compact source-of-truth projection --------------------------------------------------------
 
-const FOG_TXT = `Options:
-  - x
-KeyItems:
-- Name: lordvessel
-  ID: 3:2510
-  Area: a
-- Name: darkmoon_seance_ring
-  ID: 2:149
-  Area: catacombs
-- Name: cast_light
-  ID: 3:3500
-  Tags: randomonly
-- Name: purple_cowards_crystal
-  ID: 3:118
-  Tags: hard randomonly
-- Name: peculiar_doll
-  ID: 3:384
-  Area: z
-Warps:
-- Name: w
-LotLocations:
-  1090: anorlondo_gwynevere
-  2500: depths_gaping  # boss
-  6190: parish_andre
-DefaultFlagCols:
-  x: y
-`;
-
-test('fog.txt yields every key item (flagging the ones FogMod does not require) and every annotated lot start', () => {
-  const rules = parseFogItemRules(FOG_TXT.replaceAll('\n', '\r\n'));
-  assert.deepEqual(rules.items, [
-    { equipType: 3, itemId: 2510, required: true }, { equipType: 2, itemId: 149, required: true },
-    { equipType: 3, itemId: 3500, required: false }, { equipType: 3, itemId: 118, required: false }, { equipType: 3, itemId: 384, required: true },
-  ]);
-  assert.deepEqual(rules.lotStarts, [1090, 2500, 6190]);
+test('Compact tracking projection is copied without reinterpretation', () => {
+  const source = { items: [{ equipType: 3, itemId: 2510, required: true }], lotStarts: [1090, 2500] };
+  const tracked = trackedItemsFromCompactProjection(source);
+  assert.deepEqual(tracked, source);
+  tracked.items[0].required = false;
+  tracked.lotStarts.push(6190);
+  assert.deepEqual(source, { items: [{ equipType: 3, itemId: 2510, required: true }], lotStarts: [1090, 2500] });
 });
 
-test('an unreadable or empty fog.txt is a typed error', () => {
-  assert.throws(() => parseFogItemRules('nothing'), FogItemRulesError);
-  assert.throws(() => parseFogItemRules('KeyItems:\nWarps:\nLotLocations:\nDefaultFlagCols:\n'), FogItemRulesError);
+test('historical profiles use frozen tracking data without reading fog.txt', () => {
+  const first = legacyFogTrackedItems();
+  const second = legacyFogTrackedItems();
+  assert.equal(first.items.length, 27);
+  assert.equal(first.lotStarts.length, 440);
+  assert.ok(first.items.some((item) => item.equipType === 3 && item.itemId === 2510 && item.required));
+  assert.ok(first.items.some((item) => item.equipType === 3 && item.itemId === 3500 && !item.required));
+  assert.deepEqual(second, first);
+  first.items.pop();
+  first.lotStarts.pop();
+  assert.equal(second.items.length, 27);
+  assert.equal(second.lotStarts.length, 440);
 });

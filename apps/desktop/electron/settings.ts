@@ -8,6 +8,38 @@ export interface StoredSettings {
   language?: LanguageSetting;
   /** Application updates (docs/AUTO_UPDATE.md). Absent means the defaults: automatic checks ON, nothing checked yet. Never part of a world. */
   updates?: StoredUpdateSettings;
+  /** Local launcher convenience; never used by generation, presets, or Seed Codes. Absent means off. */
+  freeCursorInMenus?: boolean;
+  /** Local launcher hotkey for moving focus away from DSR; absent means F10. */
+  freeCursorShortcut?: string;
+}
+
+const FREE_CURSOR_SHORTCUT_KEYS = new Set([
+  'Space', 'Tab', 'Insert', 'Delete', 'Home', 'End', 'PageUp', 'PageDown', 'Up', 'Down', 'Left', 'Right', 'Enter', 'Backspace',
+]);
+
+export function normalizeFreeCursorShortcut(value: unknown): string | null {
+  if (typeof value !== 'string' || value.trim() === '') return null;
+  const parts = value.trim().split('+');
+  if (parts.length < 1 || parts.length > 4 || parts.some((part) => part.trim() === '')) return null;
+  const modifiers = new Set<string>();
+  for (const raw of parts.slice(0, -1)) {
+    const modifier = raw.trim().toLowerCase();
+    if (modifier === 'ctrl' || modifier === 'control') modifiers.add('Ctrl');
+    else if (modifier === 'alt') modifiers.add('Alt');
+    else if (modifier === 'shift') modifiers.add('Shift');
+    else return null;
+  }
+  if (modifiers.size !== parts.length - 1) return null;
+
+  const rawKey = parts.at(-1)!.trim();
+  const upperKey = rawKey.toUpperCase();
+  const namedKey = [...FREE_CURSOR_SHORTCUT_KEYS].find((key) => key.toLowerCase() === rawKey.toLowerCase());
+  const key = /^F(?:[1-9]|1[0-9]|2[0-4])$/u.test(upperKey) || /^[A-Z0-9]$/u.test(upperKey)
+    ? upperKey
+    : namedKey ?? null;
+  if (!key) return null;
+  return [...['Ctrl', 'Alt', 'Shift'].filter((modifier) => modifiers.has(modifier)), key].join('+');
 }
 
 export interface StoredUpdateSettings {
@@ -56,6 +88,9 @@ export function migrateSettings(raw: unknown): { settings: StoredSettings; chang
   if (language && language !== 'auto') settings.language = language;
   const updates = normalizeUpdateSettings(source.updates);
   if (updates) settings.updates = updates;
+  if (typeof source.freeCursorInMenus === 'boolean') settings.freeCursorInMenus = source.freeCursorInMenus;
+  const freeCursorShortcut = normalizeFreeCursorShortcut(source.freeCursorShortcut);
+  if (freeCursorShortcut) settings.freeCursorShortcut = freeCursorShortcut;
   const keptKeys = Object.keys(settings);
   const changed = Object.keys(source).length !== keptKeys.length || Object.keys(source).some((key) => !keptKeys.includes(key));
   return { settings, changed };

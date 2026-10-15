@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { generateRun } from '../../dist/core/generationPipeline.js';
-import { checkProfileComponents, currentGenerationProfile, resolveGenerationProfile, supportedGenerationProfiles } from '../../dist/core/generationProfiles.js';
+import { checkProfileComponents, currentGenerationProfile, fogHostRuntimeForProfile, resolveGenerationProfile, supportedGenerationProfiles } from '../../dist/core/generationProfiles.js';
 import { deriveAttemptSeeds, SEED_DERIVATION_V1 } from '../../dist/core/seeds.js';
 import { decodeSeedCode, encodeSeedCode } from '../../dist/core/seedCode.js';
 import { prepareRun } from '../../dist/core/seededRun.js';
@@ -13,19 +13,37 @@ import { fullConfig, fullSettings } from './seedTestSupport.mjs';
 
 const sha = (value) => createHash('sha256').update(value).digest('hex');
 
-test('profile ds1tr-gen-v1 is registered, current, and names its exact components without any application version', () => {
+test('published v1 and v2 keep their frozen roaming-boss policies while Compact v3 is current', () => {
   const profile = resolveGenerationProfile('ds1tr-gen-v1');
+  const corrected = resolveGenerationProfile('ds1tr-gen-v2');
+  const current = resolveGenerationProfile('ds1tr-gen-v3');
   assert.ok(profile);
-  assert.deepEqual(supportedGenerationProfiles(), ['ds1tr-gen-v1']);
-  assert.equal(currentGenerationProfile().id, 'ds1tr-gen-v1');
+  assert.ok(corrected);
+  assert.ok(current);
+  assert.deepEqual(supportedGenerationProfiles(), ['ds1tr-gen-v1', 'ds1tr-gen-v2', 'ds1tr-gen-v3']);
+  assert.equal(currentGenerationProfile().id, 'ds1tr-gen-v3');
   assert.doesNotMatch(profile.id, /\d+\.\d+/u, 'a profile id never contains an application version');
   assert.deepEqual(profile.combinedEngine.randomizerVersions, ['0.5.66']);
+  assert.equal(profile.roamingBossDestinationPolicy, 'protected-v1');
+  assert.deepEqual(corrected.combinedEngine.randomizerVersions, ['0.5.66']);
+  assert.equal(corrected.roamingBossDestinationPolicy, 'safe-handlers-v2');
+  assert.deepEqual(corrected.fogEngine.hostVersions, ['0.5.0']);
+  assert.equal(corrected.fogAnnotationSource, 'legacy-fogmod');
+  assert.deepEqual(current.combinedEngine.randomizerVersions, ['0.5.66']);
+  assert.equal(current.roamingBossDestinationPolicy, 'safe-handlers-v2');
+  assert.deepEqual(current.fogEngine.hostVersions, ['0.6.0']);
+  assert.equal(current.fogAnnotationSource, 'compact-v1');
   assert.deepEqual(profile.fogEngine.hostVersions, ['0.5.0']);
+  assert.deepEqual(fogHostRuntimeForProfile(profile), { hostVersion: '0.5.0', schemaVersion: 2, annotationSource: 'legacy-fogmod' });
+  assert.deepEqual(fogHostRuntimeForProfile(corrected), { hostVersion: '0.5.0', schemaVersion: 2, annotationSource: 'legacy-fogmod' });
+  assert.deepEqual(fogHostRuntimeForProfile(current), { hostVersion: '0.6.0', schemaVersion: 3, annotationSource: 'compact-v1' });
+  assert.equal(fogHostRuntimeForProfile({ ...profile, fogEngine: { ...profile.fogEngine, hostVersions: ['0.6.0'] } }), null,
+    'a legacy data/tracking profile cannot be silently routed to the current host');
   assert.equal(profile.fogEngine.fogModCommit, '6e6dc7886d0f8bcc53c1800d95c9e859d1f2f87f');
   assert.equal(profile.fogEngine.worldDataId, 'f394fa536ba9b66d');
   assert.deepEqual({ ...profile.retryBounds }, { maxCombinedAttempts: 3, maxFogAttempts: 5 });
   assert.equal(profile.fogItemTracking, 'fog-item-tracking-v1');
-  assert.equal(resolveGenerationProfile('ds1tr-gen-v2'), null);
+  assert.equal(current.fogEngine.compactCatalogFingerprint, '8c03fd3de1cd7c772d5c933753ae54eab35f9e8b70a1aef2954322330d0002d4');
   assert.ok(Object.isFrozen(profile), 'a registered profile cannot be edited at runtime');
 });
 
@@ -45,8 +63,9 @@ test('components outside the profile lists are refused, those inside are accepte
   const profile = resolveGenerationProfile('ds1tr-gen-v1');
   assert.equal(checkProfileComponents(profile, { combinedRandomizerVersion: '0.5.66', fogHostVersion: '0.5.0', fogModCommit: profile.fogEngine.fogModCommit, worldDataId: 'f394fa536ba9b66d' }), null);
   assert.equal(checkProfileComponents(profile, {}), null);
-  assert.match(checkProfileComponents(profile, { combinedRandomizerVersion: '0.5.67' }), /combined engine 0\.5\.67 is not on the list/u);
   assert.match(checkProfileComponents(profile, { fogHostVersion: '0.6.0' }), /FogHost 0\.6\.0/u);
+  assert.match(checkProfileComponents(profile, { combinedRandomizerVersion: '0.5.67' }), /combined engine 0\.5\.67 is not on the list/u);
+  assert.match(checkProfileComponents(profile, { fogHostVersion: '0.7.0' }), /FogHost 0\.7\.0/u);
   assert.match(checkProfileComponents(profile, { fogModCommit: 'abc' }), /FogMod abc/u);
   assert.match(checkProfileComponents(profile, { worldDataId: 'other' }), /world data other/u);
 });
@@ -54,13 +73,13 @@ test('components outside the profile lists are refused, those inside are accepte
 test('every code made now names a registered profile and decodes in a simulated later application', () => {
   const run = prepareRun(fullConfig(), () => '123456');
   assert.equal(run.ok, true);
-  assert.equal(run.profile.id, 'ds1tr-gen-v1');
+  assert.equal(run.profile.id, 'ds1tr-gen-v3');
   // A later application only adds profiles; decoding reads the code's own profile, never the app version.
   const decoded = decodeSeedCode(run.seedCode);
-  assert.equal(decoded.envelope.profile, 'ds1tr-gen-v1');
+  assert.equal(decoded.envelope.profile, 'ds1tr-gen-v3');
   assert.equal(decoded.seedCode, run.seedCode, 're-encoding a decoded code gives the identical code');
   // A code made by a profile this application does not know is an explicit, specific refusal, never a guess.
-  const future = encodeSeedCode({ profile: 'ds1tr-gen-v2', masterSeed: '1', settings: fullSettings() });
+  const future = encodeSeedCode({ profile: 'ds1tr-gen-v4', masterSeed: '1', settings: fullSettings() });
   const refused = prepareRun({ ...fullConfig(), seedCode: future });
   assert.equal(refused.ok, false);
   assert.equal(refused.code, 'UNSUPPORTED_PROFILE');
@@ -122,7 +141,7 @@ test('the application version never changes the world: the same Seed Code gives 
     assert.equal(today.result.manifest.appVersion, '0.30.0');
     assert.equal(later.result.manifest.appVersion, '12.4.7-future', 'the app version is recorded but only recorded');
     for (const field of ['generationProfile', 'seedCode', 'masterSeed']) assert.deepEqual(later.result.manifest[field], today.result.manifest[field], field);
-    assert.equal(today.result.manifest.generationProfile, 'ds1tr-gen-v1');
+    assert.equal(today.result.manifest.generationProfile, 'ds1tr-gen-v3');
     assert.equal(today.result.manifest.seedCode, code);
     assert.deepEqual(later.result.manifest.attempts, today.result.manifest.attempts);
     assert.deepEqual(await packageHashes(later.result.packagePath), await packageHashes(today.result.packagePath));

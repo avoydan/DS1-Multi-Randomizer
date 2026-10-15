@@ -123,6 +123,7 @@ test('maps both enabled capabilities deterministically', () => {
       enemyBossChanceNormalSlots: 10,
       enemyRoamingBossSouls: 50,
       enemyRoamingBossesStayDead: false,
+      enemyRoamingBossDestinationPolicy: 'safe-handlers-v2',
       placementDiagnosticsLevel: 'summary',
       fogTrackedItems: null,
       keyPlacement: 'vanilla',
@@ -134,6 +135,15 @@ test('maps both enabled capabilities deterministically', () => {
       generateSpoilerLog: true,
     },
   });
+});
+
+test('roaming-boss destination handling is selected by the generation profile', () => {
+  const current = mapCombinedRandomizerConfig(createRequest());
+  const legacy = mapCombinedRandomizerConfig(createRequest({ roamingBossDestinationPolicy: 'protected-v1' }));
+  assert.equal(current.ok, true);
+  assert.equal(legacy.ok, true);
+  assert.equal(current.config.enemyRoamingBossDestinationPolicy, 'safe-handlers-v2');
+  assert.equal(legacy.config.enemyRoamingBossDestinationPolicy, 'protected-v1');
 });
 
 test('ANDs nested options with a disabled parent', () => {

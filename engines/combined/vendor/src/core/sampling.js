@@ -1075,6 +1075,27 @@ export function planRoamingBosses({
       destinations: mapAll.length, protectedByReason: {}, eligible: eligible.length, notParticipating: 0, selected: 0,
       boss: 0, normalDraw: 0, unchanged: { easyAsylum: 0, fit: 0, preventSame: 0, difficulty: 0, modelBudget: 0, eventLimit: 0, other: 0 }, distinctBossModels: 0,
     };
+    // Keep a per-map explanation of the "Only where they fit" candidate universe. This is diagnostic only: it reads
+    // the same classes and candidate list as the planner, and does not participate in candidate selection or RNG use.
+    // Grouped type replacement has an all-members fit rule, so individual-slot availability is deliberately omitted there.
+    if (options.fit === "fits" && !grouped) {
+      const bySizeClass = {};
+      for (const slot of mapAll) {
+        const sizeClass = slotSizeClass(table, slot);
+        const entry = bySizeClass[sizeClass] ??= {
+          destinations: 0,
+          fittingBossArchetypes: bossTypes.filter((type) => type.size <= sizeClass).length,
+          slotsByCandidateCount: { zero: 0, one: 0, two: 0, threePlus: 0 },
+          unchangedFit: 0,
+        };
+        entry.destinations += 1;
+        const bucket = entry.fittingBossArchetypes === 0 ? "zero"
+          : entry.fittingBossArchetypes === 1 ? "one"
+            : entry.fittingBossArchetypes === 2 ? "two" : "threePlus";
+        entry.slotsByCandidateCount[bucket] += 1;
+      }
+      stat.fitCandidateAnalysis = bySizeClass;
+    }
     for (const slot of slots) {
       if (slot.mapId === mapId && excludedSlotIds.has(slot.id)) {
         const reason = protectedReasons.get(slot.id) ?? "other";
@@ -1141,6 +1162,12 @@ export function planRoamingBosses({
         // The exact reason, in the order the pools are narrowed: size, Prevent same, the Easy Asylum rule / difficulty class, the model budget.
         const reason = budgetBlocked ? "modelBudget" : sizeOk.length === 0 ? "fit" : fitPool.length === 0 ? "preventSame" : asylumRule ? "easyAsylum" : pools.every((pool) => pool.length === 0) ? "difficulty" : "other";
         stat.unchanged[reason] += size;
+        if (reason === "fit" && stat.fitCandidateAnalysis) {
+          for (const member of subject.members) {
+            const sizeClass = slotSizeClass(table, member);
+            stat.fitCandidateAnalysis[sizeClass].unchangedFit += 1;
+          }
+        }
         diagnostics.count(budgetBlocked ? "roamingBudgetRejected" : "roamingNoCandidate");
         diagnostics.count(`roamingUnchanged:${reason}`, size);
         continue;

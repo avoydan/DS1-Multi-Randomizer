@@ -1,0 +1,1449 @@
+{
+  "schemaVersion": 1,
+  "auditDate": "2026-10-15",
+  "sourceCatalog": {
+    "path": "C:\\Users\\Adam\\ds1tr-qa\\profile-0350-inst\\state\\runs\\6cab6d1f-375c-41fe-85c4-606f8aca0a7d\\combined-0\\dsr-catalog.json",
+    "sha256": "76863fbdec11b0e38560cceb60e623d065ae9c7686e0bf48189f785997645e79",
+    "schemaVersion": 17,
+    "maps": 18,
+    "enemySlots": 2192,
+    "bossSlots": 35
+  },
+  "baselineMasterSeed": "boss-fit-audit-2026-10-15",
+  "before": {
+    "eligible": 1716,
+    "selected": 1716,
+    "notParticipating": 0,
+    "bossesPlaced": 562,
+    "normalDraw": 0,
+    "unchanged": {
+      "easyAsylum": 0,
+      "fit": 1154,
+      "preventSame": 0,
+      "difficulty": 0,
+      "modelBudget": 0,
+      "eventLimit": 0,
+      "other": 0
+    },
+    "protectedByReason": {},
+    "fitClasses": {
+      "0": {
+        "destinations": 164,
+        "fittingBossArchetypes": 0,
+        "slotsByCandidateCount": {
+          "zero": 164,
+          "one": 0,
+          "two": 0,
+          "threePlus": 0
+        },
+        "unchangedFit": 164
+      },
+      "1": {
+        "destinations": 990,
+        "fittingBossArchetypes": 0,
+        "slotsByCandidateCount": {
+          "zero": 990,
+          "one": 0,
+          "two": 0,
+          "threePlus": 0
+        },
+        "unchangedFit": 990
+      },
+      "2": {
+        "destinations": 387,
+        "fittingBossArchetypes": 1,
+        "slotsByCandidateCount": {
+          "zero": 0,
+          "one": 387,
+          "two": 0,
+          "threePlus": 0
+        },
+        "unchangedFit": 0
+      },
+      "3": {
+        "destinations": 166,
+        "fittingBossArchetypes": 10,
+        "slotsByCandidateCount": {
+          "zero": 0,
+          "one": 0,
+          "two": 0,
+          "threePlus": 166
+        },
+        "unchangedFit": 0
+      },
+      "4": {
+        "destinations": 0,
+        "fittingBossArchetypes": 15,
+        "slotsByCandidateCount": {
+          "zero": 0,
+          "one": 0,
+          "two": 0,
+          "threePlus": 0
+        },
+        "unchangedFit": 0
+      },
+      "5": {
+        "destinations": 9,
+        "fittingBossArchetypes": 17,
+        "slotsByCandidateCount": {
+          "zero": 0,
+          "one": 0,
+          "two": 0,
+          "threePlus": 9
+        },
+        "unchangedFit": 0
+      }
+    },
+    "bossFrequency": {
+      "c2230:223000": 2,
+      "c2232:223200": 1,
+      "c2240:224000": 15,
+      "c2250:225000": 20,
+      "c2360:236000": 16,
+      "c2360:236001": 23,
+      "c3230:323000": 18,
+      "c3320:332000": 399,
+      "c4100:410000": 10,
+      "c4500:450000": 22,
+      "c5220:522000": 1,
+      "c5270:527000": 10,
+      "c5280:528000": 25,
+      "c2231:223100": 0,
+      "c2320:232000": 0,
+      "c5210:521000": 0,
+      "c5271:527100": 0,
+      "c5320:532000": 0
+    },
+    "placementPercent": 32.75,
+    "placementHash": "f884dde35a4bae6222b5e9e3f45e9414aae2eeb98e7c0227ab837cc1a43e8196"
+  },
+  "after": {
+    "eligible": 1716,
+    "selected": 1716,
+    "notParticipating": 0,
+    "bossesPlaced": 1716,
+    "normalDraw": 0,
+    "unchanged": {
+      "easyAsylum": 0,
+      "fit": 0,
+      "preventSame": 0,
+      "difficulty": 0,
+      "modelBudget": 0,
+      "eventLimit": 0,
+      "other": 0
+    },
+    "protectedByReason": {},
+    "fitClasses": {
+      "0": {
+        "destinations": 164,
+        "fittingBossArchetypes": 4,
+        "slotsByCandidateCount": {
+          "zero": 0,
+          "one": 0,
+          "two": 0,
+          "threePlus": 164
+        },
+        "unchangedFit": 0
+      },
+      "1": {
+        "destinations": 990,
+        "fittingBossArchetypes": 4,
+        "slotsByCandidateCount": {
+          "zero": 0,
+          "one": 0,
+          "two": 0,
+          "threePlus": 990
+        },
+        "unchangedFit": 0
+      },
+      "2": {
+        "destinations": 387,
+        "fittingBossArchetypes": 5,
+        "slotsByCandidateCount": {
+          "zero": 0,
+          "one": 0,
+          "two": 0,
+          "threePlus": 387
+        },
+        "unchangedFit": 0
+      },
+      "3": {
+        "destinations": 166,
+        "fittingBossArchetypes": 11,
+        "slotsByCandidateCount": {
+          "zero": 0,
+          "one": 0,
+          "two": 0,
+          "threePlus": 166
+        },
+        "unchangedFit": 0
+      },
+      "4": {
+        "destinations": 0,
+        "fittingBossArchetypes": 16,
+        "slotsByCandidateCount": {
+          "zero": 0,
+          "one": 0,
+          "two": 0,
+          "threePlus": 0
+        },
+        "unchangedFit": 0
+      },
+      "5": {
+        "destinations": 9,
+        "fittingBossArchetypes": 18,
+        "slotsByCandidateCount": {
+          "zero": 0,
+          "one": 0,
+          "two": 0,
+          "threePlus": 9
+        },
+        "unchangedFit": 0
+      }
+    },
+    "bossFrequency": {
+      "c2230:223000": 2,
+      "c2232:223200": 1,
+      "c2240:224000": 378,
+      "c2250:225000": 106,
+      "c2360:236000": 16,
+      "c2360:236001": 18,
+      "c3230:323000": 16,
+      "c3320:332000": 352,
+      "c4100:410000": 386,
+      "c4500:450000": 14,
+      "c5270:527000": 19,
+      "c5271:527100": 1,
+      "c5280:528000": 12,
+      "c5320:532000": 395,
+      "c2231:223100": 0,
+      "c2320:232000": 0,
+      "c5210:521000": 0,
+      "c5220:522000": 0
+    },
+    "placementPercent": 100,
+    "placementHash": "0620549a7965456500876c0fa8468e6eeb7f78321bce92be8ad5f6a62c4471d1",
+    "deterministicRerun": true
+  },
+  "approvedBossComparisons": [
+    {
+      "boss": "c4100:410000",
+      "before": 10,
+      "after": 386
+    },
+    {
+      "boss": "c2240:224000",
+      "before": 15,
+      "after": 378
+    },
+    {
+      "boss": "c3320:332000",
+      "before": 399,
+      "after": 352
+    },
+    {
+      "boss": "c2250:225000",
+      "before": 20,
+      "after": 106
+    },
+    {
+      "boss": "c5320:532000",
+      "before": 0,
+      "after": 395
+    }
+  ],
+  "matrix": [
+    {
+      "name": "bosses-only-100-fit",
+      "options": {},
+      "deterministicRerun": true,
+      "eligible": 1716,
+      "selected": 1716,
+      "notParticipating": 0,
+      "bossesPlaced": 1716,
+      "normalDraw": 0,
+      "unchanged": {
+        "easyAsylum": 0,
+        "fit": 0,
+        "preventSame": 0,
+        "difficulty": 0,
+        "modelBudget": 0,
+        "eventLimit": 0,
+        "other": 0
+      },
+      "protectedByReason": {},
+      "fitClasses": {
+        "0": {
+          "destinations": 164,
+          "fittingBossArchetypes": 4,
+          "slotsByCandidateCount": {
+            "zero": 0,
+            "one": 0,
+            "two": 0,
+            "threePlus": 164
+          },
+          "unchangedFit": 0
+        },
+        "1": {
+          "destinations": 990,
+          "fittingBossArchetypes": 4,
+          "slotsByCandidateCount": {
+            "zero": 0,
+            "one": 0,
+            "two": 0,
+            "threePlus": 990
+          },
+          "unchangedFit": 0
+        },
+        "2": {
+          "destinations": 387,
+          "fittingBossArchetypes": 5,
+          "slotsByCandidateCount": {
+            "zero": 0,
+            "one": 0,
+            "two": 0,
+            "threePlus": 387
+          },
+          "unchangedFit": 0
+        },
+        "3": {
+          "destinations": 166,
+          "fittingBossArchetypes": 11,
+          "slotsByCandidateCount": {
+            "zero": 0,
+            "one": 0,
+            "two": 0,
+            "threePlus": 166
+          },
+          "unchangedFit": 0
+        },
+        "5": {
+          "destinations": 9,
+          "fittingBossArchetypes": 18,
+          "slotsByCandidateCount": {
+            "zero": 0,
+            "one": 0,
+            "two": 0,
+            "threePlus": 9
+          },
+          "unchangedFit": 0
+        }
+      },
+      "bossFrequency": {
+        "c2232:223200": 1,
+        "c2240:224000": 388,
+        "c2250:225000": 97,
+        "c2320:232000": 2,
+        "c2360:236000": 18,
+        "c2360:236001": 20,
+        "c3230:323000": 13,
+        "c3320:332000": 399,
+        "c4100:410000": 385,
+        "c4500:450000": 16,
+        "c5220:522000": 1,
+        "c5270:527000": 17,
+        "c5280:528000": 15,
+        "c5320:532000": 344,
+        "c2230:223000": 0,
+        "c2231:223100": 0,
+        "c5210:521000": 0,
+        "c5271:527100": 0
+      },
+      "placementPercent": 100,
+      "placementHash": "f201aeea30a54e20ed71a42fc4d8053f25b9a348ded010fdd0e21542ede75bc7"
+    },
+    {
+      "name": "bosses-only-50-fit",
+      "options": {
+        "enemyReplacementChance": 50
+      },
+      "deterministicRerun": true,
+      "eligible": 1716,
+      "selected": 862,
+      "notParticipating": 854,
+      "bossesPlaced": 862,
+      "normalDraw": 0,
+      "unchanged": {
+        "easyAsylum": 0,
+        "fit": 0,
+        "preventSame": 0,
+        "difficulty": 0,
+        "modelBudget": 0,
+        "eventLimit": 0,
+        "other": 0
+      },
+      "protectedByReason": {},
+      "fitClasses": {
+        "0": {
+          "destinations": 164,
+          "fittingBossArchetypes": 4,
+          "slotsByCandidateCount": {
+            "zero": 0,
+            "one": 0,
+            "two": 0,
+            "threePlus": 164
+          },
+          "unchangedFit": 0
+        },
+        "1": {
+          "destinations": 990,
+          "fittingBossArchetypes": 4,
+          "slotsByCandidateCount": {
+            "zero": 0,
+            "one": 0,
+            "two": 0,
+            "threePlus": 990
+          },
+          "unchangedFit": 0
+        },
+        "2": {
+          "destinations": 387,
+          "fittingBossArchetypes": 5,
+          "slotsByCandidateCount": {
+            "zero": 0,
+            "one": 0,
+            "two": 0,
+            "threePlus": 387
+          },
+          "unchangedFit": 0
+        },
+        "3": {
+          "destinations": 166,
+          "fittingBossArchetypes": 11,
+          "slotsByCandidateCount": {
+            "zero": 0,
+            "one": 0,
+            "two": 0,
+            "threePlus": 166
+          },
+          "unchangedFit": 0
+        },
+        "5": {
+          "destinations": 9,
+          "fittingBossArchetypes": 18,
+          "slotsByCandidateCount": {
+            "zero": 0,
+            "one": 0,
+            "two": 0,
+            "threePlus": 9
+          },
+          "unchangedFit": 0
+        }
+      },
+      "bossFrequency": {
+        "c2232:223200": 1,
+        "c2240:224000": 217,
+        "c2250:225000": 45,
+        "c2320:232000": 1,
+        "c2360:236000": 10,
+        "c2360:236001": 7,
+        "c3230:323000": 12,
+        "c3320:332000": 187,
+        "c4100:410000": 198,
+        "c4500:450000": 6,
+        "c5210:521000": 1,
+        "c5270:527000": 7,
+        "c5280:528000": 9,
+        "c5320:532000": 161,
+        "c2230:223000": 0,
+        "c2231:223100": 0,
+        "c5220:522000": 0,
+        "c5271:527100": 0
+      },
+      "placementPercent": 50.23,
+      "placementHash": "bf3478b2cfdb574ee2a08f5cfe899dbdce6f9da13c312b80ca9f26b34fe0e678"
+    },
+    {
+      "name": "both-100-fit",
+      "options": {
+        "enemyNormalReplacement": "both",
+        "enemyBossChanceNormalSlots": 100
+      },
+      "deterministicRerun": true,
+      "eligible": 1716,
+      "selected": 1716,
+      "notParticipating": 0,
+      "bossesPlaced": 1716,
+      "normalDraw": 0,
+      "unchanged": {
+        "easyAsylum": 0,
+        "fit": 0,
+        "preventSame": 0,
+        "difficulty": 0,
+        "modelBudget": 0,
+        "eventLimit": 0,
+        "other": 0
+      },
+      "protectedByReason": {},
+      "fitClasses": {
+        "0": {
+          "destinations": 164,
+          "fittingBossArchetypes": 4,
+          "slotsByCandidateCount": {
+            "zero": 0,
+            "one": 0,
+            "two": 0,
+            "threePlus": 164
+          },
+          "unchangedFit": 0
+        },
+        "1": {
+          "destinations": 990,
+          "fittingBossArchetypes": 4,
+          "slotsByCandidateCount": {
+            "zero": 0,
+            "one": 0,
+            "two": 0,
+            "threePlus": 990
+          },
+          "unchangedFit": 0
+        },
+        "2": {
+          "destinations": 387,
+          "fittingBossArchetypes": 5,
+          "slotsByCandidateCount": {
+            "zero": 0,
+            "one": 0,
+            "two": 0,
+            "threePlus": 387
+          },
+          "unchangedFit": 0
+        },
+        "3": {
+          "destinations": 166,
+          "fittingBossArchetypes": 11,
+          "slotsByCandidateCount": {
+            "zero": 0,
+            "one": 0,
+            "two": 0,
+            "threePlus": 166
+          },
+          "unchangedFit": 0
+        },
+        "5": {
+          "destinations": 9,
+          "fittingBossArchetypes": 18,
+          "slotsByCandidateCount": {
+            "zero": 0,
+            "one": 0,
+            "two": 0,
+            "threePlus": 9
+          },
+          "unchangedFit": 0
+        }
+      },
+      "bossFrequency": {
+        "c2240:224000": 380,
+        "c2250:225000": 101,
+        "c2320:232000": 1,
+        "c2360:236000": 16,
+        "c2360:236001": 15,
+        "c3230:323000": 16,
+        "c3320:332000": 380,
+        "c4100:410000": 403,
+        "c4500:450000": 16,
+        "c5270:527000": 19,
+        "c5271:527100": 1,
+        "c5280:528000": 20,
+        "c5320:532000": 348,
+        "c2230:223000": 0,
+        "c2231:223100": 0,
+        "c2232:223200": 0,
+        "c5210:521000": 0,
+        "c5220:522000": 0
+      },
+      "placementPercent": 100,
+      "placementHash": "dc1d8a981d208ec3f6d894b123f8eb2acdb7d78dad013f6520c08717ac246fa8"
+    },
+    {
+      "name": "both-50-fit",
+      "options": {
+        "enemyNormalReplacement": "both",
+        "enemyBossChanceNormalSlots": 50
+      },
+      "deterministicRerun": true,
+      "eligible": 1716,
+      "selected": 1716,
+      "notParticipating": 0,
+      "bossesPlaced": 694,
+      "normalDraw": 818,
+      "unchanged": {
+        "easyAsylum": 0,
+        "fit": 0,
+        "preventSame": 0,
+        "difficulty": 0,
+        "modelBudget": 204,
+        "eventLimit": 0,
+        "other": 0
+      },
+      "protectedByReason": {},
+      "fitClasses": {
+        "0": {
+          "destinations": 164,
+          "fittingBossArchetypes": 4,
+          "slotsByCandidateCount": {
+            "zero": 0,
+            "one": 0,
+            "two": 0,
+            "threePlus": 164
+          },
+          "unchangedFit": 0
+        },
+        "1": {
+          "destinations": 990,
+          "fittingBossArchetypes": 4,
+          "slotsByCandidateCount": {
+            "zero": 0,
+            "one": 0,
+            "two": 0,
+            "threePlus": 990
+          },
+          "unchangedFit": 0
+        },
+        "2": {
+          "destinations": 387,
+          "fittingBossArchetypes": 5,
+          "slotsByCandidateCount": {
+            "zero": 0,
+            "one": 0,
+            "two": 0,
+            "threePlus": 387
+          },
+          "unchangedFit": 0
+        },
+        "3": {
+          "destinations": 166,
+          "fittingBossArchetypes": 11,
+          "slotsByCandidateCount": {
+            "zero": 0,
+            "one": 0,
+            "two": 0,
+            "threePlus": 166
+          },
+          "unchangedFit": 0
+        },
+        "5": {
+          "destinations": 9,
+          "fittingBossArchetypes": 18,
+          "slotsByCandidateCount": {
+            "zero": 0,
+            "one": 0,
+            "two": 0,
+            "threePlus": 9
+          },
+          "unchangedFit": 0
+        }
+      },
+      "bossFrequency": {
+        "c2232:223200": 1,
+        "c2240:224000": 291,
+        "c2250:225000": 18,
+        "c2360:236000": 3,
+        "c2360:236001": 4,
+        "c3230:323000": 34,
+        "c3320:332000": 109,
+        "c4100:410000": 148,
+        "c4500:450000": 3,
+        "c5270:527000": 9,
+        "c5280:528000": 3,
+        "c5320:532000": 71,
+        "c2230:223000": 0,
+        "c2231:223100": 0,
+        "c2320:232000": 0,
+        "c5210:521000": 0,
+        "c5220:522000": 0,
+        "c5271:527100": 0
+      },
+      "placementPercent": 40.44,
+      "placementHash": "1a3d62f0994096d4b7ee79bae5b32e7f6b53431f31c10493193d9c00e755962e"
+    },
+    {
+      "name": "bosses-only-100-fit-prevent-same",
+      "options": {
+        "preventSameEnemy": true
+      },
+      "deterministicRerun": true,
+      "eligible": 1716,
+      "selected": 1716,
+      "notParticipating": 0,
+      "bossesPlaced": 1716,
+      "normalDraw": 0,
+      "unchanged": {
+        "easyAsylum": 0,
+        "fit": 0,
+        "preventSame": 0,
+        "difficulty": 0,
+        "modelBudget": 0,
+        "eventLimit": 0,
+        "other": 0
+      },
+      "protectedByReason": {},
+      "fitClasses": {
+        "0": {
+          "destinations": 164,
+          "fittingBossArchetypes": 4,
+          "slotsByCandidateCount": {
+            "zero": 0,
+            "one": 0,
+            "two": 0,
+            "threePlus": 164
+          },
+          "unchangedFit": 0
+        },
+        "1": {
+          "destinations": 990,
+          "fittingBossArchetypes": 4,
+          "slotsByCandidateCount": {
+            "zero": 0,
+            "one": 0,
+            "two": 0,
+            "threePlus": 990
+          },
+          "unchangedFit": 0
+        },
+        "2": {
+          "destinations": 387,
+          "fittingBossArchetypes": 5,
+          "slotsByCandidateCount": {
+            "zero": 0,
+            "one": 0,
+            "two": 0,
+            "threePlus": 387
+          },
+          "unchangedFit": 0
+        },
+        "3": {
+          "destinations": 166,
+          "fittingBossArchetypes": 11,
+          "slotsByCandidateCount": {
+            "zero": 0,
+            "one": 0,
+            "two": 0,
+            "threePlus": 166
+          },
+          "unchangedFit": 0
+        },
+        "5": {
+          "destinations": 9,
+          "fittingBossArchetypes": 18,
+          "slotsByCandidateCount": {
+            "zero": 0,
+            "one": 0,
+            "two": 0,
+            "threePlus": 9
+          },
+          "unchangedFit": 0
+        }
+      },
+      "bossFrequency": {
+        "c2232:223200": 1,
+        "c2240:224000": 394,
+        "c2250:225000": 101,
+        "c2320:232000": 1,
+        "c2360:236000": 18,
+        "c2360:236001": 15,
+        "c3230:323000": 26,
+        "c3320:332000": 374,
+        "c4100:410000": 340,
+        "c4500:450000": 14,
+        "c5210:521000": 2,
+        "c5270:527000": 10,
+        "c5280:528000": 20,
+        "c5320:532000": 400,
+        "c2230:223000": 0,
+        "c2231:223100": 0,
+        "c5220:522000": 0,
+        "c5271:527100": 0
+      },
+      "placementPercent": 100,
+      "placementHash": "2978b92f8bc31b7f5aaa67e4daa43f8c924a613b5ec200c6695face2bea47fee"
+    },
+    {
+      "name": "bosses-only-100-fit-curve-loose",
+      "options": {
+        "enemyDifficultyMode": "curve",
+        "enemyDifficultyStrictness": "loose"
+      },
+      "deterministicRerun": true,
+      "eligible": 1716,
+      "selected": 1716,
+      "notParticipating": 0,
+      "bossesPlaced": 1033,
+      "normalDraw": 0,
+      "unchanged": {
+        "easyAsylum": 0,
+        "fit": 0,
+        "preventSame": 0,
+        "difficulty": 683,
+        "modelBudget": 0,
+        "eventLimit": 0,
+        "other": 0
+      },
+      "protectedByReason": {},
+      "fitClasses": {
+        "0": {
+          "destinations": 164,
+          "fittingBossArchetypes": 4,
+          "slotsByCandidateCount": {
+            "zero": 0,
+            "one": 0,
+            "two": 0,
+            "threePlus": 164
+          },
+          "unchangedFit": 0
+        },
+        "1": {
+          "destinations": 990,
+          "fittingBossArchetypes": 4,
+          "slotsByCandidateCount": {
+            "zero": 0,
+            "one": 0,
+            "two": 0,
+            "threePlus": 990
+          },
+          "unchangedFit": 0
+        },
+        "2": {
+          "destinations": 387,
+          "fittingBossArchetypes": 5,
+          "slotsByCandidateCount": {
+            "zero": 0,
+            "one": 0,
+            "two": 0,
+            "threePlus": 387
+          },
+          "unchangedFit": 0
+        },
+        "3": {
+          "destinations": 166,
+          "fittingBossArchetypes": 11,
+          "slotsByCandidateCount": {
+            "zero": 0,
+            "one": 0,
+            "two": 0,
+            "threePlus": 166
+          },
+          "unchangedFit": 0
+        },
+        "5": {
+          "destinations": 9,
+          "fittingBossArchetypes": 18,
+          "slotsByCandidateCount": {
+            "zero": 0,
+            "one": 0,
+            "two": 0,
+            "threePlus": 9
+          },
+          "unchangedFit": 0
+        }
+      },
+      "bossFrequency": {
+        "c2240:224000": 371,
+        "c2250:225000": 22,
+        "c2360:236000": 21,
+        "c2360:236001": 16,
+        "c3230:323000": 18,
+        "c3320:332000": 327,
+        "c4100:410000": 90,
+        "c4500:450000": 7,
+        "c5210:521000": 2,
+        "c5270:527000": 12,
+        "c5280:528000": 21,
+        "c5320:532000": 126,
+        "c2230:223000": 0,
+        "c2231:223100": 0,
+        "c2232:223200": 0,
+        "c2320:232000": 0,
+        "c5220:522000": 0,
+        "c5271:527100": 0
+      },
+      "placementPercent": 60.2,
+      "placementHash": "cb3cd7998cfeba3bb74b5d872d57958459d06742e1d7a47759e40b5dcd160f2a"
+    },
+    {
+      "name": "bosses-only-100-fit-type-enabled",
+      "options": {
+        "enemyTypeReplacement": "enabled"
+      },
+      "deterministicRerun": true,
+      "eligible": 1716,
+      "selected": 1716,
+      "notParticipating": 0,
+      "bossesPlaced": 1716,
+      "normalDraw": 0,
+      "unchanged": {
+        "easyAsylum": 0,
+        "fit": 0,
+        "preventSame": 0,
+        "difficulty": 0,
+        "modelBudget": 0,
+        "eventLimit": 0,
+        "other": 0
+      },
+      "protectedByReason": {},
+      "fitClasses": {},
+      "bossFrequency": {
+        "c2240:224000": 406,
+        "c2250:225000": 51,
+        "c2360:236000": 16,
+        "c2360:236001": 7,
+        "c3230:323000": 40,
+        "c3320:332000": 427,
+        "c4100:410000": 263,
+        "c4500:450000": 21,
+        "c5270:527000": 17,
+        "c5280:528000": 18,
+        "c5320:532000": 450,
+        "c2230:223000": 0,
+        "c2231:223100": 0,
+        "c2232:223200": 0,
+        "c2320:232000": 0,
+        "c5210:521000": 0,
+        "c5220:522000": 0,
+        "c5271:527100": 0
+      },
+      "placementPercent": 100,
+      "placementHash": "83eb747392f359e754dcd980751b906fd4bf1ef456b361b9e5a0ab4ba5144113"
+    },
+    {
+      "name": "bosses-only-100-fit-pinwheel-chaos",
+      "options": {
+        "pinwheelChaos": true
+      },
+      "deterministicRerun": true,
+      "eligible": 1716,
+      "selected": 1716,
+      "notParticipating": 0,
+      "bossesPlaced": 1716,
+      "normalDraw": 0,
+      "unchanged": {
+        "easyAsylum": 0,
+        "fit": 0,
+        "preventSame": 0,
+        "difficulty": 0,
+        "modelBudget": 0,
+        "eventLimit": 0,
+        "other": 0
+      },
+      "protectedByReason": {},
+      "fitClasses": {
+        "0": {
+          "destinations": 164,
+          "fittingBossArchetypes": 4,
+          "slotsByCandidateCount": {
+            "zero": 0,
+            "one": 0,
+            "two": 0,
+            "threePlus": 164
+          },
+          "unchangedFit": 0
+        },
+        "1": {
+          "destinations": 990,
+          "fittingBossArchetypes": 4,
+          "slotsByCandidateCount": {
+            "zero": 0,
+            "one": 0,
+            "two": 0,
+            "threePlus": 990
+          },
+          "unchangedFit": 0
+        },
+        "2": {
+          "destinations": 401,
+          "fittingBossArchetypes": 5,
+          "slotsByCandidateCount": {
+            "zero": 0,
+            "one": 0,
+            "two": 0,
+            "threePlus": 401
+          },
+          "unchangedFit": 0
+        },
+        "3": {
+          "destinations": 166,
+          "fittingBossArchetypes": 11,
+          "slotsByCandidateCount": {
+            "zero": 0,
+            "one": 0,
+            "two": 0,
+            "threePlus": 166
+          },
+          "unchangedFit": 0
+        },
+        "5": {
+          "destinations": 9,
+          "fittingBossArchetypes": 18,
+          "slotsByCandidateCount": {
+            "zero": 0,
+            "one": 0,
+            "two": 0,
+            "threePlus": 9
+          },
+          "unchangedFit": 0
+        }
+      },
+      "bossFrequency": {
+        "c2230:223000": 1,
+        "c2240:224000": 361,
+        "c2250:225000": 95,
+        "c2320:232000": 1,
+        "c2360:236000": 12,
+        "c2360:236001": 21,
+        "c3230:323000": 17,
+        "c3320:332000": 403,
+        "c4100:410000": 368,
+        "c4500:450000": 13,
+        "c5270:527000": 15,
+        "c5271:527100": 1,
+        "c5280:528000": 19,
+        "c5320:532000": 389,
+        "c2231:223100": 0,
+        "c2232:223200": 0,
+        "c5210:521000": 0,
+        "c5220:522000": 0
+      },
+      "placementPercent": 100,
+      "placementHash": "d416b947bc116928681b5fb8c2ec94db1a874cc77f8168764a1a21d79e8f5726"
+    }
+  ],
+  "realCatalogFitByClass": [
+    {
+      "class": 0,
+      "destinations": 164,
+      "oldFittingArchetypes": 0,
+      "oldSlotsByCandidateCount": {
+        "zero": 164,
+        "one": 0,
+        "two": 0,
+        "threePlus": 0
+      },
+      "oldFitSurvivors": 164,
+      "newFittingArchetypes": 4,
+      "newSlotsByCandidateCount": {
+        "zero": 0,
+        "one": 0,
+        "two": 0,
+        "threePlus": 164
+      },
+      "newFitSurvivors": 0
+    },
+    {
+      "class": 1,
+      "destinations": 990,
+      "oldFittingArchetypes": 0,
+      "oldSlotsByCandidateCount": {
+        "zero": 990,
+        "one": 0,
+        "two": 0,
+        "threePlus": 0
+      },
+      "oldFitSurvivors": 990,
+      "newFittingArchetypes": 4,
+      "newSlotsByCandidateCount": {
+        "zero": 0,
+        "one": 0,
+        "two": 0,
+        "threePlus": 990
+      },
+      "newFitSurvivors": 0
+    },
+    {
+      "class": 2,
+      "destinations": 387,
+      "oldFittingArchetypes": 1,
+      "oldSlotsByCandidateCount": {
+        "zero": 0,
+        "one": 387,
+        "two": 0,
+        "threePlus": 0
+      },
+      "oldFitSurvivors": 0,
+      "newFittingArchetypes": 5,
+      "newSlotsByCandidateCount": {
+        "zero": 0,
+        "one": 0,
+        "two": 0,
+        "threePlus": 387
+      },
+      "newFitSurvivors": 0
+    },
+    {
+      "class": 3,
+      "destinations": 166,
+      "oldFittingArchetypes": 10,
+      "oldSlotsByCandidateCount": {
+        "zero": 0,
+        "one": 0,
+        "two": 0,
+        "threePlus": 166
+      },
+      "oldFitSurvivors": 0,
+      "newFittingArchetypes": 11,
+      "newSlotsByCandidateCount": {
+        "zero": 0,
+        "one": 0,
+        "two": 0,
+        "threePlus": 166
+      },
+      "newFitSurvivors": 0
+    },
+    {
+      "class": 4,
+      "destinations": 0,
+      "oldFittingArchetypes": 15,
+      "oldSlotsByCandidateCount": {
+        "zero": 0,
+        "one": 0,
+        "two": 0,
+        "threePlus": 0
+      },
+      "oldFitSurvivors": 0,
+      "newFittingArchetypes": 16,
+      "newSlotsByCandidateCount": {
+        "zero": 0,
+        "one": 0,
+        "two": 0,
+        "threePlus": 0
+      },
+      "newFitSurvivors": 0
+    },
+    {
+      "class": 5,
+      "destinations": 9,
+      "oldFittingArchetypes": 17,
+      "oldSlotsByCandidateCount": {
+        "zero": 0,
+        "one": 0,
+        "two": 0,
+        "threePlus": 9
+      },
+      "oldFitSurvivors": 0,
+      "newFittingArchetypes": 18,
+      "newSlotsByCandidateCount": {
+        "zero": 0,
+        "one": 0,
+        "two": 0,
+        "threePlus": 9
+      },
+      "newFitSurvivors": 0
+    }
+  ],
+  "roamingBossArchetypes": [
+    {
+      "modelNpc": "c2230:223000",
+      "name": "Stray Demon",
+      "oldMinimumFitClass": 5,
+      "newMinimumFitClass": 5,
+      "oldFrequency": 2,
+      "newFrequency": 2
+    },
+    {
+      "modelNpc": "c2231:223100",
+      "name": "Demon Firesage",
+      "oldMinimumFitClass": 4,
+      "newMinimumFitClass": 4,
+      "oldFrequency": 0,
+      "newFrequency": 0
+    },
+    {
+      "modelNpc": "c2232:223200",
+      "name": "Asylum Demon",
+      "oldMinimumFitClass": 5,
+      "newMinimumFitClass": 5,
+      "oldFrequency": 1,
+      "newFrequency": 1
+    },
+    {
+      "modelNpc": "c2240:224000",
+      "name": "Capra Demon",
+      "oldMinimumFitClass": 3,
+      "newMinimumFitClass": 0,
+      "oldFrequency": 15,
+      "newFrequency": 378
+    },
+    {
+      "modelNpc": "c2250:225000",
+      "name": "Taurus Demon",
+      "oldMinimumFitClass": 3,
+      "newMinimumFitClass": 2,
+      "oldFrequency": 20,
+      "newFrequency": 106
+    },
+    {
+      "modelNpc": "c2320:232000",
+      "name": "Iron Golem",
+      "oldMinimumFitClass": 4,
+      "newMinimumFitClass": 4,
+      "oldFrequency": 0,
+      "newFrequency": 0
+    },
+    {
+      "modelNpc": "c2360:236000",
+      "name": "Executioner Smough",
+      "oldMinimumFitClass": 3,
+      "newMinimumFitClass": 3,
+      "oldFrequency": 16,
+      "newFrequency": 16
+    },
+    {
+      "modelNpc": "c2360:236001",
+      "name": "Super Smough",
+      "oldMinimumFitClass": 3,
+      "newMinimumFitClass": 3,
+      "oldFrequency": 23,
+      "newFrequency": 18
+    },
+    {
+      "modelNpc": "c3230:323000",
+      "name": "Moonlight Butterfly",
+      "oldMinimumFitClass": 3,
+      "newMinimumFitClass": 3,
+      "oldFrequency": 18,
+      "newFrequency": 16
+    },
+    {
+      "modelNpc": "c3320:332000",
+      "name": "Pinwheel",
+      "oldMinimumFitClass": 2,
+      "newMinimumFitClass": 0,
+      "oldFrequency": 399,
+      "newFrequency": 352
+    },
+    {
+      "modelNpc": "c4100:410000",
+      "name": "Knight Artorias",
+      "oldMinimumFitClass": 3,
+      "newMinimumFitClass": 0,
+      "oldFrequency": 10,
+      "newFrequency": 386
+    },
+    {
+      "modelNpc": "c4500:450000",
+      "name": "Manus, Father of the Abyss",
+      "oldMinimumFitClass": 3,
+      "newMinimumFitClass": 3,
+      "oldFrequency": 22,
+      "newFrequency": 14
+    },
+    {
+      "modelNpc": "c5210:521000",
+      "name": "Great Grey Wolf Sif",
+      "oldMinimumFitClass": 4,
+      "newMinimumFitClass": 4,
+      "oldFrequency": 0,
+      "newFrequency": 0
+    },
+    {
+      "modelNpc": "c5220:522000",
+      "name": "Gravelord Nito",
+      "oldMinimumFitClass": 4,
+      "newMinimumFitClass": 4,
+      "oldFrequency": 1,
+      "newFrequency": 0
+    },
+    {
+      "modelNpc": "c5270:527000",
+      "name": "Dragon Slayer Ornstein",
+      "oldMinimumFitClass": 3,
+      "newMinimumFitClass": 3,
+      "oldFrequency": 10,
+      "newFrequency": 19
+    },
+    {
+      "modelNpc": "c5271:527100",
+      "name": "Super Ornstein / alternate Ornstein",
+      "oldMinimumFitClass": 4,
+      "newMinimumFitClass": 4,
+      "oldFrequency": 0,
+      "newFrequency": 1
+    },
+    {
+      "modelNpc": "c5280:528000",
+      "name": "Chaos Witch Quelaag",
+      "oldMinimumFitClass": 3,
+      "newMinimumFitClass": 3,
+      "oldFrequency": 25,
+      "newFrequency": 12
+    },
+    {
+      "modelNpc": "c5320:532000",
+      "name": "Dark Sun Gwyndolin",
+      "oldMinimumFitClass": null,
+      "newMinimumFitClass": 0,
+      "oldFrequency": 0,
+      "newFrequency": 395
+    }
+  ],
+  "diversitySummary": {
+    "oldBossesPlaced": 562,
+    "newBossesPlaced": 1716,
+    "oldMostCommonBoss": [
+      "c3320:332000",
+      399
+    ],
+    "newMostCommonBoss": [
+      "c5320:532000",
+      395
+    ],
+    "newLeastCommonAppeared": [
+      [
+        "c2232:223200",
+        1
+      ],
+      [
+        "c5271:527100",
+        1
+      ],
+      [
+        "c2230:223000",
+        2
+      ]
+    ],
+    "newPinwheelShare": 20.51,
+    "destinationClassesWithOneFittingArchetypeAfter": [],
+    "mapsWithOneFittingArchetypeAfter": [],
+    "mapsWithOneFittingArchetypeNote": "None: the smallest destination class has four candidates; class 2 has five. Higher classes have more. The class-based fit rule alone creates no one-boss monoculture map."
+  },
+  "matrixBoundary": "These are engine-level real-catalog matrices. Fog is an independent pipeline stage and was validated separately with the real DsrDataTool/FogHost package runner.",
+  "realPackageMatrix": [
+    {
+      "name": "roaming-bosses-fits",
+      "eligible": 1716,
+      "selected": 1716,
+      "bossesPlaced": 1713,
+      "unchanged": {
+        "fit": 0,
+        "modelBudget": 3,
+        "difficulty": 0,
+        "preventSame": 0,
+        "eventLimit": 0,
+        "other": 0
+      },
+      "deterministicRerun": true,
+      "nonDeterministic": 0,
+      "eventOwnerChecked": 1754,
+      "eventOwnerFailures": 0,
+      "eventWindowOverruns": 0,
+      "maxEvents": 201,
+      "maxModels": 31,
+      "fogMerge": "not enabled"
+    },
+    {
+      "name": "roaming-both-fog",
+      "eligible": 1716,
+      "selected": 1716,
+      "bossesPlaced": 270,
+      "normalDraw": 1301,
+      "unchanged": {
+        "fit": 0,
+        "modelBudget": 145,
+        "difficulty": 0,
+        "preventSame": 0,
+        "eventLimit": 0,
+        "other": 0
+      },
+      "deterministicRerun": true,
+      "nonDeterministic": 0,
+      "eventOwnerChecked": 457,
+      "eventOwnerFailures": 0,
+      "eventWindowOverruns": 0,
+      "maxEvents": 110,
+      "maxModels": 30,
+      "fogMerge": "passed"
+    }
+  ],
+  "finalOutputAudit": {
+    "seedCode": "DS1TR1-06NWCQQ3-32HXEE10-CZNTCSCP-X3K2DSMN-4VKEG5H6-X8D1G60H-NHYX02YS-T7N6FA2P-7ZMEBH0G-NNZS0JR2-T8N1YT66-GQAKVR2J-CGGEP7B8-R265CF2M-N1W00N7B-0G10",
+    "plannedRoamingBossPlacements": 1716,
+    "finalCatalogSlots": 2192,
+    "exactModelNpcParamThinkParamMatches": 1716,
+    "missingSlots": 0,
+    "mismatchedSlots": 0,
+    "eventOwnerAudit": {
+      "checked": 1716,
+      "missing": 0,
+      "duplicateOwners": 0
+    },
+    "modelBudget": "generation package validation passed; Gwyndolin target map has 10 distinct enemy models against effective limit max(30, clean-map count)",
+    "gwyndolin": {
+      "map": "m13_00_00_00",
+      "slot": "m13_00_00_00:c3300_0000",
+      "entityId": 1300500,
+      "model": "c5320",
+      "scaledNpcParamId": 9100836,
+      "npcParamRowPresent": true,
+      "targetThinkParamId": 9600836,
+      "thinkParamRowPresent": true,
+      "roamingSouls": 20000,
+      "respawns": true,
+      "wakeUpEventAdded": true,
+      "mapEventIdsUnique": true,
+      "mapModelBudgetCheck": "passed"
+    }
+  },
+  "manualGameplayQa": {
+    "settings": {
+      "items": "off",
+      "fog": "off",
+      "ordinaryEnemies": "on",
+      "arenaBossRandomization": "off",
+      "normalReplacement": "bosses",
+      "bossChance": 100,
+      "fit": "fits",
+      "difficultyMode": "random",
+      "typeReplacement": "disabled",
+      "preventSameEnemy": false,
+      "pinwheelChaos": false,
+      "roamingBossSoulsPercent": 50,
+      "roamingBossesStayDead": false
+    },
+    "placements": [
+      {
+        "boss": "Knight Artorias",
+        "model": "c4100",
+        "seedCode": "DS1TR1-06NWCQQ3-32HXEE10-CZNTCSCP-X3K2DSMN-4VKEG5H6-X8D1GP0G-NHYX02YS-T7N6FA2P-7ZMEBH0G-NNZS0JR2-T8N1YT66-GQAKVR2J-CGGEP7B8-R265CF2M-N1W00KMX-X8G0",
+        "map": "m14_00_00_00",
+        "slot": "m14_00_00_00:c3090_0034",
+        "destinationClass": 0,
+        "risk": "narrow Blighttown scaffold/ledge"
+      },
+      {
+        "boss": "Capra Demon",
+        "model": "c2240",
+        "seedCode": "DS1TR1-06NWCQQ3-32HXEE10-CZNTCSCP-X3K2DSMN-4VKEG5H6-X8D1G60J-NHYX02YS-T7N6FA2P-7ZMEBH0G-NNZS0JR2-T8N1YT66-GQAKVR2J-CGGEP7B8-R265CF2M-N1W0076Z-1YQ0",
+        "map": "m14_00_00_00",
+        "slot": "m14_00_00_00:c3090_0036",
+        "destinationClass": 0,
+        "risk": "adjacent narrow Blighttown scaffold"
+      },
+      {
+        "boss": "Pinwheel",
+        "model": "c3320",
+        "seedCode": "DS1TR1-06NWCQQ3-32HXEE10-CZNTCSCP-X3K2DSMN-4VKEG5H6-X8D1G60H-NHYX02YS-T7N6FA2P-7ZMEBH0G-NNZS0JR2-T8N1YT66-GQAKVR2J-CGGEP7B8-R265CF2M-N1W00N7B-0G10",
+        "map": "m13_01_00_00",
+        "slot": "m13_01_00_00:c2940_0000",
+        "destinationClass": 0,
+        "risk": "tight Tomb of the Giants bonewheel route/corridor"
+      },
+      {
+        "boss": "Dark Sun Gwyndolin",
+        "model": "c5320",
+        "seedCode": "DS1TR1-06NWCQQ3-32HXEE10-CZNTCSCP-X3K2DSMN-4VKEG5H6-X8D1G60H-NHYX02YS-T7N6FA2P-7ZMEBH0G-NNZS0JR2-T8N1YT66-GQAKVR2J-CGGEP7B8-R265CF2M-N1W00N7B-0G10",
+        "map": "m13_00_00_00",
+        "slot": "m13_00_00_00:c3300_0000",
+        "destinationClass": 0,
+        "risk": "narrow Catacombs corridor; generic wake-up/AI path"
+      },
+      {
+        "boss": "Taurus Demon",
+        "model": "c2250",
+        "seedCode": "DS1TR1-06NWCQQ3-32HXEE10-CZNTCSCP-X3K2DSMN-4VKEG5H6-X8D1H60H-NHYX02YS-T7N6FA2P-7ZMEBH0G-NNZS0JR2-T8N1YT66-GQAKVR2J-CGGEP7B8-R265CF2M-N1W00PGW-MMF0",
+        "map": "m14_00_00_00",
+        "slot": "m14_00_00_00:c2810_0000",
+        "destinationClass": 2,
+        "risk": "smallest selected class-2 approach slot"
+      }
+    ]
+  }
+}

@@ -24,17 +24,31 @@ namespace FogReconstruction
 
         internal static void Build(string pristineRoot, string referenceRoot, string outputRoot)
         {
+            BuildCore(pristineRoot, referenceRoot, outputRoot);
+        }
+
+        internal static void BuildFromPristine(string pristineRoot, string outputRoot)
+        {
+            BuildCore(pristineRoot, null, outputRoot);
+        }
+
+        private static void BuildCore(string pristineRoot, string referenceRoot, string outputRoot)
+        {
             string sourceRoot = Path.GetFullPath(pristineRoot);
-            string oracleRoot = Path.GetFullPath(referenceRoot);
+            string oracleRoot = referenceRoot == null ? null : Path.GetFullPath(referenceRoot);
             string finalRoot = Path.GetFullPath(outputRoot);
+#if FOG_RECONSTRUCTION_DEV
             string repositoryRoot = FindRepositoryRoot(Environment.CurrentDirectory);
             EnsureOutsideRepository(finalRoot, repositoryRoot);
+#endif
             EnsureDistinctRoots(sourceRoot, oracleRoot, finalRoot);
             if (Directory.Exists(finalRoot) || File.Exists(finalRoot))
                 throw new IOException("Offline Layout output already exists; select a new output path: " + finalRoot);
 
-            RecipeExtractor.VerifyPristineBaseFiles(sourceRoot);
-            DataRoot.Verify(oracleRoot);
+            PristineFogInputs.Verify(sourceRoot);
+#if FOG_RECONSTRUCTION_DEV
+            if (oracleRoot != null) DataRoot.Verify(oracleRoot);
+#endif
             Dictionary<string, PARAMDEF> definitions = ReadDefinitions(sourceRoot);
             ValidateParamDefHash(sourceRoot);
 
@@ -54,16 +68,20 @@ namespace FogReconstruction
                 if (layout.Size != definition.GetRowSize() || generatedDefinition.GetRowSize() != definition.GetRowSize())
                     throw new InvalidDataException($"Generated Layout size for {paramType} is {layout.Size}/{generatedDefinition.GetRowSize()}, expected ParamDef row size {definition.GetRowSize()}.");
 
-                string oraclePath = Path.Combine(oracleRoot, "dist", "DS1R", "Layouts", paramType + ".xml");
-                CompareLayoutStructure(paramType, outputPath, oraclePath, definition.GetRowSize());
+#if FOG_RECONSTRUCTION_DEV
+                if (oracleRoot != null)
+                {
+                    string oraclePath = Path.Combine(oracleRoot, "dist", "DS1R", "Layouts", paramType + ".xml");
+                    CompareLayoutStructure(paramType, outputPath, oraclePath, definition.GetRowSize());
+                }
+#endif
                 generatedLayouts.Add(paramType, layout);
                 Console.WriteLine($"PASS ParamDef/Layout structure {paramType}: {definition.Fields.Count} ordered fields, row size {definition.GetRowSize()}.");
             }
 
             ValidateGameParamDecodeEncode(sourceRoot, definitions, generatedLayouts);
             Directory.Move(stagingRoot, finalRoot);
-            Console.WriteLine("Offline Layout reconstruction passed all four ParamDef-derived layouts and GameParam decode/re-encode checks.");
-            Console.WriteLine("Output contains only generated Layout XML and is a development artifact, not a complete Fog data root.");
+            Console.WriteLine("Reconstructed all four ParamDef-derived Layouts and passed GameParam decode/re-encode checks.");
         }
 
         private static void ValidateParamDefHash(string pristineRoot)
@@ -346,7 +364,7 @@ namespace FogReconstruction
 
         private static void EnsureDistinctRoots(string source, string oracle, string output)
         {
-            string[] roots = { source, oracle, output };
+            string[] roots = oracle == null ? new[] { source, output } : new[] { source, oracle, output };
             for (int i = 0; i < roots.Length; i++)
                 for (int j = i + 1; j < roots.Length; j++)
                     if (IsSameOrChild(roots[i], roots[j]) || IsSameOrChild(roots[j], roots[i]))

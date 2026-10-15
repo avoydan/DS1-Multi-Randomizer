@@ -6,6 +6,7 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using FogMod;
 using YamlDotNet.Serialization;
 using static FogMod.AnnotationData;
@@ -20,7 +21,7 @@ namespace FogHost
     /// visited); <c>progression-check</c> asks FogMod's own <c>ItemReader</c> and <c>GraphChecker</c> the same question on a real staged
     /// game tree, which is how the engine's evaluation is cross-checked and how every generated package is validated.
     ///
-    /// <c>FogHost progression-model --data-root &lt;dir&gt; --out &lt;model.json&gt;</c>
+    /// <c>FogHost progression-model --data-root &lt;dir&gt; --annotation-source &lt;legacy-fogmod|compact-v1&gt; --out &lt;model.json&gt;</c>
     /// <c>FogHost progression-check --data-root &lt;dir&gt; (--game &lt;staged tree&gt; | --assign &lt;key areas.json&gt;) --out &lt;result.json&gt;</c>
     ///
     /// These commands never write game data and never change what <c>generate</c> does: the generation behaviour version
@@ -72,6 +73,9 @@ namespace FogHost
             string root = Option(args, "--data-root");
             string output = Option(args, "--out");
             string variant = Option(args, "--variant") ?? "vanilla";
+            string annotationSource = Option(args, "--annotation-source") ?? HostRequest.LegacyFogModAnnotations;
+            string pristineRoot = Option(args, "--pristine-root");
+            string expectedFingerprint = Option(args, "--expected-annotation-fingerprint");
             if (variant != "vanilla" && variant != "race-plus")
             {
                 Console.Error.WriteLine("--variant must be vanilla or race-plus.");
@@ -88,9 +92,15 @@ namespace FogHost
             {
                 root = Path.GetFullPath(root);
                 output = Path.GetFullPath(output);
-                DataRoot.Verify(root);
+            if (annotationSource != HostRequest.LegacyFogModAnnotations && annotationSource != HostRequest.CompactAnnotations)
+                throw new FogHostException(HostErrors.RequestInvalid, "--annotation-source must be legacy-fogmod or compact-v1.");
+            if (annotationSource == HostRequest.CompactAnnotations
+                && (string.IsNullOrWhiteSpace(pristineRoot) || !Regex.IsMatch(expectedFingerprint ?? string.Empty, "^[a-f0-9]{64}$", RegexOptions.CultureInvariant)))
+                throw new FogHostException(HostErrors.RequestInvalid, "Compact progression models require --pristine-root and a lowercase --expected-annotation-fingerprint.");
+            DataRoot.Verify(root, includeLegacyAnnotations: annotationSource == HostRequest.LegacyFogModAnnotations);
                 Environment.CurrentDirectory = root;
-                (Annotations ann, Graph graph, RandomizerOptions opt, string annotationHash) = Build(variant);
+            (Annotations ann, Graph graph, RandomizerOptions opt, string annotationHash) = Build(
+                root, variant, annotationSource, pristineRoot, expectedFingerprint);
                 byte[] json = args[0] == "progression-model" ? Model(ann, graph, annotationHash, variant) : Check(args, ann, graph, opt, annotationHash);
                 Environment.CurrentDirectory = original;
                 File.WriteAllBytes(output + ".tmp", json);
@@ -117,13 +127,29 @@ namespace FogHost
             return null;
         }
 
-        private static (Annotations, Graph, RandomizerOptions, string) Build(string variant)
+        private static (Annotations, Graph, RandomizerOptions, string) Build(
+            string root, string variant, string annotationSource, string pristineRoot, string expectedFingerprint)
         {
             var opt = new RandomizerOptions { Seed = 1 };
             foreach (string flag in VanillaFlags) opt[flag] = true;
             if (variant == "race-plus") opt["hard"] = true;
             Annotations ann;
-            using (StreamReader reader = File.OpenText("dist/fog.txt")) ann = new DeserializerBuilder().Build().Deserialize<Annotations>(reader);
+            string annotationHash;
+            if (annotationSource == HostRequest.CompactAnnotations)
+            {
+                FogCompactCatalogV1 compact = FogCompactCatalogBuilder.Build(
+                    FogDsrFacts.Read(root, Path.GetFullPath(pristineRoot), includeLegacyAnnotations: false));
+                if (!compact.IsComplete) throw new FogHostException(HostErrors.EngineFailed, "Compact annotation coverage is incomplete.");
+                if (!string.Equals(compact.Fingerprint, expectedFingerprint, StringComparison.Ordinal))
+                    throw new FogHostException(HostErrors.RequestInvalid, "The Compact annotation fingerprint does not match the generation profile.");
+                ann = compact.CreateFreshCandidateAnnotations();
+                annotationHash = compact.Fingerprint;
+            }
+            else
+            {
+                using (StreamReader reader = File.OpenText("dist/fog.txt")) ann = new DeserializerBuilder().Build().Deserialize<Annotations>(reader);
+                annotationHash = DataRoot.Hash("dist/fog.txt", true);
+            }
             var graph = new Graph();
             graph.Construct(opt, ann);
             if (variant == "race-plus")
@@ -135,7 +161,6 @@ namespace FogHost
                     node.From.RemoveAll(edge => IsHard(edge) && RacePlusSkips.ContainsKey($"{edge.From}>{edge.To}") == false);
                 }
             }
-            string annotationHash = DataRoot.Hash("dist/fog.txt", true);
             return (ann, graph, opt, annotationHash);
         }
 

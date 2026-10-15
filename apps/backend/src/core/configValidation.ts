@@ -157,10 +157,6 @@ export function validateRandomizerConfig(input: unknown): asserts input is Rando
   if (config.fog.randomStart && !config.fog.bossFogs && !config.fog.traversableFogs) {
     problems.push('A random start requires boss or traversable fog gates.');
   }
-  if (!effectiveCombinedEnabled(config) && !config.fog.enabled) {
-    problems.push('Enable at least one supported randomization capability.');
-  }
-
   if (problems.length > 0) throw new InvalidConfigurationError(problems);
 }
 

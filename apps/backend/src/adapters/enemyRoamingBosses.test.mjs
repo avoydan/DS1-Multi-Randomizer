@@ -109,6 +109,38 @@ test('the diagnostics explain every ordinary destination of a map: protected by 
   assert.ok(map.boss > 0 && map.normalDraw > 0 && map.notParticipating > 0);
 });
 
+test('fit availability diagnostics distinguish no candidate from one or multiple fitting bosses', () => {
+  const mapId = MAP;
+  const destinations = [
+    regular(mapId, 'c1000', 0, 0.8),
+    regular(mapId, 'c1010', 1, 1.0),
+    regular(mapId, 'c1020', 2, 1.8),
+  ];
+  const diagnostics = placement.createPlacementDiagnostics({ algorithm: 'sampling-v1' });
+  const table = sampling.deriveRegularClassTable(destinations);
+  const roaming = sampling.planRoamingBosses({
+    seed: 'fit-contract',
+    options: { replacementChance: 100, normalReplacement: 'bosses', fit: 'fits', difficultyMode: 'random', difficultyStrictness: 'loose', typeReplacement: 'disabled', bossChanceInNormalSlots: 10 },
+    slots: destinations,
+    allSlots: destinations,
+    assignment: new Map(),
+    fixedModelsByMap: new Map(),
+    table,
+    bossTypes: sampling.deriveRoamingBossTypes([boss('c2230', 1.0), boss('c2240', 2.0)], table),
+    preventSame: false,
+    diagnostics,
+  });
+
+  assert.equal(roaming.size, 2, 'every selected destination with a fitting candidate receives a boss');
+  const map = diagnostics.toJSON().summary.roaming[mapId];
+  assert.equal(map.unchanged.fit, 1, 'the only vanilla survivor has no fitting boss');
+  assert.deepEqual(map.fitCandidateAnalysis, {
+    0: { destinations: 1, fittingBossArchetypes: 0, slotsByCandidateCount: { zero: 1, one: 0, two: 0, threePlus: 0 }, unchangedFit: 1 },
+    1: { destinations: 1, fittingBossArchetypes: 1, slotsByCandidateCount: { zero: 0, one: 1, two: 0, threePlus: 0 }, unchangedFit: 0 },
+    2: { destinations: 1, fittingBossArchetypes: 2, slotsByCandidateCount: { zero: 0, one: 0, two: 1, threePlus: 0 }, unchangedFit: 0 },
+  });
+});
+
 test('Prevent same enemy, Placement fit and the excluded slots are honored', () => {
   for (let seed = 0; seed < 40; seed += 1) {
     const withBosses = [...slots(), regular(MAP, 'c2240', 90, 2.8)];

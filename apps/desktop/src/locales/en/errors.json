@@ -40,6 +40,7 @@
     "PIPELINE_FAILED": "Something went wrong while creating your randomized game. Try another seed; the details are under Advanced.",
     "WORLD_DATA_GAME_VERSION": "This version of Dark Souls Remastered is not supported by the fog randomizer yet. Verify the game files in Steam, or turn the fog randomizer off.",
     "WORLD_DATA_GAME_FILES": "Your Dark Souls Remastered files could not be read. Verify the game files in Steam and try again.",
+    "WORLD_DATA_LEGACY_UNAVAILABLE": "This Seed Code needs older Fog data that is not in the local cache. This distribution does not download those files; use a GitHub build to prepare this Seed Code.",
     "WORLD_DATA_OFFLINE": "The fog randomizer files could not be prepared. Check your internet connection and click Retry.",
     "WORLD_DATA_DOWNLOAD_CORRUPT": "The fog randomizer data could not be verified. Click Retry; if it keeps failing, check your internet connection.",
     "WORLD_DATA_WRITE_FAILED": "The fog randomizer data could not be saved. Check that the disk has free space and try again.",

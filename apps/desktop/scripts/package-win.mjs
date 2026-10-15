@@ -1,5 +1,6 @@
 ﻿import { execFileSync, spawn } from 'node:child_process';
-import { cp, mkdir, rm, writeFile, access, readFile } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, rm, writeFile, access, readFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { stageRuntimeDependencies } from './stage-dependencies.mjs';
@@ -87,9 +88,12 @@ const publishArgs = ['-c', 'Release', '-r', 'win-x64', '--self-contained', 'true
   '-p:PublishSingleFile=true', '-p:DebugType=None', '-p:DebugSymbols=false'];
 const dataTool = path.join(runtime, 'engines', 'combined', 'vendor', 'tools', 'DsrDataTool');
 const fogHost = path.join(runtime, 'tools', 'fog-host');
+const legacyFogHost = path.join(runtime, 'tools', 'fog-host-legacy');
+const gameCursorHelper = path.join(runtime, 'tools', 'game-cursor-helper');
 for (const [project, output, probe] of [
   ['engines/combined/vendor/tools/DsrDataTool/DsrDataTool.csproj', dataTool, ['--help']],
   ['tools/fog-host/FogHost.csproj', fogHost, []],
+  ['tools/game-cursor-helper/GameCursorHelper.csproj', gameCursorHelper, ['--self-test']],
 ]) {
   await run(dotnet, ['restore', project, '-r', 'win-x64', '--configfile', nugetConfig, '--ignore-failed-sources'], root, dotnetEnv);
   await run(dotnet, ['publish', project, ...publishArgs, '-o', output], root, dotnetEnv);
@@ -101,6 +105,42 @@ for (const [project, output, probe] of [
     child.on('error', reject);
     child.on('exit', (code) => (code === 0 || code === 2 ? resolve() : reject(new Error(`${exe} did not start on its own (exit ${code}).`))));
   });
+}
+const legacyFogHostPin = JSON.parse(await readFile(path.join(root, 'tools', 'fog-host-legacy', 'source-pin.json'), 'utf8'));
+const legacyFogHostTree = execFileSync('git', ['rev-parse', `${legacyFogHostPin.commit}:${legacyFogHostPin.subtree}`], { cwd: root, windowsHide: true }).toString().trim();
+if (legacyFogHostTree !== legacyFogHostPin.tree) throw new Error(`Legacy FogHost source tree changed: expected ${legacyFogHostPin.tree}, got ${legacyFogHostTree}.`);
+const legacyBuildRoot = await mkdtemp(path.join(tmpdir(), 'ds1tr-foghost-legacy-build-'));
+try {
+  const archivePath = path.join(legacyBuildRoot, 'source.tar');
+  const archive = execFileSync('git', ['archive', '--format=tar', legacyFogHostPin.commit, legacyFogHostPin.subtree], {
+    cwd: root, windowsHide: true, maxBuffer: 128 * 1024 * 1024,
+  });
+  await writeFile(archivePath, archive);
+  const sourceRoot = path.join(legacyBuildRoot, 'source');
+  await mkdir(sourceRoot, { recursive: true });
+  const tarExe = path.join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe');
+  await run(tarExe, ['-xf', archivePath, '-C', sourceRoot], root);
+  const legacyFogHostProject = path.join(sourceRoot, legacyFogHostPin.subtree, 'FogHost.csproj');
+  const historicalProject = await readFile(legacyFogHostProject, 'utf8');
+  const historicalProgram = await readFile(path.join(sourceRoot, legacyFogHostPin.subtree, 'src', 'Program.cs'), 'utf8');
+  if (!historicalProject.includes(`<Version>${legacyFogHostPin.version}</Version>`)
+    || !historicalProgram.includes(`HostVersion = "${legacyFogHostPin.version}"`)) {
+    throw new Error(`Pinned legacy FogHost source does not declare version ${legacyFogHostPin.version}.`);
+  }
+  await run(dotnet, ['restore', legacyFogHostProject, '-r', 'win-x64', '--configfile', nugetConfig, '--ignore-failed-sources'], root, dotnetEnv);
+  await run(dotnet, ['publish', legacyFogHostProject, ...publishArgs, '-o', legacyFogHost], root, dotnetEnv);
+  const legacyExe = path.join(legacyFogHost, 'FogHost.exe');
+  const hidden = { SystemRoot: process.env.SystemRoot, PATH: path.join(process.env.SystemRoot ?? 'C:\\Windows', 'System32'), DOTNET_MULTILEVEL_LOOKUP: '0' };
+  await new Promise((resolve, reject) => {
+    const child = spawn(legacyExe, ['generate'], { env: hidden, stdio: 'ignore', windowsHide: true });
+    child.on('error', reject);
+    child.on('exit', (code) => (code === 0 || code === 2 ? resolve() : reject(new Error(`${legacyExe} did not start on its own (exit ${code}).`))));
+  });
+} finally {
+  const tempRoot = path.resolve(legacyBuildRoot).toLowerCase();
+  const allowedRoot = `${path.resolve(tmpdir()).toLowerCase()}${path.sep.toLowerCase()}`;
+  if (!tempRoot.startsWith(allowedRoot)) throw new Error(`Refusing to remove unexpected legacy build directory ${legacyBuildRoot}.`);
+  await rm(legacyBuildRoot, { recursive: true, force: true });
 }
 await copy(path.join(root, 'apps/backend/dist'), path.join(runtime, 'apps/backend/dist'));
 // The backend imports @ds1tr/contracts at run time; the packaged runtime has no workspace node_modules, so it is staged where Node resolves it.
@@ -125,8 +165,12 @@ for (const [source, target] of [
   ['apps/desktop/licenses/Newtonsoft.Json-MIT.md', 'Newtonsoft.Json-MIT.md'],
   ['apps/desktop/licenses/ZstdSharp.Port-MIT.txt', 'ZstdSharp.Port-MIT.txt'],
 ]) await copy(path.join(root, source), path.join(notices, target));
+await writeFile(path.join(notices, 'FogHost-legacy-0.5.0-source.txt'), `Frozen legacy FogHost ${legacyFogHostPin.version} source\nGit commit: ${legacyFogHostPin.commit}\nSubtree: ${legacyFogHostPin.subtree}\nSubtree tree: ${legacyFogHostPin.tree}\nWire schema: ${legacyFogHostPin.schemaVersion}\nThe package builds this exact historical tree at packaging time; no legacy source copy is maintained in the current source tree.\n`);
 await copy(path.join(root, 'engines/combined/vendor/UPSTREAM_PIN.md'), path.join(notices, 'combined-engine-upstream-pin.md'));
-await writeFile(path.join(notices, 'README.txt'), 'DS1 Multi Randomizer is GPL-3.0-only. Third-party notices and pinned source details are in this folder. Electron and Chromium licenses are in the application root. JuicerMV.SoulsFormats 0.1.3 declares GPL-3.0-only; ZstdSharp.Port 0.8.1, YamlDotNet 7.0.0, and Newtonsoft.Json 13.0.3 declare MIT. The static data files of FogMod (annotations, layouts, and event and talk scripts edited by its author) are never bundled: the application fetches them once, over HTTPS, from the FogMod repository (Apache-2.0, https://github.com/thefifthmatt/FogMod) at the pinned commit, verifies the SHA-256 of every file and keeps them in its own cache; the map and parameter files the world randomizer needs are copied from the own Dark Souls Remastered installation of the player (see world-randomizer-data-provenance.md). The .NET helper programs are published self-contained and include the .NET runtime (MIT, Microsoft). The public corresponding-source fork and release tag are required before publication.\n');
+const fogDataNotice = distribution === 'nexus'
+  ? 'Nexus builds never download FogMod static data: v1/v2 require a complete hash-verified local cache, while v3 reconstructs its 58 inputs locally from the player’s own game files.'
+  : 'GitHub builds can download FogMod static data over HTTPS only for legacy v1/v2, verify every file against its pinned SHA-256, and keep it in the app cache; v3 reconstructs its 58 inputs locally from the player’s own game files.';
+await writeFile(path.join(notices, 'README.txt'), `DS1 Multi Randomizer is GPL-3.0-only. Third-party notices and pinned source details are in this folder. Electron and Chromium licenses are in the application root. JuicerMV.SoulsFormats 0.1.3 declares GPL-3.0-only; ZstdSharp.Port 0.8.1, YamlDotNet 7.0.0, and Newtonsoft.Json 13.0.3 declare MIT. FogMod static data (annotations, layouts, and event and talk scripts edited by its author) is never bundled. ${fogDataNotice} The map and parameter files the world randomizer needs are copied from the player’s own Dark Souls Remastered installation (see world-randomizer-data-provenance.md). The .NET helper programs are published self-contained and include the .NET runtime (MIT, Microsoft). The public corresponding-source fork and release tag are required before publication.\n`);
 // Build information the running application can report in its diagnostics and support bundle (docs/DIAGNOSTICS.md). The signing state is NOT recorded as a
 // fact here: a public build (--release) is only accepted after tools/release/release-verify.mjs required a trusted signature, a development build is unsigned.
 const readVersion = async (file) => JSON.parse(await readFile(path.join(root, file), 'utf8')).version;
@@ -137,7 +181,8 @@ await writeFile(path.join(runtime, 'build-info.json'), `${JSON.stringify({
   schema: 'ds1tr-build-info-1', version: appVersion, commit,
   mode: distribution === 'nexus' ? 'nexus-local-unsigned' : releaseMode ? 'public' : unsignedRelease ? 'unsigned-release' : 'development',
   channel, distribution, nexusPageUrl: distribution === 'nexus' ? nexusPageUrl : null,
-  versions: { desktop: appVersion, backend: await readVersion('apps/backend/package.json'), contracts: await readVersion('packages/contracts/package.json'), foghostProject: fogHostProject },
+  versions: { desktop: appVersion, backend: await readVersion('apps/backend/package.json'), contracts: await readVersion('packages/contracts/package.json'), foghostProject: fogHostProject,
+    legacyFogHost: legacyFogHostPin.version, legacyFogHostSourceCommit: legacyFogHostPin.commit, legacyFogHostSourceTree: legacyFogHostPin.tree },
   builtAt: new Date().toISOString(),
 }, null, 2)}\n`);
 const packageApp = path.join(desktop, 'release', 'package-app');

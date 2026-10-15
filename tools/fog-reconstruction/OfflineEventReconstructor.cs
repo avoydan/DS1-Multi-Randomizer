@@ -38,17 +38,31 @@ namespace FogReconstruction
 
         internal static void Build(string pristineRoot, string referenceRoot, string outputRoot)
         {
+            BuildCore(pristineRoot, referenceRoot, outputRoot);
+        }
+
+        internal static void BuildFromPristine(string pristineRoot, string outputRoot)
+        {
+            BuildCore(pristineRoot, null, outputRoot);
+        }
+
+        private static void BuildCore(string pristineRoot, string referenceRoot, string outputRoot)
+        {
             string sourceRoot = Path.GetFullPath(pristineRoot);
-            string oracleRoot = Path.GetFullPath(referenceRoot);
+            string oracleRoot = referenceRoot == null ? null : Path.GetFullPath(referenceRoot);
             string finalRoot = Path.GetFullPath(outputRoot);
+#if FOG_RECONSTRUCTION_DEV
             string repositoryRoot = FindRepositoryRoot(Environment.CurrentDirectory);
             EnsureOutsideRepository(finalRoot, repositoryRoot);
+#endif
             EnsureDistinctRoots(sourceRoot, oracleRoot, finalRoot);
             if (Directory.Exists(finalRoot) || File.Exists(finalRoot))
                 throw new IOException("Offline event output already exists; select a new output path: " + finalRoot);
 
-            RecipeExtractor.VerifyPristineBaseFiles(sourceRoot);
-            DataRoot.Verify(oracleRoot);
+            PristineFogInputs.Verify(sourceRoot);
+#if FOG_RECONSTRUCTION_DEV
+            if (oracleRoot != null) DataRoot.Verify(oracleRoot);
+#endif
             List<DataRoot.Entry> eventEntries = DataRoot.Manifest
                 .Where(entry => entry.Path.StartsWith(EventPrefix, StringComparison.Ordinal))
                 .OrderBy(entry => entry.Path, StringComparer.Ordinal)
@@ -81,14 +95,25 @@ namespace FogReconstruction
                 byte[] outputBytes = compression == DCX.Type.None ? reconstructed : DCX.Compress(reconstructed, compression);
                 string outputPath = Path.Combine(stagingEvents, name);
                 File.WriteAllBytes(outputPath, outputBytes);
-                VerifyArchiveParity(name, outputPath, Path.Combine(oracleRoot, entry.Path.Replace('/', Path.DirectorySeparatorChar)));
+#if FOG_RECONSTRUCTION_DEV
+                if (oracleRoot != null)
+                    VerifyArchiveParity(name, outputPath, Path.Combine(oracleRoot, entry.Path.Replace('/', Path.DirectorySeparatorChar)));
+                else
+                    throw new InvalidOperationException("The development reconstruction command requires its comparison oracle.");
+#else
+                VerifyReadableArchive(outputPath);
+#endif
             }
 
             if (removedEvents != EventRemovalPlan.TotalEventCount)
                 throw new InvalidDataException($"Expected to remove {EventRemovalPlan.TotalEventCount} event IDs, removed {removedEvents}.");
             Directory.Move(stagingRoot, finalRoot);
-            Console.WriteLine($"Offline EMEVD reconstruction passed semantic parity for {eventEntries.Count}/18 archives; removed {removedEvents}/96 declared events.");
-            Console.WriteLine("Output contains only reconstructed event archives and is a development artifact, not a complete Fog data root.");
+#if FOG_RECONSTRUCTION_DEV
+            if (oracleRoot != null)
+                Console.WriteLine($"Offline EMEVD reconstruction passed semantic parity for {eventEntries.Count}/18 archives; removed {removedEvents}/96 declared events.");
+            else
+#endif
+                Console.WriteLine($"Reconstructed and decoded {eventEntries.Count}/18 EMEVD archives; removed {removedEvents}/96 declared events.");
         }
 
         private static void ApplyProjectOwnedTransforms(string archiveName, EMEVD archive)
@@ -140,6 +165,7 @@ namespace FogReconstruction
             else archive.Events[matches[0]] = replacement;
         }
 
+#if FOG_RECONSTRUCTION_DEV
         private static void VerifyArchiveParity(string name, string actualPath, string expectedPath)
         {
             EMEVD actual = ReadEmevd(actualPath);
@@ -162,10 +188,18 @@ namespace FogReconstruction
             if (DCX.Is(bytes)) bytes = DCX.Decompress(bytes);
             return EMEVD.Read(bytes);
         }
+#else
+        private static void VerifyReadableArchive(string path)
+        {
+            byte[] bytes = File.ReadAllBytes(path);
+            if (DCX.Is(bytes)) bytes = DCX.Decompress(bytes);
+            _ = EMEVD.Read(bytes);
+        }
+#endif
 
         private static void EnsureDistinctRoots(string source, string oracle, string output)
         {
-            string[] roots = { source, oracle, output };
+            string[] roots = oracle == null ? new[] { source, output } : new[] { source, oracle, output };
             for (int i = 0; i < roots.Length; i++)
             {
                 for (int j = i + 1; j < roots.Length; j++)

@@ -64,6 +64,7 @@ test('build metadata is loaded before the updater is created, and only its inter
   assert.ok(startup.indexOf('await loadBuildInfo()') >= 0, 'startup reads the packaged channel and distribution');
   assert.ok(startup.indexOf('await loadBuildInfo()') < startup.indexOf('updates = await createUpdates()'), 'immutable build metadata is known before updater setup');
   assert.match(main, /buildChannel,\s*distribution:\s*'github',\s*source:\s*UPDATE_SOURCE/u, 'the loaded channel is passed to the GitHub update controller');
+  assert.match(main, /DS1TR_DISTRIBUTION:\s*buildDistribution/u, 'the packaged backend receives the immutable distribution policy');
   assert.match(main, /initializeGithubUpdates\(buildDistribution, async \(\) =>/u, 'only GitHub metadata enters the updater bootstrap');
   assert.doesNotMatch(main, /^\s*import\s+(?!type\b).*?(?:electron-updater|githubReleaseApi|updateSource|updater\.js)/mu, 'updater networking code is not eagerly imported');
   assert.match(updater, /updater\.allowPrerelease = false;\s*if \(this\.#options\.buildChannel === 'internal'\) updater\.allowPrerelease = true;/u);

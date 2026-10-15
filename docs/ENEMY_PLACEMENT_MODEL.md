@@ -1300,6 +1300,11 @@ boss in an arena built for another) is covered by the same compatibility rules a
 **Part E2 (a regular enemy as the body of a boss encounter, legacy "Boss chance, boss slots") is built as a safe subset; see 10.8.** NPC and hostile-NPC
 replacement (Part F) is untouched.
 
+**Generation-profile behavior (2026-10-12).** These roaming-boss options were already public, so the original destination behavior is frozen in
+`ds1tr-gen-v1` (`protected-v1`). New runs use `ds1tr-gen-v2` (`safe-handlers-v2`): the four G-15..G-18 destinations use the proven ordinary-replacement handlers,
+and `both` + 100% skips a normal assignment that the boss pass would discard. V1 continues to exclude those destinations and keeps the historical assignment
+order. The Seed Code format and `RANDOMIZER_VERSION` 0.5.66 salt do not change. See `GENERATION_COMPATIBILITY.md` and `BOSSES_ONLY_AUDIT.md`.
+
 #### Legacy semantics (pinned Enemy Randomizer `83f008d`; reconstructed, not copied)
 
 | Legacy element (source) | Behavior |
@@ -1323,8 +1328,9 @@ replacement (Part F) is untouched.
 | Roaming bosses stay dead | `roamingBossesStayDead` | `false` | needs `bosses` / `both` |
 | Type replacement | `typeReplacement` (existing) | `disabled` | `enabled`: a whole kind in a map gets one boss; `enabled-except-roaming-bosses`: each slot of the kind decides on its own (the legacy distinction; the exception is now real) |
 
-**Planner** (`planRoamingBosses`, `sampling.js`). A *second pass* after the unchanged regular sampler. The sampler runs with `normalReplacement` `none`
-(`bosses`) or `normals` (`both`); the pass only *overrides* slots, so a slot that gets no boss keeps exactly the placement it had without the pass
+**Planner** (`planRoamingBosses`, `sampling.js`). A *second pass* after the regular sampler. V1 always builds the regular assignment first; v2 skips that
+discarded assignment for `both` + boss chance 100%. In other cases, the sampler runs with `normalReplacement` `none` (`bosses`) or `normals` (`both`); the
+pass only *overrides* slots, so a slot that gets no boss keeps exactly the placement it had without the pass
 (proved by the sweeps: every slot outside the pass is byte-identical to the same world with `normals`/`none`). Per map, in stable slot order (a Type
 replacement group in `enabled`): (1) participation = the first draw of the slot's / group's existing stream (replacement chance); (2) category: `bosses`
 always, `both` a draw from the named stream `roaming:slot:<id>` / `roaming:type:<map>:<model>` against the boss chance; (3) ~~per-map limit of 10 roaming
@@ -1339,8 +1345,10 @@ Manus, Sif, Gravelord Nito, Dragon Slayer Ornstein, Super Ornstein, Chaos Witch 
 Bed of Chaos (immobile, floor script), Ceaseless Discharge (immobile, 10 m body), Dark Sun Gwyndolin (neutral team, stationary, scripted), Lord Gwyn (scripted
 entrance), and every multi-body boss (Priscilla, Hellkite, Sanctuary Guardian, Kalameet, Centipede Demon, Gaping Dragon, Seath, Bell and Anor Londo Gargoyles,
 Four Kings). The exclusion holds with or without boss randomization (the dragon plan only reserves those bosses when bosses are randomized).
-**Protected slots** never take a boss: the passive slots (Asylum, New Londo, the Kiln knight, the Parish bonfire Titanite Demon), tangible-ghost slots,
-the Darkroot butterfly path, slots whose events lock their model (`eventModelLocked`) and Pinwheel Chaos clones.
+**Destination handling is profile-specific.** V1 never gives bosses to the passive slots (Asylum, New Londo, the Kiln knight, Parish bonfire Titanite Demon),
+tangible-ghost slots, the Darkroot butterfly path, or slots whose events lock their model (`eventModelLocked`). V2 allows the first four groups and reuses the
+same model-specific event sanitation, ghost grounding/tangibility and Darkroot path activation used for ordinary replacements. Asylum/New Londo passive behavior
+is retained; the Parish bonfire boss starts passive and its AI is held until attack. Pinwheel Chaos clones remain ineligible in both profiles.
 
 **A roaming boss placement** (`decorateEnemyPlacements`): compatibility `sampled-roaming-boss`; `scaling: "vanilla"` (the boss keeps its own combat
 stats; drops and team still follow the slot through the scaled NpcParam row, the model document 6.9 rule); `roamingBossSouls = trunc(souls * percent / 100)`
@@ -1356,9 +1364,9 @@ curve modes keep them out of the earliest maps and the Easy Asylum rule keeps th
 (6) Unique bosses does not apply to roaming bosses (as in the legacy). (7) Placement fit uses an authored size class for the Moonlight Butterfly (class 3, `roamingSizeClassOverrides`) instead of the class of its 0.4 x 0.2 hit capsule: the capsule of a flier does not describe its body, and without the override "only where they fit" would put the Butterfly into almost every slot (27 of 31 roaming bosses in the first smoke world).
 
 **Seed Codes.** The three options are *extension keys* (stored in a code only when different from the neutral values 10 / 50 / false); `normalReplacement`
-gains the values `bosses` and `both`. A code made before Part E contains none of them, decodes to the neutral values and re-encodes to the same text; its
-world is the same world (all 15 golden fixtures of `ds1tr-gen-v1` verify byte for byte with the Part E engine and data tool). The profile stays `ds1tr-gen-v1`: the
-change is additive and gated behind options an old code cannot have. New worlds are pinned by `ds1tr-gen-v1.roaming-bosses.json`. Presets: version 11.
+gains the values `bosses` and `both`. The format and extensions are unchanged. Because these options were already in public 0.38.4, corrected destination
+handling uses `ds1tr-gen-v2`; old codes continue to resolve to protected-v1 and reproduce the frozen world. V2 worlds are pinned by
+`ds1tr-gen-v2.roaming-bosses.json`. Presets: version 11.
 
 **Data tool** (patch 0014). `PatchPlacement` gains `roamingBossSouls` and `disableRespawn`; the scaled NpcParam row sets `getSoul` / `disableRespawn` and
 asserts them (the other cells stay asserted equal to the boss row). Events: one wake-up event per roaming boss inside the map's custom event window
@@ -1370,7 +1378,7 @@ All on the real extracted catalog of a clean Dark Souls Remastered copy; zero un
 
 | What | Result |
 |---|---|
-| Engine, 18 configurations x 100 seeds (`roamingSweep.mjs`: normal baseline, boss-sampling baseline, bosses and "either" at several chances / fit / difficulty / Prevent same / Type replacement enabled and except-roaming / souls 0 and 100 + stay dead / Unique bosses / Gwyn nerf / Second Gargoyle / Pinwheel Chaos) | 1800/1800 worlds: deterministic; every roaming boss is an allowed archetype with the right souls, respawn bit, vanilla scaling, scaled row and wake-up; at most 10 per map; no roaming boss on a protected or passive slot; the final model count of a map is never above `max(30, count without the pass)`; every slot the pass did not take is byte-identical to the same world without the pass |
+| Historical v1 engine sweep, 18 configurations x 100 seeds (`roamingSweep.mjs`) | 1800/1800 worlds: deterministic; every roaming boss has the right souls, respawn, scaling, rows and wake-up; the then-current tests kept at most 10 per map and excluded protected slots; model count stayed within `max(30, count without the pass)` |
 | Real data tool, `placementMatrix.mjs roaming-e1` (before the Butterfly size override): 6 cases x 100 seeds and 8 cases x 60 seeds | 1080/1080 generated, 0 retries, 0 event-window overruns, 0 non-deterministic reruns |
 | Same matrix after the override: 10 cases x 40 seeds | 400/400, same invariants |
 | Baselines through the real tool (`type-event-former` 100: Type replacement enabled, Placement anywhere, bosses on = the case of the event-ID fix; `type-event-matrix`: curve at 60% and boss sampling, 100 each) | 300/300 |
@@ -1381,7 +1389,9 @@ All on the real extracted catalog of a clean Dark Souls Remastered copy; zero un
 | Compatibility | all 15 earlier golden fixtures of `ds1tr-gen-v1` verify byte for byte with the Part E engine and data tool; 3 new fixtures pin roaming worlds |
 | Tests | backend 393 tests (391 pass, 2 skipped by design), desktop 6/6 |
 
-**Not verified by playing:** wake-up, navigation, killability, souls, "stay dead", textures and crashes with up to ten bosses per map. The six Part E worlds under Advanced, Test worlds for playtesting (`docs/SMOKE_TESTS.md`) are made for that.
+**Current v2 real-catalog evidence (2026-10-12).** Three seeds per core chance case cover Bosses only 0/50/100 and Both 0/50/100. At 100%, both modes selected all 1,716 eligible destinations per seed (5,148/5,148 across three seeds); Both made zero normal draws and neither had budget, fit, difficulty, protection or event-limit leftovers. Stay-dead did not change counts; representative fit/curve/Prevent-same/Type-replacement and Fog ON/OFF cases also generated with deterministic reruns and clean event-owner audits. One full output audit compared all 1,716 planned boss models with the final MSB/parameter rows. Full details and local golden-verifier limitations are in `BOSSES_ONLY_AUDIT.md`.
+
+**Not verified by playing:** wake-up, navigation, killability, souls, "stay dead", textures, grounding, cramped geometry, reload behavior and performance at this density (up to 198 bosses in one map in the real-catalog matrix). The six Part E worlds under Advanced, Test worlds for playtesting (`docs/SMOKE_TESTS.md`) remain gameplay tests; the placement-count bug does not require launching the game to close.
 
 ---
 

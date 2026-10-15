@@ -5,7 +5,8 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import {
-  hashWorldDataContent, prepareWorldData, verifyWorldDataRoot, worldDataBaseUrl, worldDataId, worldDataManifest, worldDataSourceCommit,
+  compactRuntimeWorldDataId, compactRuntimeWorldDataManifest, hashWorldDataContent, prepareWorldData, verifyWorldDataRoot,
+  worldDataBaseUrl, worldDataId, worldDataManifest, worldDataSourceCommit,
 } from '../../dist/adapters/worldData.js';
 
 const sha = (bytes) => createHash('sha256').update(bytes).digest('hex');
@@ -50,7 +51,7 @@ function server(overrides = {}) {
 }
 
 const options = (cacheRoot, pristineDirectory, extra = {}) => ({
-  cacheRoot, pristineDirectory, manifest, baseUrl: 'https://example.test/fogmod/', id: 'test-set', attempts: 2, ...extra,
+  cacheRoot, pristineDirectory, manifest, baseUrl: 'https://example.test/fogmod/', id: 'test-set', attempts: 2, allowUpstreamDownloads: true, ...extra,
 });
 
 test('the real manifest is the 59 files FogHost reads: 19 derived from the game, 40 from the pinned upstream commit', async () => {
@@ -70,6 +71,17 @@ test('the manifest equals the hash manifest compiled into FogHost (tools/fog-hos
   const hostEntries = [...source.matchAll(/new\("([^"]+)", "([0-9a-f]{64})", (true|false)\)/gu)].map((m) => `${m[1]}|${m[2]}|${m[3]}`);
   assert.equal(hostEntries.length, 59);
   assert.deepEqual(worldDataManifest.map((entry) => `${entry.path}|${entry.sha256}|${entry.text}`).sort(), [...hostEntries].sort());
+});
+
+test('the Compact runtime has 58 offline inputs while v1/v2 retain the pinned 59-file manifest', () => {
+  assert.equal(worldDataManifest.length, 59);
+  assert.equal(worldDataManifest.filter((entry) => entry.origin === 'upstream').length, 40);
+  assert.equal(compactRuntimeWorldDataManifest.length, 58);
+  assert.equal(compactRuntimeWorldDataManifest.filter((entry) => entry.origin === 'game').length, 19);
+  assert.equal(compactRuntimeWorldDataManifest.filter((entry) => entry.origin === 'reconstructed').length, 39);
+  assert.equal(compactRuntimeWorldDataManifest.filter((entry) => entry.origin === 'upstream').length, 0);
+  assert.ok(!compactRuntimeWorldDataManifest.some((entry) => entry.path === 'dist/fog.txt'));
+  assert.match(compactRuntimeWorldDataId, /^[0-9a-f]{16}$/u);
 });
 
 test('text content is hashed after CRLF normalization, binary content as is', () => {
@@ -92,6 +104,66 @@ test('cache miss: game files are copied from the pristine snapshot, the rest dow
   assert.deepEqual(await verifyWorldDataRoot(result.root, manifest), { ok: true, missing: [], altered: [], unexpected: [] });
   assert.ok(events.length > 2 && events.at(-1).fraction === 1 && events.every((e) => !/FogMod|dist|sha|\.NET/iu.test(e.message)), 'progress text is plain language');
   assert.deepEqual((await readdir(cache)).sort(), ['test-set'], 'no temporary folder is left behind');
+});
+
+test('offline distribution reuses only a complete legacy cache and refuses a cold or partial cache without repairing it', async () => {
+  const cache = await dir();
+  const pristine = await pristineWith();
+  const remote = server();
+
+  const missing = await prepareWorldData(options(cache, pristine, { allowUpstreamDownloads: false, fetchBytes: remote.fetchBytes }));
+  assert.equal(missing.ok, false);
+  assert.equal(missing.code, 'WORLD_DATA_LEGACY_UNAVAILABLE');
+  assert.deepEqual(remote.calls, []);
+  assert.deepEqual(await readdir(cache), [], 'a cold offline request does not create or repair a cache');
+
+  const complete = await prepareWorldData(options(cache, pristine, { allowUpstreamDownloads: true, fetchBytes: remote.fetchBytes }));
+  assert.equal(complete.ok, true);
+  const reused = await prepareWorldData(options(cache, pristine, { allowUpstreamDownloads: false, fetchBytes: remote.fetchBytes }));
+  assert.equal(reused.ok, true);
+  assert.equal(reused.reused, true);
+  assert.equal(reused.downloaded, 0);
+
+  await writeFile(path.join(complete.root, 'dist', 'fog.txt'), 'corrupt');
+  const callsBefore = remote.calls.length;
+  const corrupted = await prepareWorldData(options(cache, pristine, { allowUpstreamDownloads: false, fetchBytes: remote.fetchBytes }));
+  assert.equal(corrupted.ok, false);
+  assert.equal(corrupted.code, 'WORLD_DATA_LEGACY_UNAVAILABLE');
+  assert.equal(remote.calls.length, callsBefore);
+  assert.equal(await readFile(path.join(complete.root, 'dist', 'fog.txt'), 'utf8'), 'corrupt', 'a Nexus request leaves the invalid legacy cache untouched');
+});
+
+test('reconstructed inputs are built locally and never sent through the downloader', async () => {
+  const cache = await dir();
+  const pristine = await dir();
+  const content = Buffer.from('locally reconstructed input');
+  const reconstructedManifest = [{
+    path: 'dist/DS1R/event/common.emevd.dcx', sha256: sha(content), text: false, size: content.length,
+    kind: 'event', origin: 'reconstructed',
+  }];
+  let reconstructionArgs;
+  let fetchCalls = 0;
+  const result = await prepareWorldData({
+    cacheRoot: cache,
+    pristineDirectory: pristine,
+    manifest: reconstructedManifest,
+    id: 'compact-local-test',
+    fetchBytes: async () => { fetchCalls += 1; throw new Error('network access is forbidden in this test'); },
+    reconstructFiles: async (inputRoot, outputRoot) => {
+      reconstructionArgs = [inputRoot, outputRoot];
+      const target = path.join(outputRoot, 'dist', 'DS1R', 'event', 'common.emevd.dcx');
+      await mkdir(path.dirname(target), { recursive: true });
+      await writeFile(target, content);
+    },
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.downloaded, 0);
+  assert.equal(result.derived, 1);
+  assert.equal(fetchCalls, 0);
+  assert.equal(reconstructionArgs[0], pristine);
+  assert.equal(path.dirname(reconstructionArgs[1]), cache);
+  assert.match(path.basename(reconstructionArgs[1]), /^\.preparing-/u);
+  assert.deepEqual(await verifyWorldDataRoot(result.root, reconstructedManifest), { ok: true, missing: [], altered: [], unexpected: [] });
 });
 
 test('cache hit: a verified cache is used without any network access or game read', async () => {
@@ -148,7 +220,7 @@ test('offline: the failure is plain language, the technical reason is kept for d
 });
 
 test('only HTTPS sources are accepted by the default downloader', async () => {
-  const result = await prepareWorldData({ cacheRoot: await dir(), pristineDirectory: await pristineWith(), manifest, baseUrl: 'http://example.test/', id: 'http', attempts: 1 });
+  const result = await prepareWorldData({ cacheRoot: await dir(), pristineDirectory: await pristineWith(), manifest, baseUrl: 'http://example.test/', id: 'http', attempts: 1, allowUpstreamDownloads: true });
   assert.equal(result.ok, false);
   assert.match(result.technical, /Only HTTPS/u);
 });

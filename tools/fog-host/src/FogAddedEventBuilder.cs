@@ -14,9 +14,10 @@ namespace FogHost
         private const int KeyItemRewardReadyFlag = 6909;
         private const int KeyItemRewardLot = 9030;
         private const int AnorLondoRetryFlag = 5310;
-        private const int SeathCrystalObject = 1701801;
+        public const int SeathCrystalObjectEntityId = 1701801;
         private const int SeathCrystalSfx = 170004;
-        private const int SeathCrystalActivatedFlag = 5308;
+        public const int SeathCrystalActivatedFlag = 5308;
+        public const long SeathCrystalInteractionEventId = 11700005;
         private const int ClassStartProcessedFlag = 6908;
         private const int AnorLondoPlayerEntity = 10000;
 
@@ -276,12 +277,12 @@ namespace FogHost
         {
             // Activate the Seath crystal interaction, attach its SFX, and set
             // the progression flag after the player uses its action prompt.
-            var evt = NewEvent(11700005);
-            evt.Instructions.Add(DeactivateObject(SeathCrystalObject, FlagOn));
-            evt.Instructions.Add(SetObjectInvulnerability(SeathCrystalObject, FlagOn));
-            evt.Instructions.Add(CreateObjectFollowingSfx(SeathCrystalObject, 100, SeathCrystalSfx));
+            var evt = NewEvent(SeathCrystalInteractionEventId);
+            evt.Instructions.Add(DeactivateObject(SeathCrystalObjectEntityId, FlagOn));
+            evt.Instructions.Add(SetObjectInvulnerability(SeathCrystalObjectEntityId, FlagOn));
+            evt.Instructions.Add(CreateObjectFollowingSfx(SeathCrystalObjectEntityId, 100, SeathCrystalSfx));
             evt.Instructions.Add(IfActionButton(
-                0, 0, SeathCrystalObject, 180f, -1, 3f, 15000283, 48, 0));
+                0, 0, SeathCrystalObjectEntityId, 180f, -1, 3f, 15000283, 48, 0));
             evt.Instructions.Add(SetEventFlag(SeathCrystalActivatedFlag, FlagOn));
             evt.Instructions.Add(WaitSeconds(1f));
             evt.Instructions.Add(EndUnconditionally(RestartEvent));

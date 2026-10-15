@@ -34,10 +34,18 @@ namespace FogHost
         private static readonly string[] RequiredParams = { "NpcParam", "ItemLotParam", "SpEffectParam", "GameAreaParam" };
 
         private readonly Action<string, string> progress;
+        private readonly Func<Annotations> annotationProvider;
 
         public HostRunner(Action<string, string> progress)
+            : this(progress, null)
+        {
+        }
+
+        /// <summary>Allows focused integration tests to run the pinned writer against an independently built annotation projection.</summary>
+        public HostRunner(Action<string, string> progress, Func<Annotations> annotationProvider)
         {
             this.progress = progress;
+            this.annotationProvider = annotationProvider;
         }
 
         public string Stage { get; private set; } = "validate-request";
@@ -59,7 +67,7 @@ namespace FogHost
             }
             if (Contains(staging, request.LogPath)) throw Invalid("logPath must be outside the staging directory.");
 
-            DataRoot.Verify(request.FogDataRoot);
+            DataRoot.Verify(request.FogDataRoot, includeLegacyAnnotations: request.AnnotationSource == HostRequest.LegacyFogModAnnotations);
 
             var missing = new List<string>();
             IEnumerable<string> readSet = new[] { GameParam, $"msg/{request.Language}/menu.msgbnd.dcx" }
@@ -121,8 +129,30 @@ namespace FogHost
             opt.Language = request.Language;
 
             Enter("load-annotations", "Loading FogMod annotations.");
-            Annotations ann;
-            using (StreamReader reader = File.OpenText("dist/fog.txt")) ann = new DeserializerBuilder().Build().Deserialize<Annotations>(reader);
+            Annotations ann = annotationProvider?.Invoke();
+            string annotationSha256;
+            if (ann == null)
+            {
+                if (request.AnnotationSource == HostRequest.CompactAnnotations)
+                {
+                    FogCompactCatalogV1 compact = FogCompactCatalogBuilder.Build(
+                        FogDsrFacts.Read(request.FogDataRoot, request.PristineGameDirectory, includeLegacyAnnotations: false));
+                    if (!compact.IsComplete) throw Invalid("Compact annotation coverage is incomplete.");
+                    if (!string.Equals(compact.Fingerprint, request.ExpectedAnnotationFingerprint, StringComparison.Ordinal))
+                        throw Invalid("Compact annotation fingerprint differs from the backend projection.");
+                    ann = compact.CreateFreshCandidateAnnotations();
+                    annotationSha256 = compact.Fingerprint;
+                }
+                else
+                {
+                    using StreamReader reader = File.OpenText("dist/fog.txt");
+                    ann = new DeserializerBuilder().Build().Deserialize<Annotations>(reader);
+                    annotationSha256 = DataRoot.AnnotationSha256(Directory.GetCurrentDirectory());
+                }
+            }
+            else annotationSha256 = request.AnnotationSource == HostRequest.CompactAnnotations
+                ? request.ExpectedAnnotationFingerprint
+                : DataRoot.AnnotationSha256(Directory.GetCurrentDirectory());
             Console.WriteLine($"Seed: {opt.DisplaySeed}. Options: {string.Join(" ", opt.GetEnabled())}");
             var graph = new Graph();
             graph.Construct(opt, ann);
@@ -205,7 +235,7 @@ namespace FogHost
 
             var result = new HostResult
             {
-                AnnotationSha256 = DataRoot.AnnotationSha256(Directory.GetCurrentDirectory()),
+                AnnotationSha256 = annotationSha256,
                 FogOptions = opt.ToString(),
                 KeyItemsRandomized = items.Randomized,
                 KeyItemsHash = items.ItemHash ?? string.Empty,

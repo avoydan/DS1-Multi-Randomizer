@@ -1,0 +1,1392 @@
+{
+  "schemaVersion": 1,
+  "snapshotId": "boss-fit-classification-pre-nexus-2026-10-15",
+  "capturedAt": "2026-10-15",
+  "purpose": "Immutable pre-change snapshot of the current effective roaming-boss fit classification. It is intended for manual restoration, not generation input.",
+  "source": {
+    "repositoryHead": "870aa577a3a282206645ef63753dca0c37c90e4b",
+    "branch": "release/nexus-0.39.0",
+    "generatorFile": "engines/combined/vendor/src/core/generator.js",
+    "samplingFile": "engines/combined/vendor/src/core/sampling.js",
+    "cleanQaCatalogPath": "C:\\Users\\Adam\\ds1tr-qa\\profile-0350-inst\\state\\runs\\6cab6d1f-375c-41fe-85c4-606f8aca0a7d\\combined-0\\dsr-catalog.json",
+    "cleanQaCatalogSha256": "76863fbdec11b0e38560cceb60e623d065ae9c7686e0bf48189f785997645e79",
+    "cleanQaCatalogGeneratedAt": "2026-10-08T18:27:09.0217455+00:00",
+    "sourceSymbols": [
+      {
+        "file": "engines/combined/vendor/src/core/sampling.js",
+        "symbols": [
+          "SIZE_EDGES",
+          "slotFootprint",
+          "sizeClassOfFootprint"
+        ]
+      },
+      {
+        "file": "engines/combined/vendor/src/core/generator.js",
+        "symbols": [
+          "bossKillSouls",
+          "roamingExcludedModels",
+          "roamingSizeClassOverrides",
+          "effectiveBossSlots",
+          "bossSourceSlots",
+          "roamingBossCandidates"
+        ]
+      }
+    ]
+  },
+  "productionConfiguration": {
+    "normalReplacement": "bosses",
+    "bossChanceInNormalSlots": 100,
+    "fit": "fits",
+    "difficultyMode": "random",
+    "typeReplacement": "disabled",
+    "preventSameEnemy": false,
+    "pinwheelChaos": false,
+    "eligibleDestinations": 1716,
+    "bossesPlaced": 562,
+    "fitSurvivors": 1154,
+    "placementPercent": 32.75
+  },
+  "sizeClassification": {
+    "sizeEdges": [
+      0.9,
+      1.7,
+      2.6,
+      4.2,
+      7
+    ],
+    "slotFootprint": "max(2 * hitRadius, hitHeight), requiring both values finite and > 0",
+    "sizeClass": "Count of SIZE_EDGES less than or equal to footprint; classes 0 through 5",
+    "bossSourceDerivation": "deriveRoamingBossTypes measures each candidate source boss slot hit capsule directly; it does not use the regular-class table for boss size.",
+    "destinationDerivation": "slotSizeClass uses the maximum regular-slot footprint for the destination model from deriveRegularClassTable; unknown models fall back to their own slot capsule."
+  },
+  "bossKillSouls": [
+    {
+      "npcParamId": 223000,
+      "bossKillSouls": 20000
+    },
+    {
+      "npcParamId": 223100,
+      "bossKillSouls": 20000
+    },
+    {
+      "npcParamId": 223200,
+      "bossKillSouls": 2000
+    },
+    {
+      "npcParamId": 224000,
+      "bossKillSouls": 6000
+    },
+    {
+      "npcParamId": 225000,
+      "bossKillSouls": 3000
+    },
+    {
+      "npcParamId": 232000,
+      "bossKillSouls": 40000
+    },
+    {
+      "npcParamId": 236000,
+      "bossKillSouls": 10000
+    },
+    {
+      "npcParamId": 236001,
+      "bossKillSouls": 25000
+    },
+    {
+      "npcParamId": 273000,
+      "bossKillSouls": 30000
+    },
+    {
+      "npcParamId": 323000,
+      "bossKillSouls": 10000
+    },
+    {
+      "npcParamId": 332000,
+      "bossKillSouls": 15000
+    },
+    {
+      "npcParamId": 410000,
+      "bossKillSouls": 50000
+    },
+    {
+      "npcParamId": 450000,
+      "bossKillSouls": 60000
+    },
+    {
+      "npcParamId": 451000,
+      "bossKillSouls": 60000
+    },
+    {
+      "npcParamId": 521000,
+      "bossKillSouls": 40000
+    },
+    {
+      "npcParamId": 522000,
+      "bossKillSouls": 60000
+    },
+    {
+      "npcParamId": 525000,
+      "bossKillSouls": 20000
+    },
+    {
+      "npcParamId": 526000,
+      "bossKillSouls": 25000
+    },
+    {
+      "npcParamId": 527000,
+      "bossKillSouls": 10000
+    },
+    {
+      "npcParamId": 527100,
+      "bossKillSouls": 25000
+    },
+    {
+      "npcParamId": 528000,
+      "bossKillSouls": 20000
+    },
+    {
+      "npcParamId": 532000,
+      "bossKillSouls": 40000
+    },
+    {
+      "npcParamId": 537000,
+      "bossKillSouls": 70000
+    }
+  ],
+  "currentBossSizeOverrides": [
+    {
+      "modelId": "c3230",
+      "minimumFitClass": 3
+    }
+  ],
+  "currentRoamingBossExclusionModelIds": [
+    "c5230",
+    "c5401",
+    "c5250",
+    "c5320",
+    "c5370",
+    "c2730",
+    "c3430",
+    "c3471",
+    "c4510",
+    "c5200",
+    "c5260",
+    "c5290",
+    "c5350",
+    "c5351",
+    "c5390"
+  ],
+  "currentSourceSelectionRules": {
+    "candidateNeedsBossKillSoulsEntry": true,
+    "nonPortableBossReplacementModels": [],
+    "uniqueArchetypeKey": "modelName:npcParamId",
+    "explicitModelExclusionSet": [
+      "c5230",
+      "c5401",
+      "c5250",
+      "c5320",
+      "c5370",
+      "c2730",
+      "c3430",
+      "c3471",
+      "c4510",
+      "c5200",
+      "c5260",
+      "c5290",
+      "c5350",
+      "c5351",
+      "c5390"
+    ],
+    "sourceSlotExclusions": [
+      "m14_01_00_00:c5230_0000"
+    ],
+    "sourceSlotRequires": [
+      "not reserved by dragonPlan",
+      "npcParamId >= 0",
+      "thinkParamId >= 0"
+    ],
+    "pinwheelChaosWhenEnemyRandomizationEnabledExcludesSourceSlot": "m13_00_00_00:c3320_0000 (bossSourceSlots is shared by arena and roaming pools)",
+    "sourceFile": "engines/combined/vendor/src/core/generator.js",
+    "sourceFunction": "effectiveBossSlots / bossSourceSlots / roamingBossCandidates"
+  },
+  "candidateArchetypeCount": 17,
+  "candidateCountsByMinimumClass": [
+    {
+      "minimumFitClass": 0,
+      "candidateArchetypeCount": 0
+    },
+    {
+      "minimumFitClass": 1,
+      "candidateArchetypeCount": 0
+    },
+    {
+      "minimumFitClass": 2,
+      "candidateArchetypeCount": 1
+    },
+    {
+      "minimumFitClass": 3,
+      "candidateArchetypeCount": 9
+    },
+    {
+      "minimumFitClass": 4,
+      "candidateArchetypeCount": 5
+    },
+    {
+      "minimumFitClass": 5,
+      "candidateArchetypeCount": 2
+    }
+  ],
+  "currentCandidates": [
+    {
+      "canonicalBossName": "Capra Demon",
+      "modelIdentifier": "c2240",
+      "npcParamIdentifiers": [
+        224000
+      ],
+      "currentEffectiveMinimumFitClass": 3,
+      "sourceCapsuleMinimumFitClass": 3,
+      "includedInCurrentRoamingPool": true,
+      "exclusionReason": null,
+      "authoredOverride": null,
+      "source": {
+        "file": "engines/combined/vendor/src/core/generator.js",
+        "function": "roamingBossCandidates -> bossSourceSlots",
+        "sourceSlotId": "m10_01_00_00:c2240_0000",
+        "npcParamId": 224000,
+        "thinkParamId": 224001,
+        "teamType": 0,
+        "hitHeight": 2.8,
+        "hitRadius": 0.6,
+        "footprint": 2.8
+      },
+      "specialHandling": [
+        "Generic roaming path: boss NpcParam-derived scaled row, cloned destination NpcThinkParam, roaming activation event, and soul reward scaled from bossKillSouls."
+      ],
+      "classificationSource": {
+        "file": "engines/combined/vendor/src/core/sampling.js",
+        "function": "deriveRoamingBossTypes",
+        "measurement": "slotFootprint -> sizeClassOfFootprint",
+        "constant": "SIZE_EDGES"
+      }
+    },
+    {
+      "canonicalBossName": "Taurus Demon",
+      "modelIdentifier": "c2250",
+      "npcParamIdentifiers": [
+        225000
+      ],
+      "currentEffectiveMinimumFitClass": 3,
+      "sourceCapsuleMinimumFitClass": 3,
+      "includedInCurrentRoamingPool": true,
+      "exclusionReason": null,
+      "authoredOverride": null,
+      "source": {
+        "file": "engines/combined/vendor/src/core/generator.js",
+        "function": "roamingBossCandidates -> bossSourceSlots",
+        "sourceSlotId": "m10_01_00_00:c2250_0000",
+        "npcParamId": 225000,
+        "thinkParamId": 225000,
+        "teamType": 1,
+        "hitHeight": 3.5,
+        "hitRadius": 1.5,
+        "footprint": 3.5
+      },
+      "specialHandling": [
+        "Generic roaming path: boss NpcParam-derived scaled row, cloned destination NpcThinkParam, roaming activation event, and soul reward scaled from bossKillSouls."
+      ],
+      "classificationSource": {
+        "file": "engines/combined/vendor/src/core/sampling.js",
+        "function": "deriveRoamingBossTypes",
+        "measurement": "slotFootprint -> sizeClassOfFootprint",
+        "constant": "SIZE_EDGES"
+      }
+    },
+    {
+      "canonicalBossName": "Moonlight Butterfly",
+      "modelIdentifier": "c3230",
+      "npcParamIdentifiers": [
+        323000
+      ],
+      "currentEffectiveMinimumFitClass": 3,
+      "sourceCapsuleMinimumFitClass": 0,
+      "includedInCurrentRoamingPool": true,
+      "exclusionReason": null,
+      "authoredOverride": {
+        "minimumFitClass": 3,
+        "sourceFile": "engines/combined/vendor/src/core/generator.js",
+        "sourceSymbol": "roamingSizeClassOverrides"
+      },
+      "source": {
+        "file": "engines/combined/vendor/src/core/generator.js",
+        "function": "roamingBossCandidates -> bossSourceSlots",
+        "sourceSlotId": "m12_00_00_00:c3230_0000",
+        "npcParamId": 323000,
+        "thinkParamId": 323000,
+        "teamType": 0,
+        "hitHeight": 0.4,
+        "hitRadius": 0.19,
+        "footprint": 0.4
+      },
+      "specialHandling": [
+        "Generic roaming path: boss NpcParam-derived scaled row, cloned destination NpcThinkParam, roaming activation event, and soul reward scaled from bossKillSouls.",
+        "Authored size override to class 3 replaces source capsule class 0."
+      ],
+      "classificationSource": {
+        "file": "engines/combined/vendor/src/core/sampling.js",
+        "function": "deriveRoamingBossTypes",
+        "measurement": "slotFootprint -> sizeClassOfFootprint",
+        "constant": "SIZE_EDGES"
+      }
+    },
+    {
+      "canonicalBossName": "Great Grey Wolf Sif",
+      "modelIdentifier": "c5210",
+      "npcParamIdentifiers": [
+        521000
+      ],
+      "currentEffectiveMinimumFitClass": 4,
+      "sourceCapsuleMinimumFitClass": 4,
+      "includedInCurrentRoamingPool": true,
+      "exclusionReason": null,
+      "authoredOverride": null,
+      "source": {
+        "file": "engines/combined/vendor/src/core/generator.js",
+        "function": "roamingBossCandidates -> bossSourceSlots",
+        "sourceSlotId": "m12_00_00_00:c5210_0000",
+        "npcParamId": 521000,
+        "thinkParamId": 521000,
+        "teamType": 1,
+        "hitHeight": 6.7,
+        "hitRadius": 3.3,
+        "footprint": 6.7
+      },
+      "specialHandling": [
+        "Generic roaming path: boss NpcParam-derived scaled row, cloned destination NpcThinkParam, roaming activation event, and soul reward scaled from bossKillSouls."
+      ],
+      "classificationSource": {
+        "file": "engines/combined/vendor/src/core/sampling.js",
+        "function": "deriveRoamingBossTypes",
+        "measurement": "slotFootprint -> sizeClassOfFootprint",
+        "constant": "SIZE_EDGES"
+      }
+    },
+    {
+      "canonicalBossName": "Knight Artorias",
+      "modelIdentifier": "c4100",
+      "npcParamIdentifiers": [
+        410000
+      ],
+      "currentEffectiveMinimumFitClass": 3,
+      "sourceCapsuleMinimumFitClass": 3,
+      "includedInCurrentRoamingPool": true,
+      "exclusionReason": null,
+      "authoredOverride": null,
+      "source": {
+        "file": "engines/combined/vendor/src/core/generator.js",
+        "function": "roamingBossCandidates -> bossSourceSlots",
+        "sourceSlotId": "m12_01_00_00:c4100_0000",
+        "npcParamId": 410000,
+        "thinkParamId": 410000,
+        "teamType": 0,
+        "hitHeight": 2.6,
+        "hitRadius": 0.8,
+        "footprint": 2.6
+      },
+      "specialHandling": [
+        "Generic roaming path: boss NpcParam-derived scaled row, cloned destination NpcThinkParam, roaming activation event, and soul reward scaled from bossKillSouls."
+      ],
+      "classificationSource": {
+        "file": "engines/combined/vendor/src/core/sampling.js",
+        "function": "deriveRoamingBossTypes",
+        "measurement": "slotFootprint -> sizeClassOfFootprint",
+        "constant": "SIZE_EDGES"
+      }
+    },
+    {
+      "canonicalBossName": "Manus, Father of the Abyss",
+      "modelIdentifier": "c4500",
+      "npcParamIdentifiers": [
+        450000
+      ],
+      "currentEffectiveMinimumFitClass": 3,
+      "sourceCapsuleMinimumFitClass": 3,
+      "includedInCurrentRoamingPool": true,
+      "exclusionReason": null,
+      "authoredOverride": null,
+      "source": {
+        "file": "engines/combined/vendor/src/core/generator.js",
+        "function": "roamingBossCandidates -> bossSourceSlots",
+        "sourceSlotId": "m12_01_00_00:c4500_0000",
+        "npcParamId": 450000,
+        "thinkParamId": 450000,
+        "teamType": 0,
+        "hitHeight": 4,
+        "hitRadius": 1.2,
+        "footprint": 4
+      },
+      "specialHandling": [
+        "Generic roaming path: boss NpcParam-derived scaled row, cloned destination NpcThinkParam, roaming activation event, and soul reward scaled from bossKillSouls."
+      ],
+      "classificationSource": {
+        "file": "engines/combined/vendor/src/core/sampling.js",
+        "function": "deriveRoamingBossTypes",
+        "measurement": "slotFootprint -> sizeClassOfFootprint",
+        "constant": "SIZE_EDGES"
+      }
+    },
+    {
+      "canonicalBossName": "Pinwheel",
+      "modelIdentifier": "c3320",
+      "npcParamIdentifiers": [
+        332000
+      ],
+      "currentEffectiveMinimumFitClass": 2,
+      "sourceCapsuleMinimumFitClass": 2,
+      "includedInCurrentRoamingPool": true,
+      "exclusionReason": null,
+      "authoredOverride": null,
+      "source": {
+        "file": "engines/combined/vendor/src/core/generator.js",
+        "function": "roamingBossCandidates -> bossSourceSlots",
+        "sourceSlotId": "m13_00_00_00:c3320_0000",
+        "npcParamId": 332000,
+        "thinkParamId": 332000,
+        "teamType": 0,
+        "hitHeight": 2,
+        "hitRadius": 0.6,
+        "footprint": 2
+      },
+      "specialHandling": [
+        "Generic roaming path: boss NpcParam-derived scaled row, cloned destination NpcThinkParam, roaming activation event, and soul reward scaled from bossKillSouls.",
+        "Pinwheel Chaos ON excludes the main Pinwheel boss source slot before candidate collection."
+      ],
+      "classificationSource": {
+        "file": "engines/combined/vendor/src/core/sampling.js",
+        "function": "deriveRoamingBossTypes",
+        "measurement": "slotFootprint -> sizeClassOfFootprint",
+        "constant": "SIZE_EDGES"
+      }
+    },
+    {
+      "canonicalBossName": "Gravelord Nito",
+      "modelIdentifier": "c5220",
+      "npcParamIdentifiers": [
+        522000
+      ],
+      "currentEffectiveMinimumFitClass": 4,
+      "sourceCapsuleMinimumFitClass": 4,
+      "includedInCurrentRoamingPool": true,
+      "exclusionReason": null,
+      "authoredOverride": null,
+      "source": {
+        "file": "engines/combined/vendor/src/core/generator.js",
+        "function": "roamingBossCandidates -> bossSourceSlots",
+        "sourceSlotId": "m13_01_00_00:c5220_0000",
+        "npcParamId": 522000,
+        "thinkParamId": 522000,
+        "teamType": 1,
+        "hitHeight": 6,
+        "hitRadius": 2.99,
+        "footprint": 6
+      },
+      "specialHandling": [
+        "Generic roaming path: boss NpcParam-derived scaled row, cloned destination NpcThinkParam, roaming activation event, and soul reward scaled from bossKillSouls."
+      ],
+      "classificationSource": {
+        "file": "engines/combined/vendor/src/core/sampling.js",
+        "function": "deriveRoamingBossTypes",
+        "measurement": "slotFootprint -> sizeClassOfFootprint",
+        "constant": "SIZE_EDGES"
+      }
+    },
+    {
+      "canonicalBossName": "Chaos Witch Quelaag",
+      "modelIdentifier": "c5280",
+      "npcParamIdentifiers": [
+        528000
+      ],
+      "currentEffectiveMinimumFitClass": 3,
+      "sourceCapsuleMinimumFitClass": 3,
+      "includedInCurrentRoamingPool": true,
+      "exclusionReason": null,
+      "authoredOverride": null,
+      "source": {
+        "file": "engines/combined/vendor/src/core/generator.js",
+        "function": "roamingBossCandidates -> bossSourceSlots",
+        "sourceSlotId": "m14_00_00_00:c5280_0000",
+        "npcParamId": 528000,
+        "thinkParamId": 528000,
+        "teamType": 1,
+        "hitHeight": 4.01,
+        "hitRadius": 2,
+        "footprint": 4.01
+      },
+      "specialHandling": [
+        "Generic roaming path: boss NpcParam-derived scaled row, cloned destination NpcThinkParam, roaming activation event, and soul reward scaled from bossKillSouls."
+      ],
+      "classificationSource": {
+        "file": "engines/combined/vendor/src/core/sampling.js",
+        "function": "deriveRoamingBossTypes",
+        "measurement": "slotFootprint -> sizeClassOfFootprint",
+        "constant": "SIZE_EDGES"
+      }
+    },
+    {
+      "canonicalBossName": "Demon Firesage",
+      "modelIdentifier": "c2231",
+      "npcParamIdentifiers": [
+        223100
+      ],
+      "currentEffectiveMinimumFitClass": 4,
+      "sourceCapsuleMinimumFitClass": 4,
+      "includedInCurrentRoamingPool": true,
+      "exclusionReason": null,
+      "authoredOverride": null,
+      "source": {
+        "file": "engines/combined/vendor/src/core/generator.js",
+        "function": "roamingBossCandidates -> bossSourceSlots",
+        "sourceSlotId": "m14_01_00_00:c2231_0000",
+        "npcParamId": 223100,
+        "thinkParamId": 223100,
+        "teamType": 1,
+        "hitHeight": 4.6,
+        "hitRadius": 2.29,
+        "footprint": 4.6
+      },
+      "specialHandling": [
+        "Generic roaming path: boss NpcParam-derived scaled row, cloned destination NpcThinkParam, roaming activation event, and soul reward scaled from bossKillSouls."
+      ],
+      "classificationSource": {
+        "file": "engines/combined/vendor/src/core/sampling.js",
+        "function": "deriveRoamingBossTypes",
+        "measurement": "slotFootprint -> sizeClassOfFootprint",
+        "constant": "SIZE_EDGES"
+      }
+    },
+    {
+      "canonicalBossName": "Iron Golem",
+      "modelIdentifier": "c2320",
+      "npcParamIdentifiers": [
+        232000
+      ],
+      "currentEffectiveMinimumFitClass": 4,
+      "sourceCapsuleMinimumFitClass": 4,
+      "includedInCurrentRoamingPool": true,
+      "exclusionReason": null,
+      "authoredOverride": null,
+      "source": {
+        "file": "engines/combined/vendor/src/core/generator.js",
+        "function": "roamingBossCandidates -> bossSourceSlots",
+        "sourceSlotId": "m15_00_00_00:c2320_0000",
+        "npcParamId": 232000,
+        "thinkParamId": 232000,
+        "teamType": 1,
+        "hitHeight": 6,
+        "hitRadius": 1.5,
+        "footprint": 6
+      },
+      "specialHandling": [
+        "Generic roaming path: boss NpcParam-derived scaled row, cloned destination NpcThinkParam, roaming activation event, and soul reward scaled from bossKillSouls."
+      ],
+      "classificationSource": {
+        "file": "engines/combined/vendor/src/core/sampling.js",
+        "function": "deriveRoamingBossTypes",
+        "measurement": "slotFootprint -> sizeClassOfFootprint",
+        "constant": "SIZE_EDGES"
+      }
+    },
+    {
+      "canonicalBossName": "Executioner Smough",
+      "modelIdentifier": "c2360",
+      "npcParamIdentifiers": [
+        236000
+      ],
+      "currentEffectiveMinimumFitClass": 3,
+      "sourceCapsuleMinimumFitClass": 3,
+      "includedInCurrentRoamingPool": true,
+      "exclusionReason": null,
+      "authoredOverride": null,
+      "source": {
+        "file": "engines/combined/vendor/src/core/generator.js",
+        "function": "roamingBossCandidates -> bossSourceSlots",
+        "sourceSlotId": "m15_01_00_00:c2360_0000",
+        "npcParamId": 236000,
+        "thinkParamId": 236000,
+        "teamType": 0,
+        "hitHeight": 4,
+        "hitRadius": 1.8,
+        "footprint": 4
+      },
+      "specialHandling": [
+        "Generic roaming path: boss NpcParam-derived scaled row, cloned destination NpcThinkParam, roaming activation event, and soul reward scaled from bossKillSouls."
+      ],
+      "classificationSource": {
+        "file": "engines/combined/vendor/src/core/sampling.js",
+        "function": "deriveRoamingBossTypes",
+        "measurement": "slotFootprint -> sizeClassOfFootprint",
+        "constant": "SIZE_EDGES"
+      }
+    },
+    {
+      "canonicalBossName": "Super Smough",
+      "modelIdentifier": "c2360",
+      "npcParamIdentifiers": [
+        236001
+      ],
+      "currentEffectiveMinimumFitClass": 3,
+      "sourceCapsuleMinimumFitClass": 3,
+      "includedInCurrentRoamingPool": true,
+      "exclusionReason": null,
+      "authoredOverride": null,
+      "source": {
+        "file": "engines/combined/vendor/src/core/generator.js",
+        "function": "roamingBossCandidates -> bossSourceSlots",
+        "sourceSlotId": "m15_01_00_00:c2360_0001",
+        "npcParamId": 236001,
+        "thinkParamId": 236001,
+        "teamType": 0,
+        "hitHeight": 4,
+        "hitRadius": 1.8,
+        "footprint": 4
+      },
+      "specialHandling": [
+        "Generic roaming path: boss NpcParam-derived scaled row, cloned destination NpcThinkParam, roaming activation event, and soul reward scaled from bossKillSouls.",
+        "Additional boss source slot c2360_0001 is explicitly added to effectiveBossSlots."
+      ],
+      "classificationSource": {
+        "file": "engines/combined/vendor/src/core/sampling.js",
+        "function": "deriveRoamingBossTypes",
+        "measurement": "slotFootprint -> sizeClassOfFootprint",
+        "constant": "SIZE_EDGES"
+      }
+    },
+    {
+      "canonicalBossName": "Dragon Slayer Ornstein",
+      "modelIdentifier": "c5270",
+      "npcParamIdentifiers": [
+        527000
+      ],
+      "currentEffectiveMinimumFitClass": 3,
+      "sourceCapsuleMinimumFitClass": 3,
+      "includedInCurrentRoamingPool": true,
+      "exclusionReason": null,
+      "authoredOverride": null,
+      "source": {
+        "file": "engines/combined/vendor/src/core/generator.js",
+        "function": "roamingBossCandidates -> bossSourceSlots",
+        "sourceSlotId": "m15_01_00_00:c5270_0000",
+        "npcParamId": 527000,
+        "thinkParamId": 527000,
+        "teamType": 0,
+        "hitHeight": 3.2,
+        "hitRadius": 0.8,
+        "footprint": 3.2
+      },
+      "specialHandling": [
+        "Generic roaming path: boss NpcParam-derived scaled row, cloned destination NpcThinkParam, roaming activation event, and soul reward scaled from bossKillSouls."
+      ],
+      "classificationSource": {
+        "file": "engines/combined/vendor/src/core/sampling.js",
+        "function": "deriveRoamingBossTypes",
+        "measurement": "slotFootprint -> sizeClassOfFootprint",
+        "constant": "SIZE_EDGES"
+      }
+    },
+    {
+      "canonicalBossName": "Super Ornstein / alternate Ornstein",
+      "modelIdentifier": "c5271",
+      "npcParamIdentifiers": [
+        527100
+      ],
+      "currentEffectiveMinimumFitClass": 4,
+      "sourceCapsuleMinimumFitClass": 4,
+      "includedInCurrentRoamingPool": true,
+      "exclusionReason": null,
+      "authoredOverride": null,
+      "source": {
+        "file": "engines/combined/vendor/src/core/generator.js",
+        "function": "roamingBossCandidates -> bossSourceSlots",
+        "sourceSlotId": "m15_01_00_00:c5271_0000",
+        "npcParamId": 527100,
+        "thinkParamId": 527100,
+        "teamType": 0,
+        "hitHeight": 6,
+        "hitRadius": 2.4,
+        "footprint": 6
+      },
+      "specialHandling": [
+        "Generic roaming path: boss NpcParam-derived scaled row, cloned destination NpcThinkParam, roaming activation event, and soul reward scaled from bossKillSouls."
+      ],
+      "classificationSource": {
+        "file": "engines/combined/vendor/src/core/sampling.js",
+        "function": "deriveRoamingBossTypes",
+        "measurement": "slotFootprint -> sizeClassOfFootprint",
+        "constant": "SIZE_EDGES"
+      }
+    },
+    {
+      "canonicalBossName": "Stray Demon",
+      "modelIdentifier": "c2230",
+      "npcParamIdentifiers": [
+        223000
+      ],
+      "currentEffectiveMinimumFitClass": 5,
+      "sourceCapsuleMinimumFitClass": 5,
+      "includedInCurrentRoamingPool": true,
+      "exclusionReason": null,
+      "authoredOverride": null,
+      "source": {
+        "file": "engines/combined/vendor/src/core/generator.js",
+        "function": "roamingBossCandidates -> bossSourceSlots",
+        "sourceSlotId": "m18_01_00_00:c2230_0000",
+        "npcParamId": 223000,
+        "thinkParamId": 223001,
+        "teamType": 1,
+        "hitHeight": 7.5,
+        "hitRadius": 2.5,
+        "footprint": 7.5
+      },
+      "specialHandling": [
+        "Generic roaming path: boss NpcParam-derived scaled row, cloned destination NpcThinkParam, roaming activation event, and soul reward scaled from bossKillSouls."
+      ],
+      "classificationSource": {
+        "file": "engines/combined/vendor/src/core/sampling.js",
+        "function": "deriveRoamingBossTypes",
+        "measurement": "slotFootprint -> sizeClassOfFootprint",
+        "constant": "SIZE_EDGES"
+      }
+    },
+    {
+      "canonicalBossName": "Asylum Demon",
+      "modelIdentifier": "c2232",
+      "npcParamIdentifiers": [
+        223200
+      ],
+      "currentEffectiveMinimumFitClass": 5,
+      "sourceCapsuleMinimumFitClass": 5,
+      "includedInCurrentRoamingPool": true,
+      "exclusionReason": null,
+      "authoredOverride": null,
+      "source": {
+        "file": "engines/combined/vendor/src/core/generator.js",
+        "function": "roamingBossCandidates -> bossSourceSlots",
+        "sourceSlotId": "m18_01_00_00:c2232_0000",
+        "npcParamId": 223200,
+        "thinkParamId": 223200,
+        "teamType": 1,
+        "hitHeight": 7.5,
+        "hitRadius": 2.5,
+        "footprint": 7.5
+      },
+      "specialHandling": [
+        "Generic roaming path: boss NpcParam-derived scaled row, cloned destination NpcThinkParam, roaming activation event, and soul reward scaled from bossKillSouls."
+      ],
+      "classificationSource": {
+        "file": "engines/combined/vendor/src/core/sampling.js",
+        "function": "deriveRoamingBossTypes",
+        "measurement": "slotFootprint -> sizeClassOfFootprint",
+        "constant": "SIZE_EDGES"
+      }
+    }
+  ],
+  "explicitExclusions": [
+    {
+      "canonicalBossName": "Bed of Chaos",
+      "modelIdentifier": "c5230",
+      "npcParamIdentifiers": [
+        523000
+      ],
+      "currentEffectiveMinimumFitClass": null,
+      "includedInCurrentRoamingPool": false,
+      "exclusionReason": "Bed of Chaos: immobile, floor script",
+      "authoredOverride": null,
+      "source": {
+        "file": "engines/combined/vendor/src/core/generator.js",
+        "function": "roamingExcludedModels",
+        "sourceSlotIds": [
+          "m14_01_00_00:c5230_0000"
+        ],
+        "npcParamIdsObserved": [
+          523000
+        ],
+        "sourceCapsuleMinimumFitClass": 0
+      },
+      "specialHandling": "Bed of Chaos: immobile, floor script",
+      "sourceCapsuleMinimumFitClass": 0,
+      "classificationSource": {
+        "file": "engines/combined/vendor/src/core/sampling.js",
+        "function": "sizeClassOfFootprint",
+        "constant": "SIZE_EDGES"
+      }
+    },
+    {
+      "canonicalBossName": "Bed of Chaos",
+      "modelIdentifier": "c5401",
+      "npcParamIdentifiers": [
+        540100
+      ],
+      "currentEffectiveMinimumFitClass": null,
+      "includedInCurrentRoamingPool": false,
+      "exclusionReason": "Bed of Chaos core",
+      "authoredOverride": null,
+      "source": {
+        "file": "engines/combined/vendor/src/core/generator.js",
+        "function": "roamingExcludedModels",
+        "sourceSlotIds": [
+          "m14_01_00_00:c5401_0000"
+        ],
+        "npcParamIdsObserved": [
+          540100
+        ],
+        "sourceCapsuleMinimumFitClass": 1
+      },
+      "specialHandling": "Bed of Chaos core",
+      "sourceCapsuleMinimumFitClass": 1,
+      "classificationSource": {
+        "file": "engines/combined/vendor/src/core/sampling.js",
+        "function": "sizeClassOfFootprint",
+        "constant": "SIZE_EDGES"
+      }
+    },
+    {
+      "canonicalBossName": "Ceaseless Discharge",
+      "modelIdentifier": "c5250",
+      "npcParamIdentifiers": [
+        525000
+      ],
+      "currentEffectiveMinimumFitClass": null,
+      "includedInCurrentRoamingPool": false,
+      "exclusionReason": "Ceaseless Discharge: immobile, 10 m tall lava body",
+      "authoredOverride": null,
+      "source": {
+        "file": "engines/combined/vendor/src/core/generator.js",
+        "function": "roamingExcludedModels",
+        "sourceSlotIds": [
+          "m14_01_00_00:c5250_0000"
+        ],
+        "npcParamIdsObserved": [
+          525000
+        ],
+        "sourceCapsuleMinimumFitClass": 5
+      },
+      "specialHandling": "Ceaseless Discharge: immobile, 10 m tall lava body",
+      "sourceCapsuleMinimumFitClass": 5,
+      "classificationSource": {
+        "file": "engines/combined/vendor/src/core/sampling.js",
+        "function": "sizeClassOfFootprint",
+        "constant": "SIZE_EDGES"
+      }
+    },
+    {
+      "canonicalBossName": "Dark Sun Gwyndolin",
+      "modelIdentifier": "c5320",
+      "npcParamIdentifiers": [
+        532000
+      ],
+      "currentEffectiveMinimumFitClass": null,
+      "includedInCurrentRoamingPool": false,
+      "exclusionReason": "Dark Sun Gwyndolin: neutral team, stationary, scripted",
+      "authoredOverride": null,
+      "source": {
+        "file": "engines/combined/vendor/src/core/generator.js",
+        "function": "roamingExcludedModels",
+        "sourceSlotIds": [
+          "m15_01_00_00:c5320_0000"
+        ],
+        "npcParamIdsObserved": [
+          532000
+        ],
+        "sourceCapsuleMinimumFitClass": 2
+      },
+      "specialHandling": "Source catalog row is teamType=2; current generator explicitly excludes it as neutral/stationary/scripted. If enabled, destination team conversion and boss activation must be verified.",
+      "sourceCapsuleMinimumFitClass": 2,
+      "classificationSource": {
+        "file": "engines/combined/vendor/src/core/sampling.js",
+        "function": "sizeClassOfFootprint",
+        "constant": "SIZE_EDGES"
+      }
+    },
+    {
+      "canonicalBossName": "Gwyn, Lord of Cinder",
+      "modelIdentifier": "c5370",
+      "npcParamIdentifiers": [
+        537000
+      ],
+      "currentEffectiveMinimumFitClass": null,
+      "includedInCurrentRoamingPool": false,
+      "exclusionReason": "Lord Gwyn: scripted entrance, arena-bound",
+      "authoredOverride": null,
+      "source": {
+        "file": "engines/combined/vendor/src/core/generator.js",
+        "function": "roamingExcludedModels",
+        "sourceSlotIds": [
+          "m18_00_00_00:c5370_0000"
+        ],
+        "npcParamIdsObserved": [
+          537000
+        ],
+        "sourceCapsuleMinimumFitClass": 2
+      },
+      "specialHandling": "Lord Gwyn: scripted entrance, arena-bound",
+      "sourceCapsuleMinimumFitClass": 2,
+      "classificationSource": {
+        "file": "engines/combined/vendor/src/core/sampling.js",
+        "function": "sizeClassOfFootprint",
+        "constant": "SIZE_EDGES"
+      }
+    },
+    {
+      "canonicalBossName": "Crossbreed Priscilla",
+      "modelIdentifier": "c2730",
+      "npcParamIdentifiers": [
+        273000
+      ],
+      "currentEffectiveMinimumFitClass": null,
+      "includedInCurrentRoamingPool": false,
+      "exclusionReason": "Crossbreed Priscilla tail",
+      "authoredOverride": null,
+      "source": {
+        "file": "engines/combined/vendor/src/core/generator.js",
+        "function": "roamingExcludedModels",
+        "sourceSlotIds": [
+          "m11_00_00_00:c2730_0000"
+        ],
+        "npcParamIdsObserved": [
+          273000
+        ],
+        "sourceCapsuleMinimumFitClass": 4
+      },
+      "specialHandling": "Crossbreed Priscilla tail",
+      "sourceCapsuleMinimumFitClass": 4,
+      "classificationSource": {
+        "file": "engines/combined/vendor/src/core/sampling.js",
+        "function": "sizeClassOfFootprint",
+        "constant": "SIZE_EDGES"
+      }
+    },
+    {
+      "canonicalBossName": "Hellkite Drake",
+      "modelIdentifier": "c3430",
+      "npcParamIdentifiers": [
+        343000
+      ],
+      "currentEffectiveMinimumFitClass": null,
+      "includedInCurrentRoamingPool": false,
+      "exclusionReason": "Hellkite Drake bridge dragon bodies",
+      "authoredOverride": null,
+      "source": {
+        "file": "engines/combined/vendor/src/core/generator.js",
+        "function": "roamingExcludedModels",
+        "sourceSlotIds": [
+          "m10_01_00_00:c3430_0000",
+          "m10_01_00_00:c3430_0001"
+        ],
+        "npcParamIdsObserved": [
+          343000
+        ],
+        "sourceCapsuleMinimumFitClass": 4
+      },
+      "specialHandling": "Hellkite Drake bridge dragon bodies",
+      "sourceCapsuleMinimumFitClass": 4,
+      "classificationSource": {
+        "file": "engines/combined/vendor/src/core/sampling.js",
+        "function": "sizeClassOfFootprint",
+        "constant": "SIZE_EDGES"
+      }
+    },
+    {
+      "canonicalBossName": "Sanctuary Guardian",
+      "modelIdentifier": "c3471",
+      "npcParamIdentifiers": [
+        347100,
+        347101
+      ],
+      "currentEffectiveMinimumFitClass": null,
+      "includedInCurrentRoamingPool": false,
+      "exclusionReason": "Sanctuary Guardian tail",
+      "authoredOverride": null,
+      "source": {
+        "file": "engines/combined/vendor/src/core/generator.js",
+        "function": "roamingExcludedModels",
+        "sourceSlotIds": [
+          "m12_01_00_00:c3471_0000",
+          "m12_01_00_00:c3471_0001",
+          "m12_01_00_00:c3471_0002"
+        ],
+        "npcParamIdsObserved": [
+          347100,
+          347101
+        ],
+        "sourceCapsuleMinimumFitClass": 3
+      },
+      "specialHandling": "Sanctuary Guardian tail",
+      "sourceCapsuleMinimumFitClass": 3,
+      "classificationSource": {
+        "file": "engines/combined/vendor/src/core/sampling.js",
+        "function": "sizeClassOfFootprint",
+        "constant": "SIZE_EDGES"
+      }
+    },
+    {
+      "canonicalBossName": "Black Dragon Kalameet",
+      "modelIdentifier": "c4510",
+      "npcParamIdentifiers": [
+        451000,
+        451001
+      ],
+      "currentEffectiveMinimumFitClass": null,
+      "includedInCurrentRoamingPool": false,
+      "exclusionReason": "Black Dragon Kalameet tail/two bodies",
+      "authoredOverride": null,
+      "source": {
+        "file": "engines/combined/vendor/src/core/generator.js",
+        "function": "roamingExcludedModels",
+        "sourceSlotIds": [
+          "m12_01_00_00:c4510_0000",
+          "m12_01_00_00:c4510_0001",
+          "m12_01_00_00:c4510_0002"
+        ],
+        "npcParamIdsObserved": [
+          451000,
+          451001
+        ],
+        "sourceCapsuleMinimumFitClass": 5
+      },
+      "specialHandling": "Black Dragon Kalameet tail/two bodies",
+      "sourceCapsuleMinimumFitClass": 5,
+      "classificationSource": {
+        "file": "engines/combined/vendor/src/core/sampling.js",
+        "function": "sizeClassOfFootprint",
+        "constant": "SIZE_EDGES"
+      }
+    },
+    {
+      "canonicalBossName": "Centipede Demon",
+      "modelIdentifier": "c5200",
+      "npcParamIdentifiers": [
+        520000
+      ],
+      "currentEffectiveMinimumFitClass": null,
+      "includedInCurrentRoamingPool": false,
+      "exclusionReason": "Centipede Demon linked",
+      "authoredOverride": null,
+      "source": {
+        "file": "engines/combined/vendor/src/core/generator.js",
+        "function": "roamingExcludedModels",
+        "sourceSlotIds": [
+          "m14_01_00_00:c5200_0000"
+        ],
+        "npcParamIdsObserved": [
+          520000
+        ],
+        "sourceCapsuleMinimumFitClass": 5
+      },
+      "specialHandling": "Centipede Demon linked",
+      "sourceCapsuleMinimumFitClass": 5,
+      "classificationSource": {
+        "file": "engines/combined/vendor/src/core/sampling.js",
+        "function": "sizeClassOfFootprint",
+        "constant": "SIZE_EDGES"
+      }
+    },
+    {
+      "canonicalBossName": "Gaping Dragon",
+      "modelIdentifier": "c5260",
+      "npcParamIdentifiers": [
+        526000
+      ],
+      "currentEffectiveMinimumFitClass": null,
+      "includedInCurrentRoamingPool": false,
+      "exclusionReason": "Gaping Dragon tail",
+      "authoredOverride": null,
+      "source": {
+        "file": "engines/combined/vendor/src/core/generator.js",
+        "function": "roamingExcludedModels",
+        "sourceSlotIds": [
+          "m10_00_00_00:c5260_0000"
+        ],
+        "npcParamIdsObserved": [
+          526000
+        ],
+        "sourceCapsuleMinimumFitClass": 5
+      },
+      "specialHandling": "Gaping Dragon tail",
+      "sourceCapsuleMinimumFitClass": 5,
+      "classificationSource": {
+        "file": "engines/combined/vendor/src/core/sampling.js",
+        "function": "sizeClassOfFootprint",
+        "constant": "SIZE_EDGES"
+      }
+    },
+    {
+      "canonicalBossName": "Seath the Scaleless",
+      "modelIdentifier": "c5290",
+      "npcParamIdentifiers": [
+        529000,
+        529001
+      ],
+      "currentEffectiveMinimumFitClass": null,
+      "includedInCurrentRoamingPool": false,
+      "exclusionReason": "Seath the Scaleless tail/arena script",
+      "authoredOverride": null,
+      "source": {
+        "file": "engines/combined/vendor/src/core/generator.js",
+        "function": "roamingExcludedModels",
+        "sourceSlotIds": [
+          "m17_00_00_00:c5290_0000",
+          "m17_00_00_00:c5290_0001"
+        ],
+        "npcParamIdsObserved": [
+          529000,
+          529001
+        ],
+        "sourceCapsuleMinimumFitClass": 5
+      },
+      "specialHandling": "Seath the Scaleless tail/arena script",
+      "sourceCapsuleMinimumFitClass": 5,
+      "classificationSource": {
+        "file": "engines/combined/vendor/src/core/sampling.js",
+        "function": "sizeClassOfFootprint",
+        "constant": "SIZE_EDGES"
+      }
+    },
+    {
+      "canonicalBossName": "Bell Gargoyle",
+      "modelIdentifier": "c5350",
+      "npcParamIdentifiers": [
+        535000,
+        535001
+      ],
+      "currentEffectiveMinimumFitClass": null,
+      "includedInCurrentRoamingPool": false,
+      "exclusionReason": "Bell Gargoyles",
+      "authoredOverride": null,
+      "source": {
+        "file": "engines/combined/vendor/src/core/generator.js",
+        "function": "roamingExcludedModels",
+        "sourceSlotIds": [
+          "m10_01_00_00:c5350_0000",
+          "m10_01_00_00:c5350_0001",
+          "m10_01_00_00:c5350_0002"
+        ],
+        "npcParamIdsObserved": [
+          535000,
+          535001
+        ],
+        "sourceCapsuleMinimumFitClass": 3
+      },
+      "specialHandling": "Bell Gargoyles",
+      "sourceCapsuleMinimumFitClass": 3,
+      "classificationSource": {
+        "file": "engines/combined/vendor/src/core/sampling.js",
+        "function": "sizeClassOfFootprint",
+        "constant": "SIZE_EDGES"
+      }
+    },
+    {
+      "canonicalBossName": "Anor Londo Gargoyle",
+      "modelIdentifier": "c5351",
+      "npcParamIdentifiers": [
+        535100
+      ],
+      "currentEffectiveMinimumFitClass": null,
+      "includedInCurrentRoamingPool": false,
+      "exclusionReason": "Anor Londo Gargoyles",
+      "authoredOverride": null,
+      "source": {
+        "file": "engines/combined/vendor/src/core/generator.js",
+        "function": "roamingExcludedModels",
+        "sourceSlotIds": [
+          "m15_01_00_00:c5351_0000",
+          "m15_01_00_00:c5351_0001"
+        ],
+        "npcParamIdsObserved": [
+          535100
+        ],
+        "sourceCapsuleMinimumFitClass": 3
+      },
+      "specialHandling": "Anor Londo Gargoyles",
+      "sourceCapsuleMinimumFitClass": 3,
+      "classificationSource": {
+        "file": "engines/combined/vendor/src/core/sampling.js",
+        "function": "sizeClassOfFootprint",
+        "constant": "SIZE_EDGES"
+      }
+    },
+    {
+      "canonicalBossName": "Four Kings",
+      "modelIdentifier": "c5390",
+      "npcParamIdentifiers": [
+        539000,
+        539001
+      ],
+      "currentEffectiveMinimumFitClass": null,
+      "includedInCurrentRoamingPool": false,
+      "exclusionReason": "Four Kings linked bodies",
+      "authoredOverride": null,
+      "source": {
+        "file": "engines/combined/vendor/src/core/generator.js",
+        "function": "roamingExcludedModels",
+        "sourceSlotIds": [
+          "m16_00_00_00:c5390_0000",
+          "m16_00_00_00:c5390_0001",
+          "m16_00_00_00:c5390_0002",
+          "m16_00_00_00:c5390_0003",
+          "m16_00_00_00:c5390_0004"
+        ],
+        "npcParamIdsObserved": [
+          539000,
+          539001
+        ],
+        "sourceCapsuleMinimumFitClass": 3
+      },
+      "specialHandling": "Four Kings linked bodies",
+      "sourceCapsuleMinimumFitClass": 3,
+      "classificationSource": {
+        "file": "engines/combined/vendor/src/core/sampling.js",
+        "function": "sizeClassOfFootprint",
+        "constant": "SIZE_EDGES"
+      }
+    }
+  ],
+  "otherBossesExcludedBySoulGate": [],
+  "restore": {
+    "instructions": [
+      "Restore engines/combined/vendor/src/core/sampling.js SIZE_EDGES exactly as recorded.",
+      "Restore engines/combined/vendor/src/core/generator.js bossKillSouls exactly as recorded.",
+      "Restore c5320 to roamingExcludedModels and restore roamingSizeClassOverrides to c3230 => class 3 only.",
+      "Restore bossSourceSlots to the shared Pinwheel Chaos exclusion behavior and remove the roaming-only includePinwheelChaosMain override.",
+      "Restore the explicit Bed of Chaos source slot exclusion and all source-selection gates exactly as recorded.",
+      "Do not restore or alter unrelated generation profile, Seed Code, engine, or other generator behavior."
+    ],
+    "productionFiles": [
+      "engines/combined/vendor/src/core/sampling.js",
+      "engines/combined/vendor/src/core/generator.js"
+    ],
+    "sizeEdges": [
+      0.9,
+      1.7,
+      2.6,
+      4.2,
+      7
+    ],
+    "bossKillSouls": [
+      {
+        "npcParamId": 223000,
+        "bossKillSouls": 20000
+      },
+      {
+        "npcParamId": 223100,
+        "bossKillSouls": 20000
+      },
+      {
+        "npcParamId": 223200,
+        "bossKillSouls": 2000
+      },
+      {
+        "npcParamId": 224000,
+        "bossKillSouls": 6000
+      },
+      {
+        "npcParamId": 225000,
+        "bossKillSouls": 3000
+      },
+      {
+        "npcParamId": 232000,
+        "bossKillSouls": 40000
+      },
+      {
+        "npcParamId": 236000,
+        "bossKillSouls": 10000
+      },
+      {
+        "npcParamId": 236001,
+        "bossKillSouls": 25000
+      },
+      {
+        "npcParamId": 273000,
+        "bossKillSouls": 30000
+      },
+      {
+        "npcParamId": 323000,
+        "bossKillSouls": 10000
+      },
+      {
+        "npcParamId": 332000,
+        "bossKillSouls": 15000
+      },
+      {
+        "npcParamId": 410000,
+        "bossKillSouls": 50000
+      },
+      {
+        "npcParamId": 450000,
+        "bossKillSouls": 60000
+      },
+      {
+        "npcParamId": 451000,
+        "bossKillSouls": 60000
+      },
+      {
+        "npcParamId": 521000,
+        "bossKillSouls": 40000
+      },
+      {
+        "npcParamId": 522000,
+        "bossKillSouls": 60000
+      },
+      {
+        "npcParamId": 525000,
+        "bossKillSouls": 20000
+      },
+      {
+        "npcParamId": 526000,
+        "bossKillSouls": 25000
+      },
+      {
+        "npcParamId": 527000,
+        "bossKillSouls": 10000
+      },
+      {
+        "npcParamId": 527100,
+        "bossKillSouls": 25000
+      },
+      {
+        "npcParamId": 528000,
+        "bossKillSouls": 20000
+      },
+      {
+        "npcParamId": 532000,
+        "bossKillSouls": 40000
+      },
+      {
+        "npcParamId": 537000,
+        "bossKillSouls": 70000
+      }
+    ],
+    "roamingExcludedModels": [
+      "c5230",
+      "c5401",
+      "c5250",
+      "c5320",
+      "c5370",
+      "c2730",
+      "c3430",
+      "c3471",
+      "c4510",
+      "c5200",
+      "c5260",
+      "c5290",
+      "c5350",
+      "c5351",
+      "c5390"
+    ],
+    "roamingSizeClassOverrides": [
+      {
+        "modelId": "c3230",
+        "minimumFitClass": 3
+      }
+    ],
+    "bossSourcePinwheelChaosGate": "When config.pinwheelChaos && config.randomizeEnemies, bossSourceSlots excludes m13_00_00_00:c3320_0000."
+  }
+}

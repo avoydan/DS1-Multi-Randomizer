@@ -987,6 +987,27 @@ namespace FogHost
             new AnorLondoArenaGate(1212716, 1211572, 1213250, 11215370, 1211472, 1213300, 11215360),
         };
 
+        /// <summary>
+        /// Compact catalog projection of the already authored PvP gate contract. Four-player
+        /// arena regions are project-major PvP entrances; two-player regions are project-minor.
+        /// Every numeric physical anchor remains sourced from the same event-reconstruction policy.
+        /// </summary>
+        internal static IReadOnlyList<(int AreaEntity, int DoorObject, int HitCollision, int StateFlag,
+            int SwitchObject, int SwitchCollision, int PresenceFlag, bool Major)> CompactPvpGatePolicies()
+        {
+            var participantCounts = AnorLondoPvpModes()
+                .SelectMany(mode => mode.ParticipantRegions.Select(region => (Region: region, Count: mode.ParticipantRegions.Length)))
+                .ToDictionary(entry => entry.Region, entry => entry.Count);
+            var gates = AnorLondoPvpGates().Select(gate =>
+            {
+                if (!participantCounts.TryGetValue(gate.AreaEntity, out int participantCount))
+                    throw new InvalidDataException($"PvP gate region {gate.AreaEntity} is not owned by a project arena mode.");
+                return (gate.AreaEntity, gate.DoorObject, gate.HitCollision, gate.StateFlag,
+                    gate.SwitchObject, gate.SwitchCollision, gate.PresenceFlag, Major: participantCount > 2);
+            }).ToArray();
+            return Array.AsReadOnly(gates);
+        }
+
         private sealed class AnorLondoPvpMode
         {
             public AnorLondoPvpMode(int territoryRegion, int battleRoomRegion, int returnPlayerEntity,

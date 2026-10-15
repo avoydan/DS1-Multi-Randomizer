@@ -24,7 +24,7 @@ namespace FogHost.Tests
         private static string hostExe;
         private static string dataRoot;
 
-        public static int Main()
+        public static int Main(string[] args)
         {
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
             hostExe = Environment.GetEnvironmentVariable("FOGHOST_EXE") ?? Path.Combine(RepoRoot(), "tools", "fog-host", "bin", "Release", "net8.0", "FogHost.exe");
@@ -34,6 +34,30 @@ namespace FogHost.Tests
             Console.WriteLine($"Data root: {dataRoot ?? "(unset: data tests are skipped)"}");
             try
             {
+                if (args.Contains("compact-candidate", StringComparer.Ordinal))
+                {
+                    Test("Compact Full Fog V1 candidate compiles the complete authored Warp pool and project rules", FogDsrFactsTest.VerifyCompactCatalogCandidateFromEnvironment);
+                    Console.WriteLine($"Compact candidate checks: {passed} passed, {failed} failed.");
+                    return failed == 0 ? 0 : 1;
+                }
+                if (args.Contains("compact-real-generation-smoke", StringComparer.Ordinal))
+                {
+                    try { return CompactRealGenerationTest.RunSmokeFromEnvironment(); }
+                    catch (Exception error)
+                    {
+                        Console.Error.WriteLine($"FAIL Compact real GameDataWriter generation: {error}");
+                        return 1;
+                    }
+                }
+                if (args.Contains("compact-real-generation-matrix", StringComparer.Ordinal))
+                {
+                    try { return CompactRealGenerationTest.RunMatrixFromEnvironment(); }
+                    catch (Exception error)
+                    {
+                        Console.Error.WriteLine($"FAIL Compact real GameDataWriter matrix: {error}");
+                        return 1;
+                    }
+                }
                 Test("usage error exits 2", UsageError);
                 Test("unknown request key is FOG_REQUEST_INVALID", UnknownKey);
                 Test("non-DS1R game is FOG_REQUEST_INVALID", WrongGame);
@@ -262,7 +286,7 @@ namespace FogHost.Tests
             Check(run.Exit == 0, $"exit code {run.Exit}, expected 0");
             Check(run.ResponseBytes != null, "no response file");
             JsonNode response = run.Response;
-            Check(response["schemaVersion"]!.GetValue<int>() == 2, "schemaVersion");
+            Check(response["schemaVersion"]!.GetValue<int>() == HostRequest.SchemaVersion, "schemaVersion");
             Check(response["ok"]!.GetValue<bool>() == false, $"expected failure, got {Encoding.UTF8.GetString(run.ResponseBytes)}");
             string actual = response["error"]!["code"]!.GetValue<string>();
             string message = response["error"]!["message"]!.GetValue<string>();
@@ -283,7 +307,7 @@ namespace FogHost.Tests
         {
             return new JsonObject
             {
-                ["schemaVersion"] = 2,
+                ["schemaVersion"] = HostRequest.SchemaVersion,
                 ["game"] = "DS1R",
                 ["mode"] = mode,
                 ["seed"] = seed,
@@ -298,6 +322,9 @@ namespace FogHost.Tests
                 ["fogDataRoot"] = root,
                 ["stagingDirectory"] = Path.Combine(directory, "game"),
                 ["logPath"] = Path.Combine(directory, "foghost.log"),
+                ["annotationSource"] = HostRequest.LegacyFogModAnnotations,
+                ["pristineGameDirectory"] = Path.GetTempPath(),
+                ["expectedAnnotationFingerprint"] = "",
                 ["compatibility"] = new JsonObject
                 {
                     ["baseDirectory"] = Path.Combine(directory, "base"),

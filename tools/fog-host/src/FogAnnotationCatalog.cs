@@ -135,7 +135,8 @@ namespace FogHost
         FogCondition Condition,
         FogEntranceKey? ExcludeIfRandomized,
         FogMapId? DestinationMap,
-        FogWarpSideTags Tags);
+        FogWarpSideTags Tags,
+        int WarpFlag = 0);
 
     public sealed record FogEntrance(
         string Name,
@@ -171,7 +172,10 @@ namespace FogHost
     public sealed record FogDefaultCost(FogAreaId Area, float Cost);
     public sealed record FogEnemyScalingRule(FogMapId Map, string Collision, FogAreaId Area, IReadOnlyList<string> Includes);
     public sealed record FogLotLocation(FogItemLotId FirstLot, FogAreaId Area);
+    public sealed record FogLotRowLocation(FogItemLotId Lot, FogAreaId Area);
     public sealed record FogDefaultFlagCollision(FogMapId Map, string Collision, int BossFlag);
+    /// <summary>A pristine game object retained only for a pinned FogMod writer branch, never a graph edge.</summary>
+    public sealed record FogWriterSupportEntrance(string Name, int Id, FogMapId Map, string Rationale);
 
     /// <summary>
     /// Project-owned semantic annotations for the pinned DS1 Fog path. Values derived from DSR are
@@ -193,7 +197,9 @@ namespace FogHost
         public IReadOnlyList<FogDefaultCost> DefaultCosts { get; }
         public IReadOnlyList<FogEnemyScalingRule> Enemies { get; }
         public IReadOnlyList<FogLotLocation> LotLocations { get; }
+        public IReadOnlyList<FogLotRowLocation> LotRows { get; }
         public IReadOnlyList<FogDefaultFlagCollision> DefaultFlagCols { get; }
+        public IReadOnlyList<FogWriterSupportEntrance> WriterSupportEntrances { get; }
 
         public FogAnnotationCatalog(
             IEnumerable<FogArea> areas,
@@ -204,7 +210,9 @@ namespace FogHost
             IEnumerable<FogDefaultCost> defaultCosts,
             IEnumerable<FogEnemyScalingRule> enemies,
             IEnumerable<FogLotLocation> lotLocations,
-            IEnumerable<FogDefaultFlagCollision> defaultFlagCols)
+            IEnumerable<FogDefaultFlagCollision> defaultFlagCols,
+            IEnumerable<FogWriterSupportEntrance> writerSupportEntrances = null,
+            IEnumerable<FogLotRowLocation> lotRows = null)
         {
             Areas = Snapshot((areas ?? throw new ArgumentNullException(nameof(areas))).Select(area => area with
             {
@@ -222,6 +230,8 @@ namespace FogHost
             }), nameof(enemies));
             LotLocations = Snapshot(lotLocations, nameof(lotLocations));
             DefaultFlagCols = Snapshot(defaultFlagCols, nameof(defaultFlagCols));
+            WriterSupportEntrances = Snapshot(writerSupportEntrances ?? Array.Empty<FogWriterSupportEntrance>(), nameof(writerSupportEntrances));
+            LotRows = Snapshot(lotRows ?? Array.Empty<FogLotRowLocation>(), nameof(lotRows));
             _ = Unique(Areas.Select(area => area.Id.Value), "area ID");
             _ = Unique(Areas.Select(area => area.FogModName.Value), "FogMod area name");
             fogModNamesByArea = new System.Collections.ObjectModel.ReadOnlyDictionary<FogAreaId, FogModAreaName>(
@@ -253,7 +263,8 @@ namespace FogHost
                     Tags = Tags(item.Tags),
                 }).ToList(),
                 Warps = Warps.Select(ToFogModWarp).ToList(),
-                Entrances = Entrances.Select(ToFogModEntrance).ToList(),
+                Entrances = Entrances.Select(ToFogModEntrance)
+                    .Concat(WriterSupportEntrances.Select(ToFogModSupportEntrance)).ToList(),
                 CustomStarts = CustomStarts.Select(start => new CustomStart
                 {
                     // FogMod uses this text in its in-game "Return to ..." message.
@@ -269,6 +280,9 @@ namespace FogHost
                     Includes = enemy.Includes?.ToList(),
                 }).ToList(),
                 LotLocations = LotLocations.ToDictionary(lot => lot.FirstLot.Value, lot => ResolveFogModAreaName(lot.Area).Value),
+                CompactLotLocations = LotRows.Count == 0
+                    ? null
+                    : LotRows.ToDictionary(lot => lot.Lot.Value, lot => ResolveFogModAreaName(lot.Area).Value),
                 DefaultFlagCols = DefaultFlagCols.ToDictionary(flag => flag.Map.Value + "_" + flag.Collision, flag => flag.BossFlag, StringComparer.Ordinal),
             };
         }
@@ -293,6 +307,27 @@ namespace FogHost
                         json.WriteStartArray("maps");
                         foreach (FogMapId map in area.Maps ?? Array.Empty<FogMapId>()) json.WriteStringValue(map.Value);
                         json.WriteEndArray();
+                        json.WriteEndObject();
+                    }
+                    json.WriteEndArray();
+                    json.WriteStartArray("writerSupportEntrances");
+                    foreach (FogWriterSupportEntrance entrance in WriterSupportEntrances)
+                    {
+                        json.WriteStartObject();
+                        json.WriteString("name", entrance.Name);
+                        json.WriteNumber("id", entrance.Id);
+                        json.WriteString("map", entrance.Map.Value);
+                        json.WriteBoolean("fixed", true);
+                        json.WriteBoolean("unused", true);
+                        json.WriteEndObject();
+                    }
+                    json.WriteEndArray();
+                    json.WriteStartArray("compactLotRows");
+                    foreach (FogLotRowLocation lot in LotRows.OrderBy(lot => lot.Lot.Value))
+                    {
+                        json.WriteStartObject();
+                        json.WriteNumber("id", lot.Lot.Value);
+                        json.WriteString("area", ResolveFogModAreaName(lot.Area).Value);
                         json.WriteEndObject();
                     }
                     json.WriteEndArray();
@@ -326,9 +361,12 @@ namespace FogHost
                 throw new InvalidDataException("Every custom start must have a display name for the in-game return message.");
             Unique(DefaultCosts.Select(cost => cost.Area.Value), "default scaling cost area");
             Unique(LotLocations.Select(lot => lot.FirstLot.Value.ToString(CultureInfo.InvariantCulture)), "ItemLot start ID");
+            Unique(LotRows.Select(lot => lot.Lot.Value.ToString(CultureInfo.InvariantCulture)), "exact ItemLot row ID");
             Unique(DefaultFlagCols.Select(flag => flag.Map.Value + "_" + flag.Collision), "default flag collision");
             if (KeyItems.Any(item => item.GameItemId.ItemId <= 0)) throw new InvalidDataException("A key item GameParam ID must be positive.");
             if (LotLocations.Any(lot => lot.FirstLot.Value <= 0)) throw new InvalidDataException("An ItemLot start ID must be positive.");
+            if (LotRows.Any(lot => lot.Lot.Value <= 0)) throw new InvalidDataException("An exact ItemLot row ID must be positive.");
+            if (LotRows.Any(lot => !areaIds.Contains(lot.Area.Value))) throw new InvalidDataException("An exact ItemLot row references an unknown project Area.");
             if (DefaultCosts.Any(cost => !float.IsFinite(cost.Cost))) throw new InvalidDataException("Default scaling costs must be finite numbers.");
 
             var entranceIds = new HashSet<FogEntranceKey>();
@@ -353,6 +391,14 @@ namespace FogHost
                 int sideCount = (entrance.ASide == null ? 0 : 1) + (entrance.BSide == null ? 0 : 1);
                 bool unused = entrance.Tags.HasFlag(FogEntranceTags.Unused);
                 if (!unused && sideCount < 2) throw new InvalidDataException($"Entrance '{entrance.Identity}' has fewer than two sides.");
+            }
+            foreach (FogWriterSupportEntrance entrance in WriterSupportEntrances)
+            {
+                if (string.IsNullOrWhiteSpace(entrance.Name)) throw new InvalidDataException("A writer-support Entrance requires a pristine object name.");
+                if (!entranceIds.Add(new FogEntranceKey(entrance.Name))) throw new InvalidDataException($"Duplicate Fog writer-support entrance identity '{entrance.Name}'.");
+                ValidateMap(entrance.Map);
+                if (entrance.Id <= 0) throw new InvalidDataException($"Writer-support Entrance '{entrance.Name}' must have a positive pristine entity ID.");
+                if (string.IsNullOrWhiteSpace(entrance.Rationale)) throw new InvalidDataException($"Writer-support Entrance '{entrance.Name}' must state its project rationale.");
             }
 
             foreach (FogArea area in Areas)
@@ -404,6 +450,7 @@ namespace FogHost
         {
             if (side == null) return;
             RequireArea(side.Area, areaIds, "warp side");
+            if (side.WarpFlag < 0) throw new InvalidDataException($"Warp side '{side.Area}' has a negative activation flag.");
             ValidateCondition(side.Condition, areaIds, itemNames);
             if (side.DestinationMap.HasValue) ValidateMap(side.DestinationMap.Value);
         }
@@ -507,6 +554,16 @@ namespace FogHost
             BSide = ToFogModSide(entrance.BSide),
         };
 
+        private static Entrance ToFogModSupportEntrance(FogWriterSupportEntrance entrance) => new Entrance
+        {
+            Name = entrance.Name,
+            ID = entrance.Id,
+            Area = entrance.Map.Value,
+            Text = "Compact writer support anchor",
+            Tags = "unused",
+            IsFixed = true,
+        };
+
         private Entrance ToFogModWarp(FogWarp warp) => new Entrance
         {
             Name = warp.Name,
@@ -524,6 +581,7 @@ namespace FogHost
             return new Side
             {
                 Area = ResolveFogModAreaName(side.Area).Value,
+                WarpFlag = side.WarpFlag,
                 Cutscene = side.Cutscene,
                 Cond = side.Condition?.ToFogModCondition(ResolveFogModAreaName),
                 ExcludeIfRandomized = side.ExcludeIfRandomized?.Value,

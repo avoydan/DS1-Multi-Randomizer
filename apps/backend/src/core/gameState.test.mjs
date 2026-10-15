@@ -218,6 +218,27 @@ test('refuses tampered, foreign, unmanaged and unsafe packages without writing',
   assert.equal((await authority.detectState(game)).state, 'vanilla');
 }));
 
+test('activates and restores a launcher-only package without changing any game file', async () => fixture(async ({ root, game, authority }) => {
+  const snapshot = await imported(authority, game);
+  const pkg = path.join(root, 'launcher-only-package');
+  await mkdir(pkg, { recursive: true });
+  await writeFile(path.join(pkg, 'run-manifest.json'), JSON.stringify({
+    masterSeed: 'launcher-only', pristineSnapshotId: snapshot.snapshotId, gameTreeRoot: '', noRandomization: true, files: [],
+  }));
+
+  const activation = await authority.activate(game, pkg);
+  assert.equal(activation.ok, true, JSON.stringify(activation));
+  assert.deepEqual(activation.journal.files, []);
+  assert.deepEqual(await snapshotTree(game), vanilla);
+  assert.equal((await authority.detectState(game)).state, 'active');
+
+  const restored = await authority.restore(game);
+  assert.equal(restored.ok, true, JSON.stringify(restored));
+  assert.equal(restored.restored, 0);
+  assert.deepEqual(await snapshotTree(game), vanilla);
+  assert.equal((await authority.detectState(game)).state, 'vanilla');
+}));
+
 test('refuses activation and restore while the game is running', async () => fixture(async ({ root, game, authority, setRunning }) => {
   const snapshot = await imported(authority, game);
   const pkg = await fogPackage(root, snapshot.snapshotId, { 'map/MapStudio/m10_00_00_00.msb': 'fog' });

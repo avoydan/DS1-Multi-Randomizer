@@ -175,6 +175,7 @@ interface PackageManifest {
   masterSeed: string;
   pristineSnapshotId: string | null;
   gameTreeRoot: string;
+  noRandomization?: boolean;
   files: Array<{ path: string; size: number; sha256: string }>;
 }
 
@@ -494,7 +495,9 @@ export class GameStateAuthority {
       const files = read.files
         .filter((file) => file.packageSha256 !== file.pristineSha256)
         .sort((a, b) => a.path.localeCompare(b.path, 'en'));
-      if (files.length === 0) return failure('PACKAGE_EMPTY', 'The package changes no game files.');
+      const launcherOnlyRun = read.manifest.noRandomization === true
+        && read.manifest.gameTreeRoot === '' && read.files.length === 0;
+      if (files.length === 0 && !launcherOnlyRun) return failure('PACKAGE_EMPTY', 'The package changes no game files.');
       const paths = this.paths(root);
       const damaged = await this.verifyPristineCopies(paths.pristine,
         files.map((file) => ({ path: file.path, size: 0, sha256: file.pristineSha256 })));

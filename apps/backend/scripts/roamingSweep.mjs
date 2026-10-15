@@ -28,14 +28,17 @@ const base = {
   ...defaultConfig, randomizeEnemies: true, randomizeBosses: false, randomizeItems: false, generateSpoilerLog: false,
   enemyPlacementAlgorithm: 'sampling-v1', placementDiagnosticsLevel: 'summary',
 };
-const SOULS = { 223000: 20000, 223100: 20000, 223200: 2000, 224000: 6000, 225000: 3000, 232000: 40000, 236000: 10000, 236001: 25000, 273000: 30000, 323000: 10000, 332000: 15000, 410000: 50000, 450000: 60000, 521000: 40000, 522000: 60000, 527000: 10000, 527100: 25000, 528000: 20000 };
-const EXCLUDED = new Set(['c5230', 'c5401', 'c5250', 'c5320', 'c5370', 'c2730', 'c3430', 'c3471', 'c4510', 'c5200', 'c5260', 'c5290', 'c5350', 'c5351', 'c5390']);
+const SOULS = { 223000: 20000, 223100: 20000, 223200: 2000, 224000: 6000, 225000: 3000, 232000: 40000, 236000: 10000, 236001: 25000, 273000: 30000, 323000: 10000, 332000: 15000, 410000: 50000, 450000: 60000, 521000: 40000, 522000: 60000, 527000: 10000, 527100: 25000, 528000: 20000, 532000: 40000 };
+const EXCLUDED = new Set(['c5230', 'c5401', 'c5250', 'c5370', 'c2730', 'c3430', 'c3471', 'c4510', 'c5200', 'c5260', 'c5290', 'c5350', 'c5351', 'c5390']);
 
 const sets = {
   'baseline-normals': { enemyNormalReplacement: 'normals' },
   'baseline-boss-sampling': { enemyNormalReplacement: 'normals', randomizeBosses: true, enemyBossReplacement: 'bosses' },
   'bosses-fits': { enemyNormalReplacement: 'bosses', enemyPlacementFit: 'fits' },
+  'bosses-50-fits': { enemyNormalReplacement: 'bosses', enemyReplacementChance: 50, enemyPlacementFit: 'fits' },
   'bosses-anywhere': { enemyNormalReplacement: 'bosses', enemyPlacementFit: 'anywhere' },
+  'both-50-fits': { enemyNormalReplacement: 'both', enemyBossChanceNormalSlots: 50, enemyPlacementFit: 'fits' },
+  'both-100-fits': { enemyNormalReplacement: 'both', enemyBossChanceNormalSlots: 100, enemyPlacementFit: 'fits' },
   'both-25': { enemyNormalReplacement: 'both', enemyBossChanceNormalSlots: 25, enemyPlacementFit: 'fits' },
   'both-100': { enemyNormalReplacement: 'both', enemyBossChanceNormalSlots: 100, enemyPlacementFit: 'anywhere' },
   'bosses-chance-60-curve': { enemyNormalReplacement: 'bosses', enemyReplacementChance: 60, enemyDifficultyMode: 'curve', enemyDifficultyStrictness: 'loose', enemyPlacementFit: 'fits' },

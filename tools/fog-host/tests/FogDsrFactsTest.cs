@@ -6,12 +6,280 @@ using System.IO;
 using System.Buffers.Binary;
 using FogHost;
 using FogMod;
+using SoulsFormats;
 using YamlDotNet.Serialization;
 
 namespace FogHost.Tests
 {
     public static class FogDsrFactsTest
     {
+        public static void VerifyCompactCatalogCandidateFromEnvironment()
+        {
+            string root = Environment.GetEnvironmentVariable("DS1TR_FOG_DATA_ROOT");
+            string pristineGameRoot = Environment.GetEnvironmentVariable("DS1TR_PRISTINE_DSR_ROOT");
+            if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root))
+                throw new InvalidOperationException("DS1TR_FOG_DATA_ROOT is required for Compact Full Fog V1 candidate verification.");
+            if (string.IsNullOrWhiteSpace(pristineGameRoot) || !Directory.Exists(pristineGameRoot))
+                throw new InvalidOperationException("DS1TR_PRISTINE_DSR_ROOT must point to a clean DSR directory for Compact Full Fog V1 candidate verification.");
+            VerifyCompactCatalogCandidate(FogDsrFacts.Read(root, pristineGameRoot, includeLegacyAnnotations: false));
+        }
+
+        private static FogKeyItem[] ResolveProjectPolicyKeyItems(FogDsrFacts facts)
+        {
+            IReadOnlyList<FogKeyItemIdentity> identities = FogAnnotationPolicyResolver.ResolveKeyItemIdentities(
+                facts, FogProjectAnnotationPolicy.KeyItemIdentityPolicies);
+            return identities.Select(identity =>
+            {
+                FogKeyItemProjectPolicyV1 policy = FogProjectAnnotationPolicy.KeyItemProjectPoliciesV1
+                    .Single(candidate => candidate.Name == identity.Name);
+                FogItemName catalogName = identity.Name.Value switch
+                {
+                    "blighttown_key_goods_2007" => new FogItemName("blighttown_key"),
+                    "crest_of_artorias_goods_2002" => new FogItemName("crest_of_artorias"),
+                    "lordvessel_goods_2510" => new FogItemName("lordvessel"),
+                    _ => identity.Name,
+                };
+                return new FogKeyItem(catalogName, identity.GameItemId, policy.DefaultArea, policy.Tags);
+            }).ToArray();
+        }
+
+        private static int CountProjectAreaComponents(FogAnnotationCatalog catalog, bool includeHardRoutes)
+        {
+            var areas = catalog.Areas.Select(area => area.Id).ToHashSet();
+            var adjacency = areas.ToDictionary(area => area, _ => new HashSet<FogAreaId>());
+            void Join(FogAreaId first, FogAreaId second)
+            {
+                if (!areas.Contains(first) || !areas.Contains(second)) return;
+                adjacency[first].Add(second);
+                adjacency[second].Add(first);
+            }
+            foreach (FogArea area in catalog.Areas)
+            foreach (FogAreaLink link in area.To)
+            {
+                if (!includeHardRoutes && link.Tags.HasFlag(FogAreaLinkTags.Hard)) continue;
+                Join(area.Id, link.Destination);
+            }
+            foreach (FogEntrance entrance in catalog.Entrances)
+                Join(entrance.ASide.Area, entrance.BSide.Area);
+            foreach (FogWarp warp in catalog.Warps)
+                Join(warp.ASide.Area, warp.BSide.Area);
+
+            int components = 0;
+            var visited = new HashSet<FogAreaId>();
+            foreach (FogAreaId root in areas)
+            {
+                if (!visited.Add(root)) continue;
+                components++;
+                var queue = new Queue<FogAreaId>();
+                queue.Enqueue(root);
+                while (queue.Count > 0)
+                    foreach (FogAreaId neighbor in adjacency[queue.Dequeue()])
+                        if (visited.Add(neighbor)) queue.Enqueue(neighbor);
+            }
+            return components;
+        }
+
+        private static void VerifyCompactGraphProfileMatrix(FogCompactCatalogV1 candidate)
+        {
+            var profiles = new (string Name, string[] Flags)[]
+            {
+                ("default", Array.Empty<string>()),
+                ("hard/glitched", new[] { "hard" }),
+                ("random-start", new[] { "start" }),
+                ("traversable-fogs", new[] { "world" }),
+                ("boss-fogs", new[] { "boss" }),
+                ("major-pvp", new[] { "major" }),
+                ("minor-pvp", new[] { "minor" }),
+                ("lordvessel-gates", new[] { "lordvessel" }),
+                ("disconnected-fogs", new[] { "unconnected" }),
+                ("require-lord-souls", new[] { "lords" }),
+                ("no-fall-bed-of-chaos", new[] { "bboc" }),
+                ("pacifist", new[] { "pacifist" }),
+                ("enemy-scaling", new[] { "scale" }),
+                ("area-warps", new[] { "warp" }),
+            };
+            HashSet<string> requiredAreas = candidate.Catalog.Areas
+                .Where(area => !area.Tags.HasFlag(FogAreaTags.Optional))
+                .Select(area => area.Id.Value)
+                .ToHashSet(StringComparer.Ordinal);
+            var profileFailures = new List<string>();
+
+            foreach ((string profile, string[] flags) in profiles)
+            {
+                string profileFailure = null;
+                string[] starts = profile == "random-start"
+                    ? candidate.Catalog.CustomStarts.Select(start => start.Area.Value).Distinct(StringComparer.Ordinal).ToArray()
+                    : new[] { "asylum" };
+                foreach (string startArea in starts)
+                {
+                    try
+                    {
+                        int seed = 1;
+                        if (profile == "random-start")
+                        {
+                            int startIndex = candidate.Catalog.CustomStarts
+                                .Select((start, index) => (start, index))
+                                .Where(candidateStart => candidateStart.start.Area.Value == startArea)
+                                .Select(candidateStart => candidateStart.index)
+                                .First();
+                            int matchingSeed = Enumerable.Range(1, 10000).FirstOrDefault(candidateSeed =>
+                                new Random(candidateSeed - 1).Next(candidate.Catalog.CustomStarts.Count) == startIndex);
+                            if (matchingSeed == 0)
+                                throw new InvalidDataException($"Compact graph profile '{profile}' could not select custom start '{startArea}'.");
+                            seed = matchingSeed;
+                        }
+
+                        RandomizerOptions options = new RandomizerOptions { Seed = seed };
+                        foreach (string flag in flags) options[flag] = true;
+                        AnnotationData.Annotations annotations = candidate.CreateFreshCandidateAnnotations();
+                        var graph = new Graph();
+                        graph.Construct(options, annotations);
+                        foreach (AnnotationData.Item item in annotations.KeyItems)
+                        {
+                            if (!graph.graph.TryGetValue(item.Area, out Graph.Node node))
+                                throw new InvalidDataException($"Compact graph profile '{profile}' key '{item.Name}' has unknown default Area '{item.Area}'.");
+                            graph.itemAreas[item.Name] = item.Area;
+                            node.Items.Add(item.Name);
+                        }
+
+                        TextWriter originalOutput = Console.Out;
+                        GraphChecker.CheckRecord check;
+                        try
+                        {
+                            Console.SetOut(TextWriter.Null);
+                            new GraphConnector().Connect(options, graph, annotations);
+                            string selectedStart = profile == "random-start" ? graph.start.Area : startArea;
+                            if (selectedStart != startArea)
+                                throw new InvalidDataException($"Compact graph profile '{profile}' selected '{selectedStart}' instead of '{startArea}'.");
+                            check = new GraphChecker().Check(options, graph, selectedStart);
+                        }
+                        finally
+                        {
+                            Console.SetOut(originalOutput);
+                        }
+                        string[] unreachable = check.Unvisited.Where(requiredAreas.Contains)
+                            .OrderBy(area => area, StringComparer.Ordinal).ToArray();
+                        if (unreachable.Length != 0)
+                            throw new InvalidDataException($"Compact graph profile '{profile}' from '{startArea}' cannot reach required Areas: {string.Join(", ", unreachable)}.");
+                    }
+                    catch (Exception error)
+                    {
+                        profileFailure = error.Message;
+                        profileFailures.Add(profileFailure);
+                        break;
+                    }
+                }
+                if (profileFailure != null)
+                    Console.WriteLine($"BLOCKED {profileFailure}");
+                else
+                    Console.WriteLine($"PASS Compact graph profile '{profile}' ({starts.Length} start(s)): all required Areas reachable.");
+            }
+
+            if (profileFailures.Count > 0)
+                throw new InvalidDataException("Compact graph profile matrix has blocked profiles: " + string.Join(" | ", profileFailures));
+
+            FogCompactCategoryCoverage warpCoverage = candidate.Coverage.Single(category => category.Category == "Warps");
+            FogWarp seathPrisonWarp = candidate.Catalog.Warps.SingleOrDefault(warp => warp.Id == FogProjectAnnotationPolicy.SeathPrisonWarpRuntimeId);
+            if (warpCoverage.State != FogCompactCategoryState.Complete || candidate.Catalog.Warps.Count != 7
+                || seathPrisonWarp == null || seathPrisonWarp.Name != null
+                || seathPrisonWarp.Map != new FogMapId("dukes")
+                || seathPrisonWarp.ASide.Area != new FogAreaId("dukes_seath1")
+                || seathPrisonWarp.ASide.WarpFlag != FogAddedEventBuilder.SeathCrystalActivatedFlag
+                || seathPrisonWarp.BSide.Area != new FogAreaId("dukes_prison")
+                || !seathPrisonWarp.Tags.HasFlag(FogWarpTags.Unique))
+                throw new InvalidDataException("Area Warp profile must include six validated cutscene directions and the generated one-way Seath prison route.");
+            string[] firstShuffle = BuildWarpAssignmentSignature(candidate, 3917);
+            string[] repeatedShuffle = BuildWarpAssignmentSignature(candidate, 3917);
+            if (firstShuffle.Length == 0 || !firstShuffle.SequenceEqual(repeatedShuffle, StringComparer.Ordinal))
+                throw new InvalidDataException("The Area Warp shuffle is empty or not deterministic for a fixed seed.");
+            Console.WriteLine($"PASS deterministic Area Warp shuffle (seed 3917, {firstShuffle.Length} connected warp edges).");
+            VerifyCompactWarpProgressionStress(candidate, requiredAreas);
+        }
+
+        private static void VerifyCompactWarpProgressionStress(FogCompactCatalogV1 candidate, HashSet<string> requiredAreas)
+        {
+            string[] prisonAreas = { "dukes_prison", "dukes_extra", "dukes_giantcell" };
+            TextWriter originalOutput = Console.Out;
+            try
+            {
+                Console.SetOut(TextWriter.Null);
+                for (int seed = 1; seed <= 1000; seed++)
+                {
+                    var options = new RandomizerOptions { Seed = seed };
+                    options["warp"] = true;
+                    options["lords"] = true;
+                    options["start"] = seed % 2 == 0;
+                    AnnotationData.Annotations annotations = candidate.CreateFreshCandidateAnnotations();
+                    var graph = new Graph();
+                    graph.Construct(options, annotations);
+                    foreach (AnnotationData.Item item in annotations.KeyItems)
+                    {
+                        if (!graph.graph.TryGetValue(item.Area, out Graph.Node node))
+                            throw new InvalidDataException($"Warp progression stress seed {seed}: key '{item.Name}' has unknown Area '{item.Area}'.");
+                        graph.itemAreas[item.Name] = item.Area;
+                        node.Items.Add(item.Name);
+                    }
+
+                    new GraphConnector().Connect(options, graph, annotations);
+                    string start = options["start"] ? graph.start.Area : "asylum";
+                    GraphChecker.CheckRecord world = new GraphChecker().Check(options, graph, start);
+                    string[] unreachable = world.Unvisited.Where(requiredAreas.Contains)
+                        .OrderBy(area => area, StringComparer.Ordinal).ToArray();
+                    if (unreachable.Length != 0)
+                        throw new InvalidDataException($"Warp progression stress seed {seed} from '{start}' cannot reach required Areas: {string.Join(", ", unreachable)}.");
+
+                    Dictionary<string, List<string>> keptItems = graph.graph.ToDictionary(node => node.Key, node => node.Value.Items.ToList(), StringComparer.Ordinal);
+                    foreach (Graph.Node node in graph.graph.Values)
+                        if (!prisonAreas.Contains(node.Area, StringComparer.Ordinal)) node.Items.Clear();
+                    bool prisonEscapable = new GraphChecker().Check(options, graph, "dukes_prison").Records.ContainsKey("dukes_library2");
+                    if (!prisonEscapable)
+                        throw new InvalidDataException($"Warp progression stress seed {seed} cannot escape Duke's Archives prison.");
+                    foreach (KeyValuePair<string, List<string>> entry in keptItems)
+                    {
+                        graph.graph[entry.Key].Items.Clear();
+                        graph.graph[entry.Key].Items.AddRange(entry.Value);
+                    }
+                }
+            }
+            finally
+            {
+                Console.SetOut(originalOutput);
+            }
+            Console.WriteLine("PASS 1000-seed Area Warp progression stress (warp shuffle + Lord Soul gates; 500 randomized starts; prison escape checked).");
+        }
+
+        private static string[] BuildWarpAssignmentSignature(FogCompactCatalogV1 candidate, int seed)
+        {
+            RandomizerOptions options = new RandomizerOptions { Seed = seed };
+            options["warp"] = true;
+            AnnotationData.Annotations annotations = candidate.CreateFreshCandidateAnnotations();
+            var graph = new Graph();
+            graph.Construct(options, annotations);
+            foreach (AnnotationData.Item item in annotations.KeyItems)
+            {
+                if (!graph.graph.TryGetValue(item.Area, out Graph.Node node))
+                    throw new InvalidDataException($"Warp shuffle key '{item.Name}' has unknown default Area '{item.Area}'.");
+                graph.itemAreas[item.Name] = item.Area;
+                node.Items.Add(item.Name);
+            }
+            TextWriter originalOutput = Console.Out;
+            try
+            {
+                Console.SetOut(TextWriter.Null);
+                new GraphConnector().Connect(options, graph, annotations);
+            }
+            finally
+            {
+                Console.SetOut(originalOutput);
+            }
+            HashSet<string> warpNames = candidate.Catalog.Warps.Select(warp => warp.Name).ToHashSet(StringComparer.Ordinal);
+            return graph.graph.Values.SelectMany(node => node.To)
+                .Where(edge => edge.Name != null && warpNames.Contains(edge.Name))
+                .Select(edge => $"{edge.Name}:{edge.From}>{edge.To}")
+                .OrderBy(edge => edge, StringComparer.Ordinal)
+                .ToArray();
+        }
+
         public static void Verify()
         {
             string root = Environment.GetEnvironmentVariable("DS1TR_FOG_DATA_ROOT");
@@ -25,6 +293,8 @@ namespace FogHost.Tests
                 : FogDsrEventFactSource.PristineGameInstall;
             if (facts.EventFactSource != expectedEventFactSource)
                 throw new InvalidDataException($"Expected EMEVD facts from {expectedEventFactSource}, got {facts.EventFactSource}.");
+            if (facts.EventFactSource == FogDsrEventFactSource.PristineGameInstall)
+                VerifyCompactCatalogCandidate(facts);
             foreach (FogDsrFacts.Map map in facts.Maps.Values)
             {
                 foreach (FogDsrObjectActFact act in map.ObjectActDetails)
@@ -53,29 +323,49 @@ namespace FogHost.Tests
                 Console.WriteLine("Project boss-area policy: 24 area tags resolve to the expected pristine HandleBossDefeat event and MSB enemy-part anchors.");
                 VerifyBlighttownKeyRewardProvenance(facts, eventDirectory);
 
+                FogKeyItem[] projectPolicyKeyItems = ResolveProjectPolicyKeyItems(facts);
                 IReadOnlyList<FogAreaLink> areaLinks = FogAnnotationPolicyResolver.ResolveAreaLinkPolicies(
-                    facts, FogProjectAnnotationPolicy.AreaLinkPolicies);
+                    facts, FogProjectAnnotationPolicy.AreaLinkPolicies, projectPolicyKeyItems);
                 FogAreaLinkPolicy[] depthsLinks = FogProjectAnnotationPolicy.AreaLinkPolicies
-                    .Where(policy => policy.Source == new FogAreaId("depths")).ToArray();
+                    .Where(policy => policy.Source == new FogAreaId("depths")
+                        && policy.Destination == new FogAreaId("depths_gaping")).ToArray();
                 FogAreaLinkPolicy[] tombOfTheGiantsLinks = FogProjectAnnotationPolicy.AreaLinkPolicies
-                    .Where(policy => policy.Source == new FogAreaId("totg")).ToArray();
-                if (depthsLinks.Length != 1 || tombOfTheGiantsLinks.Length != 1 || areaLinks.Count != 2
+                    .Where(policy => policy.Source == new FogAreaId("totg")
+                        && policy.Destination == new FogAreaId("totg_lower")).ToArray();
+                FogAreaLinkPolicy[] orderedLinkPolicies = FogProjectAnnotationPolicy.AreaLinkPolicies.ToArray();
+                int depthsLinkIndex = Array.FindIndex(orderedLinkPolicies,
+                    policy => policy.Source == new FogAreaId("depths")
+                        && policy.Destination == new FogAreaId("depths_gaping"));
+                int tombOfTheGiantsLinkIndex = Array.FindIndex(orderedLinkPolicies,
+                    policy => policy.Source == new FogAreaId("totg")
+                        && policy.Destination == new FogAreaId("totg_lower"));
+                string depthsResolved = depthsLinkIndex >= 0
+                    ? $"{areaLinks[depthsLinkIndex].Destination}/{areaLinks[depthsLinkIndex].Condition?.Kind.ToString() ?? "none"}/{areaLinks[depthsLinkIndex].Tags}"
+                    : "missing";
+                string tombResolved = tombOfTheGiantsLinkIndex >= 0
+                    ? $"{areaLinks[tombOfTheGiantsLinkIndex].Destination}/{areaLinks[tombOfTheGiantsLinkIndex].Condition?.Kind.ToString() ?? "none"}/{areaLinks[tombOfTheGiantsLinkIndex].Tags}"
+                    : "missing";
+                if (depthsLinks.Length != 1 || tombOfTheGiantsLinks.Length != 1
+                    || areaLinks.Count != FogProjectAnnotationPolicy.AreaLinkPolicies.Count
+                    || depthsLinkIndex < 0 || tombOfTheGiantsLinkIndex < 0
                     || depthsLinks[0].Destination != new FogAreaId("depths_gaping")
                     || depthsLinks[0].Kind != FogAreaLinkKind.Static
-                    || areaLinks.Single(link => link.Destination == new FogAreaId("depths_gaping")).Condition != null
-                    || areaLinks.Single(link => link.Destination == new FogAreaId("depths_gaping")).Tags != FogAreaLinkTags.Hard
+                    || areaLinks[depthsLinkIndex].Destination != new FogAreaId("depths_gaping")
+                    || areaLinks[depthsLinkIndex].Condition != null
+                    || areaLinks[depthsLinkIndex].Tags != FogAreaLinkTags.Hard
                     || !depthsLinks[0].Rationale.Contains("hazardous drop", StringComparison.Ordinal)
                     || tombOfTheGiantsLinks[0].Destination != new FogAreaId("totg_lower")
                     || tombOfTheGiantsLinks[0].Kind != FogAreaLinkKind.Static
-                    || areaLinks.Single(link => link.Destination == new FogAreaId("totg_lower")).Condition != null
-                    || areaLinks.Single(link => link.Destination == new FogAreaId("totg_lower")).Tags != FogAreaLinkTags.Hard
+                    || areaLinks[tombOfTheGiantsLinkIndex].Destination != new FogAreaId("totg_lower")
+                    || areaLinks[tombOfTheGiantsLinkIndex].Condition != null
+                    || areaLinks[tombOfTheGiantsLinkIndex].Tags != FogAreaLinkTags.Hard
                     || !tombOfTheGiantsLinks[0].Rationale.Contains("event 11310002", StringComparison.Ordinal))
-                    throw new InvalidDataException("A project-owned hazardous hard route is incomplete or does not resolve against its stable area/map anchors.");
+                    throw new InvalidDataException($"A project-owned hazardous hard route is incomplete or does not resolve against its stable area/map anchors (depths policies={depthsLinks.Length}, index={depthsLinkIndex}, resolved={depthsResolved}; ToTG policies={tombOfTheGiantsLinks.Length}, index={tombOfTheGiantsLinkIndex}, resolved={tombResolved}; resolved links={areaLinks.Count}).");
                 VerifyTotgAreaDropEvidence(facts, eventDirectory);
                 VerifyDepthsKeyDoorEvidence(facts, eventDirectory);
                 VerifyDarkrootCrestGateEvidence(facts, eventDirectory);
-                Console.WriteLine("Project static-route policy: the Depths-to-Gaping drop and the upper-to-lower Tomb of the Giants descent resolve as hard-only same-map edges.");
-                Console.WriteLine("Project traversal ownership evidence: the Blighttown-Key door and the Darkroot Crest gate are pristine item-gated Entrance boundaries, separate from Area.To.");
+                Console.WriteLine($"Project static-route policy: {areaLinks.Count} authored Area.To routes resolve; the Depths-to-Gaping drop and upper-to-lower Tomb descent remain hard-only.");
+                Console.WriteLine("Project traversal ownership evidence: the Blighttown-Key door and Darkroot Crest gate remain pristine item-gated Entrance boundaries, separate from Area.To.");
 
                 var purpleCrystalCondition = new FogCondition(FogConditionKind.Atom, Array.AsReadOnly(new[]
                 {
@@ -147,8 +437,23 @@ namespace FogHost.Tests
                     throw new InvalidDataException("The full project Area tag policy did not assign all 131 unique IDs with explicit default rationale.");
                 Console.WriteLine("Project Area tag policy: all 131 IDs resolve; untagged nodes use the documented ordinary-progression default.");
 
+                IReadOnlyList<FogProjectAreaPolicyV1> areaPolicyV1 = FogProjectAnnotationPolicy.ResolveAreaPolicyV1(facts, projectPolicyKeyItems);
+                if (areaPolicyV1.Count != 131
+                    || areaPolicyV1.Select(policy => policy.Id).Distinct().Count() != 131
+                    || !areaPolicyV1.Select(policy => policy.Id).ToHashSet().SetEquals(FogProjectAnnotationPolicy.AreaIdentityOrder)
+                    || areaPolicyV1.Any(policy => !facts.Maps.ContainsKey(policy.OwnerMap)
+                        || policy.Anchors.Count == 0 || string.IsNullOrWhiteSpace(policy.Rationale))
+                    || areaPolicyV1.All(policy => policy.RouteDisposition == FogProjectAreaRouteDisposition.ExplicitNoStaticLink)
+                    || areaPolicyV1.Where(policy => FogProjectAnnotationPolicy.WarpPoliciesV1.Any(warp =>
+                            warp.SourceArea == policy.Id || warp.DestinationArea == policy.Id)
+                            || FogProjectAnnotationPolicy.FlagWarpPoliciesV1.Any(warp =>
+                                warp.SourceArea == policy.Id || warp.DestinationArea == policy.Id))
+                        .Any(policy => !policy.Anchors.Any(anchor => anchor.Kind == FogProjectAreaAnchorKind.Warp)))
+                    throw new InvalidDataException("FogProjectAreaPolicyV1 must give each stable Area exactly one explicit static, Entrance, Warp, or no-static-link disposition.");
+                Console.WriteLine($"FogProjectAreaPolicyV1: all 131 IDs have explicit routes/dispositions; {FogProjectAnnotationPolicy.AreaLinkPolicies.Count} static Area.To edges are authored and anchored.");
+
                 IReadOnlyList<FogAreaLink> completeAreaLinks = FogAnnotationPolicyResolver.ResolveAreaLinkPolicies(
-                    facts, FogProjectAnnotationPolicy.AreaLinkPolicies, Array.Empty<FogKeyItem>());
+                    facts, FogProjectAnnotationPolicy.AreaLinkPolicies, projectPolicyKeyItems);
                 IReadOnlyList<FogProjectEntranceBoundaryPolicy> entranceBoundaries =
                     FogAnnotationPolicyResolver.ResolveEntranceBoundaryPolicies(facts);
                 FogProjectEntranceBoundaryPolicy keyDoorPolicy = entranceBoundaries.SingleOrDefault(policy =>
@@ -165,6 +470,29 @@ namespace FogHost.Tests
                     || crestGatePolicy.RequiredItemName != new FogItemName("crest_of_artorias")
                     || crestGatePolicy.RequiredItem != new FogGameItemId((int)FogGameItemCategory.Goods, 2002))
                     throw new InvalidDataException("The project fixed-key-door family did not resolve both keyed Entrance boundaries against pristine DSR facts.");
+                IReadOnlyList<FogProjectEntranceResolution> entrancePoliciesV1 =
+                    FogAnnotationPolicyResolver.ResolveEntrancePoliciesV1(facts);
+                FogProjectEntranceResolution pinwheelBoundary = entrancePoliciesV1.SingleOrDefault(entry =>
+                    entry.Policy.Id == "catacombs-pinwheel-boss-boundary");
+                if (entrancePoliciesV1.Count != 44
+                    || entrancePoliciesV1.Count(entry => entry.Policy.Kind == FogProjectEntranceKind.FixedKeyDoor) != 2
+                    || entrancePoliciesV1.Count(entry => entry.Policy.Kind == FogProjectEntranceKind.TraversableFog) != 17
+                    || entrancePoliciesV1.Count(entry => entry.Policy.Kind == FogProjectEntranceKind.BossBoundary) != 22
+                    || entrancePoliciesV1.Count(entry => entry.Policy.Kind == FogProjectEntranceKind.LordvesselGate) != 3
+                    || entrancePoliciesV1.Any(entry => !entry.ObjectAnchorResolved
+                        || !entry.RegionAnchorResolved || !entry.EventAnchorResolved || !entry.ConditionAnchorResolved)
+                    || pinwheelBoundary?.Policy.SourceArea != new FogAreaId("catacombs_prepinwheel")
+                    || pinwheelBoundary.Policy.DestinationArea != new FogAreaId("catacombs_pinwheel")
+                    || pinwheelBoundary.Policy.ObjectEntityId != 1301990
+                    || pinwheelBoundary.Policy.BossTriggerRegionEntityId != 1302998
+                    || pinwheelBoundary.Policy.InteractionEventId != 11305391
+                    || string.IsNullOrWhiteSpace(pinwheelBoundary.ResolvedObjectPartName)
+                    || entrancePoliciesV1.Where(entry => entry.Policy.Kind == FogProjectEntranceKind.BossBoundary)
+                        .Any(entry => entry.BossTriggerArea == null || entry.BossTriggerEventId <= 0)
+                    || entrancePoliciesV1.Where(entry => entry.Policy.Kind == FogProjectEntranceKind.TraversableFog)
+                        .Any(entry => !entry.Policy.ASideActionRegionEntityId.HasValue || !entry.Policy.BSideActionRegionEntityId.HasValue))
+                    throw new InvalidDataException("Project Entrance V1 did not fully resolve the authored traversable, boss, Lordvessel, and key-door pools against pristine DSR facts.");
+                Console.WriteLine("Project Entrance V1: 44 authored physical gates resolve, including 17 traversable fogs, 22 boss boundaries, 3 Lordvessel gates, and 2 fixed key doors.");
                 FogEntrance keyDoor = keyDoorPolicy.ToFogEntrance();
                 FogEntrance crestGate = crestGatePolicy.ToFogEntrance();
                 var linksByArea = FogProjectAnnotationPolicy.AreaLinkPolicies
@@ -178,18 +506,8 @@ namespace FogHost.Tests
                     completeAreaTags.Single(policy => policy.Area == id).Tags,
                     null,
                     linksByArea.TryGetValue(id, out IReadOnlyList<FogAreaLink> links) ? links : Array.Empty<FogAreaLink>())).ToArray();
-                FogKeyItem keyDoorItem = new FogKeyItem(
-                    keyDoorPolicy.RequiredItemName,
-                    facts.RequireUniqueGameItem(FogGameItemCategory.Goods, keyDoorPolicy.RequiredItemEnglishName),
-                    new FogAreaId("depths_gaping"),
-                    FogKeyItemTags.None);
-                FogKeyItem crestGateItem = new FogKeyItem(
-                    crestGatePolicy.RequiredItemName,
-                    facts.RequireUniqueGameItem(FogGameItemCategory.Goods, crestGatePolicy.RequiredItemEnglishName),
-                    new FogAreaId("darkroot"),
-                    FogKeyItemTags.None);
                 var keyDoorCatalog = new FogAnnotationCatalog(
-                    completeAreaNodes, new[] { keyDoorItem, crestGateItem }, Array.Empty<FogWarp>(), new[] { keyDoor, crestGate },
+                    completeAreaNodes, projectPolicyKeyItems, Array.Empty<FogWarp>(), new[] { keyDoor, crestGate },
                     Array.Empty<FogCustomStart>(), Array.Empty<FogDefaultCost>(), Array.Empty<FogEnemyScalingRule>(),
                     Array.Empty<FogLotLocation>(), Array.Empty<FogDefaultFlagCollision>());
                 string[] keyDoorCatalogErrors = facts.Validate(keyDoorCatalog).ToArray();
@@ -211,7 +529,7 @@ namespace FogHost.Tests
                     throw new InvalidDataException("The project-authored Crest gate did not construct a fixed, bidirectional, key-gated FogMod graph entrance.");
                 Console.WriteLine("Project Entrance projection: both independently anchored fixed key doors construct bidirectional FogMod graph edges with their resolved game-item conditions.");
                 var completeAreaCatalog = new FogAnnotationCatalog(
-                    completeAreaNodes, Array.Empty<FogKeyItem>(), Array.Empty<FogWarp>(), Array.Empty<FogEntrance>(),
+                    completeAreaNodes, projectPolicyKeyItems, Array.Empty<FogWarp>(), Array.Empty<FogEntrance>(),
                     Array.Empty<FogCustomStart>(), Array.Empty<FogDefaultCost>(), Array.Empty<FogEnemyScalingRule>(),
                     Array.Empty<FogLotLocation>(), Array.Empty<FogDefaultFlagCollision>());
                 string[] completeAreaErrors = facts.Validate(completeAreaCatalog).ToArray();
@@ -222,7 +540,7 @@ namespace FogHost.Tests
                 if (fullAreaGraph.graph.Count != 131 || !fullAreaGraph.graph.Keys.ToHashSet(StringComparer.Ordinal)
                     .SetEquals(FogProjectAnnotationPolicy.AreaIdentityOrder.Select(id => id.Value)))
                     throw new InvalidDataException($"FogMod constructed {fullAreaGraph.graph.Count} nodes from the full project Area inventory instead of 131.");
-                Console.WriteLine("Project Area model: all 131 typed nodes validate against pristine maps and construct in FogMod Graph; the current route inventory is still incomplete.");
+                Console.WriteLine("Project Area model: all 131 typed nodes and the completed Area.To inventory validate against pristine maps and construct in FogMod Graph.");
 
                 if (HostRequest.OptionFlags.Any(option => option.Flag == "scalingbase" || option.Flag == "dumpdist"))
                     throw new InvalidDataException("The product option contract unexpectedly exposes FogMod's debug-only ScalingBase switches.");
@@ -252,11 +570,37 @@ namespace FogHost.Tests
                 Console.WriteLine("Project ScalingBase policy: all production annotations omit this debug-only override; with shipped options enabled, FogMod constructs identical graph nodes.");
 
                 IReadOnlyList<FogDefaultFlagCollision> asylumBossFlags = FogAnnotationPolicyResolver.ResolveBossDefeatFlagCollisions(
-                    facts, new[] { new FogBossDefeatFlagCollisionPolicy(new FogMapId("asylum"), "h0016B1") });
+                    facts, new[]
+                    {
+                        new FogBossDefeatFlagCollisionPolicy(new FogMapId("asylum"), "h0016B1", 11810900,
+                            FogBossFlagAnchorKind.Both, "Regression fixture: pristine Asylum collision has the matching boss entity and encoded event anchor."),
+                    });
                 if (asylumBossFlags.Count != 1 || asylumBossFlags[0].BossFlag != 11810900
                     || !facts.BossRewardCompletionFlags.Contains(11810900)
                     || !facts.Maps[new FogMapId("asylum")].BossDefeatHandlers.Any(handler => handler.EventId == 11810900))
                     throw new InvalidDataException("The pristine Asylum boss-defeat event ID was not resolved as the completion flag read by common event 970 for collision h0016B1.");
+
+                IReadOnlyList<FogDefaultFlagCollision> projectBossFlags = FogAnnotationPolicyResolver.ResolveBossDefeatFlagCollisions(
+                    facts, FogProjectAnnotationPolicy.DefaultFlagCollisionPolicies);
+                var expectedProjectBossFlags = FogProjectAnnotationPolicy.DefaultFlagCollisionPolicies.ToDictionary(
+                    policy => policy.Map.Value + "_" + policy.Collision,
+                    policy => policy.BossCompletionEventId,
+                    StringComparer.Ordinal);
+                if (projectBossFlags.Count != 22
+                    || projectBossFlags.Select(flag => flag.Map.Value + "_" + flag.Collision).Distinct(StringComparer.Ordinal).Count() != 22
+                    || projectBossFlags.Any(flag => !expectedProjectBossFlags.TryGetValue(flag.Map.Value + "_" + flag.Collision, out int eventId)
+                        || eventId != flag.BossFlag))
+                    throw new InvalidDataException("The authored DefaultFlagCols project policy did not resolve all 22 unique collision/event anchors against pristine DSR.");
+                Console.WriteLine("Project DefaultFlagCols policy: 22 authored boss-collision mappings resolve through their explicit enemy and/or encoded-PlayRegion anchors to common event 970 completion flags.");
+
+                IReadOnlyList<FogKeyItemIdentity> projectItemIdentities = FogAnnotationPolicyResolver.ResolveKeyItemIdentities(
+                    facts, FogProjectAnnotationPolicy.KeyItemIdentityPolicies);
+                if (projectItemIdentities.Count != 22
+                    || projectItemIdentities.Any(identity => identity.InteractionAnchors.Count == 0
+                        || !facts.GameItemNames.TryGetValue(identity.GameItemId, out string englishName)
+                        || !string.Equals(englishName, identity.EnglishGameName, StringComparison.Ordinal)))
+                    throw new InvalidDataException("The project key-item identity policy did not resolve all 22 DSR GameParam/FMG identities and EMEVD possession anchors.");
+                Console.WriteLine("Project KeyItem policy: 22 typed Goods identities resolve against pristine GameParam/FMG and now each has explicit Area, mechanic, and progression tags.");
                 FogDsrFacts.Map asylumFacts = facts.Maps[new FogMapId("asylum")];
                 FogDsrCollisionFact noBossCollision = asylumFacts.CollisionDetails.FirstOrDefault(collision =>
                     !asylumFacts.EnemyDetails.Where(enemy => enemy.CollisionName == collision.Name)
@@ -268,7 +612,11 @@ namespace FogHost.Tests
                 try
                 {
                     FogAnnotationPolicyResolver.ResolveBossDefeatFlagCollisions(facts,
-                        new[] { new FogBossDefeatFlagCollisionPolicy(new FogMapId("asylum"), noBossCollision.Name) });
+                        new[]
+                        {
+                            new FogBossDefeatFlagCollisionPolicy(new FogMapId("asylum"), noBossCollision.Name, 11810900,
+                                FogBossFlagAnchorKind.CollisionBossEnemy, "Negative test: a collision without the named boss entity cannot own its completion flag."),
+                        });
                 }
                 catch (InvalidDataException) { rejectedNonBossCollision = true; }
                 if (!rejectedNonBossCollision)
@@ -283,9 +631,13 @@ namespace FogHost.Tests
                 throw new InvalidDataException("The pristine MSB enemy fact index is missing finite world positions.");
             if (!facts.Maps.Values.Any(map => map.ObjectDetails.Count > 0)
                 || !facts.Maps.Values.Any(map => map.CollisionDetails.Count > 0)
+                || !facts.Maps.Values.Any(map => map.ConnectCollisionDetails.Count > 0)
                 || !facts.Maps.Values.Any(map => map.EnemyDetails.Count > 0)
                 || !facts.Maps.Values.Any(map => map.RegionDetails.Count > 0))
-                throw new InvalidDataException("The detailed MSB object, collision, enemy and region facts were not indexed.");
+                throw new InvalidDataException("The detailed MSB object, collision, ConnectCollision, enemy and region facts were not indexed.");
+            if (facts.Maps.Values.SelectMany(map => map.ConnectCollisionDetails)
+                .Any(connection => connection.TargetMapIdBytes == null || connection.TargetMapIdBytes.Count != 4))
+                throw new InvalidDataException("A pristine MSB ConnectCollision target map ID was not indexed as four bytes.");
             if (!facts.Maps.Values.SelectMany(map => map.Treasures).Any(treasure => treasure.ItemLots.Count > 0))
                 throw new InvalidDataException("No item-lot references were indexed from pristine MSB treasure events.");
             FogDsrRegionFact[] regions = facts.Maps.Values.SelectMany(map => map.RegionDetails).ToArray();
@@ -543,30 +895,15 @@ namespace FogHost.Tests
             IReadOnlyList<FogAreaNoStaticLinksPolicy> noStaticBossAreas =
                 FogAnnotationPolicyResolver.ResolveAreaNoStaticLinksPolicies(facts);
             var expectedNoStaticBossAreas = FogProjectAnnotationPolicy.BossAreaTagPolicies
+                .Where(policy => !FogProjectAnnotationPolicy.AreaLinkPolicies.Any(route => route.Source == policy.Area))
                 .Select(policy => policy.Area)
-                .Append(new FogAreaId("catacombs_prepinwheel"))
                 .ToHashSet();
-            FogAreaNoStaticLinksPolicy pinwheelPolicy = noStaticBossAreas.SingleOrDefault(policy =>
-                policy.Area == new FogAreaId("catacombs_pinwheel"));
-            FogAreaNoStaticLinksPolicy prepinwheelPolicy = noStaticBossAreas.SingleOrDefault(policy =>
-                policy.Area == new FogAreaId("catacombs_prepinwheel"));
             if (noStaticBossAreas.Count != expectedNoStaticBossAreas.Count
                 || !noStaticBossAreas.Select(policy => policy.Area).ToHashSet().SetEquals(expectedNoStaticBossAreas)
                 || noStaticBossAreas.Any(policy => string.IsNullOrWhiteSpace(policy.Rationale)
-                    || FogProjectAnnotationPolicy.AreaLinkPolicies.Any(route => route.Source == policy.Area))
-                || pinwheelPolicy == null
-                || pinwheelPolicy.EntranceMap != new FogMapId("catacombs")
-                || pinwheelPolicy.EntranceObjectEntityId != 1301990
-                || pinwheelPolicy.EntranceTriggerRegionEntityId != 1302998
-                || pinwheelPolicy.EntranceEventId != 11305391
-                || prepinwheelPolicy == null
-                || prepinwheelPolicy.BossEventId.HasValue
-                || prepinwheelPolicy.EntranceMap != new FogMapId("catacombs")
-                || prepinwheelPolicy.EntranceObjectEntityId != 1301990
-                || prepinwheelPolicy.EntranceTriggerRegionEntityId != 1302998
-                || prepinwheelPolicy.EntranceEventId != 11305391)
+                    || FogProjectAnnotationPolicy.AreaLinkPolicies.Any(route => route.Source == policy.Area)))
                 throw new InvalidDataException("The project Area empty-static-route policy is incomplete, unanchored, or conflicts with a separate static route.");
-            Console.WriteLine($"Project Area topology policy: {noStaticBossAreas.Count} boss/Entrance-boundary nodes use the separate Entrance/Warp model; both sides of the Pinwheel gate are anchored to pristine Catacombs facts.");
+            Console.WriteLine($"Project Area topology policy: {noStaticBossAreas.Count} boss nodes have no outgoing Area.To edge; other boss nodes may own explicit post-encounter routes. Pinwheel's Entrance anchors are checked by the project boundary policy.");
             FogAreaTagPolicy[] startTagPolicies = FogProjectAnnotationPolicy.AreaTagPolicies
                 .Where(policy => policy.Area == new FogAreaId("demonruins_izalithprelava")).ToArray();
             if (startTagPolicies.Length != 1
@@ -1030,6 +1367,147 @@ namespace FogHost.Tests
             if (key != new FogGameItemId(3, 2007) || initializers.Length != 1 || !lotContainsKey
                 || !awardFactMatches || !gapingDefeatUnlocksReward)
                 throw new InvalidDataException("The pristine Gaping Dragon reward chain no longer proves that common event 970 awards Blighttown Key from ItemLot 2500 after the boss event sets completion flag 2.");
+        }
+
+        private static void VerifyArenaDisbandWarpParameterization(string pristineGameRoot)
+        {
+            string archivePath = Path.Combine(pristineGameRoot, "event", "m12_01_00_00.emevd.dcx");
+            byte[] bytes = File.ReadAllBytes(archivePath);
+            if (DCX.Is(bytes)) bytes = DCX.Decompress(bytes);
+            EMEVD archive = EMEVD.Read(bytes);
+            EMEVD.Event disband = archive.Events.Single(evt => evt.ID == 11210849);
+            EMEVD.Instruction[] warpInstructions = disband.Instructions
+                .Where(instruction => instruction.Bank == 2003 && instruction.ID == 14).ToArray();
+            if (disband.Parameters.Count != 0 || warpInstructions.Length != 1
+                || warpInstructions[0].ArgData.Length != 8
+                || warpInstructions[0].ArgData[0] != 12 || warpInstructions[0].ArgData[1] != 1
+                || BitConverter.ToInt32(warpInstructions[0].ArgData, 4) != 1218146)
+                throw new InvalidDataException("Pristine event 11210849 must have no event parameters and a literal WarpPlayer target of map m12_01 / initial Area 1218146.");
+
+            EMEVD.Event caller = archive.Events.Single(evt => evt.ID == 11210700);
+            EMEVD.Instruction[] calls = caller.Instructions.Where(instruction => instruction.Bank == 2000 && instruction.ID == 0
+                && instruction.ArgData.Length >= 12 && BitConverter.ToInt32(instruction.ArgData, 4) == 11210849).ToArray();
+            if (calls.Length != 1 || BitConverter.ToInt32(calls[0].ArgData, 8) != 0)
+                throw new InvalidDataException("Pristine caller 11210700 must pass zero to event 11210849; the callee has no event parameters, so this is not its WarpPlayer destination.");
+            Console.WriteLine("Pristine event 11210849: no EventParameter bindings; caller 11210700 passes unused argument 0; WarpPlayer targets m12_01 initial Area 1218146.");
+        }
+
+        private static void VerifyCompactCatalogCandidate(FogDsrFacts facts)
+        {
+            string pristineGameRoot = Environment.GetEnvironmentVariable("DS1TR_PRISTINE_DSR_ROOT");
+            if (string.IsNullOrWhiteSpace(pristineGameRoot) || !Directory.Exists(pristineGameRoot))
+                throw new InvalidOperationException("DS1TR_PRISTINE_DSR_ROOT is required to validate Area Warp source events.");
+            VerifyArenaDisbandWarpParameterization(pristineGameRoot);
+
+            FogCompactCatalogV1 candidate = FogCompactCatalogBuilder.Build(facts);
+            FogCompactCatalogV1 repeat = FogCompactCatalogBuilder.Build(facts);
+            FogWarp seathPrisonWarp = candidate.Catalog.Warps.SingleOrDefault(warp => warp.Id == FogProjectAnnotationPolicy.SeathPrisonWarpRuntimeId);
+            bool rejectedMissingSeathPrisonRegion = false;
+            try
+            {
+                FogAnnotationPolicyResolver.ResolveFlagTriggeredWarpPoliciesV1(facts,
+                    FogProjectAnnotationPolicy.FlagWarpPoliciesV1.Select(policy => policy with { DestinationRegionName = "missing-pristine-region" }));
+            }
+            catch (InvalidDataException) { rejectedMissingSeathPrisonRegion = true; }
+            if (!rejectedMissingSeathPrisonRegion || seathPrisonWarp == null
+                || seathPrisonWarp.ASide.WarpFlag != FogAddedEventBuilder.SeathCrystalActivatedFlag
+                || seathPrisonWarp.BSide.Area != new FogAreaId("dukes_prison"))
+                throw new InvalidDataException("The Seath prison Warp did not preserve its flag/object contract and unique pristine destination region.");
+            AnnotationData.Annotations first = candidate.CreateFreshCandidateAnnotations();
+            AnnotationData.Annotations second = candidate.CreateFreshCandidateAnnotations();
+            FogCompactBackendProjection projection = candidate.CreateBackendProjection();
+            FogLogicalAreaResolver resolver = new FogLogicalAreaResolver(facts);
+            FogDsrEnemyFact taurus = facts.Maps[new FogMapId("parish")].EnemyDetails.Single(enemy => enemy.Name == "c2240_0000");
+            FogLogicalAreaResolution bossOwner = resolver.Resolve(new FogLogicalAreaQuery(FogLogicalSourceKind.Enemy,
+                new FogMapId("parish"), taurus.CollisionName, taurus.EntityId));
+            FogLogicalAreaResolution defaultOwner = resolver.Resolve(new FogLogicalAreaQuery(FogLogicalSourceKind.Collision,
+                new FogMapId("parish"), "h0000B1"));
+            int defaultGraphComponents = CountProjectAreaComponents(candidate.Catalog, includeHardRoutes: false);
+            int hardGraphComponents = CountProjectAreaComponents(candidate.Catalog, includeHardRoutes: true);
+            FogCompactCategoryCoverage areaCoverage = candidate.Coverage.Single(category => category.Category == "Areas");
+            FogCompactCategoryCoverage keyCoverage = candidate.Coverage.Single(category => category.Category == "KeyItems");
+            if (!candidate.IsComplete || candidate.Fingerprint != repeat.Fingerprint
+                || ReferenceEquals(first, second) || ReferenceEquals(first.Areas, second.Areas)
+                || first.Areas.Count != FogProjectAnnotationPolicy.AreaIdentityOrder.Count
+                || first.KeyItems.Count != FogProjectAnnotationPolicy.KeyItemIdentityPolicies.Count
+                || first.KeyItems.Count(item => !item.HasTag("randomonly") && !item.HasTag("hard")) != 9
+                || first.KeyItems.Count(item => item.HasTag("randomonly")) != 13
+                || first.KeyItems.Count(item => item.HasTag("hard")) != 0
+                || FogProjectAnnotationPolicy.KeyItemProjectPoliciesV1.Count != 22
+                || FogProjectAnnotationPolicy.KeyItemProjectPoliciesV1.Any(policy =>
+                    string.IsNullOrWhiteSpace(policy.ControlledMechanic) || string.IsNullOrWhiteSpace(policy.Rationale))
+                || first.KeyItems.Single(item => item.ID == "3:2007").Name != "blighttown_key"
+                || first.CustomStarts.Count != FogProjectAnnotationPolicy.CustomStarts.Count
+                || candidate.Catalog.Entrances.Count != 64
+                || candidate.Catalog.WriterSupportEntrances.Count != 1
+                || candidate.Catalog.WriterSupportEntrances.Single().Name != "o5869_0000"
+                || candidate.Catalog.WriterSupportEntrances.Single().Id != 1511754
+                || candidate.Catalog.WriterSupportEntrances.Single().Map != new FogMapId("anorlondo")
+                || first.Entrances.Count != 65
+                || first.Entrances.Count(entrance => entrance.HasTag("unused")) != 1
+                || first.Entrances.Count(entrance => !entrance.HasTag("unused")) != 64
+                || first.Entrances.Count(entrance => entrance.HasTag("world")) != 17
+                || first.Entrances.Count(entrance => entrance.HasTag("boss")) != 22
+                || first.Entrances.Count(entrance => entrance.HasTag("lordvessel")) != 3
+                || first.Entrances.Count(entrance => entrance.HasTag("pvp")) != 20
+                || first.Entrances.Count(entrance => entrance.HasTag("pvp") && entrance.HasTag("major")) != 16
+                || first.Entrances.Count(entrance => entrance.HasTag("pvp") && !entrance.HasTag("major")) != 4
+                || first.Warps.Count != 7
+                || first.DefaultCost.Count != first.Areas.Count || first.Enemies.Count == 0
+                || first.LotLocations.Count == 0 || first.CompactLotLocations == null
+                || !first.CompactLotLocations.TryGetValue(1100, out string sealLotArea) || sealLotArea != "newlondo"
+                || first.CompactLotLocations.ContainsKey(4013)
+                || first.CompactLotLocations.Count != candidate.Catalog.LotRows.Count
+                || first.DefaultFlagCols.Count != 22
+                || defaultGraphComponents != 1 || hardGraphComponents != 1
+                || areaCoverage.State != FogCompactCategoryState.Complete
+                || keyCoverage.State != FogCompactCategoryState.Complete
+                || bossOwner.Area != new FogAreaId("burg_taurus") || bossOwner.RuleId != "boss-entity-anchor"
+                || defaultOwner.Area != new FogAreaId("burg_start") || !defaultOwner.UsedMapDefault)
+                throw new InvalidDataException($"Compact Full Fog V1 catalog counts, connectivity (default={defaultGraphComponents}, hard={hardGraphComponents}), progression closure, fingerprint, or fresh DTO behavior are invalid.");
+
+            AnnotationData.Entrance writerAnchor = first.Entrances.Single(entrance => entrance.Name == "o5869_0000");
+            if (writerAnchor.ID != 1511754 || writerAnchor.Area != "anorlondo" || !writerAnchor.IsFixed
+                || !writerAnchor.HasTag("unused") || writerAnchor.ASide != null || writerAnchor.BSide != null
+                || candidate.Catalog.Entrances.Any(entrance => entrance.Name == "o5869_0000"))
+                throw new InvalidDataException("Compact's Anor Londo writer anchor must use pristine identity facts and remain outside the randomizable Entrance catalog.");
+            var supportGraph = new Graph();
+            supportGraph.Construct(new RandomizerOptions(), first);
+            if (!supportGraph.entranceIds["o5869_0000"].IsFixed
+                || supportGraph.graph.Values.SelectMany(node => node.To.Concat(node.From)).Any(edge => edge.Name == "o5869_0000"))
+                throw new InvalidDataException("The Anor Londo writer support anchor must be fixed and create no graph or shuffle edges.");
+            Console.WriteLine($"Compact project graph: {defaultGraphComponents} connected component(s) in the default structural graph and {hardGraphComponents} with hard routes; condition closure is checked separately by the profile matrix.");
+
+            FogCompactCategoryCoverage[] gaps = candidate.Coverage
+                .Where(category => category.State != FogCompactCategoryState.Complete).ToArray();
+            if (!candidate.IsComplete || gaps.Length != 0
+                || !candidate.Coverage.Any(category => category.Category == "Warps" && category.State == FogCompactCategoryState.Complete
+                    && category.GeneratedCount == 7 && category.UnresolvedCount == 0)
+                || !candidate.Coverage.Any(category => category.Category == "Areas" && category.State == FogCompactCategoryState.Complete)
+                || !candidate.Coverage.Any(category => category.Category == "LotLocations" && category.State == FogCompactCategoryState.Complete
+                    && category.UnresolvedCount == 0 && category.ExplicitExceptionCount > 0)
+                || !candidate.Coverage.Any(category => category.Category == "LotRows" && category.State == FogCompactCategoryState.Complete
+                    && category.GeneratedCount == candidate.Catalog.LotRows.Count)
+                || !candidate.Coverage.Any(category => category.Category == "DefaultFlagCols" && category.State == FogCompactCategoryState.Complete))
+                throw new InvalidDataException("Compact Full Fog V1 must report complete, physically anchored Area Warp coverage before the candidate can proceed to stress validation.");
+            FogCompactCategoryCoverage entranceCoverage = candidate.Coverage.Single(category => category.Category == "Entrances");
+            if (entranceCoverage.State != FogCompactCategoryState.Complete || entranceCoverage.UnresolvedCount != 0)
+                throw new InvalidDataException("Compact Full Fog V1 must report the fully anchored project Entrance pool.");
+            AnnotationData.Annotations providerProjection = FogCompactCatalogProvider.CreateFreshAnnotations(candidate);
+            if (providerProjection.Warps.Count != first.Warps.Count)
+                throw new InvalidDataException("The complete Compact catalog provider did not project its Area Warp pool.");
+
+            if (projection.CatalogVersion != FogCompactCatalogV1.Version
+                || projection.CatalogFingerprint != candidate.Fingerprint
+                || projection.Items.Count != 9
+                || projection.Items.Any(item => !item.Required)
+                || projection.LotStarts.Count != first.LotLocations.Count)
+                throw new InvalidDataException("Compact Full Fog V1 backend projection must contain only the nine required items derived from the catalog and fingerprint.");
+
+            Console.WriteLine($"Compact Full Fog V1 candidate: fingerprint={candidate.Fingerprint}, Areas={first.Areas.Count}, Entrances={first.Entrances.Count}, Warps={first.Warps.Count}, KeyItems={first.KeyItems.Count}, Lots={first.LotLocations.Count}, Enemies={first.Enemies.Count}, Flags={first.DefaultFlagCols.Count}, Costs={first.DefaultCost.Count}; 1000-seed progression stress passed.");
+            foreach (FogCompactCategoryCoverage category in candidate.Coverage)
+                Console.WriteLine($"  {category.Category}: {category.State}, generated={category.GeneratedCount}, authored exceptions={category.ExplicitExceptionCount}, unresolved={category.UnresolvedCount}.");
+            VerifyCompactGraphProfileMatrix(candidate);
         }
     }
 }

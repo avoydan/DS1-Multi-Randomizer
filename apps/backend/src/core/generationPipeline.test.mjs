@@ -4,9 +4,31 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { generateRun } from '../../dist/core/generationPipeline.js';
+import { generateRun as runGeneration } from '../../dist/core/generationPipeline.js';
+import { resolveGenerationProfile } from '../../dist/core/generationProfiles.js';
+import { legacyFogTrackedItems } from '../../dist/adapters/legacyFogTrackedItems.js';
 
 const sha = (value) => createHash('sha256').update(value).digest('hex');
+
+// These behavior tests predate Compact Fog and intentionally exercise the frozen v2 contract.
+const v2Profile = resolveGenerationProfile('ds1tr-gen-v2');
+const stubProfile = {
+  ...v2Profile,
+  combinedEngine: { randomizerVersions: ['0.5.66', 'test-engine'] },
+  fogEngine: { ...v2Profile.fogEngine, hostVersions: ['0.5.0', 'host-test'], fogModCommit: 'pin' },
+};
+function generateRun(request, onEvent, services) {
+  const profile = request.profile ?? stubProfile;
+  const getFogPrerequisites = services?.getFogPrerequisites;
+  const testServices = getFogPrerequisites && profile.id === 'ds1tr-gen-v2'
+    ? { ...services, getFogPrerequisites: async (...args) => {
+      const prepared = await getFogPrerequisites(...args);
+      if (!prepared || 'failure' in prepared) return prepared;
+      return { ...prepared, annotationSource: 'legacy-fogmod', worldDataId: prepared.worldDataId ?? 'f394fa536ba9b66d' };
+    } }
+    : services;
+  return runGeneration({ ...request, profile }, onEvent, testServices);
+}
 
 function config(gamePath, fog = false) {
   return {
@@ -81,6 +103,45 @@ test('requires a verified pristine source before invoking either engine', async 
   assert.equal(called, false);
 }));
 
+test('generates a launcher-only run without invoking a randomizer or writing game files', async () => fixture(async ({ game, pristine, workspace }) => {
+  const noRandomization = config(game, false);
+  noRandomization.items.enabled = false;
+  noRandomization.items.randomizeWorldItems = false;
+  noRandomization.enemies.enabled = false;
+  noRandomization.enemies.randomizeRegularEnemies = false;
+  noRandomization.enemies.randomizeBosses = false;
+  let engineCalls = 0;
+  const result = await generateRun({ config: noRandomization, workspacePath: workspace }, () => {}, {
+    getPristineSource: async () => ({ directory: pristine, snapshotId: 'launcher-only-snapshot' }),
+    combined: async () => { engineCalls++; throw new Error('the combined randomizer must not run'); },
+    getFogPrerequisites: async () => { engineCalls++; throw new Error('Fog data must not be requested'); },
+  });
+  assert.equal(result.ok, true, result.message);
+  assert.equal(result.manifest.noRandomization, true);
+  assert.equal(result.manifest.gameTreeRoot, '');
+  assert.deepEqual(result.manifest.files, []);
+  assert.equal(engineCalls, 0);
+  assert.deepEqual(JSON.parse(await readFile(result.manifestPath, 'utf8')).files, []);
+  assert.equal(await readFile(path.join(game, 'param/GameParam/GameParam.parambnd.dcx'), 'utf8'), 'param');
+}));
+
+test('generation profile selects its frozen roaming-boss destination policy before the combined engine runs', async () => fixture(async ({ game, pristine, root }) => {
+  const seen = [];
+  const stub = combinedStub();
+  for (const [id, policy] of [['ds1tr-gen-v1', 'protected-v1'], ['ds1tr-gen-v2', 'safe-handlers-v2']]) {
+    const result = await generateRun({ config: config(game), workspacePath: path.join(root, id), profile: resolveGenerationProfile(id) }, () => {}, {
+      getPristineSource: async () => ({ directory: pristine }),
+      combined: async (request, onEvent) => {
+        seen.push(request.roamingBossDestinationPolicy);
+        const generated = await stub(request, onEvent);
+        return { ...generated, randomizerVersion: '0.5.66' };
+      },
+    });
+    assert.equal(result.ok, true, result.message);
+    assert.equal(seen.at(-1), policy, id);
+  }
+}));
+
 test('reports absent FogHost prerequisites before combined generation', async () => fixture(async ({ game, pristine, workspace }) => {
   let called = false;
   const result = await generateRun({ config: config(game, true), workspacePath: workspace }, () => {}, {
@@ -144,12 +205,12 @@ test('retries a Fog seed and retains combined files outside the Fog read set', a
   let calls = 0;
   const fog = { execute: async (execution) => {
     calls++;
-    if (calls === 1) return { schemaVersion: 2, ok: false,
+    if (calls === 1) return { schemaVersion: 3, ok: false,
       error: { code: 'FOG_SEED_UNSOLVABLE', retryable: true, retryScope: 'fog', message: 'bad graph' } };
     const relative = 'param/GameParam/GameParam.parambnd.dcx';
     const content = 'fogged';
     await writeFile(path.join(execution.request.stagingDirectory, relative), content);
-    return { schemaVersion: 2, ok: true, hostVersion: 'host-test', fogModCommit: 'pin',
+    return { schemaVersion: 3, ok: true, hostVersion: 'host-test', fogModCommit: 'pin',
       annotationSha256: '', mode: 'write', seed: execution.request.seed, fogOptions: '',
       keyItems: { randomized: false, hash: '' },
       files: [{ path: relative, size: content.length, sha256: sha(content) }], error: null };
@@ -245,9 +306,9 @@ test('Fog runs hand the combined engine the items the fog randomizer follows and
     getPristineSource: async () => ({ directory: pristine }),
     getFogPrerequisites: async () => ({ executablePath, dataRoot, readSet: [] }),
     combined: async (request, onEvent) => { requests.push(request); return stub(request, onEvent); },
-    fog: { execute: async () => ({ schemaVersion: 2, ok: false, error: { code: 'FOG_ENGINE_FAILED', retryable: false, retryScope: 'none', message: 'stop here' } }) },
+    fog: { execute: async () => ({ schemaVersion: 3, ok: false, error: { code: 'FOG_ENGINE_FAILED', retryable: false, retryScope: 'none', message: 'stop here' } }) },
   });
-  assert.deepEqual(requests[0].fogTrackedItems, { items: [{ equipType: 2, itemId: 149, required: true }], lotStarts: [1300020] });
+  assert.deepEqual(requests[0].fogTrackedItems, legacyFogTrackedItems());
   // Without the fog randomizer nothing is constrained.
   const plain = [];
   await generateRun({ config: config(game, false), workspacePath: path.join(root, 'plain') }, () => {}, {
@@ -271,7 +332,7 @@ test('a key item outside the fog randomizer lots is structural: one attempt, no 
     combined: async (request, onEvent) => { combinedCalls += 1; return stub(request, onEvent); },
     fog: { execute: async () => {
       fogCalls += 1;
-      return { schemaVersion: 2, ok: false, error: { code: 'FOG_UPSTREAM_INCOMPATIBLE', retryable: true, retryScope: 'combined', message: "Couldn't find darkmoon_seance_ring in item lots" } };
+      return { schemaVersion: 3, ok: false, error: { code: 'FOG_UPSTREAM_INCOMPATIBLE', retryable: true, retryScope: 'combined', message: "Couldn't find darkmoon_seance_ring in item lots" } };
     } },
   });
   assert.equal(result.ok, false);
@@ -406,7 +467,7 @@ test('a fog layout that cannot be found around the shuffled keys is the typed FO
   await writeFile(executablePath, 'host');
   const dataRoot = await fogData(root);
   let fogCalls = 0;
-  const unsolvable = { execute: async () => { fogCalls += 1; return { schemaVersion: 2, ok: false, error: { code: 'FOG_SEED_UNSOLVABLE', retryable: true, retryScope: 'fog', message: 'bad graph' } }; } };
+  const unsolvable = { execute: async () => { fogCalls += 1; return { schemaVersion: 3, ok: false, error: { code: 'FOG_SEED_UNSOLVABLE', retryable: true, retryScope: 'fog', message: 'bad graph' } }; } };
   const result = await generateRun({ config: keysConfig(game, true), workspacePath: workspace }, () => {}, {
     getPristineSource: async () => ({ directory: pristine }),
     getFogPrerequisites: async () => ({ executablePath, dataRoot, readSet: [] }),

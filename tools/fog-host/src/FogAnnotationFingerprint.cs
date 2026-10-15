@@ -217,6 +217,7 @@ namespace FogHost
             {
                 WriteNullableString(json, "destinationMap", side.DestinationMap);
                 json.WriteNumber("cutscene", side.Cutscene);
+                if (side.WarpFlag != 0) json.WriteNumber("warpFlag", side.WarpFlag);
                 WriteTags(json, "tags", side.Tags, isSideA ? WarpA_SideTags : WarpB_SideTags);
             }
             else if (canBeOrdinary)

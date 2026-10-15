@@ -62,6 +62,19 @@ test('Nexus distribution update guidance and installed version are translated in
   assert.ok(en.app.update.metadataUnavailable && pl.app.update.metadataUnavailable);
 });
 
+test('the local game convenience and free-cursor setting are translated in both languages', () => {
+  assert.equal(en.app.views.settings.gameConveniencesTitle, 'Game conveniences');
+  assert.equal(pl.app.views.settings.gameConveniencesTitle, 'Udogodnienia gry');
+  assert.equal(en.app.views.settings.freeCursorLabel, 'Free cursor');
+  assert.equal(pl.app.views.settings.freeCursorLabel, 'Swobodny kursor');
+  assert.equal(en.app.views.settings.freeCursorShortcutLabel, 'Cursor release shortcut');
+  assert.equal(pl.app.views.settings.freeCursorShortcutLabel, 'Skrót zwalniania kursora');
+  assert.ok(en.app.views.settings.freeCursorShortcutDescription.includes('Ctrl+Shift+F8'));
+  assert.ok(pl.app.views.settings.freeCursorShortcutDescription.includes('Ctrl+Shift+F8'));
+  assert.ok(en.app.views.settings.freeCursorDescription.includes('stays visible'));
+  assert.ok(pl.app.views.settings.freeCursorDescription.includes('pozostanie widoczne'));
+});
+
 test('plural forms are complete: English one/other, Polish one/few/many/other', () => {
   for (const [name, entry] of groupBases(enFlat)) if (entry.plural) assert.deepEqual([...entry.forms].sort(), ['one', 'other'], `English ${name}`);
   for (const [name, entry] of groupBases(plFlat)) if (entry.plural) assert.deepEqual([...entry.forms].sort(), ['few', 'many', 'one', 'other'], `Polish ${name}`);
@@ -127,7 +140,7 @@ test('interpolation works in both languages and does not escape paths', async ()
 test('every backend error code has a translation in both languages, so no code ever shows its English text in Polish', () => {
   const codes = Object.keys(en.errors.codes);
   assert.deepEqual(Object.keys(pl.errors.codes).sort(), [...codes].sort());
-  for (const required of ['GAME_INVALID', 'FOG_KEY_CONFLICT', 'PACKAGE_TAMPERED', 'CHECKSUM', 'ACTIVATION_INTERRUPTED', 'WORLD_DATA_OFFLINE']) assert.ok(codes.includes(required), required);
+  for (const required of ['GAME_INVALID', 'FOG_KEY_CONFLICT', 'PACKAGE_TAMPERED', 'CHECKSUM', 'ACTIVATION_INTERRUPTED', 'WORLD_DATA_OFFLINE', 'WORLD_DATA_LEGACY_UNAVAILABLE']) assert.ok(codes.includes(required), required);
 });
 
 // A rough but useful detector for text that was left in the source instead of the resources: visible JSX text and the text attributes of the screens.

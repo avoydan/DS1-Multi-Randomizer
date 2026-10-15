@@ -71,7 +71,7 @@ test('run history persists across restarts, newest first, with the package flag 
   assert.equal(list[1].packageExists, false, 'a cleaned-up run folder is reported, not an error');
   assert.equal(list[0].createdAt, '2026-10-02T10:00:00.000Z');
   assert.match(list[0].seedCode, /^DS1TR1-/u);
-  assert.equal(list[0].profile, 'ds1tr-gen-v1');
+  assert.equal(list[0].profile, 'ds1tr-gen-v3');
   assert.equal(list[0].settings.fog.language, 'ENGLISH');
   assert.equal(newer.id === older.id, false);
 }));

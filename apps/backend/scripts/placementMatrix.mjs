@@ -81,7 +81,12 @@ export const sets = {
    */
   'bosses-only': [
     { name: 'bosses-only-100-asylum-off', patch: merge2(noItems, noFog, sampling({ normalReplacement: 'bosses', replacementChance: 100, fit: 'anywhere', difficultyMode: 'random' })) },
+    { name: 'bosses-only-100-stay-dead', patch: merge2(noItems, noFog, sampling({ normalReplacement: 'bosses', replacementChance: 100, fit: 'anywhere', difficultyMode: 'random', roamingBossesStayDead: true })) },
+    { name: 'bosses-only-0-random', patch: merge2(noItems, noFog, sampling({ normalReplacement: 'bosses', replacementChance: 0, fit: 'anywhere', difficultyMode: 'random' })) },
+    { name: 'bosses-only-50-random', patch: merge2(noItems, noFog, sampling({ normalReplacement: 'bosses', replacementChance: 50, fit: 'anywhere', difficultyMode: 'random' })) },
     { name: 'bosses-only-100-asylum-on', patch: merge2(noItems, noFog, sampling({ normalReplacement: 'bosses', replacementChance: 100, fit: 'anywhere', difficultyMode: 'random-easy-asylum' })) },
+    { name: 'both-boss-chance-0', patch: merge2(noItems, noFog, sampling({ normalReplacement: 'both', bossChanceInNormalSlots: 0, replacementChance: 100, fit: 'anywhere', difficultyMode: 'random' })) },
+    { name: 'both-boss-chance-50', patch: merge2(noItems, noFog, sampling({ normalReplacement: 'both', bossChanceInNormalSlots: 50, replacementChance: 100, fit: 'anywhere', difficultyMode: 'random' })) },
     { name: 'both-boss-chance-100', patch: merge2(noItems, noFog, sampling({ normalReplacement: 'both', bossChanceInNormalSlots: 100, replacementChance: 100, fit: 'anywhere', difficultyMode: 'random' })) },
     { name: 'owner-world', patch: merge2(noItems, noFog, sampling({ normalReplacement: 'bosses', replacementChance: 100, fit: 'anywhere', difficultyMode: 'random-easy-asylum', bossReplacement: 'classic', roamingBossSouls: 50, roamingBossesStayDead: true })) },
     { name: 'owner-world-fog', patch: merge2(noItems, sampling({ normalReplacement: 'bosses', replacementChance: 100, fit: 'anywhere', difficultyMode: 'random-easy-asylum', bossReplacement: 'classic', roamingBossSouls: 50, roamingBossesStayDead: true })), seeds: 10 },

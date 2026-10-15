@@ -63,7 +63,7 @@ test('desktop API exposes typed state and generation failure without touching a 
   assert.equal((await post('/settings/save', { settings: {}, generateSpoilerLog: false })).status, 400);
   const history = await (await post('/history/list', {})).json();
   assert.deepEqual(history.entries, []);
-  assert.deepEqual(history.supportedProfiles, ['ds1tr-gen-v1']);
+  assert.deepEqual(history.supportedProfiles, ['ds1tr-gen-v1', 'ds1tr-gen-v2', 'ds1tr-gen-v3']);
   // A world that is not in the history has no hint sheet; nothing is made up for an id (or a missing id).
   assert.deepEqual(await (await post('/hints/get', { id: 'not-a-world' })).json(), { ok: false, code: 'HINTS_UNAVAILABLE' });
   assert.deepEqual(await (await post('/hints/get', {})).json(), { ok: false, code: 'HINTS_UNAVAILABLE' });

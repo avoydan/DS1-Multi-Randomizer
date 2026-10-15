@@ -4,7 +4,8 @@ import { randomUUID } from 'node:crypto';
 import { readFile, writeFile, mkdir, access } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { migrateSettings, normalizeGamePath, type StoredSettings } from './settings.js';
+import { migrateSettings, normalizeFreeCursorShortcut, normalizeGamePath, type StoredSettings } from './settings.js';
+import { createCursorHelper } from './cursorHelper.js';
 import { launchGame } from './launchGame.js';
 import { DesktopLog, installModeOf } from './appLog.js';
 import { MAX_SAVE_BYTES, SAVE_KINDS, parseSaveRequest, saveBytes } from './saveFile.js';
@@ -36,6 +37,13 @@ let buildChannel: BuildChannel = 'public';
 let devToolsShown = false;
 /** The application's own log (userData/logs/app.log); the backend and the support bundle read it. */
 const desktopLog = new DesktopLog(path.join(app.getPath('userData'), 'logs', 'app.log'));
+const cursorHelper = createCursorHelper(
+  () => app.isPackaged
+    ? path.join(runtimeRoot, 'tools', 'game-cursor-helper', 'GameCursorHelper.exe')
+    : path.join(currentDirectory, '..', 'release', 'runtime', 'tools', 'game-cursor-helper', 'GameCursorHelper.exe'),
+  (file) => access(file).then(() => true, () => false),
+  (message) => desktopLog.write('error', message, 'GAME_CURSOR_HELPER'),
+);
 
 /** The language the person chose, or the operating system's when it is Auto (docs/I18N.md). Resolved before the window exists. */
 const systemLocales = (): string[] => [...app.getPreferredSystemLanguages(), app.getLocale()];
@@ -112,6 +120,7 @@ async function startBackend(): Promise<void> {
       DS1TR_APP_LOG: desktopLog.file,
       DS1TR_DESKTOP_VERSION: app.getVersion(),
       DS1TR_INSTALL_MODE: installModeOf(app.isPackaged, process.env),
+      DS1TR_DISTRIBUTION: buildDistribution,
     },
     stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
     windowsHide: true,
@@ -299,6 +308,25 @@ ipcMain.handle('runtime:connection', () => ({
 }));
 // Updates: a narrow surface. Only the main window may call it, nothing takes a path or an address, and the renderer never touches the updater object.
 const fromMainWindow = (event: IpcMainInvokeEvent): boolean => mainWindow !== null && event.sender === mainWindow.webContents;
+ipcMain.handle('game-conveniences:get-free-cursor', (event) => fromMainWindow(event) && settings.freeCursorInMenus === true);
+ipcMain.handle('game-conveniences:get-free-cursor-shortcut', (event) => fromMainWindow(event) ? settings.freeCursorShortcut ?? 'F10' : null);
+ipcMain.handle('game-conveniences:set-free-cursor', async (event, enabled: unknown) => {
+  if (!fromMainWindow(event) || typeof enabled !== 'boolean') return false;
+  settings = { ...settings, freeCursorInMenus: enabled };
+  await saveSettings();
+  await cursorHelper.setEnabled(enabled, settings.freeCursorShortcut ?? 'F10');
+  desktopLog.write('info', `free cursor in menus ${enabled ? 'enabled' : 'disabled'}`);
+  return true;
+});
+ipcMain.handle('game-conveniences:set-free-cursor-shortcut', async (event, value: unknown) => {
+  if (!fromMainWindow(event)) return false;
+  const shortcut = normalizeFreeCursorShortcut(value);
+  if (!shortcut) return false;
+  if (!await cursorHelper.setShortcut(shortcut)) return false;
+  settings = { ...settings, freeCursorShortcut: shortcut };
+  await saveSettings();
+  return true;
+});
 function currentUpdateState(): UpdateState {
   if (updates) return updates.getState();
   if (inertUpdates) return inertUpdates.getState();
@@ -328,6 +356,7 @@ ipcMain.handle('game:launch', (_event, gamePath: string) => launchGame(typeof ga
 app.whenReady().then(async () => {
   await loadBuildInfo();
   await loadSettings();
+  if (settings.freeCursorInMenus === true) await cursorHelper.setEnabled(true, settings.freeCursorShortcut ?? 'F10');
   if (buildDistribution !== 'github') {
     const distribution = buildDistribution === 'nexus' ? 'nexus' : 'unavailable';
     inertUpdates = createInertUpdateOperations(unavailableUpdateState({ distribution, currentVersion: app.getVersion(), autoCheck: settings.updates?.autoCheck !== false, nexusPageUrl }));

@@ -4,15 +4,16 @@ import path from 'node:path';
 import type { EnemyPlacementAlgorithm, FogLanguage, RandomizerConfig } from '@ds1tr/contracts';
 import { executeCombinedGeneration, type CombinedGenerationResult } from '../adapters/combinedRandomizerBridge.js';
 import { buildFogCompatibility, decideFogRetry, defaultFogRetryBounds, planFogStaging } from '../adapters/fogCompatibility.js';
-import { FogHostProcess, type FogHostResponse } from '../adapters/fogHostProcess.js';
+import { FogHostProcess, fogHostSchemaVersion, type FogHostRequest, type FogHostResponse } from '../adapters/fogHostProcess.js';
 import { userMessageFor } from './userMessages.js';
-import { readFogItemRules, type FogTrackedItems } from '../adapters/fogItemRules.js';
+import { trackedItemsFromCompactProjection, type FogTrackedItems } from '../adapters/fogItemRules.js';
+import { legacyFogTrackedItems } from '../adapters/legacyFogTrackedItems.js';
 import { loadProgressionModel, type ProgressionModel, type ProgressionModelResult, type ProgressionModelVariant } from '../adapters/progressionModel.js';
 import { resolveFogPrerequisites, type FogPreparationContext, type FogPrerequisiteFailure, type FogPrerequisites } from '../adapters/fogPrerequisites.js';
 import { effectiveCombinedEnabled, validateRandomizerConfig } from './configValidation.js';
 import { validateInstallation } from './installation.js';
 import { deriveAttemptSeeds } from './seeds.js';
-import { checkProfileComponents, currentGenerationProfile, type GenerationProfile } from './generationProfiles.js';
+import { checkProfileComponents, currentGenerationProfile, fogHostRuntimeForProfile, type GenerationProfile } from './generationProfiles.js';
 import type { PlacementSummary } from './placementDiagnostics.js';
 
 /** Set to `detail` to add one record per slot to the sampling-v1 diagnostics in randomizer.json (debugging only). */
@@ -47,6 +48,8 @@ export interface GenerationManifest {
   pristineSnapshotId: string | null;
   /** Package-relative directory mirroring the game root ('' = package root). */
   gameTreeRoot: string;
+  /** True only for a launcher-only run that activates without writing game files. */
+  noRandomization?: boolean;
   options: Omit<RandomizerConfig, 'gamePath' | 'masterSeed'>;
   /** Which enemy placement algorithm produced the layout, and the RNG version of its own streams (null: the frozen engine version). */
   enemyPlacement: {
@@ -132,7 +135,9 @@ export async function generateRun(
   const services = { ...defaults, ...dependencies };
   validateRandomizerConfig(request.config);
   const config = request.config;
+  const noRandomization = !effectiveCombinedEnabled(config) && !config.fog.enabled;
   const profile = request.profile ?? currentGenerationProfile();
+  const fogRuntime = fogHostRuntimeForProfile(profile);
   const bounds = profile.retryBounds;
   const drift = (observed: Parameters<typeof checkProfileComponents>[1]): string | null =>
     (request.profile ? checkProfileComponents(request.profile, observed) : null);
@@ -141,7 +146,7 @@ export async function generateRun(
   const manifest: GenerationManifest = {
     schemaVersion: 1, appVersion: services.appVersion, generationProfile: request.profile?.id ?? null, seedCode: request.seedCode ?? null,
     game: 'DSR', masterSeed: config.masterSeed,
-    pristineSnapshotId: null, gameTreeRoot: '',
+    pristineSnapshotId: null, gameTreeRoot: '', noRandomization,
     options: { items: config.items, enemies: config.enemies, fog: config.fog, output: config.output },
     enemyPlacement: {
       algorithm: config.enemies.placement.algorithm,
@@ -192,11 +197,15 @@ export async function generateRun(
   // Item difficulty orders the candidate locations by depth in the world graph, so it needs the same model (the vanilla variant) as key placement.
   const difficultyOn = effectiveCombinedEnabled(config) && config.items.enabled && (config.items.itemDifficulty ?? 'fair') !== 'fair';
   const keysShuffled = keysOn || difficultyOn;
+  if ((config.fog.enabled || keysShuffled) && !fogRuntime) {
+    return fail('fog', 'GENERATION_PROFILE_MISMATCH', `Generation profile ${profile.id} has no supported FogHost runtime contract.`);
+  }
   let fogReady: FogPrerequisites | null = null;
   if (config.fog.enabled || keysShuffled) {
     progress('fog', 0.12, config.fog.enabled ? 'Preparing fog randomizer...' : 'Preparing world data for key placement...');
     const prerequisites = await services.getFogPrerequisites(config.fog.language, {
       pristineDirectory: pristine.directory,
+      fogRuntime: fogRuntime!,
       onProgress: (event) => progress('fog', 0.12 + 0.03 * event.fraction, event.message),
     });
     if (!prerequisites) {
@@ -212,18 +221,24 @@ export async function generateRun(
       return fail('fog', code === 'FOG_HOST_MISSING' ? 'FOG_PREREQUISITES_MISSING' : code, userMessage);
     }
     fogReady = prerequisites;
-    const dataDrift = drift({ worldDataId: prerequisites.worldDataId });
+    const dataDrift = drift({
+      worldDataId: prerequisites.worldDataId,
+      compactCatalogVersion: prerequisites.compactProjection?.catalogVersion,
+      compactCatalogFingerprint: prerequisites.compactProjection?.catalogFingerprint,
+    });
     if (dataDrift) return fail('fog', 'GENERATION_PROFILE_MISMATCH', dataDrift);
     try { await requireFile(fogReady.executablePath); await access(fogReady.dataRoot); }
     catch { return fail('fog', 'FOG_PREREQUISITES_MISSING', 'The fog randomizer files could not be found. Click Retry; if it keeps failing, download DS1 Multi Randomizer again.'); }
   }
 
-  // The fog randomizer follows some items by lot; the item shuffle must keep them where it can (fogItemRules.ts).
+  // The fog randomizer follows items by lot. New profiles use the same Compact catalog projection as FogHost;
+  // historical profiles use their frozen tracking snapshot.
   let fogTrackedItems: FogTrackedItems | null = null;
   if (fogReady) {
-    try { fogTrackedItems = await readFogItemRules(fogReady.dataRoot); } catch (error) {
-      return fail('fog', 'FOG_ITEM_RULES_UNREADABLE', error instanceof Error ? error.message : String(error));
-    }
+    if (profile.fogAnnotationSource === 'compact-v1') {
+      if (!fogReady.compactProjection) return fail('fog', 'FOG_COMPACT_PROJECTION_UNAVAILABLE', 'The Compact catalog projection is missing.');
+      fogTrackedItems = trackedItemsFromCompactProjection(fogReady.compactProjection);
+    } else fogTrackedItems = legacyFogTrackedItems();
   }
 
   let progressionModel: ProgressionModel | null = null;
@@ -241,7 +256,7 @@ export async function generateRun(
     };
   }
 
-  const combinedEnabled = effectiveCombinedEnabled(config);
+  const combinedEnabled = !noRandomization && effectiveCombinedEnabled(config);
   let combinedAttempt = 0;
   let fogAttempt = 0;
   while (combinedAttempt < bounds.maxCombinedAttempts) {
@@ -254,6 +269,7 @@ export async function generateRun(
         gamePath: pristine.directory, workspacePath: attemptWorkspace,
         masterSeed: config.masterSeed, combinedSeed: seeds.combined,
         items: engineKeyMode === keyMode ? config.items : { ...config.items, keyPlacement: engineKeyMode }, enemies: config.enemies,
+        roamingBossDestinationPolicy: profile.roamingBossDestinationPolicy,
         generateSpoilerLog: config.output.generateSpoilerLog,
         includeDlc: config.output.includeDlc,
         placementDiagnosticsLevel: process.env[placementDiagnosticsVariable] === 'detail' ? 'detail' : 'summary',
@@ -344,14 +360,22 @@ export async function generateRun(
       } catch (error) { return fail('fog', 'FOG_STAGING_FAILED', String(error)); }
       progress('fog', 0.7, 'Generating fog layout.');
       const { enabled: _enabled, language, ...options } = config.fog;
+      const commonRequest = {
+        game: 'DS1R' as const, mode: 'write' as const, seed: attemptSeeds.fog, options, language,
+        fogDataRoot: fogReady!.dataRoot, stagingDirectory: staging.value.stagingDirectory,
+        logPath: staging.value.logPath, compatibility,
+      };
+      const fogRequest: FogHostRequest = fogRuntime!.schemaVersion === 2
+        ? { schemaVersion: 2, ...commonRequest }
+        : { schemaVersion: fogHostSchemaVersion, ...commonRequest,
+          annotationSource: fogRuntime!.annotationSource,
+          pristineGameDirectory: pristine.directory,
+          expectedAnnotationFingerprint: fogReady!.compactProjection?.catalogFingerprint ?? '' };
       const response: FogHostResponse = await services.fog.execute({
         executablePath: fogReady!.executablePath,
         requestPath: staging.value.requestPath, responsePath: staging.value.responsePath,
         timeoutMs: 300_000,
-        request: { schemaVersion: 2, game: 'DS1R', mode: 'write', seed: attemptSeeds.fog,
-          options, language, fogDataRoot: fogReady!.dataRoot,
-          stagingDirectory: staging.value.stagingDirectory, logPath: staging.value.logPath,
-          compatibility },
+        request: fogRequest,
       }, (event) => {
         if (event.type === 'log') onEvent({ type: 'log', stage: 'fog', level: event.stream === 'stderr' ? 'warning' : 'info', message: event.message, component: 'fog-host' });
         else progress('fog', 0.75, event.message);

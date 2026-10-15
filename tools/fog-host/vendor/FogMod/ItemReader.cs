@@ -19,32 +19,59 @@ namespace FogMod
             Dictionary<string, PARAM> Params = editor.LoadParams(layouts);
 
             Dictionary<int, PARAM.Row> lots = Params["ItemLotParam"].Rows.ToDictionary(r => (int)r.ID, r => r);
-            Dictionary<string, string> itemsById = ann.KeyItems.ToDictionary(item => item.ID, item => item.Name);
+            Dictionary<string, Item> itemsById = ann.KeyItems.ToDictionary(item => item.ID, item => item);
             Dictionary<string, string> itemAreas = g.itemAreas;
-            foreach (KeyValuePair<int, string> entry in ann.LotLocations)
+
+            void ProcessLot(int annotationLot, int lotId, string area, PARAM.Row row)
             {
-                int lot = entry.Key;
-                if (!g.areas.ContainsKey(entry.Value)) throw new Exception($"Internal error in lot config for {entry.Key}: {entry.Value} does not exist");
-                while (true)
+                for (int i = 1; i <= 8; i++)
                 {
-                    // It's also fine to not have a lot defined as long as all key items are found
-                    if (!lots.TryGetValue(lot, out PARAM.Row row)) break;
-                    for (int i = 1; i <= 8; i++)
+                    int item = (int)row[$"lotItemId0{i}"].Value;
+                    if (item == 0) continue;
+                    int category = (int)row[$"lotItemCategory0{i}"].Value;
+                    category = Universe.LotTypes.TryGetValue((uint)category, out int value) ? value : -1;
+                    if (category == -1) continue;
+                    string id = $"{category}:{item}";
+                    if (opt["debuglots"]) Console.WriteLine($"{annotationLot} (row {lotId}) in {area} has {id}");
+                    if (itemsById.TryGetValue(id, out Item keyItem))
                     {
-                        int item = (int)row[$"lotItemId0{i}"].Value;
-                        if (item == 0) continue;
-                        int category = (int)row[$"lotItemCategory0{i}"].Value;
-                        category = Universe.LotTypes.TryGetValue((uint)category, out int value) ? value : -1;
-                        if (category == -1) continue;
-                        string id = $"{category}:{item}";
-                        if (opt["debuglots"]) Console.WriteLine($"{entry.Key} in {entry.Value} has {id}");
-                        if (itemsById.TryGetValue(id, out string name))
+                        string name = keyItem.Name;
+                        if (itemAreas[name] != null && itemAreas[name] != area)
                         {
-                            if (itemAreas[name] != null && itemAreas[name] != entry.Value) throw new Exception($"Item {name} found in both {itemAreas[name]} and {entry.Value}");
-                            itemAreas[name] = entry.Value;
+                            // Compact's exact source rows can contain multiple vanilla copies of an
+                            // optional key item. Keep the first (lowest-ID) source as its graph
+                            // representative; these items are not shuffled, and every physical lot
+                            // remains untouched. Required key items still reject ambiguous owners.
+                            if (ann.CompactLotLocations != null && keyItem.HasTag("randomonly")) continue;
+                            throw new Exception($"Item {name} found in both {itemAreas[name]} and {area}");
                         }
+                        itemAreas[name] = area;
                     }
-                    lot++;
+                }
+            }
+
+            if (ann.CompactLotLocations != null)
+            {
+                foreach (KeyValuePair<int, string> entry in ann.CompactLotLocations.OrderBy(entry => entry.Key))
+                {
+                    if (!g.areas.ContainsKey(entry.Value)) throw new Exception($"Internal error in exact Compact lot config for {entry.Key}: {entry.Value} does not exist");
+                    // Compact ownership is backed by exact pristine references. Never expand it into adjacent IDs.
+                    if (lots.TryGetValue(entry.Key, out PARAM.Row row)) ProcessLot(entry.Key, entry.Key, entry.Value, row);
+                }
+            }
+            else
+            {
+                foreach (KeyValuePair<int, string> entry in ann.LotLocations)
+                {
+                    int lot = entry.Key;
+                    if (!g.areas.ContainsKey(entry.Value)) throw new Exception($"Internal error in lot config for {entry.Key}: {entry.Value} does not exist");
+                    while (true)
+                    {
+                        // It's also fine to not have a lot defined as long as all key items are found
+                        if (!lots.TryGetValue(lot, out PARAM.Row row)) break;
+                        ProcessLot(entry.Key, lot, entry.Value, row);
+                        lot++;
+                    }
                 }
             }
             if (opt["explain"])

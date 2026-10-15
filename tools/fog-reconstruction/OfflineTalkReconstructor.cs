@@ -36,17 +36,31 @@ namespace FogReconstruction
 
         internal static void Build(string pristineRoot, string referenceRoot, string outputRoot)
         {
+            BuildCore(pristineRoot, referenceRoot, outputRoot);
+        }
+
+        internal static void BuildFromPristine(string pristineRoot, string outputRoot)
+        {
+            BuildCore(pristineRoot, null, outputRoot);
+        }
+
+        private static void BuildCore(string pristineRoot, string referenceRoot, string outputRoot)
+        {
             string sourceRoot = Path.GetFullPath(pristineRoot);
-            string oracleRoot = Path.GetFullPath(referenceRoot);
+            string oracleRoot = referenceRoot == null ? null : Path.GetFullPath(referenceRoot);
             string finalRoot = Path.GetFullPath(outputRoot);
+#if FOG_RECONSTRUCTION_DEV
             string repositoryRoot = FindRepositoryRoot(Environment.CurrentDirectory);
             EnsureOutsideRepository(finalRoot, repositoryRoot);
+#endif
             EnsureDistinctRoots(sourceRoot, oracleRoot, finalRoot);
             if (Directory.Exists(finalRoot) || File.Exists(finalRoot))
                 throw new IOException("Offline Talk output already exists; select a new output path: " + finalRoot);
 
-            RecipeExtractor.VerifyPristineBaseFiles(sourceRoot);
-            DataRoot.Verify(oracleRoot);
+            PristineFogInputs.Verify(sourceRoot);
+#if FOG_RECONSTRUCTION_DEV
+            if (oracleRoot != null) DataRoot.Verify(oracleRoot);
+#endif
             List<DataRoot.Entry> entries = DataRoot.Manifest
                 .Where(entry => entry.Path.StartsWith(TalkPrefix, StringComparison.Ordinal))
                 .OrderBy(entry => entry.Path, StringComparer.Ordinal)
@@ -75,17 +89,25 @@ namespace FogReconstruction
                 DCX.Type outerCompression = DCX.Type.None;
                 byte[] binderBytes = DCX.Is(sourceBytes) ? DCX.Decompress(sourceBytes, out outerCompression) : sourceBytes;
                 IBinder sourceBinder = ReadBinder(binderBytes);
-                IBinder oracleBinder = ReadBinder(ReadOuter(Path.Combine(oracleRoot, entry.Path.Replace('/', Path.DirectorySeparatorChar)), out _));
-                RequireSameContainerMetadata(name, sourceBinder, oracleBinder, "source", "oracle");
-
-                Dictionary<string, ESD> oracleScripts = ReadEsdScripts(oracleBinder);
+#if FOG_RECONSTRUCTION_DEV
+                IBinder oracleBinder = null;
+                Dictionary<string, ESD> oracleScripts = null;
+                if (oracleRoot != null)
+                {
+                    oracleBinder = ReadBinder(ReadOuter(Path.Combine(oracleRoot, entry.Path.Replace('/', Path.DirectorySeparatorChar)), out _));
+                    RequireSameContainerMetadata(name, sourceBinder, oracleBinder, "source", "oracle");
+                    oracleScripts = ReadEsdScripts(oracleBinder);
+                }
+#endif
                 var presentScripts = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 foreach (BinderFile binderFile in sourceBinder.Files)
                 {
                     if (!IsEsdEntry(binderFile.Name)) continue;
                     if (!presentScripts.Add(binderFile.Name)) throw new InvalidDataException($"Duplicate Talk script entry {binderFile.Name} in {name}.");
-                    if (!oracleScripts.TryGetValue(binderFile.Name, out ESD oracleScript))
+#if FOG_RECONSTRUCTION_DEV
+                    if (oracleScripts != null && !oracleScripts.TryGetValue(binderFile.Name, out _))
                         throw new InvalidDataException($"Oracle is missing Talk script {name}:{binderFile.Name}.");
+#endif
 
                     DCX.Type innerCompression = DCX.Type.None;
                     byte[] esdBytes = DCX.Is(binderFile.Bytes) ? DCX.Decompress(binderFile.Bytes, out innerCompression) : binderFile.Bytes;
@@ -96,9 +118,14 @@ namespace FogReconstruction
                         appliedPlan.Add(name + "|" + Path.GetFileName(binderFile.Name.Replace('\\', '/')));
                         normalizedExpressions += TalkBytecodeNormalizer.Normalize(script);
                     }
-                    SemanticComparison comparison = SemanticComparer.Compare(script, oracleScript);
-                    if (!comparison.Equal)
-                        throw new InvalidDataException($"Reconstructed Talk script {name}:{binderFile.Name} differs from the development oracle at {comparison.FirstDifference}.");
+#if FOG_RECONSTRUCTION_DEV
+                    if (oracleScripts != null)
+                    {
+                        SemanticComparison comparison = SemanticComparer.Compare(script, oracleScripts[binderFile.Name]);
+                        if (!comparison.Equal)
+                            throw new InvalidDataException($"Reconstructed Talk script {name}:{binderFile.Name} differs from the development oracle at {comparison.FirstDifference}.");
+                    }
+#endif
                     if (TalkNormalizationPlan.ShouldNormalize(name, binderFile.Name))
                     {
                         byte[] serialized = script.Write();
@@ -106,25 +133,36 @@ namespace FogReconstruction
                     }
                     scripts++;
                 }
-                if (presentScripts.Count != oracleScripts.Count)
+#if FOG_RECONSTRUCTION_DEV
+                if (oracleScripts != null && presentScripts.Count != oracleScripts.Count)
                     throw new InvalidDataException($"Talk script entry membership differs in {name}: source={presentScripts.Count}, oracle={oracleScripts.Count}.");
+#endif
 
                 byte[] serializedBinder = WriteBinder(sourceBinder);
                 byte[] outputBytes = outerCompression == DCX.Type.None ? serializedBinder : DCX.Compress(serializedBinder, outerCompression);
                 string outputPath = Path.Combine(stagingTalk, name);
                 File.WriteAllBytes(outputPath, outputBytes);
-                VerifyOutput(name, outputPath, sourceBinder, oracleBinder);
+#if FOG_RECONSTRUCTION_DEV
+                if (oracleBinder != null) VerifyOutput(name, outputPath, sourceBinder, oracleBinder);
+                else
+#endif
+                    VerifyOutputFromSource(name, outputPath, sourceBinder);
             }
 
             if (scripts != 178 || normalizedScripts != TalkNormalizationPlan.EntryCount
                 || appliedPlan.Count != TalkNormalizationPlan.EntryCount)
                 throw new InvalidDataException($"Expected 178 ESD scripts and {TalkNormalizationPlan.EntryCount} planned normalizations; found scripts={scripts}, normalized={normalizedScripts}, matched-plan={appliedPlan.Count}.");
             Directory.Move(stagingRoot, finalRoot);
-            Console.WriteLine($"Offline Talk reconstruction passed semantic parity for {entries.Count}/17 archives and {scripts}/178 ESD scripts; applied {normalizedScripts}/73 planned ESD normalizations.");
+#if FOG_RECONSTRUCTION_DEV
+            if (oracleRoot != null)
+                Console.WriteLine($"Offline Talk reconstruction passed semantic parity for {entries.Count}/17 archives and {scripts}/178 ESD scripts; applied {normalizedScripts}/73 planned ESD normalizations.");
+            else
+#endif
+                Console.WriteLine($"Reconstructed and decoded {entries.Count}/17 Talk archives and {scripts}/178 ESD scripts; applied {normalizedScripts}/73 planned normalizations.");
             Console.WriteLine($"Project-owned ESD normalization changed {normalizedExpressions} bytecode expressions/compatibility edits.");
-            Console.WriteLine("Output contains only reconstructed Talk archives and is a development artifact, not a complete Fog data root.");
         }
 
+#if FOG_RECONSTRUCTION_DEV
         private static void VerifyOutput(string name, string outputPath, IBinder sourceBinder, IBinder oracleBinder)
         {
             byte[] outputBytes = ReadOuter(outputPath, out _);
@@ -142,6 +180,19 @@ namespace FogReconstruction
                     throw new InvalidDataException($"Serialized Talk script {name}:{scriptName} differs from the development oracle at {comparison.FirstDifference}.");
             }
             Console.WriteLine($"PASS Talk archive and script parity talk/{name} ({outputScripts.Count} ESD entries)");
+        }
+#endif
+
+        private static void VerifyOutputFromSource(string name, string outputPath, IBinder sourceBinder)
+        {
+            byte[] outputBytes = ReadOuter(outputPath, out _);
+            IBinder outputBinder = ReadBinder(outputBytes);
+            RequireSameContainerMetadata(name, sourceBinder, outputBinder, "source", "output");
+            Dictionary<string, ESD> sourceScripts = ReadEsdScripts(sourceBinder);
+            Dictionary<string, ESD> outputScripts = ReadEsdScripts(outputBinder);
+            if (!sourceScripts.Keys.OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+                    .SequenceEqual(outputScripts.Keys.OrderBy(value => value, StringComparer.OrdinalIgnoreCase), StringComparer.OrdinalIgnoreCase))
+                throw new InvalidDataException($"Reconstructed Talk archive {name} changed ESD entry membership.");
         }
 
         private static Dictionary<string, ESD> ReadEsdScripts(IBinder binder)
@@ -211,7 +262,7 @@ namespace FogReconstruction
 
         private static void EnsureDistinctRoots(string source, string oracle, string output)
         {
-            string[] roots = { source, oracle, output };
+            string[] roots = oracle == null ? new[] { source, output } : new[] { source, oracle, output };
             for (int i = 0; i < roots.Length; i++)
                 for (int j = i + 1; j < roots.Length; j++)
                     if (IsSameOrChild(roots[i], roots[j]) || IsSameOrChild(roots[j], roots[i]))

@@ -20,8 +20,10 @@ test('every test world the document names is a test world of the app, with its e
   for (const world of worlds.filter((entry) => entry.category === 'quick')) assert.ok(rows.includes(world.title), `${world.title} is listed`);
 });
 
-test('the Seed Codes of the full-playthrough worlds are the codes of their recipes', () => {
-  const documented = [...text.matchAll(/^(DS1TR1-[0-9A-Z-]+)$/gmu)].map((match) => match[1]);
+test('the six v3 owner-checklist Seed Codes are the codes of their recipes', () => {
+  const section = text.split('## 4. V3 owner gameplay checklist')[1]?.split('## 5. Report')[0] ?? '';
+  const documented = [...section.matchAll(/^\* \*\*Seed Code:\*\* `([^`]+)`$/gmu)].map((match) => match[1]);
+  assert.equal(documented.length, 6, 'the owner checklist stays bounded to six high-value worlds');
   assert.deepEqual(documented, qaWorldCodes().map((world) => world.seedCode));
 });
 

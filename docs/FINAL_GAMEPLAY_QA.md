@@ -69,81 +69,57 @@ The other extended worlds (the list under "Extended gameplay tests") are lower p
 | DLC intact | With the DLC installed, reach it in that world | The DLC area, enemies, bosses and items are exactly as in the normal game |
 | DLC on | Any world with **DLC content** on | As before: the DLC enemies, bosses and items take part in the randomization |
 
-## 4. Full playthrough worlds
+## 4. V3 owner gameplay checklist
 
-Press **Load seed**, paste the Seed Code into **Shared seed code**, press **Load**, then **Apply to game**. Each is meant to be played from a new game as far as the "Stop at" point; a full run to the end is welcome but not required. Times are rough estimates. **Static check (AUTOMATED VERIFIED):** every world below was generated twice through the real pipeline on a copy of the game (`node apps/backend/scripts/qaWorlds.mjs verify`) and the two packages are identical; the recipes are in `apps/backend/scripts/qaWorlds.mjs` and a test fails if a code in this document is not the code of its recipe.
+These six Seed Codes target the current `ds1tr-gen-v3` profile and cover the highest-risk combined settings. Load each code, apply it to the QA game copy, start a new game, and restore the original files before the next world. The exact recipes are in `apps/backend/scripts/qaWorlds.mjs`; `finalQaDoc.test.mjs` checks that each displayed code matches its recipe. These worlds are generated recipes, not gameplay evidence. **Every world below is GAMEPLAY UNVERIFIED.** Estimated times are minimum useful checks, not full playthrough times.
 
-### Recommended Triple
+### Recommended Triple v3
 
-* **World:** The recommended settings (fresh-install defaults plus Soul items **Transposed**): items, regular enemies and bosses with the fog randomizer.
-* **Time:** About 2-3 h.
-* **Stop at:** The Bell of Awakening in the Undead Parish.
-* **Look for:** Fog gates and warps lead somewhere and the game never traps you; bosses appear and reward their souls; weapons made from boss souls can be forged.
-* **Status:** GAMEPLAY UNVERIFIED
+* **Seed Code:** `DS1TR1-06NWCQQ3-32HXEE45-H6X6BHNT-8PMWKYDS-Q6MQJAD9-56X2AHCS-0MWTKEM6-MCTX1G6M-80JMB2BS-RM2ZKHD3-EM8AJX8G-E9MM0P85-0GQ4MW2P-7RM8BHB8-8MT88AH2-01GQ92F8`
+* **Critical settings:** fresh-install defaults, all three randomizers enabled; Soul items **Transposed**.
+* **Check:** Undead Asylum to Undead Parish; first boss gate and reward; follow a randomized fog gate and one Area Warp when found; verify the first boss-soul weapon can be forged if its soul is obtained.
+* **Pass:** game starts, transitions complete, enemies fight and die, rewards and item pickups work, and no route soft-locks.
+* **Minimum time:** 30 minutes.
 
-```
-DS1TR1-06NJDCP6-556D8KEB-SH5WSM9D-996WXKYD-9Q6MPJAD-T4THSBBX-0TKFCA99-9B62PBP8-5WFATZT8-NNZS0JR2-S8N1YW1H-GASY4G99-5132Q891-AG4G204R-25WWT
-```
+### Heavy Fog v3: bosses, PvP, Lordvessel and Warps
 
-### Chaotic Triple
+* **Seed Code:** `DS1TR1-06NWCQQ3-32HXEE45-H6X6BHNT-36MRJSCN-Q9MZKTDT-GTHHBKS0-NSW7955J-ACNG746A-6GJ5TW3V-FQG0A2J6-42GYBW6H-F86A67J3-5S8JHAY4-R32H3KGA-1JJW06AT-JMCN8355-5T1RGRAM-CQ44JSAR-THJ00MF3-JXV0`
+* **Critical settings:** Fog on; traversable fogs, boss fogs, major/minor PvP fogs, Lordvessel gates, Area Warps and Require Lord Souls on; Shuffled keys with Lordvessel/Lord Souls; bosses randomized.
+* **Check:** one boss gate, one major and one minor PvP gate, a Lordvessel gate, and the Crow, Painted World and Catacombs/Tomb warp pairs as they are encountered.
+* **Pass:** every gate opens under its intended condition, boss encounters start and award correctly, both ends of each used warp return to a playable area.
+* **Minimum time:** 45 minutes.
 
-* **World:** Everything high: all item pools, bosses in regular slots and normal enemies in boss slots, hostile NPCs, fog randomizer.
-* **Time:** About 2-3 h.
-* **Stop at:** The first bell.
-* **Look for:** No crash, no passive or invisible enemy, no boss that cannot be killed; friendly NPCs still talk.
-* **Status:** GAMEPLAY UNVERIFIED
+### Random Start + Shuffled Progression v3
 
-```
-DS1TR1-06NJDCP6-556D8KEB-SH5WSMAD-SS4CRBY9-9KB3A77H-6M7SNEE8-EM5SMEW9-N5VJ0PG8-AMXJAHC9-F72GBYE5-MCAGZA8N-1XS1305N-TRRWEMF9-4KJSES0C-BJ6G7AA2-P2X0G901-E6Y6E7H8-NT177WJ1-S79CRG27-54HVZE14-6CKXBBR0-2RST658Q-9MNJW06A-HCKME
-```
+* **Seed Code:** `DS1TR1-06NWCQQ3-32HXEE45-H6X6BHNT-T1R035VR-Q941B0XE-W5M3TD48-XCGHV9FC-TK501912-1S4HFQ2Y-3XWFK0GH-91M1JZNM-BB1THNMG-1CCCNTHM-E3MR9CSY-8CMQYHJR-VM332X48-ASPG1V4V-HH80`
+* **Critical settings:** random start, traversable/boss fogs and Area Warps on; Shuffled key placement with Lordvessel and Lord Souls shuffled; Require Lord Souls on.
+* **Check:** note the actual starting location; verify the first required key is reachable, use the hint sheet to find progression items, and confirm the Firelink Altar/Lordvessel route remains reachable.
+* **Pass:** the start is playable, required items are not behind their own gates, the hint sheet agrees with pickups, and a route to required areas exists.
+* **Minimum time:** 45 minutes.
 
-### Fog with shuffled keys
+### Disconnected Fog + Require Lord Souls v3
 
-* **World:** Fog randomizer with **Key placement: Shuffled**, Lordvessel and Lord Souls shuffled.
-* **Time:** About 3-4 h.
-* **Stop at:** Anor Londo, or the point where a key is needed.
-* **Look for:** The keys can be found; no area needs a key you cannot reach; Firelink Altar stays reachable (the hint sheet shows where the keys are).
-* **Status:** GAMEPLAY UNVERIFIED
+* **Seed Code:** `DS1TR1-06NWCQQ3-32HXEE45-H6X6BHNT-S3MMM5WM-41TM2SB2-P6QE2T1N-6J4AP88X-MQPD9JG0-MG90WJ8Q-VHF1YY7H-G88MGT7S-FPT5DGX8-TP8CP5YA-N8T71RC4-PCX46ABY-GSRXB1MW-B04DAV0G-PP1VPRG3-038BRT8J`
+* **Critical settings:** disconnected fog gates and Require Lord Souls on, with traversable/boss fogs and Lordvessel gates; Shuffled keys, Lordvessel and Lord Souls.
+* **Check:** inspect both sides of disconnected gates; collect Lord Souls and confirm their gates change as intended; verify each required key and the Lordvessel can be reached without crossing a gate that requires it.
+* **Pass:** disconnected areas stay isolated until the intended progression condition is met and every required branch can be completed.
+* **Minimum time:** 45 minutes.
 
-```
-DS1TR1-06NJDCP6-556D8KEB-SH5WSMAD-SD7XFKAE-NMPDCD8W-NNX0CWEN-MEHS97AT-36059AH1-X61DQTR3-5X9300G9-5P7RZNK4-30THJWMS-89CKA1HE-J1R5CR98-8Q76GX9P-GJN3606Y-Z4DBT
-```
+### Heavy Roaming Bosses + Fog v3
 
-### Race Mode
+* **Seed Code:** `DS1TR1-06NWCQQ3-32HXEE45-H6X6BHK8-KV84VJTF-TWTHSBC1-8SNT18AM-0CGSE1D4-AMZMKY95-37RBM1TW-HBGARXTG-S84YNNJ1-J150BRJR-SWY3ZC1V-GDSZ4G99-27P74T0Y-0N2HMD7D-M05TE5G7-JWJ5DEN4-4TKC0JJY-VBB6MM5H-25DAJ080-WGSK3XR`
+* **Critical settings:** `sampling-v1`; regular enemy replacements include bosses at 100%; roaming boss souls 100% and stay-dead on; Fog, boss/traversable gates, Area Warps and major PvP fogs on.
+* **Check:** several regular enemy slots in early areas, one roaming boss death/rest cycle, one arena boss, then one fog gate and one Area Warp.
+* **Pass:** roaming bosses spawn, fight, drop the expected souls and respect stay-dead; arena bosses and Fog transitions still work.
+* **Minimum time:** 45 minutes.
 
-* **World:** **Race Mode** without fog or enemy randomization: keys and embers only in boss rewards, chests and key places.
-* **Time:** About 3-4 h.
-* **Stop at:** The first three keys or the first bell.
-* **Look for:** The hint sheet (**...** -> **View hints** on the world, Progression level) matches what you find; no key is unreachable.
-* **Status:** GAMEPLAY UNVERIFIED
+### Hard Combined Configuration v3
 
-```
-DS1TR1-06NJDCP6-556D8KEB-SH5WSM9D-9964XN9N-3JPQC1N6-V8MJJJPC-5CQCGBS6-A3RYGA35-MXB0C84N-D52S0RGS-DTNGZF1G-R4425D6W-HPHGWGZQ-RT4ANH4G-HC9WMTHG-E1CR9CZP-88MPTT2Z-JD0M6TDM-5AHM4N86-03X62DVN
-```
-
-### Race Mode +
-
-* **World:** **Race Mode +**: the world may need a skip or glitch (the Capra skip, the Seal skip).
-* **Time:** About 3-4 h.
-* **Stop at:** The first skip the hint sheet names.
-* **Look for:** Where a skip is needed, it works as the hint sheet says; a needed skip is a property of this mode, not a defect.
-* **Status:** GAMEPLAY UNVERIFIED
-
-```
-DS1TR1-06NJDCP6-556D8KEB-SH5WSM9D-9964WBE8-54PXCD8W-NNX0CWEN-MEHS97AT-36059AM1-W96HE53H-9941DYY0-SCA8RM22-SFJ3HAHJ-EJFRSA5T-1JWN98DC-481HEJ9R-5CRS8GM7-YRAHMD4M-8SNK8APM-D00AWDAD-CW
-```
-
-### DLC content left out
-
-* **World:** **DLC content** off with all item pools and Soul items **Transposed**, no fog randomizer.
-* **Time:** About 2 h to the first bell, plus 20 min in the DLC if you own it.
-* **Stop at:** The first bell; then the DLC.
-* **Look for:** No DLC item or enemy appears in the base game; the DLC itself is untouched.
-* **Status:** GAMEPLAY UNVERIFIED
-
-```
-DS1TR1-06NJDCP6-556D8KEB-SH5WSMAD-S54XDKAF-9F9KA77H-6M7SNEE8-EM5SMEW9-N5VJ0PG8-AMXJAHC9-F72GBYE5-MCAGZA8N-1XS12G2S-NM1JWFVG-TRW2G984-XNNHYT18-HNB3Z52M-7XG2VDDN-PM0DB5YR-78
-```
+* **Seed Code:** `DS1TR1-06NWCQQ3-32HXEE45-H6X6BHNT-364MAADT-S7WVJJCS-F6MJKEP6-MEAWZG2M-7RJMB2BS-RM2ZKH84-N8FHV9FC-TK50194J-1PMX50PV-XG1JYNHG-G84J77W3-4BC0AQMW-59CM24KY-D5F5MRK6-26QCM3PX-MWHTNDJ3-5SVJHAZA-R22HDKKA-1TJNG6JT-AMF58355-RT1RGRAM-F344J1AT-VX0R8C5B-7E43GSKD-GYBASC2P-ETR48HAC-BM3QAAF9-AMEG04XS-37Q0`
+* **Critical settings:** Items on with Shuffled keys, randomized Lordvessel and Lord Souls, **Very Unfair** placement and **Transposed** soul items; Enemies off; Fog on with traversable/boss gates, Warps, major/minor PvP, Lordvessel gates, random start, disconnected/glitched logic, Require Lord Souls, No Fall and Pacifist.
+* **Check:** note the random start; use the hint sheet to find the first key; check a Lord Soul gate, the Crow/Painted World/Catacombs warp pairs as found, and a fall-sensitive/Pacifist route. Watch for progression locks, unsafe falls or invalid warp returns.
+* **Pass:** required keys remain reachable, the Lord Soul gate opens under its condition, every used warp returns to a playable area, and the hard item mix does not destabilize the world.
+* **Minimum time:** 60 minutes.
 
 ## 5. Report
 
@@ -159,8 +135,13 @@ For each test write: the title (or the Seed Code), PASS or FAIL, and for a FAIL 
 **GAMEPLAY UNVERIFIED** until the owner has played it. It is not a test world of the internal list (nothing is added to the public build); it is a Seed Code and the exact settings.
 
 * **Seed Code** (paste it into **Seed Code** -> **Load a Seed Code**; it makes the world at once):
-  `DS1TR1-06NJDCP6-556D8K85-FC9N982N-X9K1DTS6-GAYT4TT8-P0344BV8-8YNT18AT-0PGSE5A3-PG744BGD-92NR184S-EX8DAFYG-R0CTV058-A00G2073-EA43C`
+  `DS1TR1-06NWCQQ3-32GXEE45-H6XAJR3F-G85B8JPX-SHHDTH5G-AXT0T2EP-83M0BVB8-2MT59AS0-YJS6526P-874AA0B9-2M839WRE-NBX0E6HR-MCAH059A-400CFWVG-ZM`
 * **Or set it by hand** (Advanced mode): Item randomization OFF, Transition and fog randomization OFF, Enemy randomization ON, Regular enemies ON, Boss randomization OFF, Placement method **Pick a replacement for every spot**, Replacement chance **100%**, Replace regular enemies with **Only bosses**, Size of replacements **Anywhere**, Difficulty matching **Random** (not "Random, easy Asylum"), then Generate world.
 * **What you should see:** start a new game: in the Undead Asylum the Hollows and the other ordinary enemies of the first rooms are bosses (Capra, Taurus, Asylum Demon, Pinwheel, Moonlight Butterfly, Smough, Artorias ... the same boss several times is expected); in Firelink, the Burg, the Parish nearly every ordinary enemy is a boss. Not every single spot changes: the few enemies that are scripted, passive or ghosts stay (about 150 of 1,700 in a whole world). Bosses in ordinary spots have no boss bar and no fog gate, drop 50% of their souls and (stay dead OFF) come back after a rest.
-* **Planned by the engine for this exact Seed Code** (real catalog, checked before it was written down): 1,559 roaming bosses in the world, 26 of them in the Undead Asylum, 0 ordinary-enemy replacements, nothing left unchanged for a counted reason; the first Asylum enemies are bosses such as the Pinwheel, the Asylum Demon variants, Artorias, Smough and the Moonlight Butterfly.
+* **Planned by the engine for this exact Seed Code** (v2 roaming-boss profile): 1,716 roaming bosses across all eligible ordinary destinations, including the Asylum; 0 ordinary-enemy replacements and no unexplained unchanged destinations. Asylum passive behavior remains until the player attacks.
 * **What would be a bug:** a map in which only about one enemy in ten became a boss; an ordinary enemy standing where "Only bosses" should have put a boss (Titanite Demons and Drakes included).
+
+
+## Nexus candidate automation note (2026-10-14)
+
+The six v3 worlds above were generated by the fresh local Nexus Setup and Portable packages against the safe QA copy. Apply and Restore returned all 73 generated file paths to the pristine snapshot hashes. This verifies package generation and file activation only; it does not mark any of the six worlds as played or gameplay-verified.

@@ -197,7 +197,7 @@ test('diagnostics describe the application without a single folder of the person
     const diagnostics = await gatherDiagnostics(w.deps([entry]), { gamePath: w.gameDir, language: 'en' });
     const text = JSON.stringify(diagnostics);
     assert.ok(!text.includes(w.gameDir.replace(/\\/gu, '\\\\')) && !text.includes(w.root.replace(/\\/gu, '\\\\')));
-    assert.equal(diagnostics.application.generationProfile, 'ds1tr-gen-v1');
+    assert.equal(diagnostics.application.generationProfile, 'ds1tr-gen-v2');
     assert.equal(diagnostics.application.backendVersion, '0.43.0');
     assert.equal(diagnostics.application.installMode, 'installed');
     assert.equal(diagnostics.release.signing, 'unknown');

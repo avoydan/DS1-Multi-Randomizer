@@ -213,7 +213,13 @@
       "title": "Ustawienia aplikacji",
       "note": "Język i narzędzia.",
       "languageTitle": "Język",
-      "languageNote": "Język tej aplikacji. Nigdy nie zmienia świata i nie jest częścią Seed Code."
+      "languageNote": "Język tej aplikacji. Nigdy nie zmienia świata i nie jest częścią Seed Code.",
+      "gameConveniencesTitle": "Udogodnienia gry",
+      "gameConveniencesNote": "Lokalne ustawienia launchera. Nie wpływają na losowanie świata ani Seed Code.",
+      "freeCursorLabel": "Swobodny kursor",
+      "freeCursorDescription": "Użyj skrótu, aby zwolnić kursor i przełączyć focus poza grę. Dark Souls Remastered pozostanie widoczne.",
+      "freeCursorShortcutLabel": "Skrót zwalniania kursora",
+      "freeCursorShortcutDescription": "Kliknij pole i naciśnij nowy skrót, np. F10 lub Ctrl+Shift+F8."
     },
     "about": {
       "title": "O programie",

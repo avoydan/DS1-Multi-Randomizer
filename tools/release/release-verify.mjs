@@ -87,22 +87,34 @@ for (const [kind, name] of [['installer', installerName], ['portable', portableN
 const mainExe = path.join(unpacked, policy.ds1trExecutables[0].path);
 const dataToolExe = path.join(unpacked, policy.ds1trExecutables[1].path);
 const fogHostExe = path.join(unpacked, policy.ds1trExecutables[2].path);
-const present = [mainExe, dataToolExe, fogHostExe, ...artifacts.map((artifact) => artifact.file)].filter((file) => files.length > 0);
+const legacyFogHostExe = path.join(unpacked, policy.ds1trExecutables[3].path);
+const gameCursorHelperExe = path.join(unpacked, policy.ds1trExecutables[4].path);
+const present = [mainExe, dataToolExe, fogHostExe, legacyFogHostExe, gameCursorHelperExe, ...artifacts.map((artifact) => artifact.file)].filter((file) => files.length > 0);
 const infos = await readVersionInfo(present.filter((file) => /\.exe$/iu.test(file)));
 const infoOf = (file) => infos.find((entry) => entry.file === file);
 const fogCsproj = await readFile(path.join(repositoryRoot, 'tools', 'fog-host', 'FogHost.csproj'), 'utf8');
 const fogVersion = /<Version>([^<]+)<\/Version>/u.exec(fogCsproj)?.[1];
+const legacyFogHostPin = await readJson(path.join(repositoryRoot, 'tools', 'fog-host-legacy', 'source-pin.json'));
+const cursorHelperCsproj = await readFile(path.join(repositoryRoot, 'tools', 'game-cursor-helper', 'GameCursorHelper.csproj'), 'utf8');
+const cursorHelperVersion = /<Version>([^<]+)<\/Version>/u.exec(cursorHelperCsproj)?.[1];
 const randomizerVersion = (await readJson(path.join(repositoryRoot, 'engines', 'combined', 'vendor', 'package.json'))).version;
 const fileVersionOf = (info) => (info?.fileVersion ?? '').split('.').slice(0, 3).join('.');
 if (infoOf(mainExe) && fileVersionOf(infoOf(mainExe)) !== version) fail('versions', `the application executable says ${infoOf(mainExe).fileVersion}, package.json says ${version}`);
 if (infoOf(fogHostExe) && fileVersionOf(infoOf(fogHostExe)) !== fogVersion) fail('versions', `FogHost.exe says ${infoOf(fogHostExe).fileVersion}, FogHost.csproj says ${fogVersion}`);
-for (const [label, file] of [['application', mainExe], ['DsrDataTool', dataToolExe], ['FogHost', fogHostExe]]) {
+if (infoOf(legacyFogHostExe) && fileVersionOf(infoOf(legacyFogHostExe)) !== legacyFogHostPin.version) fail('versions', `legacy FogHost.exe says ${infoOf(legacyFogHostExe).fileVersion}, source pin says ${legacyFogHostPin.version}`);
+if (infoOf(gameCursorHelperExe) && fileVersionOf(infoOf(gameCursorHelperExe)) !== cursorHelperVersion) fail('versions', `GameCursorHelper.exe says ${infoOf(gameCursorHelperExe).fileVersion}, GameCursorHelper.csproj says ${cursorHelperVersion}`);
+for (const [label, file] of [['application', mainExe], ['DsrDataTool', dataToolExe], ['FogHost', fogHostExe], ['legacy FogHost', legacyFogHostExe], ['GameCursorHelper', gameCursorHelperExe]]) {
   const info = infoOf(file);
   if (!info) continue;
   if (/GitHub, Inc\.|^$/u.test(info.company ?? '')) fail('metadata', `${label}: the company name is "${info.company ?? ''}" (it must name this project, not the toolchain)`);
   if (!info.description) fail('metadata', `${label}: no file description`);
   if (!info.copyright || !info.copyright.trim()) fail('metadata', `${label}: no copyright text`);
   if (/FromSoftware|Bandai/iu.test(`${info.company} ${info.product} ${info.copyright}`)) fail('metadata', `${label}: the metadata names the game's publisher`);
+}
+const legacySourceNotice = lower.get('resources/runtime/licenses/foghost-legacy-0.5.0-source.txt');
+if (legacySourceNotice) {
+  const text = await readFile(path.join(unpacked, legacySourceNotice), 'utf8');
+  if (!text.includes(legacyFogHostPin.commit) || !text.includes(legacyFogHostPin.tree)) fail('provenance', 'the packaged legacy FogHost source notice does not match source-pin.json');
 }
 // The pinned world data: the commit the application fetches from must be the commit of the FogHost pin.
 const pin = await readFile(path.join(repositoryRoot, 'tools', 'fog-host', 'vendor', 'UPSTREAM_PIN.md'), 'utf8');
@@ -124,6 +136,16 @@ if (await exists(buildInfoFile)) {
     buildMode = info.mode ?? null;
     buildDistribution = info.distribution === undefined ? 'github' : info.distribution;
   } catch { channel = null; }
+}
+if (await exists(buildInfoFile)) {
+  try {
+    const info = JSON.parse(await readFile(buildInfoFile, 'utf8'));
+    if (info.versions?.legacyFogHost !== legacyFogHostPin.version
+      || info.versions?.legacyFogHostSourceCommit !== legacyFogHostPin.commit
+      || info.versions?.legacyFogHostSourceTree !== legacyFogHostPin.tree) {
+      fail('provenance', 'build-info.json does not match the pinned legacy FogHost source identity');
+    }
+  } catch { fail('provenance', 'build-info.json cannot verify the pinned legacy FogHost source identity'); }
 }
 if (requireSignature && channel !== 'public') fail('channel', `a public release must be a public-channel build; build-info.json says ${channel ?? 'nothing'}`);
 if (buildDistribution !== distribution) fail('distribution', `requested ${distribution} verification but build-info.json says ${buildDistribution}`);
@@ -243,12 +265,19 @@ const missingBeforePublic = [];
 if (overall !== 'TRUSTED SIGNED') missingBeforePublic.push('a trusted code-signing identity (see docs/RELEASE_TRUST.md, "What the owner has to do") and a signed build made with --release');
 if (!expectedPublisher) missingBeforePublic.push('the expected publisher name (DS1TR_EXPECTED_PUBLISHER) so that the signer can be verified');
 if (!installerName) missingBeforePublic.push('an installer built for this version');
+const generationSource = await readFile(path.join(repositoryRoot, 'packages', 'contracts', 'src', 'generation.ts'), 'utf8');
 
 const manifest = {
   schema: 'ds1tr-release-manifest-1',
   product: policy.product,
   version,
-  generationProfile: /CURRENT_GENERATION_PROFILE\s*=\s*([A-Z0-9_]+)/u.test(await readFile(path.join(repositoryRoot, 'packages', 'contracts', 'src', 'generation.ts'), 'utf8')) ? 'ds1tr-gen-v1 (the profile of every Seed Code made so far; later profiles stay runnable)' : 'unknown',
+  generationProfile: (() => {
+    const source = generationSource;
+    const currentSymbol = /export const CURRENT_GENERATION_PROFILE\s*=\s*(GENERATION_PROFILE_[A-Z0-9_]+)/u.exec(source)?.[1];
+    if (!currentSymbol) return 'unknown';
+    return [...source.matchAll(/export const (GENERATION_PROFILE_[A-Z0-9_]+)\s*=\s*['"]([^'"]+)['"]/gu)]
+      .find(([, symbol]) => symbol === currentSymbol)?.[2] ?? 'unknown';
+  })(),
   mode: requireSignature ? 'public' : publication ? 'unsigned-release' : 'development',
   buildMode,
   channel,

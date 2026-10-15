@@ -17,13 +17,33 @@ namespace FogHost
     public sealed record FogDsrTransform(float X, float Y, float Z, float Yaw);
     public sealed record FogDsrRegionShape(FogDsrRegionShapeKind Kind, float? Width, float? Height, float? Depth, float? Radius);
     public sealed record FogDsrObjectFact(string Name, int EntityId, string CollisionName, FogDsrTransform Transform);
+    public sealed record FogDsrConnectCollisionFact(string PartName, string CollisionName, IReadOnlyList<byte> TargetMapIdBytes);
     public sealed record FogDsrObjectActFact(string PartName, int ObjectActEntityId, int? ObjectEntityId, int ParamId, int EventFlagId, int State);
-    public sealed record FogDsrCollisionFact(string Name, int PlayRegionId, int DisableBonfireEntityId);
+    public sealed record FogDsrCollisionFact(string Name, int EntityId, int PlayRegionId, int DisableBonfireEntityId);
     public sealed record FogDsrEnemyFact(string Name, int EntityId, int NpcParamId, int ThinkParamId, string CollisionName, FogDsrTransform Transform);
     public sealed record FogDsrRegionFact(string Name, int EntityId, FogDsrTransform Transform, FogDsrRegionShape Shape);
     public sealed record FogDsrEventFlagWrite(long EventId, int FlagId);
     public sealed record FogDsrEventFact(long EventId);
+    public sealed record FogDsrCutsceneWarpFact(
+        FogMapId SourceMap,
+        long EventId,
+        int InstructionIndex,
+        int CutsceneId,
+        int PlaybackType,
+        int DestinationEntityId,
+        string DestinationMapFileId,
+        FogMapId? DestinationMap,
+        bool HasEventParameterBindings);
     public sealed record FogDsrBossDefeatFact(long EventId, int EnemyEntityId);
+    public sealed record FogDsrItemPossessionFact(
+        FogMapId Map,
+        long EventId,
+        int InstructionIndex,
+        int Group,
+        FogGameItemId Item,
+        int RequiredState,
+        long? CallerEventId,
+        int? CallerInstructionIndex);
     public sealed record FogDsrTreasureFact(int EntityId, string PartName, string PartCollisionName, bool StartDisabled, bool InChest, FogDsrTransform? PartTransform, IReadOnlyList<int> ItemLots);
     public sealed record FogDsrTreasureLotFact(FogMapId Map, int TreasureEntityId, string PartName, string PartCollisionName, bool StartDisabled, bool InChest, int Slot, int ItemLotId, FogDsrTransform? PartTransform);
     public sealed record FogDsrLotItemFact(int Slot, FogGameItemId Item);
@@ -35,7 +55,9 @@ namespace FogHost
         int InstructionIndex,
         int? ItemLotId,
         long? InitializerEventId,
-        int? InitializerInstructionIndex);
+        int? InitializerInstructionIndex,
+        int? CharacterEntityId = null,
+        int? RequiredEventFlagId = null);
 
     /// <summary>
     /// Facts read from the verified pristine DSR data root. This is deliberately separate from
@@ -46,6 +68,7 @@ namespace FogHost
         public sealed class Map
         {
             public FogMapId Id { get; init; }
+            public string GameMapFileId { get; init; }
             public IReadOnlySet<string> Collisions { get; init; }
             public IReadOnlySet<string> Objects { get; init; }
             public IReadOnlySet<int> ObjectEntityIds { get; init; }
@@ -58,8 +81,10 @@ namespace FogHost
             public IReadOnlyList<FogDsrObjectActFact> ObjectActDetails { get; init; }
             public string EventArchiveName { get; init; }
             public IReadOnlySet<long> EventIds { get; init; }
+            public IReadOnlyList<FogDsrCutsceneWarpFact> CutsceneWarps { get; init; }
             public IReadOnlyList<FogDsrEventFlagWrite> EventFlagWrites { get; init; }
             public IReadOnlyList<FogDsrObjectFact> ObjectDetails { get; init; }
+            public IReadOnlyList<FogDsrConnectCollisionFact> ConnectCollisionDetails { get; init; }
             public IReadOnlyList<FogDsrCollisionFact> CollisionDetails { get; init; }
             public IReadOnlyList<FogDsrEnemyFact> EnemyDetails { get; init; }
             public IReadOnlyList<FogDsrBossDefeatFact> BossDefeatHandlers { get; init; }
@@ -73,6 +98,8 @@ namespace FogHost
         public IReadOnlyList<FogDsrNpcDropLotFact> NpcDropLots { get; }
         /// <summary>Schema-confirmed 2003[4]/[36] item-lot award calls; InitializeEvent arguments are resolved per caller when possible.</summary>
         public IReadOnlyList<FogDsrItemLotAwardFact> ItemLotAwards { get; }
+        /// <summary>Resolved pristine EMEVD IfPlayerHasItem checks with their exact map-event and caller anchors.</summary>
+        public IReadOnlyList<FogDsrItemPossessionFact> ItemPossessionChecks { get; }
         public IReadOnlyDictionary<string, IReadOnlySet<int>> ItemLotParamTableIds { get; }
         public IReadOnlyList<FogDsrEventFlagWrite> CommonEventFlagWrites { get; }
         /// <summary>Completion flags passed to common event 970 and consumed by its event-flag conditions.</summary>
@@ -127,6 +154,7 @@ namespace FogHost
             IReadOnlyDictionary<int, FogDsrItemLotFact> itemLots,
             IReadOnlyList<FogDsrNpcDropLotFact> npcDropLots,
             IReadOnlyList<FogDsrItemLotAwardFact> itemLotAwards,
+            IReadOnlyList<FogDsrItemPossessionFact> itemPossessionChecks,
             IReadOnlyDictionary<string, IReadOnlySet<int>> itemLotParamTableIds,
             IReadOnlyList<FogDsrEventFlagWrite> commonEventFlagWrites,
             IReadOnlySet<int> bossRewardCompletionFlags,
@@ -141,6 +169,7 @@ namespace FogHost
             ItemLots = itemLots;
             NpcDropLots = Snapshot(npcDropLots, "NPC drop ItemLot references");
             ItemLotAwards = Snapshot(itemLotAwards, "EMEVD AwardItemLot calls");
+            ItemPossessionChecks = Snapshot(itemPossessionChecks, "EMEVD item-possession checks");
             ItemLotParamTableIds = itemLotParamTableIds;
             CommonEventFlagWrites = Snapshot(commonEventFlagWrites, "common EMEVD event-flag writes");
             BossRewardCompletionFlags = bossRewardCompletionFlags;
@@ -160,11 +189,11 @@ namespace FogHost
         /// GameParam must match the pinned bytes and its EMEVD archives supply event facts; the
         /// FogMod reference EMEVD is never presented as pristine in that mode.
         /// </summary>
-        public static FogDsrFacts Read(string dataRoot, string pristineGameDirectory = null)
+        public static FogDsrFacts Read(string dataRoot, string pristineGameDirectory = null, bool includeLegacyAnnotations = true)
         {
             if (string.IsNullOrWhiteSpace(dataRoot)) throw new ArgumentException("A verified data root is required.", nameof(dataRoot));
             string root = Path.GetFullPath(dataRoot);
-            DataRoot.Verify(root);
+            DataRoot.Verify(root, includeLegacyAnnotations);
             string gameData = Path.Combine(root, "dist", "DS1R");
             if (!Directory.Exists(gameData)) throw new DirectoryNotFoundException($"Verified DSR fact data was not found under {gameData}.");
             string pristineDirectory = string.IsNullOrWhiteSpace(pristineGameDirectory) ? null : Path.GetFullPath(pristineGameDirectory);
@@ -177,6 +206,7 @@ namespace FogHost
             string commonEventPath = Path.Combine(eventData, "common.emevd.dcx");
             IReadOnlyList<FogDsrEventFlagWrite> commonEventFlagWrites = ReadEventFlagWrites(commonEventPath);
             var itemLotAwards = new List<FogDsrItemLotAwardFact>();
+            var itemPossessionChecks = new List<FogDsrItemPossessionFact>();
             var indexedEventArchives = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             AddItemLotAwards(commonEventPath, itemLotAwards, indexedEventArchives);
             IReadOnlySet<int> bossRewardCompletionFlags = ReadBossRewardCompletionFlags(commonEventPath);
@@ -190,8 +220,10 @@ namespace FogHost
                     eventArchivePath = Path.Combine(eventData, spec.Map.Substring(0, spec.Map.Length - 2) + "00.emevd.dcx");
                 if (!File.Exists(eventArchivePath)) throw new FileNotFoundException($"Pristine map event archive for {spec.Name} is missing.", eventArchivePath);
                 AddItemLotAwards(eventArchivePath, itemLotAwards, indexedEventArchives);
+                itemPossessionChecks.AddRange(ReadItemPossessionChecks(eventArchivePath, new FogMapId(spec.Name)));
                 IReadOnlyList<FogDsrEventFlagWrite> eventFlagWrites = ReadEventFlagWrites(eventArchivePath);
                 IReadOnlySet<long> eventIds = ReadEventIds(eventArchivePath);
+                IReadOnlyList<FogDsrCutsceneWarpFact> cutsceneWarps = ReadCutsceneWarps(eventArchivePath, new FogMapId(spec.Name));
                 IReadOnlyList<FogDsrBossDefeatFact> bossDefeatHandlers = ReadBossDefeatHandlers(eventArchivePath);
                 var spawnPoints = new Dictionary<int, string>();
                 foreach (MSB1.Event.SpawnPoint spawn in msb.Events.SpawnPoints)
@@ -226,6 +258,7 @@ namespace FogHost
                 var mapFacts = new Map
                 {
                     Id = new FogMapId(spec.Name),
+                    GameMapFileId = spec.Map,
                     Collisions = Set(msb.Parts.Collisions.Select(part => part.Name)),
                     Objects = Set(msb.Parts.Objects.Select(part => part.Name)),
                     ObjectEntityIds = Set(msb.Parts.Objects.Select(part => part.EntityID).Where(id => id > 0)),
@@ -238,10 +271,14 @@ namespace FogHost
                     ObjectActDetails = objectActDetails,
                     EventArchiveName = Path.GetFileName(eventArchivePath),
                     EventIds = eventIds,
+                    CutsceneWarps = cutsceneWarps,
                     EventFlagWrites = eventFlagWrites,
                     ObjectDetails = objectDetails,
+                    ConnectCollisionDetails = Snapshot(msb.Parts.ConnectCollisions.Select(part => new FogDsrConnectCollisionFact(
+                        part.Name, part.CollisionName,
+                        Array.AsReadOnly((part.MapID ?? Array.Empty<byte>()).ToArray()))), "map ConnectCollision parts"),
                     CollisionDetails = Snapshot(msb.Parts.Collisions.Select(part => new FogDsrCollisionFact(
-                        part.Name, part.PlayRegionID, part.DisableBonfireEntityID)), "map collisions"),
+                        part.Name, part.EntityID, part.PlayRegionID, part.DisableBonfireEntityID)), "map collisions"),
                     EnemyDetails = Snapshot(msb.Parts.Enemies.Select(part => new FogDsrEnemyFact(
                         part.Name, part.EntityID, part.NPCParamID, part.ThinkParamID, part.CollisionName,
                         new FogDsrTransform(part.Position.X, part.Position.Y, part.Position.Z, part.Rotation.Y))), "map enemies"),
@@ -328,6 +365,7 @@ namespace FogHost
                 new System.Collections.ObjectModel.ReadOnlyDictionary<int, FogDsrItemLotFact>(itemLotsById),
                 Array.AsReadOnly(npcDropLots.ToArray()),
                 Array.AsReadOnly(itemLotAwards.ToArray()),
+                Array.AsReadOnly(itemPossessionChecks.ToArray()),
                 new System.Collections.ObjectModel.ReadOnlyDictionary<string, IReadOnlySet<int>>(itemLotTableIds),
                 commonEventFlagWrites,
                 bossRewardCompletionFlags,
@@ -460,7 +498,13 @@ namespace FogHost
                                 throw new InvalidDataException($"InitializeEvent in {Path.GetFileName(fullPath)} event {caller.ID} instruction {callerIndex} does not supply the ItemLot argument for event {evt.ID}.");
                             destination.Add(new FogDsrItemLotAwardFact(
                                 Path.GetFileName(fullPath), evt.ID, index,
-                                BitConverter.ToInt32(call.ArgData, sourceOffset), caller.ID, callerIndex));
+                                BitConverter.ToInt32(call.ArgData, sourceOffset), caller.ID, callerIndex,
+                                string.Equals(Path.GetFileName(fullPath), "common.emevd.dcx", StringComparison.OrdinalIgnoreCase) && evt.ID == 960
+                                    ? ReadEventParameterArgument(evt, call, 4, 0)
+                                    : null,
+                                string.Equals(Path.GetFileName(fullPath), "common.emevd.dcx", StringComparison.OrdinalIgnoreCase) && (evt.ID is 960 or 970)
+                                    ? ReadEventParameterArgument(evt, call, 3, 0)
+                                    : null));
                             resolvedCallers++;
                         }
                     }
@@ -470,6 +514,23 @@ namespace FogHost
             }
         }
 
+        private static int? ReadEventParameterArgument(EMEVD.Event evt, EMEVD.Instruction initializer, int bank, int instructionId)
+        {
+            int[] conditionIndexes = evt.Instructions.Select((instruction, index) => (instruction, index))
+                .Where(entry => entry.instruction.Bank == bank && entry.instruction.ID == instructionId)
+                .Select(entry => entry.index).ToArray();
+            if (conditionIndexes.Length != 1) return null;
+
+            EMEVD.Parameter[] bindings = evt.Parameters.Where(parameter => parameter.InstructionIndex == conditionIndexes[0]
+                && parameter.TargetStartByte == sizeof(int) && parameter.ByteCount == sizeof(int)).ToArray();
+            if (bindings.Length != 1) return null;
+
+            int sourceOffset = checked(8 + checked((int)bindings[0].SourceStartByte));
+            if (sourceOffset < 8 || sourceOffset + sizeof(int) > initializer.ArgData.Length)
+                throw new InvalidDataException($"InitializeEvent does not supply parameter data for common event {evt.ID} condition {bank}[{instructionId}].");
+            return BitConverter.ToInt32(initializer.ArgData, sourceOffset);
+        }
+
         private static IReadOnlySet<long> ReadEventIds(string eventArchivePath)
         {
             if (!File.Exists(eventArchivePath)) throw new FileNotFoundException("A pristine DSR EMEVD archive is missing.", eventArchivePath);
@@ -477,6 +538,41 @@ namespace FogHost
             if (DCX.Is(bytes)) bytes = DCX.Decompress(bytes);
             EMEVD archive = EMEVD.Read(bytes);
             return archive.Events.Select(evt => evt.ID).ToFrozenSet();
+        }
+
+        private static IReadOnlyList<FogDsrCutsceneWarpFact> ReadCutsceneWarps(string eventArchivePath, FogMapId sourceMap)
+        {
+            byte[] bytes = File.ReadAllBytes(eventArchivePath);
+            if (DCX.Is(bytes)) bytes = DCX.Decompress(bytes);
+            EMEVD archive = EMEVD.Read(bytes);
+            var warps = new List<FogDsrCutsceneWarpFact>();
+            foreach (EMEVD.Event evt in archive.Events)
+            {
+                for (int index = 0; index < evt.Instructions.Count; index++)
+                {
+                    EMEVD.Instruction instruction = evt.Instructions[index];
+                    if (instruction.Bank != 2002 || instruction.ID != 4) continue;
+                    if (instruction.ArgData.Length < 14)
+                        throw new InvalidDataException($"PlayCutsceneAndWarpPlayer in {Path.GetFileName(eventArchivePath)} event {evt.ID} instruction {index} has fewer than 14 argument bytes.");
+
+                    int cutsceneId = BitConverter.ToInt32(instruction.ArgData, 0);
+                    int playbackType = BitConverter.ToInt32(instruction.ArgData, 4);
+                    int destinationEntityId = BitConverter.ToInt32(instruction.ArgData, 8);
+                    byte destinationArea = instruction.ArgData[12];
+                    byte destinationBlock = instruction.ArgData[13];
+                    string destinationMapPrefix = $"m{destinationArea:D2}_{destinationBlock:D2}_";
+                    AnnotationData.MapSpec[] mapSpecs = AnnotationData.specs.Values.Where(mapSpec =>
+                        mapSpec.Map.StartsWith(destinationMapPrefix, StringComparison.Ordinal)).ToArray();
+                    string destinationMapFileId = mapSpecs.Length == 1 ? mapSpecs[0].Map : destinationMapPrefix;
+                    FogMapId? destinationMap = mapSpecs.Length == 1 ? new FogMapId(mapSpecs[0].Name) : null;
+                    bool hasBindings = evt.Parameters.Any(parameter => parameter.InstructionIndex == index
+                        && parameter.TargetStartByte < 14
+                        && parameter.TargetStartByte + parameter.ByteCount > 0);
+                    warps.Add(new FogDsrCutsceneWarpFact(sourceMap, evt.ID, index, cutsceneId, playbackType,
+                        destinationEntityId, destinationMapFileId, destinationMap, hasBindings));
+                }
+            }
+            return Array.AsReadOnly(warps.ToArray());
         }
 
         private static IReadOnlyList<FogDsrBossDefeatFact> ReadBossDefeatHandlers(string eventArchivePath)
@@ -495,6 +591,92 @@ namespace FogHost
                 }
             }
             return Array.AsReadOnly(handlers.ToArray());
+        }
+
+        private sealed record EmevdCallSite(EMEVD.Event Caller, int InstructionIndex, EMEVD.Instruction Instruction);
+
+        private static IReadOnlyList<FogDsrItemPossessionFact> ReadItemPossessionChecks(string eventArchivePath, FogMapId map)
+        {
+            byte[] bytes = File.ReadAllBytes(eventArchivePath);
+            if (DCX.Is(bytes)) bytes = DCX.Decompress(bytes);
+            EMEVD archive = EMEVD.Read(bytes);
+            var callers = new Dictionary<long, List<EmevdCallSite>>();
+            foreach (EMEVD.Event caller in archive.Events)
+            {
+                for (int instructionIndex = 0; instructionIndex < caller.Instructions.Count; instructionIndex++)
+                {
+                    EMEVD.Instruction instruction = caller.Instructions[instructionIndex];
+                    if (instruction.Bank != 2000 || instruction.ID != 0 || instruction.ArgData.Length < 8) continue;
+                    long targetEventId = (uint)BitConverter.ToInt32(instruction.ArgData, 4);
+                    if (!callers.TryGetValue(targetEventId, out List<EmevdCallSite> callSites))
+                        callers[targetEventId] = callSites = new List<EmevdCallSite>();
+                    callSites.Add(new EmevdCallSite(caller, instructionIndex, instruction));
+                }
+            }
+
+            var result = new List<FogDsrItemPossessionFact>();
+            foreach (EMEVD.Event evt in archive.Events)
+            {
+                EmevdCallSite[] eventCallers = callers.TryGetValue(evt.ID, out List<EmevdCallSite> mapped)
+                    ? mapped.ToArray()
+                    : new EmevdCallSite[] { null };
+                for (int instructionIndex = 0; instructionIndex < evt.Instructions.Count; instructionIndex++)
+                {
+                    EMEVD.Instruction instruction = evt.Instructions[instructionIndex];
+                    if (instruction.Bank != 3 || instruction.ID != 4 || instruction.ArgData.Length < 12) continue;
+                    foreach (EmevdCallSite caller in eventCallers)
+                    {
+                        (int Group, bool GroupResolved) group = ResolvePossessionByte(evt, instructionIndex, 0, caller, signed: true);
+                        (int Category, bool CategoryResolved) category = ResolvePossessionByte(evt, instructionIndex, 1, caller);
+                        (int ItemId, bool ItemIdResolved) itemId = ResolvePossessionInt(evt, instructionIndex, 4, caller);
+                        (int State, bool StateResolved) state = ResolvePossessionByte(evt, instructionIndex, 8, caller);
+                        if (!group.GroupResolved || !category.CategoryResolved || !itemId.ItemIdResolved || !state.StateResolved)
+                            continue;
+                        result.Add(new FogDsrItemPossessionFact(
+                            map, evt.ID, instructionIndex, group.Group,
+                            new FogGameItemId(category.Category, itemId.ItemId), state.State,
+                            caller?.Caller.ID,
+                            caller == null ? null : caller.InstructionIndex));
+                    }
+                }
+            }
+            return Array.AsReadOnly(result.ToArray());
+        }
+
+        private static (int Value, bool Resolved) ResolvePossessionInt(
+            EMEVD.Event evt,
+            int instructionIndex,
+            int targetOffset,
+            EmevdCallSite caller)
+        {
+            int literal = BitConverter.ToInt32(evt.Instructions[instructionIndex].ArgData, targetOffset);
+            EMEVD.Parameter[] bindings = evt.Parameters.Where(parameter => parameter.InstructionIndex == instructionIndex
+                && parameter.TargetStartByte == targetOffset && parameter.ByteCount == sizeof(int)).ToArray();
+            if (bindings.Length == 0) return (literal, true);
+            if (bindings.Length != 1 || caller == null) return (literal, false);
+            int sourceOffset = checked(8 + checked((int)bindings[0].SourceStartByte));
+            if (sourceOffset < 8 || sourceOffset + sizeof(int) > caller.Instruction.ArgData.Length)
+                throw new InvalidDataException($"InitializeEvent for {evt.ID} has an out-of-range item-check parameter source at {sourceOffset}.");
+            return (BitConverter.ToInt32(caller.Instruction.ArgData, sourceOffset), true);
+        }
+
+        private static (int Value, bool Resolved) ResolvePossessionByte(
+            EMEVD.Event evt,
+            int instructionIndex,
+            int targetOffset,
+            EmevdCallSite caller,
+            bool signed = false)
+        {
+            byte literal = evt.Instructions[instructionIndex].ArgData[targetOffset];
+            EMEVD.Parameter[] bindings = evt.Parameters.Where(parameter => parameter.InstructionIndex == instructionIndex
+                && parameter.TargetStartByte == targetOffset && parameter.ByteCount == sizeof(byte)).ToArray();
+            if (bindings.Length == 0) return (signed ? unchecked((sbyte)literal) : literal, true);
+            if (bindings.Length != 1 || caller == null) return (signed ? unchecked((sbyte)literal) : literal, false);
+            int sourceOffset = checked(8 + checked((int)bindings[0].SourceStartByte));
+            if (sourceOffset < 8 || sourceOffset >= caller.Instruction.ArgData.Length)
+                throw new InvalidDataException($"InitializeEvent for {evt.ID} has an out-of-range item-check byte parameter source at {sourceOffset}.");
+            byte value = caller.Instruction.ArgData[sourceOffset];
+            return (signed ? unchecked((sbyte)value) : value, true);
         }
 
         private static IReadOnlySet<int> ReadBossRewardCompletionFlags(string commonEventPath)
@@ -573,6 +755,29 @@ namespace FogHost
                 }
             }
 
+            var validatedRuntimeWarpRegions = new HashSet<(FogMapId Map, int EntityId)>();
+            if (EventFactSource == FogDsrEventFactSource.PristineGameInstall)
+            {
+                foreach (FogProjectFlagWarpPolicyV1 policy in FogProjectAnnotationPolicy.FlagWarpPoliciesV1)
+                {
+                    bool candidatePresent = catalog.Warps.Any(warp => warp.Id == policy.RuntimeDestinationRegionEntityId
+                        && warp.Map == policy.Map);
+                    if (!candidatePresent) continue;
+                    try
+                    {
+                        FogWarp expected = FogAnnotationPolicyResolver.ResolveFlagTriggeredWarpPoliciesV1(this, new[] { policy }).Single();
+                        if (catalog.Warps.Contains(expected))
+                            validatedRuntimeWarpRegions.Add((policy.Map, policy.RuntimeDestinationRegionEntityId));
+                        else
+                            problems.Add($"Flag-triggered Warp {policy.Id} does not match its resolved project policy.");
+                    }
+                    catch (Exception error)
+                    {
+                        problems.Add($"Flag-triggered Warp {policy.Id} failed pristine region validation: {error.Message}");
+                    }
+                }
+            }
+
             foreach (FogWarp warp in catalog.Warps)
             {
                 if (warp.Tags.HasFlag(FogWarpTags.Unused)) continue;
@@ -590,7 +795,8 @@ namespace FogHost
                     && !destination.PlayerEntityIds.Contains(warp.Id))
                     problems.Add($"Warp {warp.Identity} player entity {warp.Id} is absent from map {destinationId}.");
                 else if (!warp.BSide.Tags.HasFlag(FogWarpSideTags.Player)
-                    && !destination.RegionEntityIds.Contains(warp.Id))
+                    && !destination.RegionEntityIds.Contains(warp.Id)
+                    && !validatedRuntimeWarpRegions.Contains((destinationId, warp.Id)))
                     problems.Add($"Warp {warp.Identity} destination region {warp.Id} is absent from map {destinationId}.");
             }
 

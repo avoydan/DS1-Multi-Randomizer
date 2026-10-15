@@ -14,9 +14,10 @@ const options = Object.fromEntries([
 ].map((key) => [key, false]));
 
 const request = {
-  schemaVersion: 2, game: 'DS1R', mode: 'dryRun', seed: 0xffffffff,
+  schemaVersion: 3, game: 'DS1R', mode: 'dryRun', seed: 0xffffffff,
   options, language: 'ENGLISH', fogDataRoot: 'fog-data',
   stagingDirectory: 'attempt/game', logPath: 'attempt/foghost.log',
+  annotationSource: 'legacy-fogmod', pristineGameDirectory: 'attempt/pristine', expectedAnnotationFingerprint: '',
   compatibility: {
     baseDirectory: 'attempt/base',
     combinedFiles: [{
@@ -26,7 +27,7 @@ const request = {
   },
 };
 const success = {
-  schemaVersion: 2, ok: true, hostVersion: '0.1.0', fogModCommit: 'abc',
+  schemaVersion: 3, ok: true, hostVersion: '0.1.0', fogModCommit: 'abc',
   annotationSha256: 'f'.repeat(64), mode: 'dryRun', seed: request.seed,
   fogOptions: 'v5', keyItems: { randomized: true, hash: '01234' },
   files: [], error: null,
@@ -75,9 +76,42 @@ test('writes request, forwards exact command, parses progress and authoritative 
   ]);
 });
 
+test('runs the frozen schema-v2 legacy request without Compact-only fields', async (t) => {
+  const execution = await fixture(t);
+  const { annotationSource, pristineGameDirectory, expectedAnnotationFingerprint, ...legacyRequest } = request;
+  const v2Request = { ...legacyRequest, schemaVersion: 2 };
+  execution.request = v2Request;
+  const response = { ...success, schemaVersion: 2, hostVersion: '0.5.0' };
+  const process = new FogHostProcess((_command, _args, _options) => {
+    const child = new FakeChild();
+    queueMicrotask(async () => {
+      assert.deepEqual(JSON.parse(await readFile(execution.requestPath, 'utf8')), v2Request);
+      await writeFile(execution.responsePath, JSON.stringify(response));
+      child.emit('close', 0);
+    });
+    return child;
+  });
+  assert.deepEqual(await process.execute(execution), response);
+
+  const mismatch = await fixture(t);
+  mismatch.request = v2Request;
+  const wrongSchemaProcess = new FogHostProcess((_command, _args, _options) => {
+    const child = new FakeChild();
+    queueMicrotask(async () => {
+      await writeFile(mismatch.responsePath, JSON.stringify(success));
+      child.emit('close', 0);
+    });
+    return child;
+  });
+  const rejected = await wrongSchemaProcess.execute(mismatch);
+  assert.equal(rejected.schemaVersion, 2);
+  assert.equal(rejected.ok, false);
+  assert.equal(rejected.error.code, 'FOG_HOST_CRASHED');
+});
+
 test('preserves typed host failure and retry scope', async (t) => {
   const execution = await fixture(t);
-  const response = { schemaVersion: 2, ok: false, error: {
+  const response = { schemaVersion: 3, ok: false, error: {
     code: 'FOG_SEED_UNSOLVABLE', stage: 'solve-graph', retryable: true,
     retryScope: 'fog', message: 'Could not solve seed',
   } };
@@ -167,7 +201,7 @@ test('rejects invalid compatibility inputs and schema v1 before process launch',
 test('accepts the Task 11 merge-conflict and post-write violation codes', async (t) => {
   for (const code of ['FOG_MERGE_CONFLICT', 'FOG_COMPATIBILITY_VIOLATED']) {
     const execution = await fixture(t);
-    const response = { schemaVersion: 2, ok: false, error: {
+    const response = { schemaVersion: 3, ok: false, error: {
       code, stage: 'write-game-data', retryable: false, retryScope: null, message: 'event 11810310',
     } };
     const process = new FogHostProcess(() => {

@@ -13,14 +13,14 @@ import { GameStateAuthority, defaultStateRoot } from './core/gameState.js';
 import { describeEnemyPool } from './adapters/enemyPool.js';
 import { discoverGameInstallations } from './core/gameDiscovery.js';
 import { userMessageFor } from './core/userMessages.js';
+import { worldDataOptionsForProfile } from './adapters/fogPrerequisites.js';
 import { prepareWorldData } from './adapters/worldData.js';
 import { RunHistory } from './core/runHistory.js';
 import { loadPersistedSettings, savePersistedSettings } from './core/settingsStore.js';
 import { prepareRun, type RunRequestBody } from './core/seededRun.js';
 import { decodeSeedCode } from './core/seedCode.js';
 import { smokeTestWorlds } from './core/smokeTests.js';
-import { supportedGenerationProfiles } from './core/generationProfiles.js';
-import { defaultWorldDataCacheRoot } from './adapters/fogPrerequisites.js';
+import { currentGenerationProfile, resolveGenerationProfile, supportedGenerationProfiles } from './core/generationProfiles.js';
 import { hintsAvailableFor, hintsForEntry, persistHints } from './core/hintStore.js';
 import { AppLogger, LOG_STAGES, type LogLevel, type LogStage } from './core/appLog.js';
 import { OperationTracker } from './core/operations.js';
@@ -123,12 +123,20 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === 'POST' && url.pathname === '/api/world-data/prepare') {
-      const body = await readJson<{ gamePath?: string }>(req);
+      const body = await readJson<{ gamePath?: string; seedCode?: string }>(req);
       const pristine = body.gamePath ? await authority.getPristineSource(body.gamePath) : null;
       if (!pristine) {
         return send(res, 409, { ok: false, code: 'PRISTINE_IMPORT_REQUIRED', userMessage: 'Dark Souls Remastered has not been checked yet.', technical: 'No verified pristine snapshot for this installation.' });
       }
-      const result = await prepareWorldData({ cacheRoot: defaultWorldDataCacheRoot(), pristineDirectory: pristine.directory });
+      let profile = currentGenerationProfile();
+      if (body.seedCode !== undefined) {
+        const decoded = decodeSeedCode(typeof body.seedCode === 'string' ? body.seedCode : '');
+        if (!decoded.ok) return send(res, 400, { ok: false, code: decoded.code, userMessage: decoded.message, technical: decoded.technical });
+        const seededProfile = resolveGenerationProfile(decoded.envelope.profile);
+        if (!seededProfile) return send(res, 400, { ok: false, code: 'GENERATION_PROFILE_UNSUPPORTED', userMessage: 'This Seed Code uses a generation profile this application cannot run.' });
+        profile = seededProfile;
+      }
+      const result = await prepareWorldData(worldDataOptionsForProfile(profile, pristine.directory));
       return send(res, result.ok ? 200 : 409, result.ok ? { ok: true } : result);
     }
 

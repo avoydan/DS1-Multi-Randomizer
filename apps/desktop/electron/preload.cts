@@ -7,6 +7,12 @@ contextBridge.exposeInMainWorld('desktop', {
   launchGame: (gamePath: string): Promise<{ ok: boolean; method: 'steam' | 'executable' | 'none'; message: string; technical?: string }> => ipcRenderer.invoke('game:launch', gamePath),
   language: (): Promise<{ setting: 'auto' | 'en' | 'pl'; resolved: 'en' | 'pl' }> => ipcRenderer.invoke('language:get'),
   setLanguage: (setting: 'auto' | 'en' | 'pl'): Promise<{ setting: 'auto' | 'en' | 'pl'; resolved: 'en' | 'pl' }> => ipcRenderer.invoke('language:set', setting),
+  gameConveniences: {
+    freeCursorInMenus: (): Promise<boolean> => ipcRenderer.invoke('game-conveniences:get-free-cursor'),
+    setFreeCursorInMenus: (enabled: boolean): Promise<boolean> => ipcRenderer.invoke('game-conveniences:set-free-cursor', enabled === true),
+    freeCursorShortcut: (): Promise<string> => ipcRenderer.invoke('game-conveniences:get-free-cursor-shortcut'),
+    setFreeCursorShortcut: (shortcut: string): Promise<boolean> => ipcRenderer.invoke('game-conveniences:set-free-cursor-shortcut', shortcut),
+  },
   saveFile: (request: { kind: 'html' | 'txt' | 'json' | 'zip'; defaultName: string; content: string }): Promise<{ ok: boolean; canceled: boolean; name?: string; code?: string }> => ipcRenderer.invoke('file:save', request),
   devTools: (): Promise<boolean> => ipcRenderer.invoke('app:dev-tools'),
   onDevTools: (listener: (shown: boolean) => void): (() => void) => {

@@ -22,6 +22,10 @@ namespace FogHost.Tests
             Assert(FogAnnotationFingerprint.Compute(original) == FogAnnotationFingerprint.Compute(equivalent),
                 "Fields consumed only for ordinary entrances must be excluded from warp semantics.");
             equivalent = Fixture(false);
+            equivalent.Warps[0].ASide.WarpFlag++;
+            Assert(FogAnnotationFingerprint.Compute(original) != FogAnnotationFingerprint.Compute(equivalent),
+                "A consumed flag-triggered warp activation flag must change the fingerprint.");
+            equivalent = Fixture(false);
             equivalent.Warps[0].BSide.Cutscene++;
             Assert(FogAnnotationFingerprint.Compute(original) != FogAnnotationFingerprint.Compute(equivalent),
                 "A warp cutscene target must change the consumed-model fingerprint.");

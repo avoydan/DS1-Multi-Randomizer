@@ -7,11 +7,11 @@ import type { FogCompatibility } from './fogCompatibility.js';
 
 export type FogHostMode = 'dryRun' | 'write';
 export type FogHostOptions = Omit<FogOptions, 'enabled' | 'language'>;
+export type FogAnnotationSource = 'legacy-fogmod' | 'compact-v1';
 
-export const fogHostSchemaVersion = 2;
+export const fogHostSchemaVersion = 3;
 
-export interface FogHostRequest {
-  schemaVersion: 2;
+interface FogHostRequestBase {
   game: 'DS1R';
   mode: FogHostMode;
   seed: number;
@@ -22,6 +22,21 @@ export interface FogHostRequest {
   logPath: string;
   compatibility: FogCompatibility;
 }
+
+/** Frozen legacy wire contract used by generation profiles v1 and v2. */
+export interface FogHostRequestV2 extends FogHostRequestBase {
+  schemaVersion: 2;
+}
+
+/** Current Compact Fog wire contract used by generation profile v3. */
+export interface FogHostRequestV3 extends FogHostRequestBase {
+  schemaVersion: 3;
+  annotationSource: FogAnnotationSource;
+  pristineGameDirectory: string;
+  expectedAnnotationFingerprint: string;
+}
+
+export type FogHostRequest = FogHostRequestV2 | FogHostRequestV3;
 
 export type FogHostErrorCode =
   | 'FOG_REQUEST_INVALID' | 'FOG_DATA_MISSING' | 'FOG_STAGING_UNSAFE'
@@ -44,21 +59,23 @@ export interface FogHostFile {
   sha256: string;
 }
 
+interface FogHostSuccessResponseBase {
+  ok: true;
+  hostVersion: string;
+  fogModCommit: string;
+  annotationSha256: string;
+  mode: FogHostMode;
+  seed: number;
+  fogOptions: string;
+  keyItems: { randomized: boolean; hash: string };
+  files: FogHostFile[];
+  error: null;
+}
+
 export type FogHostResponse =
-  | {
-    schemaVersion: 2;
-    ok: true;
-    hostVersion: string;
-    fogModCommit: string;
-    annotationSha256: string;
-    mode: FogHostMode;
-    seed: number;
-    fogOptions: string;
-    keyItems: { randomized: boolean; hash: string };
-    files: FogHostFile[];
-    error: null;
-  }
-  | { schemaVersion: 2; ok: false; error: FogHostError };
+  | ({ schemaVersion: 2 } & FogHostSuccessResponseBase)
+  | ({ schemaVersion: 3 } & FogHostSuccessResponseBase)
+  | { schemaVersion: 2 | 3; ok: false; error: FogHostError };
 
 export interface FogHostExecutionRequest {
   executablePath: string;
@@ -99,7 +116,7 @@ function uint32(value: unknown): value is number {
 }
 
 function parseResponse(value: unknown, request: FogHostRequest): FogHostResponse | null {
-  if (!record(value) || value.schemaVersion !== fogHostSchemaVersion || typeof value.ok !== 'boolean') return null;
+  if (!record(value) || value.schemaVersion !== request.schemaVersion || typeof value.ok !== 'boolean') return null;
   if (!value.ok) {
     const error = value.error;
     if (!record(error) || !hostErrors.has(error.code as FogHostErrorCode)
@@ -123,8 +140,8 @@ function parseResponse(value: unknown, request: FogHostRequest): FogHostResponse
   return value as unknown as FogHostResponse;
 }
 
-function failure(code: FogHostErrorCode, message: string): FogHostResponse {
-  return { schemaVersion: 2, ok: false, error: { code, message, retryable: false, retryScope: null } };
+function failure(code: FogHostErrorCode, message: string, schemaVersion: 2 | 3): FogHostResponse {
+  return { schemaVersion, ok: false, error: { code, message, retryable: false, retryScope: null } };
 }
 
 export class FogHostProcess {
@@ -134,7 +151,17 @@ export class FogHostProcess {
     execution: FogHostExecutionRequest,
     onEvent?: (event: FogHostEvent) => void,
   ): Promise<FogHostResponse> {
-    if (!uint32(execution.request.seed) || execution.request.schemaVersion !== fogHostSchemaVersion
+    const schemaVersion = execution.request.schemaVersion === 2 ? 2 : 3;
+    const protocolFieldsValid = execution.request.schemaVersion === 2
+      ? !('annotationSource' in execution.request)
+        && !('pristineGameDirectory' in execution.request)
+        && !('expectedAnnotationFingerprint' in execution.request)
+      : ['legacy-fogmod', 'compact-v1'].includes(execution.request.annotationSource)
+        && typeof execution.request.pristineGameDirectory === 'string'
+        && typeof execution.request.expectedAnnotationFingerprint === 'string';
+    if (!uint32(execution.request.seed)
+      || ![2, fogHostSchemaVersion].includes(execution.request.schemaVersion)
+      || !protocolFieldsValid
       || execution.request.game !== 'DS1R' || !['dryRun', 'write'].includes(execution.request.mode)
       || !Number.isSafeInteger(execution.timeoutMs) || execution.timeoutMs <= 0
       || validateFogCompatibility(execution.request.compatibility).length !== 0
@@ -145,22 +172,22 @@ export class FogHostProcess {
       || ![execution.request.fogDataRoot, execution.request.stagingDirectory,
         execution.request.logPath, execution.requestPath, execution.responsePath,
         execution.executablePath].every((path) => typeof path === 'string' && path.length > 0)) {
-      return failure('FOG_REQUEST_INVALID', 'Invalid FogHost request or timeout.');
+      return failure('FOG_REQUEST_INVALID', 'Invalid FogHost request or timeout.', schemaVersion);
     }
 
     try {
       await stat(execution.responsePath);
-      return failure('FOG_REQUEST_INVALID', 'FogHost response path must be unused.');
+      return failure('FOG_REQUEST_INVALID', 'FogHost response path must be unused.', schemaVersion);
     } catch (error) {
       if (record(error) && error.code !== 'ENOENT') {
-        return failure('FOG_IO_FAILED', `Cannot inspect FogHost response path: ${String(error)}`);
+        return failure('FOG_IO_FAILED', `Cannot inspect FogHost response path: ${String(error)}`, schemaVersion);
       }
     }
 
     try {
       await writeFile(execution.requestPath, JSON.stringify(execution.request), { flag: 'wx' });
     } catch (error) {
-      return failure('FOG_IO_FAILED', `Cannot write FogHost request: ${String(error)}`);
+      return failure('FOG_IO_FAILED', `Cannot write FogHost request: ${String(error)}`, schemaVersion);
     }
 
     return new Promise((resolve) => {
@@ -170,7 +197,7 @@ export class FogHostProcess {
           ['generate', '--request', execution.requestPath, '--response', execution.responsePath],
           { stdio: ['ignore', 'pipe', 'pipe'] });
       } catch (error) {
-        resolve(failure('FOG_HOST_CRASHED', `Cannot start FogHost: ${String(error)}`));
+        resolve(failure('FOG_HOST_CRASHED', `Cannot start FogHost: ${String(error)}`, schemaVersion));
         return;
       }
 
@@ -205,25 +232,25 @@ export class FogHostProcess {
       child.stderr?.on('data', (chunk: Buffer | string) => {
         onEvent?.({ type: 'log', stream: 'stderr', message: chunk.toString() });
       });
-      child.once('error', (error) => finish(failure('FOG_HOST_CRASHED', error.message)));
+      child.once('error', (error) => finish(failure('FOG_HOST_CRASHED', error.message, schemaVersion)));
       child.once('close', (exitCode) => {
         if (settled) return;
         if (stdoutBuffer) onEvent?.({ type: 'log', stream: 'stdout', message: stdoutBuffer });
         if (exitCode !== 0) {
-          finish(failure('FOG_HOST_CRASHED', `FogHost exited with code ${exitCode}.`));
+          finish(failure('FOG_HOST_CRASHED', `FogHost exited with code ${exitCode}.`, schemaVersion));
           return;
         }
         void readFile(execution.responsePath, 'utf8').then((contents) => {
           let value: unknown;
           try { value = JSON.parse(contents); }
-          catch { finish(failure('FOG_HOST_CRASHED', 'FogHost returned invalid response JSON.')); return; }
+          catch { finish(failure('FOG_HOST_CRASHED', 'FogHost returned invalid response JSON.', schemaVersion)); return; }
           finish(parseResponse(value, execution.request)
-            ?? failure('FOG_HOST_CRASHED', 'FogHost returned an invalid response contract.'));
-        }).catch(() => finish(failure('FOG_HOST_CRASHED', 'FogHost exited without a response file.')));
+            ?? failure('FOG_HOST_CRASHED', 'FogHost returned an invalid response contract.', schemaVersion));
+        }).catch(() => finish(failure('FOG_HOST_CRASHED', 'FogHost exited without a response file.', schemaVersion)));
       });
       const timer = setTimeout(() => {
         child.kill();
-        finish(failure('FOG_HOST_TIMEOUT', `FogHost exceeded ${execution.timeoutMs} ms.`));
+        finish(failure('FOG_HOST_TIMEOUT', `FogHost exceeded ${execution.timeoutMs} ms.`, schemaVersion));
       }, execution.timeoutMs);
     });
   }

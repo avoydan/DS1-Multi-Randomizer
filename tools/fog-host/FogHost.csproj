@@ -32,6 +32,12 @@
     <Compile Include="src\**\*.cs" />
     <Compile Include="vendor\FogMod\*.cs" />
     <Compile Include="vendor\SoulsIds\*.cs" />
+    <Compile Include="..\fog-reconstruction\OfflineEventReconstructor.cs" Link="src\OfflineEventReconstructor.cs" />
+    <Compile Include="..\fog-reconstruction\OfflineTalkReconstructor.cs" Link="src\OfflineTalkReconstructor.cs" />
+    <Compile Include="..\fog-reconstruction\OfflineLayoutReconstructor.cs" Link="src\OfflineLayoutReconstructor.cs" />
+    <Compile Include="..\fog-reconstruction\EventRemovalPlan.cs" Link="src\EventRemovalPlan.cs" />
+    <Compile Include="..\fog-reconstruction\TalkNormalizationPlan.cs" Link="src\TalkNormalizationPlan.cs" />
+    <Compile Include="..\fog-reconstruction\TalkBytecodeNormalizer.cs" Link="src\TalkBytecodeNormalizer.cs" />
   </ItemGroup>
 
   <ItemGroup>
