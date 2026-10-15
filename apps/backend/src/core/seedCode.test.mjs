@@ -192,7 +192,7 @@ test('the master seed is made when a run starts, never earlier; a Seed Code deci
   assert.equal(made, 2);
   assert.notEqual(first.seedCode, second.seedCode);
   assert.equal(first.config.masterSeed, 'fresh-1');
-  assert.equal(first.profile.id, 'ds1tr-gen-v3');
+  assert.equal(first.profile.id, 'ds1tr-gen-v4');
   // A real seed is a number made at that moment.
   const real = prepareRun(fullConfig());
   assert.match(real.config.masterSeed, /^\d{1,10}$/u);

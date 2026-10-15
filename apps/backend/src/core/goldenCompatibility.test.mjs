@@ -54,6 +54,19 @@ test('the v3 golden fixture pins a production Compact Fog full-triple run', asyn
   assert.equal(entry.expected.attempts.at(-1), 'success');
 });
 
+test('the v4 golden fixture pins owner-approved roaming-boss fit behavior', async () => {
+  const v4 = (await fixtures()).find((fixture) => fixture.file === 'ds1tr-gen-v4.roaming-boss-fit.json');
+  assert.ok(v4, 'the ds1tr-gen-v4 roaming-boss fit fixture file exists');
+  assert.deepEqual(v4.cases.map((entry) => entry.name), [
+    'v4-bosses-only-100-anywhere', 'v4-both-100-boss-share', 'v4-bosses-only-100-stay-dead',
+  ]);
+  for (const entry of v4.cases) {
+    assert.equal(entry.profile, 'ds1tr-gen-v4');
+    assert.ok(entry.expected.fileCount > 0 && Object.keys(entry.expected.files).length === entry.expected.fileCount);
+    assert.equal(entry.expected.attempts.at(-1), 'success');
+  }
+});
+
 test('every recorded Seed Code decodes to its recorded profile, master seed and canonical settings, and re-encodes identically', async () => {
   for (const fixture of await fixtures()) {
     assert.ok(resolveGenerationProfile(fixture.profile), `profile ${fixture.profile} is still supported`);

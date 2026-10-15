@@ -16,6 +16,7 @@
 //   DS1TR_GOLDEN_GAME_SOURCE=<clean game dir> node apps/backend/scripts/goldenCompatibility.mjs record ds1tr-gen-v1
 //   DS1TR_GOLDEN_GAME_SOURCE=<clean game dir> node apps/backend/scripts/goldenCompatibility.mjs record ds1tr-gen-v2 roaming-bosses
 //   DS1TR_GOLDEN_GAME_SOURCE=<clean game dir> node apps/backend/scripts/goldenCompatibility.mjs record ds1tr-gen-v3 compact-fog
+//   DS1TR_GOLDEN_GAME_SOURCE=<clean game dir> node apps/backend/scripts/goldenCompatibility.mjs record ds1tr-gen-v4 roaming-boss-fit
 //   (set DS1TR_STATE_DIR to an empty folder to prepare the world data there; DS1TR_FOG_HOST / DS1TR_DATA_TOOL_EXE as usual)
 
 import { createHash } from 'node:crypto';
@@ -233,6 +234,18 @@ export const v3ExtraCaseSets = {
   ],
 };
 
+/** Owner-approved roaming-boss fit rules are isolated to v4; v1-v3 retain their exact historical candidate/fit behavior. */
+export const v4ExtraCaseSets = {
+  'roaming-boss-fit': [
+    { name: 'v4-bosses-only-100-anywhere', masterSeed: 'golden-v2-bosses-only-100', patch: { items: { enabled: false }, fog: { enabled: false },
+      enemies: { randomizeBosses: false, placement: { algorithm: 'sampling-v1', replacementChance: 100, normalReplacement: 'bosses', fit: 'anywhere', difficultyMode: 'random' } } } },
+    { name: 'v4-both-100-boss-share', masterSeed: 'golden-v2-both-100', patch: { items: { enabled: false }, fog: { enabled: false },
+      enemies: { randomizeBosses: false, placement: { algorithm: 'sampling-v1', replacementChance: 100, normalReplacement: 'both', bossChanceInNormalSlots: 100, fit: 'anywhere', difficultyMode: 'random' } } } },
+    { name: 'v4-bosses-only-100-stay-dead', masterSeed: 'golden-v2-bosses-stay-dead', patch: { items: { enabled: false }, fog: { enabled: false },
+      enemies: { randomizeBosses: false, placement: { algorithm: 'sampling-v1', replacementChance: 100, normalReplacement: 'bosses', roamingBossesStayDead: true, fit: 'anywhere', difficultyMode: 'random' } } } },
+  ],
+};
+
 export function buildSettings(patch) {
   const merged = merge(defaults, patch);
   return JSON.parse(JSON.stringify(merged));
@@ -304,9 +317,10 @@ async function main() {
       const profile = argument;
       const setName = process.argv[4] && !process.argv[4].startsWith('--') ? process.argv[4] : null;
       const profileSets = profile === 'ds1tr-gen-v2' ? v2ExtraCaseSets
-        : profile === 'ds1tr-gen-v3' ? v3ExtraCaseSets : v1ExtraCaseSets;
+        : profile === 'ds1tr-gen-v3' ? v3ExtraCaseSets
+          : profile === 'ds1tr-gen-v4' ? v4ExtraCaseSets : v1ExtraCaseSets;
       const caseList = setName ? profileSets[setName]
-        : (profile === 'ds1tr-gen-v2' || profile === 'ds1tr-gen-v3' ? [] : v1Cases);
+        : (profile === 'ds1tr-gen-v2' || profile === 'ds1tr-gen-v3' || profile === 'ds1tr-gen-v4' ? [] : v1Cases);
       if (!caseList) throw new Error(`Unknown extra case set ${setName}.`);
       const target = path.join(fixtureDirectory, setName ? `${profile}.${setName}.json` : `${profile}.json`);
       const exists = await access(target).then(() => true, () => false);

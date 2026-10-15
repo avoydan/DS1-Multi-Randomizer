@@ -125,20 +125,25 @@ test('generates a launcher-only run without invoking a randomizer or writing gam
   assert.equal(await readFile(path.join(game, 'param/GameParam/GameParam.parambnd.dcx'), 'utf8'), 'param');
 }));
 
-test('generation profile selects its frozen roaming-boss destination policy before the combined engine runs', async () => fixture(async ({ game, pristine, root }) => {
+test('generation profile selects its frozen roaming-boss destination and fit policies before the combined engine runs', async () => fixture(async ({ game, pristine, root }) => {
   const seen = [];
   const stub = combinedStub();
-  for (const [id, policy] of [['ds1tr-gen-v1', 'protected-v1'], ['ds1tr-gen-v2', 'safe-handlers-v2']]) {
+  for (const [id, destinationPolicy, fitPolicy] of [
+    ['ds1tr-gen-v1', 'protected-v1', 'legacy-v1'],
+    ['ds1tr-gen-v2', 'safe-handlers-v2', 'legacy-v1'],
+    ['ds1tr-gen-v3', 'safe-handlers-v2', 'legacy-v1'],
+    ['ds1tr-gen-v4', 'safe-handlers-v2', 'owner-approved-v1'],
+  ]) {
     const result = await generateRun({ config: config(game), workspacePath: path.join(root, id), profile: resolveGenerationProfile(id) }, () => {}, {
       getPristineSource: async () => ({ directory: pristine }),
       combined: async (request, onEvent) => {
-        seen.push(request.roamingBossDestinationPolicy);
+        seen.push([request.roamingBossDestinationPolicy, request.roamingBossFitPolicy]);
         const generated = await stub(request, onEvent);
         return { ...generated, randomizerVersion: '0.5.66' };
       },
     });
     assert.equal(result.ok, true, result.message);
-    assert.equal(seen.at(-1), policy, id);
+    assert.deepEqual(seen.at(-1), [destinationPolicy, fitPolicy], id);
   }
 }));
 

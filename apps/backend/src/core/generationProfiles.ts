@@ -1,4 +1,4 @@
-import { CURRENT_GENERATION_PROFILE, GENERATION_PROFILE_V1, GENERATION_PROFILE_V2, GENERATION_PROFILE_V3 } from '@ds1tr/contracts';
+import { CURRENT_GENERATION_PROFILE, GENERATION_PROFILE_V1, GENERATION_PROFILE_V2, GENERATION_PROFILE_V3, GENERATION_PROFILE_V4 } from '@ds1tr/contracts';
 import { SEED_DERIVATION_V1, type SeedDerivation } from './seeds.js';
 
 /**
@@ -25,6 +25,8 @@ export interface GenerationProfile {
   readonly combinedEngine: { readonly randomizerVersions: readonly string[] };
   /** Which audited destination handling the combined engine applies to roaming bosses. */
   readonly roamingBossDestinationPolicy: 'protected-v1' | 'safe-handlers-v2';
+  /** Frozen roaming-boss candidate and fit-class rules; not a user setting. */
+  readonly roamingBossFitPolicy: 'legacy-v1' | 'owner-approved-v1';
   /** Whether this profile selects the legacy pinned FogMod annotation source or the project Compact catalog. */
   readonly fogAnnotationSource: 'legacy-fogmod' | 'compact-v1';
   /** Fog engine: FogHost versions with identical output, the pinned FogMod commit, and the world data set it reads. */
@@ -61,6 +63,7 @@ const v1: GenerationProfile = Object.freeze({
   retryBounds: Object.freeze({ maxCombinedAttempts: 3, maxFogAttempts: 5 }),
   combinedEngine: Object.freeze({ randomizerVersions: Object.freeze(['0.5.66']) }),
   roamingBossDestinationPolicy: 'protected-v1',
+  roamingBossFitPolicy: 'legacy-v1',
   fogAnnotationSource: 'legacy-fogmod',
   fogEngine: Object.freeze({
     // Legacy profiles remain pinned to the FogHost version verified by their frozen outputs.
@@ -80,6 +83,7 @@ const v2: GenerationProfile = Object.freeze({
   retryBounds: Object.freeze({ maxCombinedAttempts: 3, maxFogAttempts: 5 }),
   combinedEngine: Object.freeze({ randomizerVersions: Object.freeze(['0.5.66']) }),
   roamingBossDestinationPolicy: 'safe-handlers-v2',
+  roamingBossFitPolicy: 'legacy-v1',
   fogAnnotationSource: 'legacy-fogmod',
   fogEngine: v1.fogEngine,
   fogItemTracking: v1.fogItemTracking,
@@ -93,6 +97,7 @@ const v3: GenerationProfile = Object.freeze({
   retryBounds: Object.freeze({ maxCombinedAttempts: 3, maxFogAttempts: 5 }),
   combinedEngine: Object.freeze({ randomizerVersions: Object.freeze(['0.5.66']) }),
   roamingBossDestinationPolicy: 'safe-handlers-v2',
+  roamingBossFitPolicy: 'legacy-v1',
   fogAnnotationSource: 'compact-v1',
   fogEngine: Object.freeze({
     hostVersions: Object.freeze(['0.6.0']),
@@ -105,7 +110,21 @@ const v3: GenerationProfile = Object.freeze({
   completeSettings: v2.completeSettings,
 });
 
-const registry: ReadonlyMap<string, GenerationProfile> = new Map([[v1.id, v1], [v2.id, v2], [v3.id, v3]]);
+const v4: GenerationProfile = Object.freeze({
+  id: GENERATION_PROFILE_V4,
+  title: 'Owner-approved roaming boss fit and Compact Fog',
+  seedDerivation: SEED_DERIVATION_V1,
+  retryBounds: Object.freeze({ maxCombinedAttempts: 3, maxFogAttempts: 5 }),
+  combinedEngine: Object.freeze({ randomizerVersions: Object.freeze(['0.5.66']) }),
+  roamingBossDestinationPolicy: 'safe-handlers-v2',
+  roamingBossFitPolicy: 'owner-approved-v1',
+  fogAnnotationSource: 'compact-v1',
+  fogEngine: v3.fogEngine,
+  fogItemTracking: 'compact-fog-item-tracking-v1',
+  completeSettings: v3.completeSettings,
+});
+
+const registry: ReadonlyMap<string, GenerationProfile> = new Map([[v1.id, v1], [v2.id, v2], [v3.id, v3], [v4.id, v4]]);
 
 export function resolveGenerationProfile(id: string): GenerationProfile | null {
   return registry.get(id) ?? null;

@@ -16,18 +16,19 @@ deterministic behavior that turns *(master seed, canonical settings)* into a wor
 
 ## What a profile freezes (`apps/backend/src/core/generationProfiles.ts`)
 
-| Component | `ds1tr-gen-v1` | `ds1tr-gen-v2` | `ds1tr-gen-v3` |
-|---|---|---|---|
-| Seed derivation | `seed-derivation-v1`: named streams from `SHA256("ds1-triple-randomizer:v1" ...)`, retry attempts included | same | same |
-| Retry bounds | combined engine 3 attempts, Fog 5 attempts (every attempt draws different seeds, so the bounds are semantics) | same | same |
-| Combined engine (items, enemies, bosses) | `RANDOMIZER_VERSION` `0.5.66`, roaming destination policy `protected-v1` | `RANDOMIZER_VERSION` `0.5.66`, roaming destination policy `safe-handlers-v2` | same as v2 |
-| World randomizer | FogHost `0.5.0`, FogMod commit `6e6dc7886d0f8bcc53c1800d95c9e859d1f2f87f`, world data id `f394fa536ba9b66d` | same | FogHost `0.6.0`, Compact catalog `ds1tr-compact-full-fog-v1` fingerprint `8c03fd3de1cd7c772d5c933753ae54eab35f9e8b70a1aef2954322330d0002d4`, world data id `compact-runtime-offline-v1` |
-| Item tracking for the world randomizer | `fog-item-tracking-v1` (`docs/FOG_ITEM_TRACKING.md`) | same | `compact-fog-item-tracking-v1` |
-| Settings completion | `completeSettings`: options added after the profile get the value that reproduces the profile's behavior | same | same |
+| Component | `ds1tr-gen-v1` | `ds1tr-gen-v2` | `ds1tr-gen-v3` | `ds1tr-gen-v4` |
+|---|---|---|---|---|
+| Seed derivation | `seed-derivation-v1`: named streams from `SHA256("ds1-triple-randomizer:v1" ...)`, retry attempts included | same | same | same |
+| Retry bounds | combined engine 3 attempts, Fog 5 attempts (every attempt draws different seeds, so the bounds are semantics) | same | same | same |
+| Combined engine (items, enemies, bosses) | `RANDOMIZER_VERSION` `0.5.66`, roaming destination policy `protected-v1` | `RANDOMIZER_VERSION` `0.5.66`, roaming destination policy `safe-handlers-v2` | same as v2 | same as v2 |
+| Roaming-boss candidate and fit behavior | historical `legacy-v1` | historical `legacy-v1` | historical `legacy-v1` | owner-approved `owner-approved-v1` |
+| World randomizer | FogHost `0.5.0`, FogMod commit `6e6dc7886d0f8bcc53c1800d95c9e859d1f2f87f`, world data id `f394fa536ba9b66d` | same | FogHost `0.6.0`, Compact catalog `ds1tr-compact-full-fog-v1` fingerprint `8c03fd3de1cd7c772d5c933753ae54eab35f9e8b70a1aef2954322330d0002d4`, world data id `compact-runtime-offline-v1` | same as v3 |
+| Item tracking for the world randomizer | `fog-item-tracking-v1` (`docs/FOG_ITEM_TRACKING.md`) | same | `compact-fog-item-tracking-v1` | same as v3 |
+| Settings completion | `completeSettings`: options added after the profile get the value that reproduces the profile's behavior | same | same | same |
 
 `ds1tr-gen-v1` is the behavior of desktop 0.16.1 / backend 0.29.1 / contracts 0.12.0.
 
-`ds1tr-gen-v2` preserves the audited roaming-boss destination handling described below. `ds1tr-gen-v3` is current for new runs; it selects the independent Compact Fog catalog, offline reconstructed data, and required-only backend Fog item constraints. Seed Code format 1, canonical setting shape, seed derivation, retry bounds, combined engine `0.5.66` RNG salt, and the v2 roaming-boss policy remain unchanged. V1 and v2 continue to use their original Fog data and tracking behavior.
+`ds1tr-gen-v2` preserves the audited roaming-boss destination handling described below. `ds1tr-gen-v3` added the independent Compact Fog catalog, offline reconstructed data, and required-only backend Fog item constraints. `ds1tr-gen-v4` is current for new runs and adds the owner-approved roaming-boss fit and candidate behavior while retaining the exact Compact Fog contract from v3. Profiles v1 through v3 explicitly use the historical fit behavior. Seed Code format 1, canonical setting shape, seed derivation, retry bounds, combined engine `0.5.66` RNG salt, and each profile's destination policy remain unchanged.
 
 ## Recorded exception 6: roaming-boss safe destination handling (backend 0.46.0, desktop 0.39.0; 2026-10-12)
 
@@ -44,6 +45,16 @@ New runs use `ds1tr-gen-v3` because Compact Fog's project-owned world catalog an
 The Compact catalog has 22 item identities (9 required, 13 random-only, 0 hard-only). Only required identities enter the combined engine's Fog-tracked placement constraints. Random-only items remain visible to Fog's own graph reader but do not constrain the combined pool; this avoids incorrectly forcing world-loot/drop sources into shops. The change is v3-only, so v1/v2 item placement remains unchanged.
 
 Fixture `apps/backend/fixtures/golden/ds1tr-gen-v3.compact-fog.json` pins a full Items + Enemies + Fog run. Cold-cache regeneration from the clean QA DSR source passed with the same 73-file package digest. The real Fog writer matrix passed 18 configurations plus a deterministic repeat; every run wrote and decoded 54 game files. Desktop app version remains 0.39.0 and this task did not create a release.
+
+## Recorded exception 8: profile-scoped owner-approved roaming-boss fit (desktop 0.39.2; 2026-10-15)
+
+The owner-approved boss classifications were initially applied globally in an unpublished release candidate. That changed three existing v2 golden worlds. The compatibility fix restores the original roaming candidate exclusions and fit classes for `ds1tr-gen-v1`, `ds1tr-gen-v2`, and `ds1tr-gen-v3`, and selects the owner-approved rules only for new profile `ds1tr-gen-v4`. V4 keeps v3's Compact Fog host, data, and item-tracking contract; only the roaming-boss fit/candidate policy differs.
+
+The old golden files are not rewritten. The new file `apps/backend/fixtures/golden/ds1tr-gen-v4.roaming-boss-fit.json` pins the three affected boss-only/boss-share cases under v4. The profile-aware pipeline passes its frozen fit policy to the combined engine; this internal routing is not a user setting and does not change canonical settings or Seed Code encoding.
+
+The release gate regenerated all four existing v2 cases, the v3 Compact Fog case, and all three new v4 cases against the clean QA DSR snapshot; every digest matched. Four additional v1 roaming-boss cases matched. Two v1 cases that also require the missing local legacy Fog cache stopped before generation with `WORLD_DATA_LEGACY_UNAVAILABLE`; they did not produce digest mismatches.
+
+Seed Codes created by an unpublished intermediate build that globally applied the owner-approved rules while still labeling them `ds1tr-gen-v3` cannot be distinguished from ordinary v3 codes. V3 now correctly restores its historical behavior. To retain the intermediate world's output, the user must generate and save a new code under v4; the application does not silently relabel existing codes.
 
 ### Drift guard
 
@@ -198,7 +209,7 @@ The **third recording (backend 0.45.3)** follows the fix of the DLC drop tables 
 
 ## Nexus release-hardening verification (2026-10-14)
 
-- The current new-run profile remains ds1tr-gen-v3; v1 and v2 fixture files were not changed. The 55 available v1/v2 golden cases produced **39 matches and 16 mismatches** when tested with FogHost 0.6.0. All mismatches were v1 cases with Fog enabled and differed in event/common.emevd.dcx and event/m12_01_00_00.emevd.dcx. The v2 cases present in the corpus matched.
+- At that release-hardening checkpoint, the new-run profile was ds1tr-gen-v3; v1 and v2 fixture files were not changed. The 55 available v1/v2 golden cases produced **39 matches and 16 mismatches** when tested with FogHost 0.6.0. All mismatches were v1 cases with Fog enabled and differed in event/common.emevd.dcx and event/m12_01_00_00.emevd.dcx. The v2 cases present in the corpus matched.
 - Keep the frozen v1/v2 FogHost allowlist at 0.5.0. The fresh Nexus package contains FogHost 0.6.0 only, so v1/v2 Fog runs fail closed in that package. This is a release blocker; no output drift is accepted and fixtures must not be rewritten to mask it.
 - V3 remained deterministic: its compact golden regenerated with the same 73-file package digest. Packaged Setup and Portable each generated the recommended Triple v3 world on the safe QA copy; Apply/Restore completed and all 73 generated target paths returned to their pristine snapshot hashes.
 
@@ -206,6 +217,6 @@ The **third recording (backend 0.45.3)** follows the fix of the DLC drop tables 
 
 - The authentic FogHost 0.5.0 source is the `tools/fog-host` subtree at Git commit `b2ba7d6148810b367bd01d955688364cad30c845`, tree `438b66455982060760419a755283acaa23997979`. Packaging extracts that exact historical tree; the repository stores only its source pin, not a second mutable implementation.
 - The 16 previously drifting v1 Fog cases return to their recorded package hashes with that host, the existing legacy 59-file data cache, `fog-item-tracking-v1`, and no fixture changes. The legacy protocol is schema 2; the current Compact host protocol is schema 3.
-- Generation routing is selected from the validated profile's host-version, annotation-source, and item-tracking contract: gen-v1/v2 use FogHost 0.5.0; gen-v3 uses FogHost 0.6.0. Both executables ship side-by-side and a missing selected executable fails closed.
+- Generation routing is selected from the validated profile's host-version, annotation-source, and item-tracking contract: gen-v1/v2 use FogHost 0.5.0; gen-v3/v4 use FogHost 0.6.0. Both executables ship side-by-side and a missing selected executable fails closed.
 - The read-only progression-model exporter was added in 0.6.0. Legacy profiles use it only to export a progression graph from legacy data for key placement; the Fog generation request and output remain on 0.5.0. No Compact data is supplied to the legacy host.
 - Final gate (2026-10-15): **55/55 v1/v2 cases and 1/1 v3 Compact case** match their frozen package hashes; no fixture was modified. Packaged backend smoke also confirmed the v1/v2 -> 0.5.0/legacy-data and v3 -> 0.6.0/Compact routes. Exact package digests and regression results are in `docs/IMPLEMENTATION_STATUS.md`.

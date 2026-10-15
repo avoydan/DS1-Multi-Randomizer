@@ -45,15 +45,15 @@ The backend imports `@ds1tr/contracts` at run time. electron-builder never copie
 * `electron-builder.yml` `publish:` (explicit `provider: github`, owner, repo) makes electron-builder write `resources/app-update.yml` and `latest.yml` + `.blockmap` next to the installer; nothing is uploaded by the builder (`--publish never`).
 * Release steps: [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md); design and limits: [AUTO_UPDATE.md](AUTO_UPDATE.md).
 
-## Versioned Fog runtime (desktop 0.39.0)
+## Versioned Fog runtime (desktop 0.39.2)
 
 The Seed Code profile selects the Fog generation executable and request protocol; the app version and the presence of `fog.txt` do not select a host:
 
 | Profile | Generation host | Wire schema | Packaged path |
 |---|---|---:|---|
 | `ds1tr-gen-v1` / `ds1tr-gen-v2` | FogHost 0.5.0 | 2 | `resources/runtime/tools/fog-host-legacy/FogHost.exe` |
-| `ds1tr-gen-v3` | FogHost 0.6.0 | 3 | `resources/runtime/tools/fog-host/FogHost.exe` |
+| `ds1tr-gen-v3` / `ds1tr-gen-v4` | FogHost 0.6.0 | 3 | `resources/runtime/tools/fog-host/FogHost.exe` |
 
-Both hosts are required package contents. The backend fails closed if the selected executable is missing; it never falls back across versions. Legacy profiles still require their complete hash-verified 59-file data cache. Nexus builds do not download or bundle it, so a v1/v2 Fog run needs that cache already available. V3 keeps the zero-download Compact path and reconstructs its 58 inputs from the player's verified local game snapshot.
+Both hosts are required package contents. The backend fails closed if the selected executable is missing; it never falls back across versions. Legacy profiles still require their complete hash-verified 59-file data cache. Nexus builds do not download or bundle it, so a v1/v2 Fog run needs that cache already available. V3 and v4 use the zero-download Compact path and reconstruct its 58 inputs from the player's verified local game snapshot.
 
-FogHost 0.5.0 predates the read-only `progression-model` command. For legacy profiles that use key placement, FogHost 0.6.0 may export this model from the legacy 59-file data root; that helper does not generate or modify Fog outputs. The actual v1/v2 Fog generation request and output still use schema 2 and FogHost 0.5.0. Compact v3 data is never passed to the legacy host.
+FogHost 0.5.0 predates the read-only `progression-model` command. For legacy profiles that use key placement, FogHost 0.6.0 may export this model from the legacy 59-file data root; that helper does not generate or modify Fog outputs. The actual v1/v2 Fog generation request and output still use schema 2 and FogHost 0.5.0. Compact v3/v4 data is never passed to the legacy host.

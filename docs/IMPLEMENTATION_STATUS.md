@@ -1,5 +1,11 @@
 # Implementation status
 
+## Profile-scoped roaming-boss fit compatibility fix (desktop 0.39.2 candidate; 2026-10-15)
+
+The owner-approved roaming-boss candidate and fit rules now select generation profile `ds1tr-gen-v4`. Existing `gen-v1`, `gen-v2`, and `gen-v3` explicitly restore the pre-change behavior; v4 inherits v3's Compact Fog runtime unchanged. Three original v2 golden outputs had drifted under the transient global rules; their existing fixtures remain untouched. A separate v4 golden fixture records the corresponding owner-approved outputs.
+
+Verification so far: root typecheck passed; focused generation profile/pipeline/Seed Code/history/API tests passed **56/56**; combined config mapping passed **15/15**; roaming-boss engine regressions passed **28/28**; golden metadata/code tests passed **4/4** with the optional end-to-end test skipped there. Real package-hash regeneration passed for **all 4 v2 fixtures**, **the v3 Compact fixture**, and **all 3 new v4 cases**. Four additional v1 roaming-boss cases matched; two v1 cases requiring the unavailable local legacy Fog cache stopped with `WORLD_DATA_LEGACY_UNAVAILABLE` before generation. Release packaging and publication follow after the commit.
+
 ## Compact Full Fog V1 production path (2026-10-14; desktop 0.39.0 retained)
 
 FogCompactCatalogBuilder compiles verified pristine DSR facts plus project rules into the existing typed FogAnnotationCatalog; FogLogicalAreaResolver resolves map defaults, boss entities/events/collisions, custom-start regions, and authored entrance objects. Production Compact projection is enabled for profile ds1tr-gen-v3 under fingerprint 8c03fd3de1cd7c772d5c933753ae54eab35f9e8b70a1aef2954322330d0002d4. It does not read, bundle, or download fog.txt.

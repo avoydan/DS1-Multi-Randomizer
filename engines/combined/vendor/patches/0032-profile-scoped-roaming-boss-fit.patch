@@ -1,0 +1,31 @@
+diff --git a/src/core/config.js b/src/core/config.js
+index b107663..a847c1f 100644
+--- a/src/core/config.js
++++ b/src/core/config.js
+@@ -90,0 +91,2 @@ export const defaultConfig = Object.freeze({
++  // Profile-controlled candidate and fit behavior. Historical Seed Codes pass legacy-v1 explicitly.
++  enemyRoamingBossFitPolicy: "owner-approved-v1",
+@@ -149,0 +152,3 @@ export function normalizeConfig(input = {}) {
++  if (!["legacy-v1", "owner-approved-v1"].includes(config.enemyRoamingBossFitPolicy)) {
++    config.enemyRoamingBossFitPolicy = defaultConfig.enemyRoamingBossFitPolicy;
++  }
+diff --git a/src/core/generator.js b/src/core/generator.js
+index 53fb347..1e0037c 100644
+--- a/src/core/generator.js
++++ b/src/core/generator.js
+@@ -299,0 +300 @@ const roamingExcludedModels = new Set([
++const legacyRoamingExcludedModels = new Set([...roamingExcludedModels, "c5320"]);
+@@ -312,0 +314 @@ const roamingSizeClassOverrides = new Map([
++const legacyRoamingSizeClassOverrides = new Map([["c3230", 3]]);
+@@ -1787 +1789,2 @@ function sampleExtractedEnemies(config, catalog, dragonPlan, bossPlan, diagnosti
+-      bossTypes: deriveRoamingBossTypes(candidates, table, roamingSizeClassOverrides),
++      bossTypes: deriveRoamingBossTypes(candidates, table,
++        config.enemyRoamingBossFitPolicy === "owner-approved-v1" ? roamingSizeClassOverrides : legacyRoamingSizeClassOverrides),
+@@ -1867 +1870,3 @@ function roamingBossCandidates(config, catalog, dragonPlan) {
+-  for (const slot of bossSourceSlots(config, catalog, dragonPlan, { includePinwheelChaosMain: true })) {
++  const ownerApprovedFit = config.enemyRoamingBossFitPolicy === "owner-approved-v1";
++  const excludedModels = ownerApprovedFit ? roamingExcludedModels : legacyRoamingExcludedModels;
++  for (const slot of bossSourceSlots(config, catalog, dragonPlan, { includePinwheelChaosMain: ownerApprovedFit })) {
+@@ -1869 +1874 @@ function roamingBossCandidates(config, catalog, dragonPlan) {
+-    if (byKey.has(key) || nonPortableBossReplacementModels.has(slot.modelName) || roamingExcludedModels.has(slot.modelName)) continue;
++    if (byKey.has(key) || nonPortableBossReplacementModels.has(slot.modelName) || excludedModels.has(slot.modelName)) continue;

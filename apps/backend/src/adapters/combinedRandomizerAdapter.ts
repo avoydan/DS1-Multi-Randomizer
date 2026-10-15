@@ -15,6 +15,8 @@ export interface CombinedRandomizerRequest {
   enemies: EnemyOptions;
   /** Frozen by the Seed Code generation profile; not a user setting. */
   roamingBossDestinationPolicy?: GenerationProfile['roamingBossDestinationPolicy'];
+  /** Frozen by the Seed Code generation profile; not a user setting. */
+  roamingBossFitPolicy?: GenerationProfile['roamingBossFitPolicy'];
   /** Whether upstream writes `spoiler.txt` into the generated package. */
   generateSpoilerLog: boolean;
   /** False leaves the DLC out of the data the engine reads (docs/DLC_AUDIT.md); absent or true is the world as it has always been generated. */

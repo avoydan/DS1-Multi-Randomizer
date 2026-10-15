@@ -1,6 +1,6 @@
 # Compact Full Fog V1
 
-**Status (2026-10-14):** production Offline Compact Fog is wired in the current worktree under `ds1tr-gen-v3`. The application version remains 0.39.0; no release, commit, or push was made.
+**Status (introduced 2026-10-14):** production Offline Compact Fog was first wired under `ds1tr-gen-v3`; `ds1tr-gen-v4` inherits that same Compact Fog contract. The follow-up profile-scoping release is desktop 0.39.2.
 
 ## Runtime boundary
 
@@ -67,6 +67,6 @@ The other nine cross-map cutscene relocations are progression/tutorial routes (D
 
 ## Nexus packaging and offline run (2026-10-14)
 
-The current Nexus package selects ds1tr-gen-v3 and has no updater feed metadata. Against a fresh temporary app-data/cache root and the clean QA DSR copy, its packaged backend reconstructed the 58 Compact inputs locally, made a full 73-file Items + Enemies + Fog package, applied it, and restored the original hashes for all 73 target paths. The process-scoped network guard logged no blocked request; the cache held 58 files and no fog.txt. This is packaged generation/apply/restore evidence, not gameplay evidence or an OS-wide firewall test. The same v3 generation/apply/restore/hash check passed via the installed Setup build.
+The earlier Nexus package selects ds1tr-gen-v3 and has no updater feed metadata. Against a fresh temporary app-data/cache root and the clean QA DSR copy, its packaged backend reconstructed the 58 Compact inputs locally, made a full 73-file Items + Enemies + Fog package, applied it, and restored the original hashes for all 73 target paths. The process-scoped network guard logged no blocked request; the cache held 58 files and no fog.txt. This is packaged generation/apply/restore evidence, not gameplay evidence or an OS-wide firewall test. The same v3 generation/apply/restore/hash check passed via the installed Setup build.
 
 Legacy v1/v2 remain a separate open release gate: their frozen Fog profile allows Host 0.5.0, while this Nexus package ships Host 0.6.0. Do not admit the newer host until untouched golden fixtures prove identical output.

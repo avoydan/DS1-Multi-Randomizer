@@ -47,6 +47,7 @@ export interface UpstreamCombinedRandomizerConfig {
   enemyRoamingBossSouls: number;
   enemyRoamingBossesStayDead: boolean;
   enemyRoamingBossDestinationPolicy: 'protected-v1' | 'safe-handlers-v2';
+  enemyRoamingBossFitPolicy: 'legacy-v1' | 'owner-approved-v1';
   placementDiagnosticsLevel: 'summary' | 'detail';
   /** Items the world randomizer follows and the lots it can follow them in; null when it does not run. */
   fogTrackedItems: FogTrackedItems | null;
@@ -135,6 +136,7 @@ export function mapCombinedRandomizerConfig(
     enemyRoamingBossSouls: request.enemies.placement.roamingBossSouls ?? 50,
     enemyRoamingBossesStayDead: request.enemies.placement.roamingBossesStayDead ?? false,
     enemyRoamingBossDestinationPolicy: request.roamingBossDestinationPolicy ?? 'safe-handlers-v2',
+    enemyRoamingBossFitPolicy: request.roamingBossFitPolicy ?? 'owner-approved-v1',
     placementDiagnosticsLevel: request.placementDiagnosticsLevel ?? 'summary',
     fogTrackedItems: request.fogTrackedItems ?? null,
     // Part H options are optional on input (an older configuration means the keys stay where the game puts them).

@@ -4,7 +4,7 @@ DS1 Multi Randomizer is a Windows desktop app for creating one deterministic Dar
 
 ## Download
 
-[Download latest release — v0.38.4](https://github.com/avoydan/DS1-Multi-Randomizer/releases/tag/v0.38.4) · [All releases](https://github.com/avoydan/DS1-Multi-Randomizer/releases)
+[Download latest release — v0.39.2](https://github.com/avoydan/DS1-Multi-Randomizer/releases/tag/v0.39.2) · [All releases](https://github.com/avoydan/DS1-Multi-Randomizer/releases)
 
 The release is a **public prerelease**. The recommended file is `DS1-Multi-Randomizer-0.38.4-Setup-x64.exe`. A portable executable is also provided; it extracts to a temporary folder each time it starts, which can trigger more antivirus warnings.
 
@@ -34,7 +34,7 @@ Compare the `Hash` value with the line for that exact filename in `SHA256SUMS.tx
 
 ## Code signing and antivirus
 
-**v0.38.4 is unsigned.** No SignPath application has been approved and no trusted code-signing certificate is active. Windows SmartScreen or antivirus software may warn about the download. We do not recommend disabling protection or adding an exclusion. See [false-positive reporting and verification](docs/ANTIVIRUS_FALSE_POSITIVES.md), [release trust](docs/RELEASE_TRUST.md), and the [code-signing preparation](docs/CODE_SIGNING.md).
+**The latest release is unsigned.** No SignPath application has been approved and no trusted code-signing certificate is active. Windows SmartScreen or antivirus software may warn about the download. We do not recommend disabling protection or adding an exclusion. See [false-positive reporting and verification](docs/ANTIVIRUS_FALSE_POSITIVES.md), [release trust](docs/RELEASE_TRUST.md), and the [code-signing preparation](docs/CODE_SIGNING.md).
 
 ## Privacy and network use
 
@@ -42,7 +42,7 @@ There is no telemetry, analytics, account, crash reporting, or automatic support
 
 ## Source and license
 
-The source code for this release is available in this repository at the matching `v0.38.4` tag. DS1 Multi Randomizer is licensed under [GPL-3.0-only](LICENSE). See [third-party notices](THIRD_PARTY_NOTICES.md) and the [licensing policy](docs/LICENSING.md) for upstream components and distribution terms.
+The source code for each release is available in this repository at its matching tag. DS1 Multi Randomizer is licensed under [GPL-3.0-only](LICENSE). See [third-party notices](THIRD_PARTY_NOTICES.md) and the [licensing policy](docs/LICENSING.md) for upstream components and distribution terms.
 
 Issues: [GitHub issue tracker](https://github.com/avoydan/DS1-Multi-Randomizer/issues).
 

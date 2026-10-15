@@ -1,14 +1,22 @@
 # Decisions
 
+## Owner-approved roaming-boss fit is scoped to generation profile v4
+
+Date: 2026-10-15
+
+The updated fit classifications and Pinwheel Chaos roaming-candidate behavior change generated enemy placements. They therefore belong to `ds1tr-gen-v4`; v1, v2, and v3 explicitly select the pre-change candidate exclusions and fit classes. This preserves all three existing profile contracts, including local v3 Seed Codes, while making the owner-approved rules the behavior for new worlds. V4 inherits v3's Compact Fog runtime and data contract. The `RANDOMIZER_VERSION` salt and canonical user settings stay unchanged; the profile supplies the internal policy.
+
+Three existing v2 golden outputs changed when the owner-approved rules were first applied globally. The change was not released. The profile-aware behavior restores those golden outputs and records the new v4 results in a separate fixture file; no existing golden is modified. Intermediate unreleased worlds created under the transient global behavior while labeled v3 cannot be inferred from their Seed Codes and must be recreated under v4 if their exact output matters.
+
 ## Compact Fog uses a new offline generation profile
 
 Date: 2026-10-14
 
-Compact Fog is the production path for new runs. Its 58-file world-data set is assembled from verified DSR files and deterministic local reconstruction; it has no upstream annotation files and does not read or package `fog.txt`. Profiles v1/v2 retain their original 59-file data manifest and frozen item-tracking rules.
+Compact Fog was introduced for new runs in profile v3. Its 58-file world-data set is assembled from verified DSR files and deterministic local reconstruction; it has no upstream annotation files and does not read or package `fog.txt`. Profiles v1/v2 retain their original 59-file data manifest and frozen item-tracking rules; v4 inherits the exact v3 Compact Fog contract.
 
-The Compact catalog contains 22 key-item identities, but only its 9 `required` items constrain backend item placement before Fog runs. `RandomOnly` and `Hard` entries remain in the Fog catalog but are omitted from that backend-required set. The current catalog has 13 RandomOnly and no Hard entries; FogMod's reader excludes RandomOnly entries from its item hash and handles their multiple source lots as optional, while Hard entries remain controlled by Fog's hard-logic option. Applying the old `required:false => shop-only` backend rule made a valid full run fail for Eye of Death when its source was a world lot or enemy drop. This policy is isolated to `ds1tr-gen-v3`; v1/v2 behavior and fixtures remain frozen.
+The Compact catalog contains 22 key-item identities, but only its 9 `required` items constrain backend item placement before Fog runs. `RandomOnly` and `Hard` entries remain in the Fog catalog but are omitted from that backend-required set. The catalog has 13 RandomOnly and no Hard entries; FogMod's reader excludes RandomOnly entries from its item hash and handles their multiple source lots as optional, while Hard entries remain controlled by Fog's hard-logic option. Applying the old `required:false => shop-only` backend rule made a valid full run fail for Eye of Death when its source was a world lot or enemy drop. This policy was introduced in `ds1tr-gen-v3` and is inherited by v4; v1/v2 behavior and fixtures remain frozen.
 
-The v3 generation profile pins FogHost 0.6.0, the Compact catalog fingerprint, offline world-data identity, and Compact item tracking. The current worktree remains app version 0.39.0; no release or commit is included in this task.
+The v3 generation profile pins FogHost 0.6.0, the Compact catalog fingerprint, offline world-data identity, and Compact item tracking. V4 inherits these values while adding its independent roaming-boss fit policy. The original Compact change was implemented under desktop 0.39.0; the later profile-scoping patch is prepared as desktop 0.39.2.
 
 ## Nexus packages do not download legacy Fog data
 
@@ -1329,7 +1337,7 @@ Full evidence: `docs/BOSSES_ONLY_AUDIT.md`.
 ## Frozen FogHost runtime routing (2026-10-15)
 
 1. Keep the exact historical FogHost 0.5.0 tree as a pinned build input, not as a hand-maintained source fork. The source identity is commit `b2ba7d6148810b367bd01d955688364cad30c845`, subtree `tools/fog-host`, tree `438b66455982060760419a755283acaa23997979`; `tools/fog-host-legacy/source-pin.json` is the versioned identity record.
-2. Select the generation executable and wire schema from the frozen Seed Code profile components. `ds1tr-gen-v1/v2` use 0.5.0/schema 2 and the legacy 59-file world data plus legacy item tracking. `ds1tr-gen-v3` uses 0.6.0/schema 3 and Compact data plus Compact item tracking. Missing selected hosts fail closed; there is no cross-version fallback.
+2. Select the generation executable and wire schema from the frozen Seed Code profile components. `ds1tr-gen-v1/v2` use 0.5.0/schema 2 and the legacy 59-file world data plus legacy item tracking. `ds1tr-gen-v3/v4` use 0.6.0/schema 3 and Compact data plus Compact item tracking. Missing selected hosts fail closed; there is no cross-version fallback.
 3. FogHost 0.5.0 predates `progression-model`. For key-placement runs only, 0.6.0 may export the read-only model from the legacy data root. The generation executable remains 0.5.0, and this helper does not write or transform Fog outputs. The package still requires both hosts; Compact reconstruction and Compact projection remain on 0.6.0.
 4. Nexus does not download or bundle legacy Fog data. A v1/v2 Fog run there requires a complete hash-verified local 59-file cache. V3 remains independently reconstructable from the player's verified DSR files with zero downloads.
 

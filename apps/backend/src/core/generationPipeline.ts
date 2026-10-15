@@ -270,6 +270,7 @@ export async function generateRun(
         masterSeed: config.masterSeed, combinedSeed: seeds.combined,
         items: engineKeyMode === keyMode ? config.items : { ...config.items, keyPlacement: engineKeyMode }, enemies: config.enemies,
         roamingBossDestinationPolicy: profile.roamingBossDestinationPolicy,
+        roamingBossFitPolicy: profile.roamingBossFitPolicy,
         generateSpoilerLog: config.output.generateSpoilerLog,
         includeDlc: config.output.includeDlc,
         placementDiagnosticsLevel: process.env[placementDiagnosticsVariable] === 'detail' ? 'detail' : 'summary',

@@ -297,6 +297,7 @@ const roamingExcludedModels = new Set([
   "c5351", // Anor Londo Gargoyles
   "c5390", // Four Kings (linked bodies)
 ]);
+const legacyRoamingExcludedModels = new Set([...roamingExcludedModels, "c5320"]);
 
 /**
  * Bosses whose hit capsule does not describe their body, with the size class (0-5, `SIZE_EDGES` in sampling.js) Placement fit uses instead:
@@ -310,6 +311,7 @@ const roamingSizeClassOverrides = new Map([
   ["c4100", 0], // Owner-approved minimum destination class: Knight Artorias.
   ["c5320", 0], // Owner-approved minimum destination class: Dark Sun Gwyndolin.
 ]);
+const legacyRoamingSizeClassOverrides = new Map([["c3230", 3]]);
 
 // ---- a regular enemy as the body of a boss encounter (Part E2, patches/0016) ------------------------------------------------
 // The encounter stays the boss's: the slot keeps its entity id, so every vanilla event that waits for that entity (the health bar, the
@@ -1784,7 +1786,8 @@ function sampleExtractedEnemies(config, catalog, dragonPlan, bossPlan, diagnosti
       assignment: new Map([...regularAssignment, ...dragonSlots.filter((slot) => dragonOccupants.has(slot.id)).map((slot) => [slot.id, dragonOccupants.get(slot.id)])]),
       fixedModelsByMap,
       table,
-      bossTypes: deriveRoamingBossTypes(candidates, table, roamingSizeClassOverrides),
+      bossTypes: deriveRoamingBossTypes(candidates, table,
+        config.enemyRoamingBossFitPolicy === "owner-approved-v1" ? roamingSizeClassOverrides : legacyRoamingSizeClassOverrides),
       preventSame: config.preventSameEnemy,
       excludedSlotIds: safeHandlers ? new Set() : roamingProtectedSlotIds(roamingSlots),
       protectedReasons: safeHandlers ? new Map() : roamingProtectedReasons(roamingSlots),
@@ -1864,9 +1867,11 @@ function bossSourceSlots(config, catalog, dragonPlan, { includePinwheelChaosMain
 // "none" setting: the nerf applies to Lord Gwyn, who never roams).
 function roamingBossCandidates(config, catalog, dragonPlan) {
   const byKey = new Map();
-  for (const slot of bossSourceSlots(config, catalog, dragonPlan, { includePinwheelChaosMain: true })) {
+  const ownerApprovedFit = config.enemyRoamingBossFitPolicy === "owner-approved-v1";
+  const excludedModels = ownerApprovedFit ? roamingExcludedModels : legacyRoamingExcludedModels;
+  for (const slot of bossSourceSlots(config, catalog, dragonPlan, { includePinwheelChaosMain: ownerApprovedFit })) {
     const key = bossArchetypeKey(slot);
-    if (byKey.has(key) || nonPortableBossReplacementModels.has(slot.modelName) || roamingExcludedModels.has(slot.modelName)) continue;
+    if (byKey.has(key) || nonPortableBossReplacementModels.has(slot.modelName) || excludedModels.has(slot.modelName)) continue;
     if (!bossKillSouls.has(slot.npcParamId)) continue;
     byKey.set(key, slot);
   }
