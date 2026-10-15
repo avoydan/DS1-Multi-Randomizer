@@ -6,7 +6,7 @@ DS1 Multi Randomizer is a Windows desktop app for creating one deterministic Dar
 
 [Download latest release — v0.39.2](https://github.com/avoydan/DS1-Multi-Randomizer/releases/tag/v0.39.2) · [All releases](https://github.com/avoydan/DS1-Multi-Randomizer/releases)
 
-The release is a **public prerelease**. The recommended file is `DS1-Multi-Randomizer-0.38.4-Setup-x64.exe`. A portable executable is also provided; it extracts to a temporary folder each time it starts, which can trigger more antivirus warnings.
+The release is a **public prerelease**. The recommended file is `DS1-Multi-Randomizer-0.39.2-Setup-x64.exe`. A portable executable is also provided; it extracts to a temporary folder each time it starts, which can trigger more antivirus warnings.
 
 ## What it does
 
@@ -27,7 +27,7 @@ The release is a **public prerelease**. The recommended file is `DS1-Multi-Rando
 Each release includes `SHA256SUMS.txt` and a versioned release manifest. In PowerShell, calculate a file's hash with:
 
 ```powershell
-Get-FileHash .\DS1-Multi-Randomizer-0.38.4-Setup-x64.exe -Algorithm SHA256
+Get-FileHash .\DS1-Multi-Randomizer-0.39.2-Setup-x64.exe -Algorithm SHA256
 ```
 
 Compare the `Hash` value with the line for that exact filename in `SHA256SUMS.txt`. A matching hash shows that the file matches the published checksum; it is not a code signature or a safety certification.
