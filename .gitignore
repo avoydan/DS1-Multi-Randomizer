@@ -20,6 +20,9 @@ tools/fog-host/**/bin/
 tools/fog-host/**/obj/
 tools/smoke-verify/bin/
 tools/smoke-verify/obj/
+# Game cursor helper build output.
+tools/game-cursor-helper/bin/
+tools/game-cursor-helper/obj/
 # Repository-authored combined-engine tests.
 engines/combined/tests/**/bin/
 engines/combined/tests/**/obj/
