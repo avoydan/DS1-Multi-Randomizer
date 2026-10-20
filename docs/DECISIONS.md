@@ -1,5 +1,11 @@
 # Decisions
 
+## Owner gameplay QA loadout is a local post-generation overlay
+
+Date: 2026-10-20
+
+The owner-only gameplay QA loadout is enabled only by the backend runtime environment variable `DS1TR_OWNER_QA_LOADOUT=1` and defaults off. It runs after all normal combined/Fog generation and changes only starting-class `CharaInitParam` fields in the generated package. The world Seed Code, profile, presets, generation options, RNG streams, and Fog topology remain the ordinary run's; the manifest records `ownerQaLoadout: true` separately when the overlay is applied. This keeps the owner convenience outside the deterministic world contract and leaves ordinary runs byte-identical. The tool validates every granted equipment/goods name against the supplied clean DSR source's English FMG and PARAM rows before writing, and fails closed on any mismatch. The exact ring slots are Ring of Favor and Protection (`143`) and Cloranthy Ring (`104`); Havel's Ring (`100`) is validated by name but explicitly excluded. Black Knight Halberd (`1105000`) is equipped in the right hand and Grass Crest Shield (`1453000`) in the left hand; Havel's Greatshield (`1505000`) is validated but excluded. Secondary hand slots are cleared.
+
 ## Owner-approved roaming-boss fit is scoped to generation profile v4
 
 Date: 2026-10-15

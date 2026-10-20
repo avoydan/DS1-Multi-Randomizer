@@ -1,7 +1,9 @@
-// Modified by ds1-triple-randomizer, 2026-09-28 (GPL-3.0 section 5(a) notice).
+// Modified by ds1-triple-randomizer, 2026-10-20 (GPL-3.0 section 5(a) notice).
 // Original: kellernz1/ds-randomizer@f120efe0e95b957b7e76109868c3c9966e22720c tools/DsrDataTool/Program.cs.
 // Change: InsertEventInstruction/RemoveEventInstruction now keep DS1 "skip N lines" counts
-// consistent (EventSkipRanges.cs); insertions state their anchor. See
+// consistent (EventSkipRanges.cs); insertions state their anchor. Also adds an
+// owner-only package overlay, apply-owner-qa-loadout, which validates resolved
+// DSR item names/IDs and patches only generated CharaInitParam rows. See
 // engines/combined/vendor/UPSTREAM_PIN.md ("Local modifications").
 
 using System.Security.Cryptography;
@@ -68,6 +70,14 @@ try
         Console.WriteLine($"Changed slots: {report.ChangedSlots}");
         Console.WriteLine($"Output: {report.OutputDirectory}");
     }
+    else if (command == "apply-owner-qa-loadout")
+    {
+        var report = ApplyOwnerQaLoadout(
+            RequireDirectory(options, "game"),
+            RequireDirectory(options, "package"));
+        Console.WriteLine($"Owner QA loadout applied to {report.Classes} classes.");
+        Console.WriteLine($"Validated DSR items: {report.Items}.");
+    }
     else if (command == "install")
     {
         var report = InstallPackage(
@@ -110,9 +120,232 @@ static void PrintUsage()
     Console.WriteLine(
         "  patch-enemies --game <DSR directory> --catalog <catalog.json> " +
         "--placements <randomizer.json> --output <directory>");
+    Console.WriteLine("  apply-owner-qa-loadout --game <read-only DSR source> --package <generated package>");
     Console.WriteLine("  install --game <DSR directory> --package <seed directory>");
     Console.WriteLine("  restore --game <DSR directory> --package <seed directory>");
     Console.WriteLine("  inspect-boss-bars --game <DSR directory>");
+}
+
+// This is an owner-only package overlay. Its item IDs were resolved from the
+// English FMG and equipment PARAMs in the verified QA DSR source, then are
+// revalidated against that source every time the command runs. It only reads
+// --game and only writes the generated package.
+static OwnerQaLoadoutReport ApplyOwnerQaLoadout(string gameDirectory, string packageDirectory)
+{
+    if (IsSameOrWithin(gameDirectory, packageDirectory) || IsSameOrWithin(packageDirectory, gameDirectory))
+        throw new InvalidOperationException("Owner QA package and read-only DSR source must be separate, non-overlapping directories.");
+
+    const int blackKnightHalberd = 1_105_000;
+    const int grassCrestShield = 1_453_000;
+    const int havelsGreatshield = 1_505_000;
+    const int havelsHelm = 440_000;
+    const int havelsArmor = 441_000;
+    const int havelsGauntlets = 442_000;
+    const int havelsLeggings = 443_000;
+    const int ringOfFavorAndProtection = 143;
+    const int cloranthyRing = 104;
+    const int havelsRing = 100;
+    const int twinklingTitanite = 1_130;
+
+    var itemMessagePath = Path.Combine(gameDirectory, "msg", "ENGLISH", "item.msgbnd.dcx");
+    var sourceGameParamPath = Path.Combine(gameDirectory, "param", "GameParam", "GameParam.parambnd.dcx");
+    var paramdefPath = Path.Combine(gameDirectory, "paramdef", "paramdef.paramdefbnd.dcx");
+    if (!File.Exists(itemMessagePath)) throw new FileNotFoundException("English item messages are required to validate the owner QA loadout.", itemMessagePath);
+    if (!File.Exists(sourceGameParamPath)) throw new FileNotFoundException("Source GameParam is required to validate the owner QA loadout.", sourceGameParamPath);
+    if (!File.Exists(paramdefPath)) throw new FileNotFoundException("Source paramdef is required to write the owner QA loadout.", paramdefPath);
+
+    var names = ReadEnglishItemNames(itemMessagePath);
+    var sourceBinder = BND3.Read(sourceGameParamPath);
+    PARAM ReadSourceParam(string name) => PARAM.Read(sourceBinder.Files.Single(file =>
+        Path.GetFileName(file.Name).Equals(name, StringComparison.OrdinalIgnoreCase)).Bytes);
+    void RequireName(Dictionary<int, string> table, int id, string expected)
+    {
+        if (!table.TryGetValue(id, out var actual) || !string.Equals(actual, expected, StringComparison.Ordinal))
+            throw new InvalidDataException($"Owner QA item resolution failed: expected {expected} at ID {id}, found {actual ?? "no English FMG entry"}.");
+    }
+    void RequireRow(PARAM param, int id, string expected)
+    {
+        if (param.Rows.All(row => row.ID != id))
+            throw new InvalidDataException($"Owner QA item resolution failed: {expected} PARAM row {id} is missing.");
+    }
+
+    RequireName(names.Weapons, blackKnightHalberd, "Black Knight Halberd");
+    RequireName(names.Weapons, grassCrestShield, "Grass Crest Shield");
+    RequireName(names.Weapons, havelsGreatshield, "Havel's Greatshield");
+    RequireName(names.Armor, havelsHelm, "Havel's Helm");
+    RequireName(names.Armor, havelsArmor, "Havel's Armor");
+    RequireName(names.Armor, havelsGauntlets, "Havel's Gauntlets");
+    RequireName(names.Armor, havelsLeggings, "Havel's Leggings");
+    RequireName(names.Accessories, ringOfFavorAndProtection, "Ring of Favor and Protection");
+    RequireName(names.Accessories, cloranthyRing, "Cloranthy Ring");
+    RequireName(names.Accessories, havelsRing, "Havel's Ring");
+    if (new[] { ringOfFavorAndProtection, cloranthyRing }.Contains(havelsRing))
+        throw new InvalidDataException("Owner QA ring resolution unexpectedly selected Havel's Ring.");
+    RequireName(names.Goods, twinklingTitanite, "Twinkling Titanite");
+    var weaponParam = ReadSourceParam("EquipParamWeapon.param");
+    RequireRow(weaponParam, blackKnightHalberd, "Black Knight Halberd");
+    RequireRow(weaponParam, grassCrestShield, "Grass Crest Shield");
+    RequireRow(weaponParam, havelsGreatshield, "Havel's Greatshield");
+    var protectorParam = ReadSourceParam("EquipParamProtector.param");
+    foreach (var id in new[] { havelsHelm, havelsArmor, havelsGauntlets, havelsLeggings })
+        RequireRow(protectorParam, id, names.Armor[id]);
+    var accessoryParam = ReadSourceParam("EquipParamAccessory.param");
+    RequireRow(accessoryParam, ringOfFavorAndProtection, "Ring of Favor and Protection");
+    RequireRow(accessoryParam, cloranthyRing, "Cloranthy Ring");
+    RequireRow(accessoryParam, havelsRing, "Havel's Ring");
+    RequireRow(ReadSourceParam("EquipParamGoods.param"), twinklingTitanite, "Twinkling Titanite");
+
+    var paramdefs = BND3.Read(paramdefPath).Files.Select(file => PARAMDEF.Read(file.Bytes)).ToList();
+    var sourceChara = ReadSourceParam("CharaInitParam.param");
+    ApplyCompatibleParamdef(sourceChara, paramdefs);
+    var statFields = new[] { "baseVit", "baseWil", "baseEnd", "baseStr", "baseDex", "baseLuc", "baseMag", "baseFai" };
+    var levelOffsets = new HashSet<int>();
+    foreach (var index in Enumerable.Range(0, 10))
+    {
+        var display = sourceChara.Rows.Single(row => row.ID == 3_000 + index);
+        var start = sourceChara.Rows.Single(row => row.ID == 2_000 + index);
+        var displayStats = statFields.Select(field => GetCellInt(display, field)).ToArray();
+        var startStats = statFields.Select(field => GetCellInt(start, field)).ToArray();
+        if (!displayStats.SequenceEqual(startStats) || GetCellInt(display, "soulLv") != GetCellInt(start, "soulLv"))
+            throw new InvalidDataException($"Owner QA source class rows {display.ID}/{start.ID} disagree on stats or soul level.");
+        levelOffsets.Add(displayStats.Sum() - GetCellInt(display, "soulLv"));
+    }
+    if (levelOffsets.Count != 1)
+        throw new InvalidDataException("Owner QA source classes do not share one unambiguous DSR soul-level offset.");
+    var expectedSoulLevel = statFields.Length * 99 - levelOffsets.Single();
+    if (expectedSoulLevel <= 0)
+        throw new InvalidDataException("Owner QA attributes produce an invalid DSR soul level.");
+
+    var packageParamCandidates = new[]
+    {
+        Path.Combine(packageDirectory, "mod", "param", "GameParam", "GameParam.parambnd.dcx"),
+        Path.Combine(packageDirectory, "param", "GameParam", "GameParam.parambnd.dcx"),
+    }.Where(File.Exists).ToArray();
+    if (packageParamCandidates.Length != 1)
+        throw new InvalidDataException(packageParamCandidates.Length == 0
+            ? "Generated package GameParam is missing; the owner QA overlay requires a complete randomizer package."
+            : "Generated package has more than one GameParam root; refusing an ambiguous owner QA overlay.");
+    var packageParamPath = packageParamCandidates[0];
+
+    var packageBinder = BND3.Read(packageParamPath);
+    var charaFile = packageBinder.Files.Single(file =>
+        file.Name.EndsWith("CharaInitParam.param", StringComparison.OrdinalIgnoreCase));
+    var unchangedPackageFiles = packageBinder.Files
+        .Where(file => !file.Name.EndsWith("CharaInitParam.param", StringComparison.OrdinalIgnoreCase))
+        .ToDictionary(file => file.Name, file => file.Bytes.ToArray(), StringComparer.OrdinalIgnoreCase);
+    var charaParam = PARAM.Read(charaFile.Bytes);
+    ApplyCompatibleParamdef(charaParam, paramdefs);
+
+    var classRowIds = Enumerable.Range(0, 10)
+        .Select(index => (Display: 3_000 + index, Start: 2_000 + index))
+        .ToList();
+    foreach (var (displayId, startId) in classRowIds)
+    {
+        foreach (var rowId in new[] { displayId, startId })
+        {
+            var row = charaParam.Rows.SingleOrDefault(entry => entry.ID == rowId)
+                ?? throw new InvalidDataException($"Owner QA class row {rowId} is missing from CharaInitParam.");
+            foreach (var (field, value) in new[]
+            {
+                ("baseVit", 99), ("baseWil", 99), ("baseEnd", 99), ("baseStr", 99),
+                ("baseDex", 99), ("baseLuc", 99), ("baseMag", 99), ("baseFai", 99),
+                ("soulLv", expectedSoulLevel), ("soul", 10_000),
+                ("equip_Wep_Right", blackKnightHalberd), ("equip_Wep_Left", grassCrestShield),
+                ("equip_Subwep_Right", -1), ("equip_Subwep_Left", -1),
+                ("equip_Helm", havelsHelm), ("equip_Armer", havelsArmor),
+                ("equip_Gaunt", havelsGauntlets), ("equip_Leg", havelsLeggings),
+                ("equip_Accessory01", ringOfFavorAndProtection),
+                ("equip_Accessory02", cloranthyRing), ("equip_Accessory03", -1),
+                ("equip_Accessory04", -1), ("equip_Accessory05", -1),
+                ("equip_Arrow", -1), ("equip_Bolt", -1), ("equip_SubArrow", -1), ("equip_SubBolt", -1),
+                ("equip_Skill_01", -1), ("equip_Skill_02", -1), ("equip_Skill_03", -1),
+                ("equip_Spell_01", -1), ("equip_Spell_02", -1), ("equip_Spell_03", -1),
+                ("equip_Spell_04", -1), ("equip_Spell_05", -1), ("equip_Spell_06", -1), ("equip_Spell_07", -1),
+            }) SetCell(row, field, value);
+
+            for (var slot = 1; slot <= 10; slot++)
+            {
+                var suffix = slot.ToString("00", System.Globalization.CultureInfo.InvariantCulture);
+                SetCell(row, $"item_{suffix}", slot == 1 ? twinklingTitanite : -1);
+                SetCell(row, $"itemNum_{suffix}", slot == 1 ? 10 : 0);
+            }
+            AssertOwnerQaClass(row, blackKnightHalberd, grassCrestShield, havelsGreatshield, havelsHelm, havelsArmor,
+                havelsGauntlets, havelsLeggings, ringOfFavorAndProtection, cloranthyRing, havelsRing,
+                twinklingTitanite, expectedSoulLevel);
+        }
+    }
+
+    charaFile.Bytes = charaParam.Write();
+    var temporaryPath = packageParamPath + ".owner-qa.tmp";
+    try
+    {
+        packageBinder.Write(temporaryPath);
+        var verificationBinder = BND3.Read(temporaryPath);
+        if (verificationBinder.Files.Count != unchangedPackageFiles.Count + 1)
+            throw new InvalidDataException("Owner QA overlay changed the GameParam binder file set.");
+        foreach (var (name, bytes) in unchangedPackageFiles)
+        {
+            var unchangedFile = verificationBinder.Files.SingleOrDefault(file =>
+                file.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+            if (unchangedFile == null || !bytes.SequenceEqual(unchangedFile.Bytes))
+                throw new InvalidDataException($"Owner QA overlay unexpectedly changed another GameParam entry: {name}.");
+        }
+        var verifiedFile = verificationBinder.Files.Single(file =>
+            file.Name.EndsWith("CharaInitParam.param", StringComparison.OrdinalIgnoreCase));
+        var verifiedParam = PARAM.Read(verifiedFile.Bytes);
+        ApplyCompatibleParamdef(verifiedParam, paramdefs);
+        foreach (var (displayId, startId) in classRowIds)
+            foreach (var id in new[] { displayId, startId })
+                AssertOwnerQaClass(verifiedParam.Rows.Single(row => row.ID == id), blackKnightHalberd,
+                    grassCrestShield, havelsGreatshield,
+                    havelsHelm, havelsArmor, havelsGauntlets, havelsLeggings,
+                    ringOfFavorAndProtection, cloranthyRing, havelsRing, twinklingTitanite, expectedSoulLevel);
+        File.Move(temporaryPath, packageParamPath, true);
+    }
+    finally
+    {
+        if (File.Exists(temporaryPath)) File.Delete(temporaryPath);
+    }
+    return new OwnerQaLoadoutReport(classRowIds.Count, 9);
+}
+
+static bool IsSameOrWithin(string parent, string child)
+{
+    var relative = Path.GetRelativePath(Path.GetFullPath(parent), Path.GetFullPath(child));
+    return relative == "." || (!relative.StartsWith("..", StringComparison.Ordinal) && !Path.IsPathRooted(relative));
+}
+
+static void AssertOwnerQaClass(
+    PARAM.Row row, int weapon, int shield, int excludedShield, int helm, int armor, int gauntlets, int leggings,
+    int ring, int secondRing, int excludedRing, int twinkling, int soulLevel)
+{
+    foreach (var field in new[] { "baseVit", "baseWil", "baseEnd", "baseStr", "baseDex", "baseLuc", "baseMag", "baseFai" })
+        if (GetCellInt(row, field) != 99) throw new InvalidDataException($"Owner QA invariant failed: {field} on row {row.ID}.");
+    if (GetCellInt(row, "soulLv") != soulLevel || GetCellInt(row, "soul") != 10_000 ||
+        GetCellInt(row, "equip_Wep_Right") != weapon || GetCellInt(row, "equip_Wep_Left") != shield ||
+        GetCellInt(row, "equip_Helm") != helm ||
+        GetCellInt(row, "equip_Armer") != armor || GetCellInt(row, "equip_Gaunt") != gauntlets ||
+        GetCellInt(row, "equip_Leg") != leggings || GetCellInt(row, "equip_Accessory01") != ring ||
+        GetCellInt(row, "equip_Accessory02") != secondRing ||
+        new[] { "equip_Subwep_Right", "equip_Subwep_Left",
+            "equip_Accessory03", "equip_Accessory04", "equip_Accessory05", "equip_Arrow", "equip_Bolt",
+            "equip_SubArrow", "equip_SubBolt", "equip_Skill_01", "equip_Skill_02", "equip_Skill_03",
+            "equip_Spell_01", "equip_Spell_02", "equip_Spell_03", "equip_Spell_04", "equip_Spell_05",
+            "equip_Spell_06", "equip_Spell_07" }.Any(field => GetCellInt(row, field) != -1) ||
+        GetCellInt(row, "item_01") != twinkling || GetCellInt(row, "itemNum_01") != 10)
+        throw new InvalidDataException($"Owner QA invariant failed for CharaInitParam row {row.ID}.");
+    if (new[] { "equip_Wep_Right", "equip_Wep_Left", "equip_Subwep_Right", "equip_Subwep_Left" }
+        .Any(field => GetCellInt(row, field) == excludedShield))
+        throw new InvalidDataException($"Owner QA invariant failed: Havel's Greatshield was equipped on row {row.ID}.");
+    if (new[] { "equip_Accessory01", "equip_Accessory02", "equip_Accessory03", "equip_Accessory04", "equip_Accessory05" }
+        .Any(field => GetCellInt(row, field) == excludedRing))
+        throw new InvalidDataException($"Owner QA invariant failed: Havel's Ring was equipped on row {row.ID}.");
+    for (var slot = 2; slot <= 10; slot++)
+    {
+        var suffix = slot.ToString("00", System.Globalization.CultureInfo.InvariantCulture);
+        if (GetCellInt(row, $"item_{suffix}") != -1 || GetCellInt(row, $"itemNum_{suffix}") != 0)
+            throw new InvalidDataException($"Owner QA inventory invariant failed on row {row.ID}, slot {slot}.");
+    }
 }
 
 static void InspectBossBars(string gameDirectory)
@@ -5932,3 +6165,4 @@ record ActivationReport(
     DateTimeOffset InstalledAt,
     DateTimeOffset? RestoredAt,
     List<ActivationFile> Files);
+record OwnerQaLoadoutReport(int Classes, int Items);

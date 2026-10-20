@@ -1,4 +1,6 @@
 import { createHash } from 'node:crypto';
+import { applyOwnerQaLoadout, ownerQaLoadoutEnabled } from '../adapters/ownerQaLoadout.js';
+import type { OwnerQaLoadoutResult } from '../adapters/ownerQaLoadout.js';
 import { access, copyFile, cp, mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { EnemyPlacementAlgorithm, FogLanguage, RandomizerConfig } from '@ds1tr/contracts';
@@ -50,6 +52,8 @@ export interface GenerationManifest {
   gameTreeRoot: string;
   /** True only for a launcher-only run that activates without writing game files. */
   noRandomization?: boolean;
+  /** Present only when the owner-only post-generation QA overlay was applied. */
+  ownerQaLoadout?: true;
   options: Omit<RandomizerConfig, 'gamePath' | 'masterSeed'>;
   /** Which enemy placement algorithm produced the layout, and the RNG version of its own streams (null: the frozen engine version). */
   enemyPlacement: {
@@ -86,6 +90,8 @@ export interface GenerationDependencies {
   fog: FogHostProcess;
   /** The progression model of the prepared world data (key placement only). */
   progressionModel: (prerequisites: FogPrerequisites, variant: ProgressionModelVariant) => Promise<ProgressionModelResult>;
+  ownerQaLoadoutEnabled: () => boolean;
+  ownerQaLoadout: (gameRoot: string, packagePath: string, onLog: (stream: 'stdout' | 'stderr', message: string) => void) => Promise<OwnerQaLoadoutResult>;
   /** Recorded in the manifest only; it never influences the output (a Seed Code does not depend on the app version). */
   appVersion: string;
 }
@@ -99,6 +105,8 @@ const defaults: GenerationDependencies = {
   combined: executeCombinedGeneration,
   fog: new FogHostProcess(),
   progressionModel: (prerequisites, variant) => loadProgressionModel(prerequisites, undefined, variant),
+  ownerQaLoadoutEnabled: () => ownerQaLoadoutEnabled(),
+  ownerQaLoadout: (gameRoot, packagePath, onLog) => applyOwnerQaLoadout(gameRoot, packagePath, { onLog }),
   appVersion: '0.46.0',
 };
 
@@ -187,6 +195,21 @@ export async function generateRun(
   if (!cleanInstallation.valid) return fail('import', 'PRISTINE_SOURCE_INVALID', cleanInstallation.problems.join(' '));
   manifest.pristineSnapshotId = pristine.snapshotId ?? null;
   progress('import', 0.1, 'Verified pristine source available.');
+
+  const applyQaOverlay = async (packagePath: string): Promise<GenerationResult | null> => {
+    if (noRandomization || !services.ownerQaLoadoutEnabled()) return null;
+    progress('package', 0.92, 'Applying owner gameplay QA loadout.');
+    const result = await services.ownerQaLoadout(pristine.directory, packagePath, (stream, message) => {
+      onEvent({ type: 'log', stage: 'package', level: stream === 'stderr' ? 'warning' : 'info', message, component: 'data-tool' });
+    });
+    if (!result.ok) {
+      const detail = [result.message, result.stderr].filter(Boolean).join(' ');
+      return fail('package', result.code, detail);
+    }
+    manifest.ownerQaLoadout = true;
+    manifest.validation.push('Owner gameplay QA loadout applied and CharaInitParam invariants verified.');
+    return null;
+  };
 
   // Key placement evaluates FogMod's own world graph, so it needs the prepared world data even when the fog randomizer itself is off.
   const keyMode = config.items.keyPlacement ?? 'vanilla';
@@ -322,6 +345,8 @@ export async function generateRun(
       manifest.attempts.push({ combinedAttempt, fogAttempt: 0, combinedSeed: seeds.combined, fogSeed: seeds.fog, result: 'success' });
       // Combined-only packages mirror the game root under mod/.
       manifest.gameTreeRoot = combined?.ok ? 'mod' : '';
+      const qaFailure = await applyQaOverlay(packagePath);
+      if (qaFailure) return qaFailure;
       return finish(packagePath, manifest, progress, fail);
     }
     let retryCombined = false;
@@ -403,6 +428,8 @@ export async function generateRun(
         manifest.attempts.push({ combinedAttempt, fogAttempt, combinedSeed: attemptSeeds.combined,
           fogSeed: attemptSeeds.fog, result: 'success' });
         // The staging game tree is the final generated package. Activation is separate.
+        const qaFailure = await applyQaOverlay(staging.value.stagingDirectory);
+        if (qaFailure) return qaFailure;
         return finish(staging.value.stagingDirectory, manifest, progress, fail);
       } catch (error) { return fail('validation', 'FOG_OUTPUT_INVALID', String(error)); }
     }

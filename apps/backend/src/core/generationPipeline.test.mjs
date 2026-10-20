@@ -195,12 +195,80 @@ test('writes a validated combined package, manifest and progress', async () => f
   assert.equal(result.ok, true);
   assert.equal(result.manifest.engines.combined, 'test-engine');
   assert.equal(result.manifest.pristineSnapshotId, 'snapshot-1');
+  assert.equal(result.manifest.ownerQaLoadout, undefined, 'ordinary packages omit the QA-only manifest marker');
   assert.deepEqual(result.manifest.enemyPlacement, { algorithm: 'permutation-v1', rngVersion: null, classTableHash: null, summary: null, validation: null });
   assert.equal(result.manifest.gameTreeRoot, 'mod');
   assert.equal(result.manifest.attempts[0].result, 'success');
   assert.equal(result.manifest.files.some((file) => file.path === 'mod/items.bin'), true);
   assert.equal(JSON.parse(await readFile(result.manifestPath, 'utf8')).masterSeed, 'pipeline-test');
   assert.equal(events.at(-1).progress, 1);
+}));
+
+test('owner QA overlay is opt-in, runs after Fog output, and leaves world seeds, profile, and Fog request unchanged', async () => fixture(async ({ root, game, pristine }) => {
+  const executablePath = path.join(root, 'FogHost.exe');
+  await writeFile(executablePath, 'host');
+  const dataRoot = await fogData(root);
+  const runs = [];
+  for (const enabled of [false, true]) {
+    const workspacePath = path.join(root, enabled ? 'qa-on' : 'qa-off');
+    const order = [];
+    let combinedRequest;
+    let fogRequest;
+    const fog = { execute: async (execution) => {
+      order.push('fog');
+      fogRequest = execution.request;
+      const relative = 'param/GameParam/GameParam.parambnd.dcx';
+      const content = 'fogged';
+      await writeFile(path.join(execution.request.stagingDirectory, relative), content);
+      return { schemaVersion: 3, ok: true, hostVersion: 'host-test', fogModCommit: 'pin',
+        annotationSha256: '', mode: 'write', seed: execution.request.seed, fogOptions: '',
+        keyItems: { randomized: false, hash: '' },
+        files: [{ path: relative, size: content.length, sha256: sha(content) }], error: null };
+    } };
+    const result = await generateRun({ config: config(game, true), workspacePath, seedCode: 'ds1tr-gen-v2-qa-test' }, () => {}, {
+      getPristineSource: async () => ({ directory: pristine, snapshotId: 'qa-snapshot' }),
+      getFogPrerequisites: async () => ({ executablePath, dataRoot, readSet: ['param/GameParam/GameParam.parambnd.dcx'] }),
+      combined: async (request, onEvent) => { combinedRequest = request; return combinedStub()(request, onEvent); },
+      fog,
+      ownerQaLoadoutEnabled: () => enabled,
+      ownerQaLoadout: async (gameRoot, packagePath) => {
+        order.push('qa');
+        assert.equal(gameRoot, pristine);
+        const paramPath = path.join(packagePath, 'param/GameParam/GameParam.parambnd.dcx');
+        assert.equal(await readFile(paramPath, 'utf8'), 'fogged', 'overlay sees completed Fog output');
+        await writeFile(paramPath, 'owner-qa-fogged');
+        return { ok: true, stdout: 'invariants passed', stderr: '' };
+      },
+    });
+    assert.equal(result.ok, true, result.message);
+    assert.equal(result.manifest.ownerQaLoadout, enabled ? true : undefined);
+    assert.equal(result.manifest.seedCode, 'ds1tr-gen-v2-qa-test');
+    assert.equal(result.manifest.generationProfile, 'ds1tr-gen-v2');
+    assert.deepEqual(order, enabled ? ['fog', 'qa'] : ['fog']);
+    runs.push({ result, combinedRequest, fogRequest, file: await readFile(path.join(result.packagePath, 'param/GameParam/GameParam.parambnd.dcx'), 'utf8') });
+  }
+  assert.equal(runs[0].combinedRequest.masterSeed, runs[1].combinedRequest.masterSeed);
+  assert.equal(runs[0].combinedRequest.combinedSeed, runs[1].combinedRequest.combinedSeed);
+  assert.deepEqual(runs[0].combinedRequest.config, runs[1].combinedRequest.config);
+  assert.equal(runs[0].fogRequest.seed, runs[1].fogRequest.seed);
+  assert.equal(runs[0].fogRequest.seed, runs[1].fogRequest.seed);
+  assert.equal(runs[0].fogRequest.language, runs[1].fogRequest.language);
+  assert.deepEqual(runs[0].fogRequest.options, runs[1].fogRequest.options);
+  assert.equal(runs[0].file, 'fogged');
+  assert.equal(runs[1].file, 'owner-qa-fogged');
+}));
+
+test('owner QA overlay failure is typed and does not create a successful manifest', async () => fixture(async ({ game, pristine, workspace }) => {
+  const result = await generateRun({ config: config(game), workspacePath: workspace }, () => {}, {
+    getPristineSource: async () => ({ directory: pristine }),
+    combined: combinedStub(),
+    ownerQaLoadoutEnabled: () => true,
+    ownerQaLoadout: async () => ({ ok: false, code: 'OWNER_QA_TOOL_FAILED', message: 'item lookup failed', stdout: '', stderr: 'invalid FMG name' }),
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.stage, 'package');
+  assert.equal(result.code, 'OWNER_QA_TOOL_FAILED');
+  assert.match(result.manifest.validation.at(-1), /OWNER_QA_TOOL_FAILED.*invalid FMG name/u);
 }));
 
 test('retries a Fog seed and retains combined files outside the Fog read set', async () => fixture(async ({ root, game, pristine, workspace }) => {
