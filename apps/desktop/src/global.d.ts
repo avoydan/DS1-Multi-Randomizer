@@ -16,6 +16,8 @@ declare global {
       gameConveniences: {
         freeCursorInMenus(): Promise<boolean>;
         setFreeCursorInMenus(enabled: boolean): Promise<boolean>;
+        skillIssueMode(): Promise<boolean>;
+        setSkillIssueMode(enabled: boolean): Promise<boolean>;
         freeCursorShortcut(): Promise<string>;
         setFreeCursorShortcut(shortcut: string): Promise<boolean>;
       };

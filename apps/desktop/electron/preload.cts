@@ -10,6 +10,8 @@ contextBridge.exposeInMainWorld('desktop', {
   gameConveniences: {
     freeCursorInMenus: (): Promise<boolean> => ipcRenderer.invoke('game-conveniences:get-free-cursor'),
     setFreeCursorInMenus: (enabled: boolean): Promise<boolean> => ipcRenderer.invoke('game-conveniences:set-free-cursor', enabled === true),
+    skillIssueMode: (): Promise<boolean> => ipcRenderer.invoke('game-conveniences:get-skill-issue-mode'),
+    setSkillIssueMode: (enabled: boolean): Promise<boolean> => ipcRenderer.invoke('game-conveniences:set-skill-issue-mode', enabled === true),
     freeCursorShortcut: (): Promise<string> => ipcRenderer.invoke('game-conveniences:get-free-cursor-shortcut'),
     setFreeCursorShortcut: (shortcut: string): Promise<boolean> => ipcRenderer.invoke('game-conveniences:set-free-cursor-shortcut', shortcut),
   },

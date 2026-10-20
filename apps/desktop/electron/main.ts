@@ -309,6 +309,14 @@ ipcMain.handle('runtime:connection', () => ({
 // Updates: a narrow surface. Only the main window may call it, nothing takes a path or an address, and the renderer never touches the updater object.
 const fromMainWindow = (event: IpcMainInvokeEvent): boolean => mainWindow !== null && event.sender === mainWindow.webContents;
 ipcMain.handle('game-conveniences:get-free-cursor', (event) => fromMainWindow(event) && settings.freeCursorInMenus === true);
+ipcMain.handle('game-conveniences:get-skill-issue-mode', (event) => fromMainWindow(event) && settings.skillIssueMode === true);
+ipcMain.handle('game-conveniences:set-skill-issue-mode', async (event, enabled: unknown) => {
+  if (!fromMainWindow(event) || typeof enabled !== 'boolean') return false;
+  settings = { ...settings, skillIssueMode: enabled };
+  await saveSettings();
+  desktopLog.write('info', `Skill Issue Mode ${enabled ? 'enabled' : 'disabled'}`);
+  return true;
+});
 ipcMain.handle('game-conveniences:get-free-cursor-shortcut', (event) => fromMainWindow(event) ? settings.freeCursorShortcut ?? 'F10' : null);
 ipcMain.handle('game-conveniences:set-free-cursor', async (event, enabled: unknown) => {
   if (!fromMainWindow(event) || typeof enabled !== 'boolean') return false;

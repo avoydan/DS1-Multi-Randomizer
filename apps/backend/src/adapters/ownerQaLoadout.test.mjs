@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { copyFile, mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
+import { spawnSync } from 'node:child_process';
 import { EventEmitter } from 'node:events';
-import { readFile } from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
 import { PassThrough } from 'node:stream';
 import test from 'node:test';
@@ -37,6 +40,54 @@ test('vendored QA overlay pins the verified equipment identities and exact equip
   assert.match(source, /\("equip_Accessory01", ringOfFavorAndProtection\),\s*\("equip_Accessory02", cloranthyRing/u);
   assert.match(source, /Havel's Greatshield was equipped/u);
   assert.match(source, /Havel's Ring was equipped/u);
+});
+
+test('Resistance uses DSR CHARACTER_INIT_PARAM.baseDurability, not the unrelated baseLuc field', async () => {
+  const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../../');
+  const source = await readFile(path.join(repositoryRoot, 'engines/combined/vendor/tools/DsrDataTool/Program.cs'), 'utf8');
+  assert.match(source, /DSR's displayed Resistance stat is stored in baseDurability/u);
+  assert.match(source, /"baseDex", "baseDurability", "baseMag", "baseFai"/u);
+  assert.match(source, /\("baseDex", 99\), \("baseDurability", 99\), \("baseMag", 99\)/u);
+  assert.match(source, /foreach \(var field in new\[\] \{[^}]*baseDurability[^}]*\}\)/u);
+  assert.doesNotMatch(source, /\("baseLuc", 99\)/u);
+  assert.match(source, /originalBaseLuc/u);
+  assert.match(source, /changed the separate baseLuc field/u);
+  assert.match(source, /verified Resistance\/baseDurability and separate baseLuc fields/u);
+});
+
+test('real DSR PARAM data: serialized Skill Issue output sets all eight displayed stats and creates GameParam when absent', {
+  skip: !process.env.DS1TR_QA_DSR_ROOT,
+}, async () => {
+  const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../../');
+  const gameRoot = process.env.DS1TR_QA_DSR_ROOT;
+  const tool = path.join(repositoryRoot, 'engines/combined/vendor/tools/DsrDataTool/bin/Release/net8.0/DsrDataTool.exe');
+  const itemMessages = path.join(gameRoot, 'msg/ENGLISH/item.msgbnd.dcx');
+  const gameParam = path.join(gameRoot, 'param/GameParam/GameParam.parambnd.dcx');
+  const paramdef = path.join(gameRoot, 'paramdef/paramdef.paramdefbnd.dcx');
+  const hash = (value) => createHash('sha256').update(value).digest('hex');
+  const sourceHashes = await Promise.all([itemMessages, gameParam, paramdef].map(async (file) => hash(await readFile(file))));
+  const temp = await mkdtemp(path.join(os.tmpdir(), 'ds1tr-skill-issue-param-'));
+  try {
+    const layouts = [
+      { name: 'existing-mod-output', root: path.join(temp, 'with-mod'), relative: 'mod/param/GameParam/GameParam.parambnd.dcx', copy: true },
+      { name: 'minimal-no-randomizer-output', root: path.join(temp, 'no-randomizers'), relative: 'param/GameParam/GameParam.parambnd.dcx', copy: false },
+    ];
+    for (const layout of layouts) {
+      const output = path.join(layout.root, layout.relative);
+      await mkdir(path.dirname(output), { recursive: true });
+      if (layout.copy) await copyFile(gameParam, output);
+      const result = spawnSync(tool, ['apply-owner-qa-loadout', '--game', gameRoot, '--package', layout.root], { encoding: 'utf8' });
+      assert.equal(result.error, undefined, `${layout.name}: ${result.error?.message}`);
+      assert.equal(result.status, 0, `${layout.name}: ${result.stderr}`);
+      assert.match(result.stdout, /applied to 10 classes/u, layout.name);
+      assert.match(result.stdout, /Validated DSR items: 9/u, layout.name);
+      assert.ok((await readFile(output)).byteLength > 0, `${layout.name} emitted GameParam`);
+    }
+    assert.deepEqual(await Promise.all([itemMessages, gameParam, paramdef].map(async (file) => hash(await readFile(file)))), sourceHashes,
+      'the real QA source remains byte-identical');
+  } finally {
+    await rm(temp, { recursive: true, force: true });
+  }
 });
 
 test('invokes only the owner QA package command and forwards process logs', async () => {

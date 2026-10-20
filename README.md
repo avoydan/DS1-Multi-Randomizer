@@ -15,6 +15,8 @@ The release is a **public prerelease**. The recommended file is `DS1-Multi-Rando
 - Keeps run history, presets, and a spoiler hint sheet; supports English and Polish.
 - Generates into a workspace and can restore the original managed game files from its pristine snapshot.
 
+The **Your game** screen also has an optional, local **Skill Issue Mode** convenience. When enabled, it gives new characters an overpowered starting loadout for exploration. It is off by default, stays on this device, and does not change the randomized world or Seed Code.
+
 ## Requirements and safe use
 
 - 64-bit Windows and your own installed copy of Dark Souls Remastered.

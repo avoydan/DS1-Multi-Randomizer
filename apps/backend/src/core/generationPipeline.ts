@@ -32,6 +32,8 @@ export interface GenerationRequest {
   profile?: GenerationProfile;
   /** The Seed Code of this run, recorded in the manifest. */
   seedCode?: string;
+  /** Local gameplay convenience. It is outside RandomizerConfig and world identity. */
+  skillIssueMode?: boolean;
 }
 
 export type GenerationEvent =
@@ -52,7 +54,7 @@ export interface GenerationManifest {
   gameTreeRoot: string;
   /** True only for a launcher-only run that activates without writing game files. */
   noRandomization?: boolean;
-  /** Present only when the owner-only post-generation QA overlay was applied. */
+  /** Present only when the local Skill Issue Mode post-generation overlay was applied. */
   ownerQaLoadout?: true;
   options: Omit<RandomizerConfig, 'gamePath' | 'masterSeed'>;
   /** Which enemy placement algorithm produced the layout, and the RNG version of its own streams (null: the frozen engine version). */
@@ -143,6 +145,7 @@ export async function generateRun(
   const services = { ...defaults, ...dependencies };
   validateRandomizerConfig(request.config);
   const config = request.config;
+  const skillIssueMode = request.skillIssueMode === true || services.ownerQaLoadoutEnabled();
   const noRandomization = !effectiveCombinedEnabled(config) && !config.fog.enabled;
   const profile = request.profile ?? currentGenerationProfile();
   const fogRuntime = fogHostRuntimeForProfile(profile);
@@ -154,7 +157,7 @@ export async function generateRun(
   const manifest: GenerationManifest = {
     schemaVersion: 1, appVersion: services.appVersion, generationProfile: request.profile?.id ?? null, seedCode: request.seedCode ?? null,
     game: 'DSR', masterSeed: config.masterSeed,
-    pristineSnapshotId: null, gameTreeRoot: '', noRandomization,
+    pristineSnapshotId: null, gameTreeRoot: '', noRandomization: noRandomization && !skillIssueMode,
     options: { items: config.items, enemies: config.enemies, fog: config.fog, output: config.output },
     enemyPlacement: {
       algorithm: config.enemies.placement.algorithm,
@@ -197,8 +200,8 @@ export async function generateRun(
   progress('import', 0.1, 'Verified pristine source available.');
 
   const applyQaOverlay = async (packagePath: string): Promise<GenerationResult | null> => {
-    if (noRandomization || !services.ownerQaLoadoutEnabled()) return null;
-    progress('package', 0.92, 'Applying owner gameplay QA loadout.');
+    if (!skillIssueMode) return null;
+    progress('package', 0.92, 'Applying Skill Issue Mode starting loadout.');
     const result = await services.ownerQaLoadout(pristine.directory, packagePath, (stream, message) => {
       onEvent({ type: 'log', stage: 'package', level: stream === 'stderr' ? 'warning' : 'info', message, component: 'data-tool' });
     });
@@ -207,7 +210,7 @@ export async function generateRun(
       return fail('package', result.code, detail);
     }
     manifest.ownerQaLoadout = true;
-    manifest.validation.push('Owner gameplay QA loadout applied and CharaInitParam invariants verified.');
+    manifest.validation.push('Skill Issue Mode starting loadout applied and CharaInitParam invariants verified.');
     return null;
   };
 

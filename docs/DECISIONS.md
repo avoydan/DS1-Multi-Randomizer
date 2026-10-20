@@ -1,10 +1,12 @@
 # Decisions
 
-## Owner gameplay QA loadout is a local post-generation overlay
+## Skill Issue Mode is a local post-generation convenience
 
 Date: 2026-10-20
 
-The owner-only gameplay QA loadout is enabled only by the backend runtime environment variable `DS1TR_OWNER_QA_LOADOUT=1` and defaults off. It runs after all normal combined/Fog generation and changes only starting-class `CharaInitParam` fields in the generated package. The world Seed Code, profile, presets, generation options, RNG streams, and Fog topology remain the ordinary run's; the manifest records `ownerQaLoadout: true` separately when the overlay is applied. This keeps the owner convenience outside the deterministic world contract and leaves ordinary runs byte-identical. The tool validates every granted equipment/goods name against the supplied clean DSR source's English FMG and PARAM rows before writing, and fails closed on any mismatch. The exact ring slots are Ring of Favor and Protection (`143`) and Cloranthy Ring (`104`); Havel's Ring (`100`) is validated by name but explicitly excluded. Black Knight Halberd (`1105000`) is equipped in the right hand and Grass Crest Shield (`1453000`) in the left hand; Havel's Greatshield (`1505000`) is validated but excluded. Secondary hand slots are cleared.
+Skill Issue Mode is a default-off local gameplay convenience in the Your game view. Its setting lives in Electron `userData/settings.json`; the renderer sends it on each run as a separate operational `localGameplay` value, not through `RandomizerConfig`. It applies after normal generation, without restart, and changes only the generated package's starting-character `CharaInitParam`. Seed Codes, profiles, presets, canonical options, RNG streams, placements, and Fog topology remain unaffected. `ownerQaLoadout: true` remains a diagnostic manifest marker, and `DS1TR_OWNER_QA_LOADOUT=1` remains an internal override. When normal output has no GameParam archive, the tool copies the verified pristine binder into the package and edits only `CharaInitParam`; this enables Fog-only and launcher-only operation without changing normal engine behavior.
+
+The actual DSR `CHARACTER_INIT_PARAM` definition maps displayed Resistance to `baseDurability`; `baseLuc` is a separate field and must not be used as a proxy. The Soul Level is derived per class from its pristine eight displayed stats and starting level, not from a global offset. The tool verifies the selected DSR PARAMDEF and rereads serialized output. Item names/IDs are checked against the clean source's English FMG and PARAM rows. The loadout is Havel's full set, Black Knight Halberd (`1105000`), Grass Crest Shield (`1453000`), Ring of Favor and Protection (`143`), Cloranthy Ring (`104`), exactly 10 Twinkling Titanite, and 10,000 souls; it excludes progression items, Havel's Ring (`100`) and Havel's Greatshield (`1505000`).
 
 ## Owner-approved roaming-boss fit is scoped to generation profile v4
 

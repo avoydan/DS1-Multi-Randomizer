@@ -14,7 +14,11 @@ import { decodeSeedCode, encodeSeedCode } from './seedCode.js';
  *     configurations carry, is honored).
  * The machine's game path and the spoiler preference come from the request in both cases; they are not part of the world.
  */
-export type RunRequestBody = Partial<RandomizerConfig> & { seedCode?: string };
+export type RunRequestBody = Partial<RandomizerConfig> & {
+  seedCode?: string;
+  /** Local launcher/gameplay preference, deliberately excluded from RandomizerConfig and Seed Codes. */
+  localGameplay?: { skillIssueMode?: boolean };
+};
 
 export type PreparedRun =
   | { ok: true; config: RandomizerConfig; profile: GenerationProfile; seedCode: string; envelope: Pick<SeedEnvelope, 'profile' | 'masterSeed' | 'settings'>; fromSeedCode: boolean }

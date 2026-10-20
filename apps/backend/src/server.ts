@@ -307,7 +307,10 @@ const server = http.createServer(async (req, res) => {
         plan: { items: prepared.config.items.enabled, enemies: prepared.config.enemies.enabled },
       });
       try {
-        const result = await generateRun({ config: prepared.config, workspacePath, profile: prepared.profile, seedCode: prepared.seedCode }, (event) => {
+        const result = await generateRun({
+          config: prepared.config, workspacePath, profile: prepared.profile, seedCode: prepared.seedCode,
+          skillIssueMode: body.localGameplay?.skillIssueMode === true,
+        }, (event) => {
           operation.event(event);
           res.write(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`);
         }, runDependencies);

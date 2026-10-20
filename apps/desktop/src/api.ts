@@ -34,12 +34,12 @@ async function post<T>(path: string, body: unknown, allowFailure = false): Promi
   return response.json() as Promise<T>;
 }
 
-export async function generate(config: RandomizerConfig, onEvent: (event: GenerationEvent) => void, seedCode?: string): Promise<GenerationResult> {
+export async function generate(config: RandomizerConfig, onEvent: (event: GenerationEvent) => void, seedCode?: string, skillIssueMode = false): Promise<GenerationResult> {
   const { apiBase, token } = await connection();
   const response = await fetch(`${apiBase}/runs/generate`, {
     method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream', 'X-DS1TR-Token': token },
     // The master seed is made by the backend when Randomize is clicked; a Seed Code, when given, decides the whole world.
-    body: JSON.stringify({ ...config, masterSeed: '', ...(seedCode ? { seedCode } : {}) }),
+    body: JSON.stringify({ ...config, masterSeed: '', ...(seedCode ? { seedCode } : {}), localGameplay: { skillIssueMode } }),
   });
   if (!response.ok || !response.body) throw new Error(`${response.status}: ${await response.text()}`);
   const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();

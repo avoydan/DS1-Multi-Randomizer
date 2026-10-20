@@ -10,6 +10,8 @@ export interface StoredSettings {
   updates?: StoredUpdateSettings;
   /** Local launcher convenience; never used by generation, presets, or Seed Codes. Absent means off. */
   freeCursorInMenus?: boolean;
+  /** Local starting-character convenience; never used by RandomizerConfig, presets, or Seed Codes. Absent means off. */
+  skillIssueMode?: boolean;
   /** Local launcher hotkey for moving focus away from DSR; absent means F10. */
   freeCursorShortcut?: string;
 }
@@ -89,6 +91,7 @@ export function migrateSettings(raw: unknown): { settings: StoredSettings; chang
   const updates = normalizeUpdateSettings(source.updates);
   if (updates) settings.updates = updates;
   if (typeof source.freeCursorInMenus === 'boolean') settings.freeCursorInMenus = source.freeCursorInMenus;
+  if (typeof source.skillIssueMode === 'boolean') settings.skillIssueMode = source.skillIssueMode;
   const freeCursorShortcut = normalizeFreeCursorShortcut(source.freeCursorShortcut);
   if (freeCursorShortcut) settings.freeCursorShortcut = freeCursorShortcut;
   const keptKeys = Object.keys(settings);

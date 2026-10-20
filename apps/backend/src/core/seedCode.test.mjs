@@ -212,6 +212,15 @@ test('the master seed is made when a run starts, never earlier; a Seed Code deci
   assert.equal(prepareRun({ ...fullConfig(), items: undefined }).ok, false);
 });
 
+test('local gameplay Skill Issue Mode is outside canonical settings and does not alter Seed Codes', () => {
+  const ordinary = prepareRun(fullConfig(), () => 'same-master');
+  const enabled = prepareRun({ ...fullConfig(), localGameplay: { skillIssueMode: true } }, () => 'same-master');
+  assert.equal(enabled.ok, true);
+  assert.equal(enabled.seedCode, ordinary.seedCode);
+  assert.deepEqual(enabled.envelope.settings, ordinary.envelope.settings);
+  assert.equal(Object.hasOwn(enabled.config, 'localGameplay'), false);
+});
+
 test('placement options added after format 1 are stored only when they differ from their neutral value, so old codes keep their text', () => {
   const complete = fullSettings();
   const withoutExtensions = structuredClone(complete);

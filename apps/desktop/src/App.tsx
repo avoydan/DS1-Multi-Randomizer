@@ -86,6 +86,8 @@ export function App() {
   const [gameState, setGameState] = useState<GameStateReport | null>(null);
   const [generation, setGeneration] = useState<GenerationResult | null>(null);
   const [freeCursorEnabled, setFreeCursorEnabled] = useState(false);
+  const [skillIssueModeEnabled, setSkillIssueModeEnabled] = useState(false);
+  const [gameConveniencesReady, setGameConveniencesReady] = useState(false);
   const [progress, setProgress] = useState(0);
   const [progressStage, setProgressStage] = useState('');
   const [logs, setLogs] = useState<string[]>([]);
@@ -165,7 +167,7 @@ export function App() {
     () => Number(config.items.enabled || config.enemies.enabled) + Number(config.fog.enabled),
     [config],
   );
-  const generationDisabled = !config.gamePath || (enabledCount === 0 && !freeCursorEnabled);
+  const generationDisabled = !config.gamePath || !gameConveniencesReady || (enabledCount === 0 && !freeCursorEnabled && !skillIssueModeEnabled);
 
   const reportError = (error: unknown) => {
     const detail = error instanceof Error ? error.message : String(error);
@@ -211,7 +213,7 @@ export function App() {
       const result = await api.generate(config, (event) => {
         if (event.type === 'progress') { setProgress(event.progress); setProgressStage(event.stage); setMessage(progressLabel(event.stage, t)); }
         else setLogs((current) => [...current, `[${event.stage}] ${event.level}: ${event.message}`]);
-      }, seedCode);
+      }, seedCode, skillIssueModeEnabled);
       setGeneration(result);
       if (result.correlationId) setLastOperationId(result.correlationId);
       if (result.ok) {
@@ -538,7 +540,7 @@ export function App() {
                   {mode === 'basic'
                     ? <BasicView config={config} onChange={changeSetting} onShowAdvanced={showAdvanced} />
                     : <AdvancedView config={config} onChange={changeSetting} onBackToBasic={() => setMode('basic')} openSections={focusSections} />}
-                  <GameConvenienceSettings onEnabledChange={setFreeCursorEnabled} />
+                  <GameConvenienceSettings onEnabledChange={setFreeCursorEnabled} onSkillIssueChange={setSkillIssueModeEnabled} onReadyChange={setGameConveniencesReady} />
                 </div>
                 <div className="side-column">
                   {runPanel}

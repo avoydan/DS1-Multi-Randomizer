@@ -33,6 +33,13 @@ test('the language setting is validated and persisted without touching other set
   assert.deepEqual(migrateSettings({ language: 'auto' }), { settings: {}, changed: true }, 'Auto is stored as no value');
 });
 
+test('Skill Issue Mode is a validated local setting that defaults off and persists without affecting world settings', () => {
+  assert.deepEqual(migrateSettings({}), { settings: {}, changed: false });
+  assert.deepEqual(migrateSettings({ skillIssueMode: true }), { settings: { skillIssueMode: true }, changed: false });
+  assert.deepEqual(migrateSettings({ skillIssueMode: false }), { settings: { skillIssueMode: false }, changed: false });
+  assert.deepEqual(migrateSettings({ skillIssueMode: 'yes' }), { settings: {}, changed: true });
+});
+
 test('the main process messages exist in both languages with the same variables', () => {
   const english = MAIN_MESSAGE_TABLES.en;
   const polish = MAIN_MESSAGE_TABLES.pl;

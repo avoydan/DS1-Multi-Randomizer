@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { access, mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -225,12 +225,12 @@ test('owner QA overlay is opt-in, runs after Fog output, and leaves world seeds,
         keyItems: { randomized: false, hash: '' },
         files: [{ path: relative, size: content.length, sha256: sha(content) }], error: null };
     } };
-    const result = await generateRun({ config: config(game, true), workspacePath, seedCode: 'ds1tr-gen-v2-qa-test' }, () => {}, {
+    const result = await generateRun({ config: config(game, true), workspacePath, seedCode: 'ds1tr-gen-v2-qa-test', skillIssueMode: enabled }, () => {}, {
       getPristineSource: async () => ({ directory: pristine, snapshotId: 'qa-snapshot' }),
       getFogPrerequisites: async () => ({ executablePath, dataRoot, readSet: ['param/GameParam/GameParam.parambnd.dcx'] }),
       combined: async (request, onEvent) => { combinedRequest = request; return combinedStub()(request, onEvent); },
       fog,
-      ownerQaLoadoutEnabled: () => enabled,
+      ownerQaLoadoutEnabled: () => false,
       ownerQaLoadout: async (gameRoot, packagePath) => {
         order.push('qa');
         assert.equal(gameRoot, pristine);
@@ -256,6 +256,57 @@ test('owner QA overlay is opt-in, runs after Fog output, and leaves world seeds,
   assert.deepEqual(runs[0].fogRequest.options, runs[1].fogRequest.options);
   assert.equal(runs[0].file, 'fogged');
   assert.equal(runs[1].file, 'owner-qa-fogged');
+}));
+
+test('Skill Issue Mode overlays every supported randomizer combination, including launcher-only output', async () => fixture(async ({ root, game, pristine }) => {
+  const executablePath = path.join(root, 'FogHost.exe');
+  await writeFile(executablePath, 'host');
+  const dataRoot = await fogData(root);
+  const cases = [
+    { name: 'items-enemies-fog', fog: true, items: true, enemies: true, combined: true },
+    { name: 'fog-only', fog: true, items: false, enemies: false, combined: false },
+    { name: 'items-only', fog: false, items: true, enemies: false, combined: true },
+    { name: 'enemies-only', fog: false, items: false, enemies: true, combined: true },
+    { name: 'launcher-only', fog: false, items: false, enemies: false, combined: false },
+  ];
+  for (const item of cases) {
+    const input = config(game, item.fog);
+    input.items.enabled = item.items;
+    input.items.randomizeWorldItems = item.items;
+    input.enemies.enabled = item.enemies;
+    input.enemies.randomizeRegularEnemies = item.enemies;
+    let combinedCalls = 0;
+    let fogCalls = 0;
+    let overlayCalls = 0;
+    const fog = { execute: async () => {
+      fogCalls++;
+      return { schemaVersion: 3, ok: true, hostVersion: 'host-test', fogModCommit: 'pin',
+        annotationSha256: '', mode: 'write', seed: 1, fogOptions: '', keyItems: { randomized: false, hash: '' }, files: [], error: null };
+    } };
+    const result = await generateRun({ config: input, workspacePath: path.join(root, item.name), skillIssueMode: true }, () => {}, {
+      getPristineSource: async () => ({ directory: pristine, snapshotId: 'skill-issue-matrix' }),
+      getFogPrerequisites: async () => ({ executablePath, dataRoot, readSet: [] }),
+      combined: async (...args) => { combinedCalls++; return combinedStub()(...args); },
+      fog,
+      ownerQaLoadoutEnabled: () => false,
+      ownerQaLoadout: async (_gameRoot, packagePath) => {
+        overlayCalls++;
+        let gameRoot = packagePath;
+        try { await access(path.join(packagePath, 'mod')); gameRoot = path.join(packagePath, 'mod'); } catch { /* Fog-only and launcher-only packages use their root. */ }
+        const output = path.join(gameRoot, 'param/GameParam/GameParam.parambnd.dcx');
+        await mkdir(path.dirname(output), { recursive: true });
+        await writeFile(output, 'skill-issue-charainit');
+        return { ok: true, stdout: '', stderr: '' };
+      },
+    });
+    assert.equal(result.ok, true, `${item.name}: ${result.message}`);
+    assert.equal(combinedCalls > 0, item.combined, `${item.name} combined invocation`);
+    assert.equal(fogCalls > 0, item.fog, `${item.name} Fog invocation`);
+    assert.equal(overlayCalls, 1, `${item.name} overlay invocation`);
+    assert.equal(result.manifest.ownerQaLoadout, true, `${item.name} manifest marker`);
+    assert.equal(result.manifest.noRandomization, false, `${item.name} package is not launcher-only when it writes a starting loadout`);
+    assert.equal(result.manifest.files.some((file) => file.path.endsWith('GameParam.parambnd.dcx')), true, `${item.name} GameParam output`);
+  }
 }));
 
 test('owner QA overlay failure is typed and does not create a successful manifest', async () => fixture(async ({ game, pristine, workspace }) => {
