@@ -24,14 +24,22 @@ test('owner QA mode is opt-in and accepts only the explicit local flag', () => {
   assert.equal(ownerQaLoadoutEnabled({ DS1TR_OWNER_QA_LOADOUT: '1' }), true);
 });
 
-test('vendored QA overlay pins the verified equipment identities and exact equipped slots', async () => {
+test('vendored Skill Issue overlay resolves the named +5 weapon identity and preserves exact equipment slots', async () => {
   const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../../');
   const source = await readFile(path.join(repositoryRoot, 'engines/combined/vendor/tools/DsrDataTool/Program.cs'), 'utf8');
   for (const [name, id] of [
-    ['blackKnightHalberd', '1_105_000'], ['grassCrestShield', '1_453_000'],
+    ['grassCrestShield', '1_453_000'],
     ['havelsGreatshield', '1_505_000'], ['ringOfFavorAndProtection', '143'],
     ['cloranthyRing', '104'], ['havelsRing', '100'],
   ]) assert.match(source, new RegExp(`const int ${name} = ${id};`, 'u'));
+  assert.match(source, /ResolveUniqueWeaponName\(level == 0\s*\? "Black Knight Halberd"\s*:\s*\$"Black Knight Halberd\+\{level\}"\)/u);
+  assert.match(source, /var blackKnightHalberd = blackKnightHalberdByLevel\[5\]/u);
+  assert.match(source, /id \/ 1_000 != blackKnightHalberdBaseId \/ 1_000/u);
+  assert.match(source, /RequireRow\(weaponParam, blackKnightHalberdBaseId, "Black Knight Halberd base EquipParamWeapon row"\)/u);
+  assert.match(source, /GetCellInt\(baseWeaponRow, "reinforceTypeId", -1\)/u);
+  assert.match(source, /GetCellInt\(reinforcementRow, "reinforcementLevel", -1\)/u);
+  assert.match(source, /reinforcementLevel != 5/u);
+  assert.doesNotMatch(source, /const int blackKnightHalberd = 1_105_000/u);
   assert.match(source, /RequireName\(names\.Weapons, grassCrestShield, "Grass Crest Shield"\)/u);
   assert.match(source, /RequireName\(names\.Weapons, havelsGreatshield, "Havel's Greatshield"\)/u);
   assert.match(source, /RequireName\(names\.Accessories, ringOfFavorAndProtection, "Ring of Favor and Protection"\)/u);
@@ -81,6 +89,7 @@ test('real DSR PARAM data: serialized Skill Issue output sets all eight displaye
       assert.equal(result.status, 0, `${layout.name}: ${result.stderr}`);
       assert.match(result.stdout, /applied to 10 classes/u, layout.name);
       assert.match(result.stdout, /Validated DSR items: 9/u, layout.name);
+      assert.match(result.stdout, /Black Knight Halberd \+5 item ID: 1105005; EquipParamWeapon base row: 1105000; ReinforceParamWeapon row: 1200 \(level 5\)/u, layout.name);
       assert.ok((await readFile(output)).byteLength > 0, `${layout.name} emitted GameParam`);
     }
     assert.deepEqual(await Promise.all([itemMessages, gameParam, paramdef].map(async (file) => hash(await readFile(file)))), sourceHashes,

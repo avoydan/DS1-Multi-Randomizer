@@ -77,6 +77,7 @@ try
             RequireDirectory(options, "package"));
         Console.WriteLine($"Skill Issue Mode loadout applied to {report.Classes} classes.");
         Console.WriteLine($"Validated DSR items: {report.Items}.");
+        Console.WriteLine($"Black Knight Halberd +5 item ID: {report.BlackKnightHalberdPlus5Id}; EquipParamWeapon base row: {report.BlackKnightHalberdBaseId}; ReinforceParamWeapon row: {report.BlackKnightHalberdReinforcementId} (level {report.BlackKnightHalberdReinforcementLevel}).");
     }
     else if (command == "install")
     {
@@ -135,7 +136,6 @@ static OwnerQaLoadoutReport ApplyOwnerQaLoadout(string gameDirectory, string pac
     if (IsSameOrWithin(gameDirectory, packageDirectory) || IsSameOrWithin(packageDirectory, gameDirectory))
         throw new InvalidOperationException("Skill Issue Mode package and read-only DSR source must be separate, non-overlapping directories.");
 
-    const int blackKnightHalberd = 1_105_000;
     const int grassCrestShield = 1_453_000;
     const int havelsGreatshield = 1_505_000;
     const int havelsHelm = 440_000;
@@ -169,7 +169,46 @@ static OwnerQaLoadoutReport ApplyOwnerQaLoadout(string gameDirectory, string pac
             throw new InvalidDataException($"Skill Issue Mode item resolution failed: {expected} PARAM row {id} is missing.");
     }
 
-    RequireName(names.Weapons, blackKnightHalberd, "Black Knight Halberd");
+    int ResolveUniqueWeaponName(string expected)
+    {
+        var matches = names.Weapons
+            .Where(entry => string.Equals(entry.Value, expected, StringComparison.Ordinal))
+            .Select(entry => entry.Key)
+            .ToArray();
+        if (matches.Length != 1)
+            throw new InvalidDataException($"Skill Issue Mode weapon resolution failed: expected one EquipParamWeapon identity named '{expected}' in English item messages, found {matches.Length}.");
+        return matches[0];
+    }
+
+    // Resolve every BKH reinforcement identity by exact DSR English item name.
+    // The item suffix selects reinforcement; EquipParamWeapon holds the base
+    // row and its ReinforceParamWeapon type supplies the supported level.
+    // Select +5 by its named data identity, never by incrementing +0.
+    var blackKnightHalberdByLevel = Enumerable.Range(0, 6).ToDictionary(
+        level => level,
+        level => ResolveUniqueWeaponName(level == 0
+            ? "Black Knight Halberd"
+            : $"Black Knight Halberd+{level}"));
+    var weaponParam = ReadSourceParam("EquipParamWeapon.param");
+    var paramdefs = BND3.Read(paramdefPath).Files.Select(file => PARAMDEF.Read(file.Bytes)).ToList();
+    ApplyCompatibleParamdef(weaponParam, paramdefs);
+    var blackKnightHalberd = blackKnightHalberdByLevel[5];
+    var blackKnightHalberdBaseId = blackKnightHalberdByLevel[0];
+    foreach (var (level, id) in blackKnightHalberdByLevel)
+        if (id / 1_000 != blackKnightHalberdBaseId / 1_000)
+            throw new InvalidDataException($"Skill Issue Mode BKH +{level} FMG item ID {id} does not belong to the verified base weapon family.");
+    RequireRow(weaponParam, blackKnightHalberdBaseId, "Black Knight Halberd base EquipParamWeapon row");
+    var baseWeaponRow = weaponParam.Rows.Single(row => row.ID == blackKnightHalberdBaseId);
+    var reinforcementId = GetCellInt(baseWeaponRow, "reinforceTypeId", -1);
+    if (reinforcementId < 0)
+        throw new InvalidDataException("Skill Issue Mode BKH EquipParamWeapon row has no verified reinforceTypeId.");
+    var reinforcementParam = ReadSourceParam("ReinforceParamWeapon.param");
+    ApplyCompatibleParamdef(reinforcementParam, paramdefs);
+    var reinforcementRow = reinforcementParam.Rows.SingleOrDefault(row => row.ID == reinforcementId)
+        ?? throw new InvalidDataException($"Skill Issue Mode BKH reinforcement row {reinforcementId} is missing.");
+    var reinforcementLevel = GetCellInt(reinforcementRow, "reinforcementLevel", -1);
+    if (reinforcementLevel != 5)
+        throw new InvalidDataException($"Skill Issue Mode BKH +5 resolves to reinforcement row {reinforcementId} at level {reinforcementLevel}, not level 5.");
     RequireName(names.Weapons, grassCrestShield, "Grass Crest Shield");
     RequireName(names.Weapons, havelsGreatshield, "Havel's Greatshield");
     RequireName(names.Armor, havelsHelm, "Havel's Helm");
@@ -182,8 +221,6 @@ static OwnerQaLoadoutReport ApplyOwnerQaLoadout(string gameDirectory, string pac
     if (new[] { ringOfFavorAndProtection, cloranthyRing }.Contains(havelsRing))
         throw new InvalidDataException("Skill Issue Mode ring resolution unexpectedly selected Havel's Ring.");
     RequireName(names.Goods, twinklingTitanite, "Twinkling Titanite");
-    var weaponParam = ReadSourceParam("EquipParamWeapon.param");
-    RequireRow(weaponParam, blackKnightHalberd, "Black Knight Halberd");
     RequireRow(weaponParam, grassCrestShield, "Grass Crest Shield");
     RequireRow(weaponParam, havelsGreatshield, "Havel's Greatshield");
     var protectorParam = ReadSourceParam("EquipParamProtector.param");
@@ -195,7 +232,6 @@ static OwnerQaLoadoutReport ApplyOwnerQaLoadout(string gameDirectory, string pac
     RequireRow(accessoryParam, havelsRing, "Havel's Ring");
     RequireRow(ReadSourceParam("EquipParamGoods.param"), twinklingTitanite, "Twinkling Titanite");
 
-    var paramdefs = BND3.Read(paramdefPath).Files.Select(file => PARAMDEF.Read(file.Bytes)).ToList();
     var sourceChara = ReadSourceParam("CharaInitParam.param");
     ApplyCompatibleParamdef(sourceChara, paramdefs);
     var charaDefinition = paramdefs.Single(definition => definition.ParamType == "CHARACTER_INIT_PARAM");
@@ -323,7 +359,7 @@ static OwnerQaLoadoutReport ApplyOwnerQaLoadout(string gameDirectory, string pac
     {
         if (File.Exists(temporaryPath)) File.Delete(temporaryPath);
     }
-    return new OwnerQaLoadoutReport(classRowIds.Count, 9);
+    return new OwnerQaLoadoutReport(classRowIds.Count, 9, blackKnightHalberd, blackKnightHalberdBaseId, reinforcementId, reinforcementLevel);
 }
 
 static bool IsSameOrWithin(string parent, string child)
@@ -6182,4 +6218,4 @@ record ActivationReport(
     DateTimeOffset InstalledAt,
     DateTimeOffset? RestoredAt,
     List<ActivationFile> Files);
-record OwnerQaLoadoutReport(int Classes, int Items);
+record OwnerQaLoadoutReport(int Classes, int Items, int BlackKnightHalberdPlus5Id, int BlackKnightHalberdBaseId, int BlackKnightHalberdReinforcementId, int BlackKnightHalberdReinforcementLevel);
