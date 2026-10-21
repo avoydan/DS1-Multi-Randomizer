@@ -1,8 +1,10 @@
 ﻿# Compact Full Fog V2: boss progression correction
 
-Status: **development / unpromoted**. The current generation profile remains
-`ds1tr-gen-v4`; v1-v4 compatibility is unchanged. V2 uses the existing FogHost
-schema 3 with the project-owned Compact catalog and adds no game-data files.
+Status: **promoted for local owner gameplay QA on 2026-10-21**. New worlds use
+`ds1tr-gen-v5`; v1-v4 compatibility is unchanged. This promotes the existing
+V5 behavior without changing its semantics. Gameplay QA remains outstanding.
+V2 uses the existing FogHost schema 3 with the project-owned Compact catalog
+and adds no game-data files.
 
 Catalog fingerprint: `701f5aa84085ac2361bee382c43a05c4813e11878fac8a462dd1341a859a1d7a`.
 World-data identity: `221c01fa780daba7`.
@@ -180,7 +182,8 @@ The dirty reference worktree was not modified. Its older compiled constants
 (`77ab...` / `c724000d431a5e98`) fail the profile drift guard against the
 current isolated projection; current V5 conclusions use the isolated source,
 verified clean DSR facts, and project-owned policy. No gameplay launch is
-claimed. `CURRENT_GENERATION_PROFILE` remains v4 and V5 remains unpromoted.
+claimed. (At the time of that analysis, `CURRENT_GENERATION_PROFILE` was v4;
+the later local QA promotion is recorded above.)
 - The reachability checker assumes a reachable boss encounter can be defeated;
   it does not model combat outcomes. No gameplay launch was made for this
   corrected v5 package.

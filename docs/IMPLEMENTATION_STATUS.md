@@ -1,5 +1,47 @@
 # Implementation status
 
+## ds1tr-gen-v5 promoted for local gameplay QA (2026-10-21)
+
+`CURRENT_GENERATION_PROFILE` is now `ds1tr-gen-v5` for newly created worlds,
+by owner decision. This is profile selection only; V5 generation semantics
+were not changed. Existing V1-V4 Seed Codes and golden fixture files remain
+unchanged. The reported V4 hard-lock Seed Code from support bundle
+`DS1TR-support-06NWCQQ3-20261020-181751Z.zip` still decodes as V4 and
+re-encodes byte-for-byte identically.
+
+The QA reproduction is a new V5 Seed Code created from the original canonical
+world settings and master seed `332055808`:
+
+```text
+DS1TR1-06NWCQQ3-K2HDEE66-RS30D9N6-2R31C11B-3KT74XF8-TRW6G1J0-5CE38MF4-582WV6E4-AGVH0B8M-TGV4HJ8W-JKKMNWTJ-HBS764X1-NV3N20D1-QDJM9NA0-S1JG2TEN-9X97WJ86-QKQ035S2-YJN7E80N-16X6QG5H-MAHG8BAS-82RG8KA0-C0FJ02D7-2R3SE92P-QAJ2D9P0-HBDD2TMC-HHN0RPQT-2ANCA016-ZGP0P
+```
+
+The profile-aware derivation gives combined seed
+`025aa1170ca6f73955bde4f8a2eb8f5c` and Fog seed `4009337993`. The real-format
+V5 support reproduction passed on attempt 0 with 55 files and package digest
+`4ff13748e6c52ac10b845c6dfb9ba2c253dff8387fb70e5c493627b4a5cdfc34`.
+The V5 full Items + Enemies + Bosses + Fog golden also passed: 73 files,
+digest `c70b79d3fe7333b83ba7250babf78237d8a1c13d0d8067f95f2a16367c2f6024`.
+Both were regenerated against the read-only QA DSR source with the pinned
+FogHost/data root and matched all expected package hashes.
+
+Promotion checks: generation-profile, Seed-Code and golden metadata tests
+passed; all recorded V1-V5 golden Seed Codes decode to their recorded profile
+and re-encode exactly. Focused profile/Seed-Code/golden tests: 30 passed,
+1 environment-gated regeneration test skipped (the two V5 real-format
+regenerations above ran separately). Full backend suite: 615 total, 613
+passed, 0 failed, 2 skipped. Root typecheck passed for contracts, backend,
+desktop renderer and Electron main. No package has been released or
+published; gameplay QA remains outstanding.
+
+Packaging review found a separate historical-runtime limitation: V3/V4
+contracts require FogHost 0.6.0, but the current package builder places only
+FogHost 0.7.0 at the shared Compact-host path. The profile guard therefore
+refuses V3/V4 Fog generation in this packaged build. V1/V2 still select their
+separately pinned 0.5.0 host. This promotion leaves all those profile contracts
+unchanged; the V5 QA package is not evidence that every historical profile is
+playable from the package. Preserve this as a release compatibility blocker.
+
 ## Compact Fog V2 / ds1tr-gen-v5 boss progression (2026-10-21; development only)
 
 The owner-approved Path A now represents Ceaseless completion as a typed
@@ -28,8 +70,8 @@ condition, Entrance record, graph solver and writer behavior; no upstream
 annotation data was copied.
 
 The profile is `ds1tr-gen-v5`, with “Compact Fog V2” identifying its catalog
-generation. V5 remains unpromoted: `CURRENT_GENERATION_PROFILE` stays v4 and
-v1-v4 behavior remains frozen.
+generation. At the time of this development report, V5 was not promoted and
+`CURRENT_GENERATION_PROFILE` stayed v4; v1-v4 behavior remains frozen.
 
 Baseline ToTG comparison used the same .NET SDK 8.0.425, pinned FogMod data
 root and read-only QA DSR source. Baseline v4 FogHost suite: **117 passed, 0
@@ -62,9 +104,10 @@ including the ToTG anchor check. This is not a V5 product regression.
   output is based on current project-owned policy and passes the route,
   arrival, and real-format checks below. The old fixture copy is retained in
   `%TEMP%` for audit. No v1-v4 fixture was changed.
-- The standard golden recorder now encodes the declared fixture profile in
-  its Seed Code. This permits a development V5 recording while
-  `CURRENT_GENERATION_PROFILE` remains v4; it changes no runtime default.
+- The standard golden recorder encodes the declared fixture profile in its
+  Seed Code. This initially permitted a development V5 recording while
+  `CURRENT_GENERATION_PROFILE` remained v4; it did not change the runtime
+  default at that time.
 - The replacement fixture was recorded through
   `goldenCompatibility.mjs record ds1tr-gen-v5 compact-fog`:
   `v5-support-reproduction` is 55 files, digest
@@ -92,8 +135,10 @@ including the ToTG anchor check. This is not a V5 product regression.
   skipped**. Golden profile/Seed-Code tests passed; the optional in-test real
   regeneration remains skipped because the dedicated Seed-Code runs above
   already verified both V5 fixtures twice.
-- V5 remains development-only and unpromoted. `CURRENT_GENERATION_PROFILE`
-  remains `ds1tr-gen-v4`; no version bump, tag, release, or publish was made.
+- At the time of this original V5 verification, it was development-only and
+  unpromoted (`CURRENT_GENERATION_PROFILE` was v4). The later local gameplay
+  QA promotion is documented above; no version bump, tag, release, or publish
+  was made.
 
 ## Skill Issue Mode local starting loadout (2026-10-20)
 

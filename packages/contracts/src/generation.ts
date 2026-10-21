@@ -18,10 +18,10 @@ export const GENERATION_PROFILE_V2 = 'ds1tr-gen-v2';
 export const GENERATION_PROFILE_V3 = 'ds1tr-gen-v3';
 /** Owner-approved roaming-boss fit behavior, with all earlier profiles kept byte-compatible. */
 export const GENERATION_PROFILE_V4 = 'ds1tr-gen-v4';
-/** Development-only Compact Fog boss-completion model; promotion is gated on the full v5 proof matrix. */
+/** Compact Fog boss-completion model for new worlds; existing codes remain pinned to their own profile. */
 export const GENERATION_PROFILE_V5 = 'ds1tr-gen-v5';
 /** The profile new runs use. A later profile may replace it here; older profiles stay runnable. */
-export const CURRENT_GENERATION_PROFILE = GENERATION_PROFILE_V4;
+export const CURRENT_GENERATION_PROFILE = GENERATION_PROFILE_V5;
 
 export const SEED_CODE_PREFIX = 'DS1TR';
 /** Version of the Seed Code container itself (encoding, checksum, envelope layout). */

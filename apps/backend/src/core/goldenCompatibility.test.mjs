@@ -92,14 +92,14 @@ test('the v5 golden fixtures pin the Compact Fog hard-lock reproduction and full
   assert.equal(v5.cases[1].settings.fog.enabled, true);
 });
 
-test('the development V5 recorder encodes its declared profile without promoting the current profile', () => {
+test('the V5 recorder preserves its declared profile and new worlds use the promoted profile', () => {
   const [spec] = v5ExtraCaseSets['compact-fog'];
   const seedCode = seedCodeForProfile('ds1tr-gen-v5', spec.masterSeed, buildSettings(spec.patch));
   const decoded = decodeSeedCode(seedCode);
   assert.equal(decoded.ok, true, decoded.message ?? '');
   assert.equal(decoded.envelope.profile, 'ds1tr-gen-v5');
   assert.equal(resolveGenerationProfile('ds1tr-gen-v5')?.id, 'ds1tr-gen-v5');
-  assert.equal(currentGenerationProfile().id, 'ds1tr-gen-v4');
+  assert.equal(currentGenerationProfile().id, 'ds1tr-gen-v5');
 });
 
 test('every recorded Seed Code decodes to its recorded profile, master seed and canonical settings, and re-encodes identically', async () => {

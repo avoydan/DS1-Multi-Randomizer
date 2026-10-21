@@ -13,7 +13,7 @@ import { fullConfig, fullSettings } from './seedTestSupport.mjs';
 
 const sha = (value) => createHash('sha256').update(value).digest('hex');
 
-test('v1 through v4 keep their frozen behavior while Compact v5 remains unpromoted', () => {
+test('v1 through v4 keep their frozen behavior while Compact v5 is current for new worlds', () => {
   const profile = resolveGenerationProfile('ds1tr-gen-v1');
   const corrected = resolveGenerationProfile('ds1tr-gen-v2');
   const compactLegacy = resolveGenerationProfile('ds1tr-gen-v3');
@@ -25,7 +25,7 @@ test('v1 through v4 keep their frozen behavior while Compact v5 remains unpromot
   assert.ok(historicalCurrent);
   assert.ok(current);
   assert.deepEqual(supportedGenerationProfiles(), ['ds1tr-gen-v1', 'ds1tr-gen-v2', 'ds1tr-gen-v3', 'ds1tr-gen-v4', 'ds1tr-gen-v5']);
-  assert.equal(currentGenerationProfile().id, 'ds1tr-gen-v4');
+  assert.equal(currentGenerationProfile().id, 'ds1tr-gen-v5');
   assert.doesNotMatch(profile.id, /\d+\.\d+/u, 'a profile id never contains an application version');
   assert.deepEqual(profile.combinedEngine.randomizerVersions, ['0.5.66']);
   assert.equal(profile.roamingBossDestinationPolicy, 'protected-v1');
@@ -93,14 +93,24 @@ test('components outside the profile lists are refused, those inside are accepte
   assert.match(checkProfileComponents(profile, { worldDataId: 'other' }), /world data other/u);
 });
 
-test('every code made now names a registered profile and decodes in a simulated later application', () => {
+test('new worlds use v5 while the original V4 hard-lock Seed Code remains exact and pinned to v4', () => {
   const run = prepareRun(fullConfig(), () => '123456');
   assert.equal(run.ok, true);
-  assert.equal(run.profile.id, 'ds1tr-gen-v4');
+  assert.equal(run.profile.id, 'ds1tr-gen-v5');
   // A later application only adds profiles; decoding reads the code's own profile, never the app version.
   const decoded = decodeSeedCode(run.seedCode);
-  assert.equal(decoded.envelope.profile, 'ds1tr-gen-v4');
-  assert.equal(decoded.seedCode, run.seedCode, 're-encoding a decoded code gives the identical code');
+  assert.equal(decoded.envelope.profile, 'ds1tr-gen-v5');
+  assert.equal(decoded.seedCode, run.seedCode, 'the newly encoded V5 code round-trips exactly');
+
+  const originalHardLockCode = 'DS1TR1-06NWCQQ3-K2GDEE66-RS30D9N6-2R31C11B-3KT74XF8-TRW6G1J0-5CE38MF4-582WV6E4-AGVH0B8M-TGV4HJ8W-JKKMNWTJ-HBS764X1-NV3N20D1-QDJM9NA0-S1JG2TEN-9X97WJ86-QKQ035S2-YJN7E80N-16X6QG5H-MAHG8BAS-82RG8KA0-C0FJ02D7-2R3SE92P-QAJ2D9P0-HBDD2TMC-HHN0RPQT-2ANCA013-N99NW';
+  const oldCode = decodeSeedCode(originalHardLockCode);
+  assert.equal(oldCode.ok, true);
+  assert.equal(oldCode.envelope.profile, 'ds1tr-gen-v4');
+  assert.equal(encodeSeedCode(oldCode.envelope), originalHardLockCode, 'the support-bundle V4 code stays byte-for-byte identical');
+  const oldRun = prepareRun({ ...fullConfig(), seedCode: originalHardLockCode });
+  assert.equal(oldRun.ok, true);
+  assert.equal(oldRun.profile.id, 'ds1tr-gen-v4');
+  assert.equal(oldRun.seedCode, originalHardLockCode);
   // A code made by a profile this application does not know is an explicit, specific refusal, never a guess.
   const future = encodeSeedCode({ profile: 'ds1tr-gen-v6', masterSeed: '1', settings: fullSettings() });
   const refused = prepareRun({ ...fullConfig(), seedCode: future });
@@ -164,7 +174,7 @@ test('the application version never changes the world: the same Seed Code gives 
     assert.equal(today.result.manifest.appVersion, '0.30.0');
     assert.equal(later.result.manifest.appVersion, '12.4.7-future', 'the app version is recorded but only recorded');
     for (const field of ['generationProfile', 'seedCode', 'masterSeed']) assert.deepEqual(later.result.manifest[field], today.result.manifest[field], field);
-    assert.equal(today.result.manifest.generationProfile, 'ds1tr-gen-v4');
+    assert.equal(today.result.manifest.generationProfile, 'ds1tr-gen-v5');
     assert.equal(today.result.manifest.seedCode, code);
     assert.deepEqual(later.result.manifest.attempts, today.result.manifest.attempts);
     assert.deepEqual(await packageHashes(later.result.packagePath), await packageHashes(today.result.packagePath));

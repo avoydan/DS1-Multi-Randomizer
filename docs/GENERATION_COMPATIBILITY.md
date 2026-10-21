@@ -30,6 +30,14 @@ deterministic behavior that turns *(master seed, canonical settings)* into a wor
 
 `ds1tr-gen-v2` preserves the audited roaming-boss destination handling described below. `ds1tr-gen-v3` added the independent Compact Fog catalog, offline reconstructed data, and required-only backend Fog item constraints. `ds1tr-gen-v4` adds owner-approved roaming-boss fit behavior while retaining the v3 Compact Fog contract. `ds1tr-gen-v5` inherits v4 and selects the corrected Compact Fog v2 topology and boss-side arrival policy. Profiles v1 through v3 retain the historical fit behavior; v1-v4 Fog behavior and fixtures remain unchanged. Seed Code format 1, canonical setting shape, seed derivation, retry bounds, and combined engine `0.5.66` RNG salt remain unchanged. See [Compact Full Fog V2](COMPACT_FULL_FOG_V2.md).
 
+For local owner gameplay QA, new worlds now use `ds1tr-gen-v5` as
+`CURRENT_GENERATION_PROFILE`. This promotion changes only which already-defined
+profile is selected for a new world; it does not change V5 semantics. A loaded
+Seed Code continues to select its embedded profile. Existing v1-v4 Seed Codes
+and golden fixtures remain unchanged, including the reported V4 hard-lock
+code, which still decodes and re-encodes byte-for-byte as V4. This local QA
+promotion is not a release-readiness or gameplay-success claim.
+
 ## Recorded exception 6: roaming-boss safe destination handling (backend 0.46.0, desktop 0.39.0; 2026-10-12)
 
 The roaming-boss settings were already present in the public 0.38.4 prerelease. Therefore a new run that changes their world output cannot be silently assigned to v1, even though the earlier implementation had been described as pre-public. `ds1tr-gen-v1` and all its golden fixtures remain frozen; `ds1tr-gen-v2` selects the corrected behavior for new runs. This supersedes the compatibility conclusions in recorded exception 4 for these options.

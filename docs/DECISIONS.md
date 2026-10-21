@@ -1,6 +1,6 @@
 # Decisions
 
-## Compact Fog V2 uses explicit boss-completion progression in profile v5 (2026-10-21; unpromoted)
+## Compact Fog V2 uses explicit boss-completion progression in profile v5 (2026-10-21)
 
 The owner selected Path A: represent boss completion as a typed V5-only graph
 condition rather than restore the unconditional Ceaseless/lava shortcut or
@@ -20,10 +20,13 @@ boss death. For the reproduced Ceaseless arrival, Entrance `o4961_0000` targets
 the center of trigger region `1412698` in map `m14_01_00_00`, which event
 `11415371` checks.
 
-This policy is assigned only to development profile `ds1tr-gen-v5`;
-`CURRENT_GENERATION_PROFILE` remains v4. Profiles v1-v4 and their generated
+This policy is assigned only to `ds1tr-gen-v5`, which is now
+`CURRENT_GENERATION_PROFILE` for new worlds for local owner gameplay QA.
+Profiles v1-v4 and their generated
 behavior remain frozen. “Compact Fog V2” names the catalog/policy generation;
-it is not the historical profile `ds1tr-gen-v2`.
+it is not the historical profile `ds1tr-gen-v2`. Promotion changes only the
+default profile selection, not V5 semantics, and is not a release-readiness or
+gameplay-verification claim.
 
 Pristine event `11410090` was classified as an unreferenced, non-randomizable
 system script, not evidence for a Ceaseless route. It has parameter-bound
