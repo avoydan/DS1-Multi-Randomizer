@@ -133,15 +133,27 @@ namespace FogHost
             string annotationSha256;
             if (ann == null)
             {
-                if (request.AnnotationSource == HostRequest.CompactAnnotations)
+                if (request.AnnotationSource == HostRequest.CompactAnnotations || request.AnnotationSource == HostRequest.CompactV2Annotations)
                 {
-                    FogCompactCatalogV1 compact = FogCompactCatalogBuilder.Build(
-                        FogDsrFacts.Read(request.FogDataRoot, request.PristineGameDirectory, includeLegacyAnnotations: false));
-                    if (!compact.IsComplete) throw Invalid("Compact annotation coverage is incomplete.");
-                    if (!string.Equals(compact.Fingerprint, request.ExpectedAnnotationFingerprint, StringComparison.Ordinal))
+                    FogDsrFacts facts = FogDsrFacts.Read(request.FogDataRoot, request.PristineGameDirectory, includeLegacyAnnotations: false);
+                    string compactFingerprint;
+                    if (request.AnnotationSource == HostRequest.CompactV2Annotations)
+                    {
+                        FogCompactCatalogV2 compact = FogCompactCatalogBuilder.BuildV2(facts);
+                        if (!compact.IsComplete) throw Invalid("Compact annotation coverage is incomplete.");
+                        compactFingerprint = compact.Fingerprint;
+                        ann = compact.CreateFreshCandidateAnnotations();
+                    }
+                    else
+                    {
+                        FogCompactCatalogV1 compact = FogCompactCatalogBuilder.Build(facts);
+                        if (!compact.IsComplete) throw Invalid("Compact annotation coverage is incomplete.");
+                        compactFingerprint = compact.Fingerprint;
+                        ann = compact.CreateFreshCandidateAnnotations();
+                    }
+                    if (!string.Equals(compactFingerprint, request.ExpectedAnnotationFingerprint, StringComparison.Ordinal))
                         throw Invalid("Compact annotation fingerprint differs from the backend projection.");
-                    ann = compact.CreateFreshCandidateAnnotations();
-                    annotationSha256 = compact.Fingerprint;
+                    annotationSha256 = compactFingerprint;
                 }
                 else
                 {
@@ -150,7 +162,7 @@ namespace FogHost
                     annotationSha256 = DataRoot.AnnotationSha256(Directory.GetCurrentDirectory());
                 }
             }
-            else annotationSha256 = request.AnnotationSource == HostRequest.CompactAnnotations
+            else annotationSha256 = request.AnnotationSource != HostRequest.LegacyFogModAnnotations
                 ? request.ExpectedAnnotationFingerprint
                 : DataRoot.AnnotationSha256(Directory.GetCurrentDirectory());
             Console.WriteLine($"Seed: {opt.DisplaySeed}. Options: {string.Join(" ", opt.GetEnabled())}");

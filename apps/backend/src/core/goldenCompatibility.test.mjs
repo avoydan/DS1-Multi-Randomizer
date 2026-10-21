@@ -4,9 +4,11 @@ import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
+import { buildSettings, seedCodeForProfile, v5ExtraCaseSets } from '../../scripts/goldenCompatibility.mjs';
 import { canonicalSettingsJson } from '../../dist/core/canonicalSettings.js';
-import { resolveGenerationProfile } from '../../dist/core/generationProfiles.js';
+import { currentGenerationProfile, resolveGenerationProfile } from '../../dist/core/generationProfiles.js';
 import { decodeSeedCode, encodeSeedCode } from '../../dist/core/seedCode.js';
+import { deriveSeeds } from '../../dist/core/seeds.js';
 
 /**
  * Golden compatibility fixtures (docs/GENERATION_COMPATIBILITY.md). They are permanent: a fixture is never regenerated to make
@@ -65,6 +67,39 @@ test('the v4 golden fixture pins owner-approved roaming-boss fit behavior', asyn
     assert.ok(entry.expected.fileCount > 0 && Object.keys(entry.expected.files).length === entry.expected.fileCount);
     assert.equal(entry.expected.attempts.at(-1), 'success');
   }
+});
+
+test('the v5 golden fixtures pin the Compact Fog hard-lock reproduction and full-triple output', async () => {
+  const v5 = (await fixtures()).find((fixture) => fixture.file === 'ds1tr-gen-v5.compact-fog.json');
+  assert.ok(v5, 'the ds1tr-gen-v5 Compact Fog fixture file exists');
+  assert.deepEqual(v5.cases.map((entry) => entry.name), ['v5-support-reproduction', 'v5-compact-full-triple']);
+  const reproduction = v5.cases[0];
+  assert.equal(reproduction.profile, 'ds1tr-gen-v5');
+  assert.equal(reproduction.masterSeed, '332055808');
+  assert.equal(deriveSeeds(reproduction.masterSeed).fog, 4009337993);
+  assert.deepEqual(reproduction.expected.fogSeeds, [4009337993]);
+  assert.equal(reproduction.settings.fog.language, 'POLISH');
+  assert.equal(reproduction.settings.items.enabled, false);
+  assert.equal(reproduction.settings.enemies.enabled, false);
+  for (const entry of v5.cases) {
+    assert.equal(entry.profile, 'ds1tr-gen-v5');
+    assert.ok(entry.expected.fileCount > 0 && Object.keys(entry.expected.files).length === entry.expected.fileCount);
+    assert.equal(entry.expected.attempts.at(-1), 'success');
+    assert.ok(entry.expected.fogSeeds.every((seed) => Number.isInteger(seed) && seed >= 0 && seed <= 0xffffffff));
+  }
+  assert.equal(v5.cases[1].settings.items.enabled, true);
+  assert.equal(v5.cases[1].settings.enemies.enabled, true);
+  assert.equal(v5.cases[1].settings.fog.enabled, true);
+});
+
+test('the development V5 recorder encodes its declared profile without promoting the current profile', () => {
+  const [spec] = v5ExtraCaseSets['compact-fog'];
+  const seedCode = seedCodeForProfile('ds1tr-gen-v5', spec.masterSeed, buildSettings(spec.patch));
+  const decoded = decodeSeedCode(seedCode);
+  assert.equal(decoded.ok, true, decoded.message ?? '');
+  assert.equal(decoded.envelope.profile, 'ds1tr-gen-v5');
+  assert.equal(resolveGenerationProfile('ds1tr-gen-v5')?.id, 'ds1tr-gen-v5');
+  assert.equal(currentGenerationProfile().id, 'ds1tr-gen-v4');
 });
 
 test('every recorded Seed Code decodes to its recorded profile, master seed and canonical settings, and re-encodes identically', async () => {

@@ -7,6 +7,7 @@ using static FogMod.GraphChecker;
 using static FogMod.Graph;
 using System.IO;
 
+// Modified from FogMod commit 6e6dc7886d0f8bcc53c1800d95c9e859d1f2f87f by DS1 Multi Randomizer contributors under Apache-2.0; see ../UPSTREAM_PIN.md.
 namespace FogMod
 {
     public class GraphConnector
@@ -138,7 +139,10 @@ namespace FogMod
                         pairedOnly = false;
                         continue;
                     }
-                    throw new Exception($"Could not find edge into unreachable areas [{string.Join(", ", check.Unvisited)}] starting from {start}");
+                    string unmetBossGates = check.UnmetBossCompletionEdges.Count == 0
+                        ? string.Empty
+                        : $"; unmet boss-completion edges [{string.Join("; ", check.UnmetBossCompletionEdges)}]";
+                    throw new Exception($"Could not find edge into unreachable areas [{string.Join(", ", check.Unvisited)}] starting from {start}{unmetBossGates}");
                 }
 
                 (Edge, float) victim = (null, 0);

@@ -6,7 +6,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { defaultFogHostExecutable, resolveFogPrerequisites, worldDataOptionsForProfile } from '../../dist/adapters/fogPrerequisites.js';
-import { compactRuntimeWorldDataId, compactRuntimeWorldDataManifest } from '../../dist/adapters/worldData.js';
+import { compactRuntimeWorldDataId, compactRuntimeWorldDataManifest, compactRuntimeWorldDataV2Id } from '../../dist/adapters/worldData.js';
 import { resolveGenerationProfile } from '../../dist/core/generationProfiles.js';
 
 const tmp = () => mkdtemp(path.join(os.tmpdir(), 'ds1tr-fogprereq-'));
@@ -71,14 +71,21 @@ test('only the explicit GitHub distribution enables upstream legacy-data downloa
 test('world-data preflight selects the Seed Code profile and defaults new runs to the current compact profile', () => {
   const current = resolveGenerationProfile('ds1tr-gen-v3');
   const legacy = resolveGenerationProfile('ds1tr-gen-v1');
+  const v5 = resolveGenerationProfile('ds1tr-gen-v5');
   assert.ok(current);
   assert.ok(legacy);
+  assert.ok(v5);
   const nexusEnv = { DS1TR_DISTRIBUTION: 'nexus', DS1TR_FOG_HOST: 'C:\\FogHost.exe', DS1TR_FOG_HOST_LEGACY: 'C:\\FogHost-0.5.0.exe' };
   const compact = worldDataOptionsForProfile(current, 'C:\\Pristine', nexusEnv, 'C:\\Cache');
   assert.equal(compact.id, compactRuntimeWorldDataId);
   assert.equal(compact.manifest, compactRuntimeWorldDataManifest);
   assert.equal(typeof compact.reconstructFiles, 'function');
   assert.equal(compact.allowUpstreamDownloads, false);
+  const compactV2 = worldDataOptionsForProfile(v5, 'C:\\Pristine', nexusEnv, 'C:\\Cache');
+  assert.equal(compactV2.id, compactRuntimeWorldDataV2Id);
+  assert.equal(compactV2.id, v5.fogEngine.worldDataId);
+  assert.equal(compactV2.manifest, compactRuntimeWorldDataManifest);
+  assert.equal(typeof compactV2.reconstructFiles, 'function');
   const v1 = worldDataOptionsForProfile(legacy, 'C:\\Pristine', nexusEnv, 'C:\\Cache');
   assert.equal(v1.id, legacy.fogEngine.worldDataId);
   assert.equal(v1.manifest, undefined);

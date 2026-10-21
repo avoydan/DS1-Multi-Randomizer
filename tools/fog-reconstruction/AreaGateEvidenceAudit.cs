@@ -84,6 +84,15 @@ namespace FogReconstruction
                 throw new InvalidOperationException("Area gate evidence must be written outside the repository.");
 
             FogDsrFacts facts = FogDsrFacts.Read(dataRoot, pristineGameRoot);
+            AreaGateEvidenceAuditReport result = Build(facts, pristineGameRoot);
+            Directory.CreateDirectory(Path.GetDirectoryName(output));
+            File.WriteAllBytes(output, JsonSerializer.SerializeToUtf8Bytes(result, new JsonSerializerOptions { WriteIndented = true }));
+            Console.WriteLine($"Pristine area-gate evidence: {result.Maps} maps, {result.ObjectActs.Count} MSB ObjActs, {result.EventsWithEvidence} events with typed item/action/flag/warp evidence. Report: {output}");
+        }
+
+        internal static AreaGateEvidenceAuditReport Build(FogDsrFacts facts, string pristineGameRoot)
+        {
+            if (facts == null) throw new ArgumentNullException(nameof(facts));
             if (facts.EventFactSource != FogDsrEventFactSource.PristineGameInstall)
                 throw new InvalidOperationException("Area gate evidence requires EMEVD from the byte-verified clean DSR installation.");
 
@@ -130,9 +139,7 @@ namespace FogReconstruction
                 Array.AsReadOnly(objectActs.ToArray()),
                 Array.AsReadOnly(mapFlagWrites.ToArray()),
                 Array.AsReadOnly(reports.ToArray()));
-            Directory.CreateDirectory(Path.GetDirectoryName(output));
-            File.WriteAllBytes(output, JsonSerializer.SerializeToUtf8Bytes(result, new JsonSerializerOptions { WriteIndented = true }));
-            Console.WriteLine($"Pristine area-gate evidence: {facts.Maps.Count} maps, {objectActs.Count} MSB ObjActs, {reports.Count} events with typed item/action/flag/warp evidence. Report: {output}");
+            return result;
         }
 
         private static AreaGateEventReport BuildEventReport(
@@ -218,11 +225,11 @@ namespace FogReconstruction
                 else if (instruction.Bank == 2003 && instruction.ID == 14)
                 {
                     playerWarps++;
-                    if (args.Length >= 6)
+                    if (args.Length >= 8)
                     {
                         int destinationArea = ResolveByte(evt, instructionIndex, 0, callSite, ref parameterValuesResolved);
                         int destinationBlock = ResolveByte(evt, instructionIndex, 1, callSite, ref parameterValuesResolved);
-                        int initialAreaId = Resolve(instructionIndex, 2);
+                        int initialAreaId = ResolveWarpPlayerInitialAreaId(args, offset => Resolve(instructionIndex, offset));
                         warpTargets.Add(new AreaGateWarpTarget("WarpPlayer", 0, null, null, 0, 0, null, null,
                             destinationArea, destinationBlock, initialAreaId));
                     }
@@ -343,6 +350,14 @@ namespace FogReconstruction
             return (resolveInt32(0), resolveInt32(4), resolveInt32(8));
         }
 
+        internal static int ResolveWarpPlayerInitialAreaId(byte[] args, Func<int, int> resolveInt32)
+        {
+            if (args == null || args.Length < 8)
+                throw new InvalidDataException("WarpPlayer stores its initial-area ID in the aligned 4-byte argument slot at offset 4.");
+            if (resolveInt32 == null) throw new ArgumentNullException(nameof(resolveInt32));
+            return resolveInt32(4);
+        }
+
         private static int ReadInt32(byte[] bytes, int offset)
         {
             if (bytes == null || offset < 0 || offset + sizeof(int) > bytes.Length)
@@ -362,7 +377,11 @@ namespace FogReconstruction
                 shortWarpArgs, offset => ReadInt32(shortWarpArgs, offset));
             if (shortWarp.EntityId != 10000 || shortWarp.WarpType != 0 || shortWarp.DestinationEntityId != 1501011)
                 throw new InvalidOperationException("The IssueShortWarpRequest destination entity must be decoded from aligned argument offset 8.");
-            Console.WriteLine("Area gate evidence self-test passed (Crest item layout and aligned short-warp destination argument).");
+            byte[] playerWarpArgs = Convert.FromHexString("0C01000062961200");
+            int initialAreaId = ResolveWarpPlayerInitialAreaId(playerWarpArgs, offset => ReadInt32(playerWarpArgs, offset));
+            if (initialAreaId != 0x00129662)
+                throw new InvalidOperationException("WarpPlayer's initial-area ID must be decoded from aligned argument offset 4, after the packed area/block bytes.");
+            Console.WriteLine("Area gate evidence self-test passed (Crest item layout and aligned short/player-warp argument decoding).");
         }
 
         private static EMEVD ReadEmevd(string path)

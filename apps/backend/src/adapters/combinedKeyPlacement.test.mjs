@@ -66,6 +66,27 @@ test('a condition naming a key counts when the key lies in a visited area, not b
   assert.equal(visitedAreas(prepared, placed, new Set(['key_a'])).has('cellar'), true);
 });
 
+test('v2 boss progression unlocks only after traversing its trigger-bound encounter edge', () => {
+  const bossName = 'boss_defeated_11410410';
+  const bossModel = (triggered) => ({
+    format: 'ds1tr-progression-model-2', fogModCommit: 'test', annotationSha256: 'test', variant: 'vanilla',
+    start: 'start', areas: ['start', 'demonruins_ceaseless', 'demonruins_lava'],
+    edges: [
+      { from: 'start', to: 'demonruins_ceaseless', when: true, ...(triggered ? { bossCompletion: bossName } : {}) },
+      { from: 'demonruins_ceaseless', to: 'demonruins_lava', when: bossName },
+    ],
+    bossCompletions: [{ name: bossName, eventId: 11410410, area: 'demonruins_ceaseless', triggerEntrance: 'o4961_0000', triggerMap: 'm14_01_00_00', triggerRegionEntityId: 1412698 }],
+    keys: [], lotAreas: {}, optionalAreas: [], prison: { start: 'start', mustReach: 'start', areas: ['start'] },
+  });
+  assert.equal(visitedAreas(prepareModel(bossModel(false)), new Map()).has('demonruins_lava'), false,
+    'merely visiting the boss Area does not satisfy the completion condition');
+  assert.equal(visitedAreas(prepareModel(bossModel(true)), new Map()).has('demonruins_lava'), true,
+    'only the explicit trigger-bound encounter transition makes the completion condition available');
+  assert.throws(() => prepareModel({ ...bossModel(true), edges: [
+    { from: 'start', to: 'demonruins_lava', when: true, bossCompletion: bossName },
+  ] }), /trigger-bound transition/u, 'completion cannot be attached to an unrelated destination');
+});
+
 test('a malformed model is refused with a typed code', () => {
   const code = (build) => { try { prepareModel(build()); } catch (error) { return error.code; } return null; };
   assert.equal(code(() => ({ ...model(), format: 'other' })), 'KEY_PLACEMENT_MODEL_INVALID');

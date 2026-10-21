@@ -1,10 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using static FogMod.Util;
 using static FogMod.AnnotationData;
 using static FogMod.Graph;
 
+// Modified from FogMod commit 6e6dc7886d0f8bcc53c1800d95c9e859d1f2f87f by DS1 Multi Randomizer contributors under Apache-2.0; see ../UPSTREAM_PIN.md.
 namespace FogMod
 {
     public class GraphChecker
@@ -13,6 +15,8 @@ namespace FogMod
         {
             public Dictionary<string, NodeRecord> Records { get; set; }
             public List<string> Unvisited { get; set; }
+            public List<string> BossCompletions { get; set; }
+            public List<string> UnmetBossCompletionEdges { get; set; }
         }
         public class NodeRecord
         {
@@ -37,6 +41,7 @@ namespace FogMod
             }
             Dictionary<string, Expr> config = new Dictionary<string, Expr>();
             HashSet<string> visited = new HashSet<string>();
+            HashSet<string> bossCompletions = new HashSet<string>(StringComparer.Ordinal);
             void visit(string area)
             {
                 visited.Add(area);
@@ -57,6 +62,11 @@ namespace FogMod
             bool getDepRecord(string dep, out NodeRecord nr)
             {
                 if (g.itemAreas.TryGetValue(dep, out string itemArea)) dep = itemArea;
+                else if (g.bossCompletions.TryGetValue(dep, out BossCompletionRule boss))
+                {
+                    if (!bossCompletions.Contains(dep)) { nr = null; return false; }
+                    dep = boss.Area;
+                }
                 return recs.TryGetValue(dep, out nr);
             }
             float addEdge(Edge e, string scalingBase)
@@ -79,7 +89,9 @@ namespace FogMod
                     foreach (string dep in depVisit)
                     {
                         if (!getDepRecord(dep, out NodeRecord nr)) throw new Exception($"Dependency in edge {e} not visited: {dep}");
-                        string depArea = g.itemAreas.TryGetValue(dep, out string itemArea) ? itemArea : dep;
+                        string depArea = g.itemAreas.TryGetValue(dep, out string itemArea)
+                            ? itemArea
+                            : g.bossCompletions.TryGetValue(dep, out BossCompletionRule boss) ? boss.Area : dep;
                         preVisit.Add(depArea);
                         preVisit.UnionWith(nr.Visited);
                     }
@@ -106,7 +118,7 @@ namespace FogMod
             while (true)
             {
                 if (opt["explain"]) Console.WriteLine("---");
-                int diff = visited.Count;
+                int diff = visited.Count + bossCompletions.Count;
                 foreach (string loc in visited.OrderBy(l => recs[l].Dist).ToList())
                 {
                     Node node = graph[loc];
@@ -133,6 +145,15 @@ namespace FogMod
                             continue;
                         }
                         float dist = addEdge(edge, toNode.ScalingBase);
+                        foreach (KeyValuePair<string, BossCompletionRule> completion in g.bossCompletions)
+                        {
+                            if (IsBossCompletionTriggerEdge(edge, completion.Value)
+                                && bossCompletions.Add(completion.Key))
+                            {
+                                config[completion.Key] = Expr.TRUE;
+                                if (opt["explain"]) Console.WriteLine($"Boss completion achievable: {completion.Value.EventId} via {completion.Value.TriggerEntrance}");
+                            }
+                        }
                         seenEdge.Add(edge);
                         recs[edge.To].InEdge[edge] = dist;
                         if (visited.Contains(edge.To))
@@ -150,12 +171,20 @@ namespace FogMod
                 {
                     break;
                 }
-                else if (visited.Count == diff)
+                else if (visited.Count + bossCompletions.Count == diff)
                 {
                     lastLoop = true;
                 }
             }
             List<string> unvisited = graph.Keys.Except(visited).Except(g.areas.Values.Where(a => a.HasTag("optional")).Select(a => a.Name)).ToList();
+            List<string> unmetBossCompletionEdges = graph.Values.SelectMany(node => node.To)
+                .Where(edge => edge.To != null)
+                .Select(edge => (Edge: edge, Missing: edge.LinkedExpr?.FreeVars()
+                    .Where(name => g.bossCompletions.ContainsKey(name) && !bossCompletions.Contains(name))
+                    .OrderBy(name => name, StringComparer.Ordinal).ToArray() ?? Array.Empty<string>()))
+                .Where(entry => entry.Missing.Length > 0)
+                .Select(entry => $"{entry.Edge.From}->{entry.Edge.To} requires {string.Join(" & ", entry.Missing)}")
+                .OrderBy(value => value, StringComparer.Ordinal).ToList();
 
             if (opt["explain"]) Console.WriteLine($"Not visited: [{string.Join(", ", unvisited)}]");
             if (opt["explain"]) Console.WriteLine();
@@ -164,7 +193,35 @@ namespace FogMod
             {
                 Records = recs,
                 Unvisited = unvisited,
+                BossCompletions = bossCompletions.OrderBy(value => value, StringComparer.Ordinal).ToList(),
+                UnmetBossCompletionEdges = unmetBossCompletionEdges,
             };
+        }
+
+        /// <summary>
+        /// A broad Area visit is not a boss defeat. The completion state is derivable only after a
+        /// directed arrival through the authored boss side, whose registered trigger and generated
+        /// warp center match the verified trigger volume. The real game still sets the flag on kill.
+        /// </summary>
+        public static bool IsBossCompletionTriggerEdge(Edge edge, BossCompletionRule completion)
+        {
+            if (edge?.Link?.Side == null || completion == null || edge.To != completion.Area) return false;
+            Side side = edge.Link.Side;
+            if (side.Area != completion.Area || side.BossTrigger != completion.EventId
+                || side.BossTriggerArea == null || side.CustomWarp == null
+                || !string.Equals(edge.Link.Name, completion.TriggerEntrance, StringComparison.Ordinal)) return false;
+            string[] trigger = side.BossTriggerArea.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            string[] warp = side.CustomWarp.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (trigger.Length != 7 || warp.Length != 5
+                || !string.Equals(warp[0], completion.TriggerMap, StringComparison.Ordinal)) return false;
+            for (int index = 0; index < 4; index++)
+            {
+                if (!float.TryParse(trigger[index], NumberStyles.Float, CultureInfo.InvariantCulture, out float expected)
+                    || !float.TryParse(warp[index + 1], NumberStyles.Float, CultureInfo.InvariantCulture, out float actual)
+                    || !float.IsFinite(expected) || !float.IsFinite(actual)
+                    || Math.Abs(expected - actual) > 0.0001f) return false;
+            }
+            return true;
         }
     }
 }

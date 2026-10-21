@@ -11,6 +11,7 @@
     <ImplicitUsings>disable</ImplicitUsings>
     <InvariantGlobalization>true</InvariantGlobalization>
     <Deterministic>true</Deterministic>
+    <DefineConstants>$(DefineConstants);FOG_RECONSTRUCTION_DEV</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>

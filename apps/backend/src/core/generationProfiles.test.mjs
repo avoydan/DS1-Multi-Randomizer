@@ -13,16 +13,18 @@ import { fullConfig, fullSettings } from './seedTestSupport.mjs';
 
 const sha = (value) => createHash('sha256').update(value).digest('hex');
 
-test('v1 through v3 keep frozen roaming-boss fit behavior while Compact v4 is current', () => {
+test('v1 through v4 keep their frozen behavior while Compact v5 remains unpromoted', () => {
   const profile = resolveGenerationProfile('ds1tr-gen-v1');
   const corrected = resolveGenerationProfile('ds1tr-gen-v2');
   const compactLegacy = resolveGenerationProfile('ds1tr-gen-v3');
-  const current = resolveGenerationProfile('ds1tr-gen-v4');
+  const historicalCurrent = resolveGenerationProfile('ds1tr-gen-v4');
+  const current = resolveGenerationProfile('ds1tr-gen-v5');
   assert.ok(profile);
   assert.ok(corrected);
   assert.ok(compactLegacy);
+  assert.ok(historicalCurrent);
   assert.ok(current);
-  assert.deepEqual(supportedGenerationProfiles(), ['ds1tr-gen-v1', 'ds1tr-gen-v2', 'ds1tr-gen-v3', 'ds1tr-gen-v4']);
+  assert.deepEqual(supportedGenerationProfiles(), ['ds1tr-gen-v1', 'ds1tr-gen-v2', 'ds1tr-gen-v3', 'ds1tr-gen-v4', 'ds1tr-gen-v5']);
   assert.equal(currentGenerationProfile().id, 'ds1tr-gen-v4');
   assert.doesNotMatch(profile.id, /\d+\.\d+/u, 'a profile id never contains an application version');
   assert.deepEqual(profile.combinedEngine.randomizerVersions, ['0.5.66']);
@@ -41,20 +43,30 @@ test('v1 through v3 keep frozen roaming-boss fit behavior while Compact v4 is cu
   assert.deepEqual(current.combinedEngine.randomizerVersions, ['0.5.66']);
   assert.equal(current.roamingBossDestinationPolicy, 'safe-handlers-v2');
   assert.equal(current.roamingBossFitPolicy, 'owner-approved-v1');
-  assert.deepEqual(current.fogEngine.hostVersions, ['0.6.0']);
-  assert.equal(current.fogAnnotationSource, 'compact-v1');
+  assert.deepEqual(historicalCurrent.fogEngine.hostVersions, ['0.6.0']);
+  assert.equal(historicalCurrent.fogAnnotationSource, 'compact-v1');
+  assert.deepEqual(current.fogEngine.hostVersions, ['0.7.0']);
+  assert.equal(current.fogAnnotationSource, 'compact-v2');
   assert.deepEqual(profile.fogEngine.hostVersions, ['0.5.0']);
   assert.deepEqual(fogHostRuntimeForProfile(profile), { hostVersion: '0.5.0', schemaVersion: 2, annotationSource: 'legacy-fogmod' });
   assert.deepEqual(fogHostRuntimeForProfile(corrected), { hostVersion: '0.5.0', schemaVersion: 2, annotationSource: 'legacy-fogmod' });
   assert.deepEqual(fogHostRuntimeForProfile(compactLegacy), { hostVersion: '0.6.0', schemaVersion: 3, annotationSource: 'compact-v1' });
-  assert.deepEqual(fogHostRuntimeForProfile(current), { hostVersion: '0.6.0', schemaVersion: 3, annotationSource: 'compact-v1' });
+  assert.deepEqual(fogHostRuntimeForProfile(historicalCurrent), { hostVersion: '0.6.0', schemaVersion: 3, annotationSource: 'compact-v1' });
+  assert.deepEqual(fogHostRuntimeForProfile(current), { hostVersion: '0.7.0', schemaVersion: 3, annotationSource: 'compact-v2' });
   assert.equal(fogHostRuntimeForProfile({ ...profile, fogEngine: { ...profile.fogEngine, hostVersions: ['0.6.0'] } }), null,
     'a legacy data/tracking profile cannot be silently routed to the current host');
   assert.equal(profile.fogEngine.fogModCommit, '6e6dc7886d0f8bcc53c1800d95c9e859d1f2f87f');
   assert.equal(profile.fogEngine.worldDataId, 'f394fa536ba9b66d');
   assert.deepEqual({ ...profile.retryBounds }, { maxCombinedAttempts: 3, maxFogAttempts: 5 });
   assert.equal(profile.fogItemTracking, 'fog-item-tracking-v1');
-  assert.equal(current.fogEngine.compactCatalogFingerprint, '8c03fd3de1cd7c772d5c933753ae54eab35f9e8b70a1aef2954322330d0002d4');
+  assert.equal(historicalCurrent.fogEngine.compactCatalogFingerprint, '8c03fd3de1cd7c772d5c933753ae54eab35f9e8b70a1aef2954322330d0002d4');
+  assert.equal(current.fogEngine.compactCatalogVersion, 'ds1tr-compact-full-fog-v2');
+  assert.equal(current.fogEngine.compactCatalogFingerprint, '701f5aa84085ac2361bee382c43a05c4813e11878fac8a462dd1341a859a1d7a');
+  assert.equal(current.fogEngine.worldDataId, '221c01fa780daba7');
+  assert.notEqual(current.fogEngine.worldDataId, historicalCurrent.fogEngine.worldDataId);
+  assert.notEqual(current.fogEngine.compactCatalogFingerprint, historicalCurrent.fogEngine.compactCatalogFingerprint);
+  assert.match(current.fogEngine.compactCatalogFingerprint, /^[a-f0-9]{64}$/u,
+    'v5 must pin the computed immutable Compact v2 catalog fingerprint');
   assert.ok(Object.isFrozen(profile), 'a registered profile cannot be edited at runtime');
 });
 
@@ -90,7 +102,7 @@ test('every code made now names a registered profile and decodes in a simulated 
   assert.equal(decoded.envelope.profile, 'ds1tr-gen-v4');
   assert.equal(decoded.seedCode, run.seedCode, 're-encoding a decoded code gives the identical code');
   // A code made by a profile this application does not know is an explicit, specific refusal, never a guess.
-  const future = encodeSeedCode({ profile: 'ds1tr-gen-v5', masterSeed: '1', settings: fullSettings() });
+  const future = encodeSeedCode({ profile: 'ds1tr-gen-v6', masterSeed: '1', settings: fullSettings() });
   const refused = prepareRun({ ...fullConfig(), seedCode: future });
   assert.equal(refused.ok, false);
   assert.equal(refused.code, 'UNSUPPORTED_PROFILE');

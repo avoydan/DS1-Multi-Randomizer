@@ -44,12 +44,14 @@ namespace FogHost
     }
 
     public enum FogConditionKind { Atom, All, Any }
-    public enum FogConditionReferenceKind { Area, KeyItem }
+    public enum FogConditionReferenceKind { Area, KeyItem, BossCompletion }
 
     public readonly record struct FogConditionReference(FogConditionReferenceKind Kind, string Value)
     {
         public static FogConditionReference Area(FogAreaId id) => new FogConditionReference(FogConditionReferenceKind.Area, id.Value);
         public static FogConditionReference KeyItem(FogItemName id) => new FogConditionReference(FogConditionReferenceKind.KeyItem, id.Value);
+        public static FogConditionReference BossCompletion(int eventId) => new FogConditionReference(FogConditionReferenceKind.BossCompletion, eventId.ToString(CultureInfo.InvariantCulture));
+        public string ToFogModName() => Kind == FogConditionReferenceKind.BossCompletion ? "boss_defeated_" + Value : Value;
     }
 
     public sealed record FogCondition(FogConditionKind Kind, IReadOnlyList<FogConditionReference> Terms)
@@ -62,6 +64,7 @@ namespace FogHost
             {
                 FogConditionReferenceKind.Area => resolveAreaName(new FogAreaId(term.Value)).Value,
                 FogConditionReferenceKind.KeyItem => term.Value,
+                FogConditionReferenceKind.BossCompletion => term.ToFogModName(),
                 _ => throw new InvalidDataException($"Unknown Fog condition reference kind {term.Kind}.")
             };
             if (Kind == FogConditionKind.Atom)
@@ -174,6 +177,24 @@ namespace FogHost
     public sealed record FogLotLocation(FogItemLotId FirstLot, FogAreaId Area);
     public sealed record FogLotRowLocation(FogItemLotId Lot, FogAreaId Area);
     public sealed record FogDefaultFlagCollision(FogMapId Map, string Collision, int BossFlag);
+    /// <summary>Checker-only transition: a verified trigger-side arrival makes a boss defeat achievable.</summary>
+    public sealed record FogBossCompletionTransition(
+        int EventId,
+        FogAreaId EncounterArea,
+        FogEntranceKey TriggerEntrance,
+        FogMapId TriggerMap,
+        int TriggerRegionEntityId)
+    {
+        public string ConditionName => "boss_defeated_" + EventId.ToString(CultureInfo.InvariantCulture);
+    }
+    /// <summary>Project-owned same-map passage whose availability follows a verified boss completion flag.</summary>
+    public sealed record FogBossGatedRoute(
+        FogAreaId Source,
+        FogAreaId Destination,
+        int CompletionEventId,
+        FogMapId Map,
+        string CompletionCollision,
+        string PhysicalRationale);
     /// <summary>A pristine game object retained only for a pinned FogMod writer branch, never a graph edge.</summary>
     public sealed record FogWriterSupportEntrance(string Name, int Id, FogMapId Map, string Rationale);
 
@@ -199,6 +220,7 @@ namespace FogHost
         public IReadOnlyList<FogLotLocation> LotLocations { get; }
         public IReadOnlyList<FogLotRowLocation> LotRows { get; }
         public IReadOnlyList<FogDefaultFlagCollision> DefaultFlagCols { get; }
+        public IReadOnlyList<FogBossCompletionTransition> BossCompletions { get; }
         public IReadOnlyList<FogWriterSupportEntrance> WriterSupportEntrances { get; }
 
         public FogAnnotationCatalog(
@@ -212,7 +234,8 @@ namespace FogHost
             IEnumerable<FogLotLocation> lotLocations,
             IEnumerable<FogDefaultFlagCollision> defaultFlagCols,
             IEnumerable<FogWriterSupportEntrance> writerSupportEntrances = null,
-            IEnumerable<FogLotRowLocation> lotRows = null)
+            IEnumerable<FogLotRowLocation> lotRows = null,
+            IEnumerable<FogBossCompletionTransition> bossCompletions = null)
         {
             Areas = Snapshot((areas ?? throw new ArgumentNullException(nameof(areas))).Select(area => area with
             {
@@ -230,6 +253,7 @@ namespace FogHost
             }), nameof(enemies));
             LotLocations = Snapshot(lotLocations, nameof(lotLocations));
             DefaultFlagCols = Snapshot(defaultFlagCols, nameof(defaultFlagCols));
+            BossCompletions = Snapshot(bossCompletions ?? Array.Empty<FogBossCompletionTransition>(), nameof(bossCompletions));
             WriterSupportEntrances = Snapshot(writerSupportEntrances ?? Array.Empty<FogWriterSupportEntrance>(), nameof(writerSupportEntrances));
             LotRows = Snapshot(lotRows ?? Array.Empty<FogLotRowLocation>(), nameof(lotRows));
             _ = Unique(Areas.Select(area => area.Id.Value), "area ID");
@@ -284,6 +308,15 @@ namespace FogHost
                     ? null
                     : LotRows.ToDictionary(lot => lot.Lot.Value, lot => ResolveFogModAreaName(lot.Area).Value),
                 DefaultFlagCols = DefaultFlagCols.ToDictionary(flag => flag.Map.Value + "_" + flag.Collision, flag => flag.BossFlag, StringComparer.Ordinal),
+                BossCompletions = BossCompletions.Select(transition => new BossCompletionRule
+                {
+                    Name = transition.ConditionName,
+                    Area = ResolveFogModAreaName(transition.EncounterArea).Value,
+                    EventId = transition.EventId,
+                    TriggerEntrance = transition.TriggerEntrance.Value,
+                    TriggerMap = transition.TriggerMap.Value,
+                    TriggerRegionEntityId = transition.TriggerRegionEntityId,
+                }).ToList(),
             };
         }
 
@@ -344,6 +377,23 @@ namespace FogHost
                         json.WriteEndObject();
                     }
                     json.WriteEndArray();
+                    // Preserve every pre-V2 fingerprint byte: this section exists only when a
+                    // profile explicitly opts into boss-completion semantics.
+                    if (BossCompletions.Count > 0)
+                    {
+                        json.WriteStartArray("bossCompletions");
+                        foreach (FogBossCompletionTransition transition in BossCompletions.OrderBy(value => value.EventId))
+                        {
+                            json.WriteStartObject();
+                            json.WriteNumber("eventId", transition.EventId);
+                            json.WriteString("area", transition.EncounterArea.Value);
+                            json.WriteString("triggerEntrance", transition.TriggerEntrance.Value);
+                            json.WriteString("triggerMap", transition.TriggerMap.Value);
+                            json.WriteNumber("triggerRegionEntityId", transition.TriggerRegionEntityId);
+                            json.WriteEndObject();
+                        }
+                        json.WriteEndArray();
+                    }
                     json.WriteEndObject();
                 }
                 byte[] input = stream.ToArray();
@@ -363,6 +413,7 @@ namespace FogHost
             Unique(LotLocations.Select(lot => lot.FirstLot.Value.ToString(CultureInfo.InvariantCulture)), "ItemLot start ID");
             Unique(LotRows.Select(lot => lot.Lot.Value.ToString(CultureInfo.InvariantCulture)), "exact ItemLot row ID");
             Unique(DefaultFlagCols.Select(flag => flag.Map.Value + "_" + flag.Collision), "default flag collision");
+            Unique(BossCompletions.Select(transition => transition.ConditionName), "boss completion condition");
             if (KeyItems.Any(item => item.GameItemId.ItemId <= 0)) throw new InvalidDataException("A key item GameParam ID must be positive.");
             if (LotLocations.Any(lot => lot.FirstLot.Value <= 0)) throw new InvalidDataException("An ItemLot start ID must be positive.");
             if (LotRows.Any(lot => lot.Lot.Value <= 0)) throw new InvalidDataException("An exact ItemLot row ID must be positive.");
@@ -432,6 +483,17 @@ namespace FogHost
             }
             foreach (FogLotLocation lot in LotLocations) RequireArea(lot.Area, areaIds, $"lot {lot.FirstLot.Value}");
             foreach (FogDefaultFlagCollision flag in DefaultFlagCols) ValidateMap(flag.Map);
+            foreach (FogBossCompletionTransition transition in BossCompletions)
+            {
+                if (transition.EventId <= 0 || transition.TriggerRegionEntityId <= 0)
+                    throw new InvalidDataException("Boss completion transitions require positive event and trigger-region IDs.");
+                RequireArea(transition.EncounterArea, areaIds, "boss completion transition");
+                ValidateMap(transition.TriggerMap);
+                if (!Entrances.Any(entrance => entrance.Identity == transition.TriggerEntrance
+                    && new[] { entrance.ASide, entrance.BSide }.Any(side => side != null && side.Area == transition.EncounterArea
+                        && side.BossTrigger == transition.EventId && side.BossTriggerArea != null && side.CustomWarp != null)))
+                    throw new InvalidDataException($"Boss completion {transition.EventId} has no trigger-centered entrance side for '{transition.EncounterArea}'.");
+            }
 
             var allNames = new HashSet<FogEntranceKey>(Warps.Select(warp => warp.Identity).Concat(Entrances.Select(entrance => entrance.Identity)));
             foreach (FogEntranceSide side in Entrances.SelectMany(entrance => new[] { entrance.ASide, entrance.BSide }).Where(side => side != null))
@@ -446,7 +508,7 @@ namespace FogHost
             }
         }
 
-        private static void ValidateWarpSide(FogWarpSide side, HashSet<string> areaIds, HashSet<string> itemNames)
+        private void ValidateWarpSide(FogWarpSide side, HashSet<string> areaIds, HashSet<string> itemNames)
         {
             if (side == null) return;
             RequireArea(side.Area, areaIds, "warp side");
@@ -455,7 +517,7 @@ namespace FogHost
             if (side.DestinationMap.HasValue) ValidateMap(side.DestinationMap.Value);
         }
 
-        private static void ValidateSide(FogEntranceSide side, HashSet<string> areaIds, HashSet<string> itemNames)
+        private void ValidateSide(FogEntranceSide side, HashSet<string> areaIds, HashSet<string> itemNames)
         {
             if (side == null) return;
             RequireArea(side.Area, areaIds, "entrance side");
@@ -464,7 +526,7 @@ namespace FogHost
             if (side.CustomWarp != null) ValidateMap(side.CustomWarp.Map);
         }
 
-        private static void ValidateCondition(FogCondition condition, HashSet<string> areaIds, HashSet<string> itemNames)
+        private void ValidateCondition(FogCondition condition, HashSet<string> areaIds, HashSet<string> itemNames)
         {
             if (condition == null) return;
             if (condition.Terms == null || condition.Terms.Count == 0)
@@ -478,6 +540,12 @@ namespace FogHost
                 if (term.Kind == FogConditionReferenceKind.Area) RequireArea(new FogAreaId(term.Value), areaIds, "condition");
                 else if (term.Kind == FogConditionReferenceKind.KeyItem && !itemNames.Contains(term.Value))
                     throw new InvalidDataException($"Condition references unknown key item '{term.Value}'.");
+                else if (term.Kind == FogConditionReferenceKind.BossCompletion)
+                {
+                    if (!int.TryParse(term.Value, NumberStyles.None, CultureInfo.InvariantCulture, out int eventId)
+                        || !BossCompletions.Any(transition => transition.EventId == eventId))
+                        throw new InvalidDataException($"Condition references unknown boss completion '{term.Value}'.");
+                }
                 else if (term.Kind != FogConditionReferenceKind.KeyItem)
                     throw new InvalidDataException($"Unknown Fog condition reference kind {term.Kind}.");
             }

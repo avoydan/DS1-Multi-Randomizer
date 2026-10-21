@@ -28,6 +28,7 @@ import { fileURLToPath } from 'node:url';
 import { GameStateAuthority, executableName, managedRoots } from '../dist/core/gameState.js';
 import { generateRun } from '../dist/core/generationPipeline.js';
 import { prepareRun } from '../dist/core/seededRun.js';
+import { encodeSeedCode } from '../dist/core/seedCode.js';
 import { canonicalSettingsJson } from '../dist/core/canonicalSettings.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -246,9 +247,33 @@ export const v4ExtraCaseSets = {
   ],
 };
 
+/** Corrected Compact Fog topology and boss-side arrival are frozen only in v5. */
+export const v5ExtraCaseSets = {
+  'compact-fog': [
+    { name: 'v5-support-reproduction', masterSeed: '332055808', patch: {
+      items: { enabled: false, randomizeStartingEquipment: true, randomizeGifts: true, randomizeEnemyDrops: true,
+        randomizeShops: true, fashionSouls: true, soulItems: 'shuffled', startingItems: 'mixed-pool', keyPlacement: 'vanilla', laundromat: true },
+      enemies: { enabled: false, randomizeBosses: true, scaling: 'area', replaceMimics: true, replaceRespawningMosquitoes: true,
+        gwynNerf: 'medium', secondGargoyle: 'replace', placement: { algorithm: 'sampling-v1', replacementChance: 100,
+          normalReplacement: 'both', fit: 'fits', difficultyMode: 'random', difficultyStrictness: 'loose', bossReplacement: 'bosses',
+          bossChanceInNormalSlots: 10, roamingBossSouls: 100, roamingBossesStayDead: true, bossChanceInBossSlots: 90 } },
+      fog: { traversableFogs: true, bossFogs: true, areaWarps: true, scaling: true, requireLordSouls: true, language: 'POLISH' },
+      output: { generateSpoilerLog: true },
+    } },
+    { name: 'v5-compact-full-triple', masterSeed: 'golden-v5-compact-full-triple', patch: {} },
+  ],
+};
+
 export function buildSettings(patch) {
   const merged = merge(defaults, patch);
   return JSON.parse(JSON.stringify(merged));
+}
+
+/** Encode a fixture with its declared profile without promoting the profile used for ordinary new runs. */
+export function seedCodeForProfile(profile, masterSeed, settings) {
+  const normalized = prepareRun({ masterSeed, ...settings });
+  if (!normalized.ok) throw new Error(`${profile}/${masterSeed}: ${normalized.code}: ${normalized.technical}`);
+  return encodeSeedCode({ ...normalized.envelope, profile });
 }
 
 async function reconstruct(source, temp) {
@@ -318,9 +343,10 @@ async function main() {
       const setName = process.argv[4] && !process.argv[4].startsWith('--') ? process.argv[4] : null;
       const profileSets = profile === 'ds1tr-gen-v2' ? v2ExtraCaseSets
         : profile === 'ds1tr-gen-v3' ? v3ExtraCaseSets
-          : profile === 'ds1tr-gen-v4' ? v4ExtraCaseSets : v1ExtraCaseSets;
+          : profile === 'ds1tr-gen-v4' ? v4ExtraCaseSets
+            : profile === 'ds1tr-gen-v5' ? v5ExtraCaseSets : v1ExtraCaseSets;
       const caseList = setName ? profileSets[setName]
-        : (profile === 'ds1tr-gen-v2' || profile === 'ds1tr-gen-v3' || profile === 'ds1tr-gen-v4' ? [] : v1Cases);
+        : (profile === 'ds1tr-gen-v2' || profile === 'ds1tr-gen-v3' || profile === 'ds1tr-gen-v4' || profile === 'ds1tr-gen-v5' ? [] : v1Cases);
       if (!caseList) throw new Error(`Unknown extra case set ${setName}.`);
       const target = path.join(fixtureDirectory, setName ? `${profile}.${setName}.json` : `${profile}.json`);
       const exists = await access(target).then(() => true, () => false);
@@ -328,13 +354,19 @@ async function main() {
       const cases = [];
       for (const spec of caseList) {
         const settings = buildSettings(spec.patch);
-        const { prepared, result } = await run(context, { masterSeed: spec.masterSeed, ...settings }, spec.name, appVersion);
+        const seedCode = seedCodeForProfile(profile, spec.masterSeed, settings);
+        const { prepared, result } = await run(context, { seedCode }, spec.name, appVersion);
         if (!result.ok) throw new Error(`${spec.name}: ${result.code}: ${result.message}`);
         const grace = Object.values(result.manifest.enemyPlacement.summary?.maps ?? {}).filter((map) => map.customPoolModelGrace).length;
         cases.push({
           name: spec.name, seedCode: prepared.seedCode, masterSeed: prepared.config.masterSeed, profile: prepared.profile.id,
           settings: JSON.parse(canonicalSettingsJson(prepared.envelope.settings)),
-          expected: { ...(await packageDigest(result.manifest.files, result.packagePath)), modelGraceMaps: grace, attempts: result.manifest.attempts.map((attempt) => attempt.result) },
+          expected: {
+            ...(await packageDigest(result.manifest.files, result.packagePath)),
+            modelGraceMaps: grace,
+            attempts: result.manifest.attempts.map((attempt) => attempt.result),
+            fogSeeds: result.manifest.attempts.map((attempt) => attempt.fogSeed),
+          },
         });
         console.log(`${spec.name}: ${result.manifest.files.length} files, grace maps ${grace}, attempts ${result.manifest.attempts.map((a) => a.result).join(',')}`);
       }
@@ -358,7 +390,7 @@ async function main() {
         if (!good) {
           failed += 1;
           const differing = actual ? Object.keys(entry.expected.files).filter((key) => entry.expected.files[key] !== actual.files[key]) : [];
-          console.log(`FAIL ${fixture.profile}/${entry.name}: ${result.ok ? `digest ${actual.digest} != ${entry.expected.digest}; differing: ${differing.slice(0, 5).join(', ')}` : `${result.code}: ${result.message}`}`);
+          console.log(`FAIL ${fixture.profile}/${entry.name}: ${result.ok ? `digest ${actual.digest} != ${entry.expected.digest}; differing: ${differing.join(', ')}` : `${result.code}: ${result.message}`}`);
         } else {
           console.log(`PASS ${fixture.profile}/${entry.name} (${actual.fileCount} files${appVersion ? `, app version ${appVersion}` : ''})`);
         }

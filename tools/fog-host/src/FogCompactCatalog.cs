@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -229,6 +229,34 @@ namespace FogHost
         }
     }
 
+    /// <summary>Frozen v2 projection with a Ceaseless arrival inside its verified boss-start trigger.</summary>
+    public sealed class FogCompactCatalogV2
+    {
+        public const string Version = "ds1tr-compact-full-fog-v2";
+        public FogAnnotationCatalog Catalog { get; }
+        public IReadOnlyList<FogCompactCategoryCoverage> Coverage { get; }
+        public IReadOnlyList<FogBossGatedRoute> BossGatedRoutes { get; }
+        public string Fingerprint => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(Version + "\n" + Catalog.Fingerprint))).ToLowerInvariant();
+        public bool IsComplete => Coverage.All(category => category.State == FogCompactCategoryState.Complete);
+
+        internal FogCompactCatalogV2(FogAnnotationCatalog catalog, IEnumerable<FogCompactCategoryCoverage> coverage,
+            IEnumerable<FogBossGatedRoute> bossGatedRoutes)
+        {
+            Catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
+            Coverage = Array.AsReadOnly((coverage ?? throw new ArgumentNullException(nameof(coverage))).ToArray());
+            BossGatedRoutes = Array.AsReadOnly((bossGatedRoutes ?? throw new ArgumentNullException(nameof(bossGatedRoutes))).ToArray());
+        }
+
+        public Annotations CreateFreshCandidateAnnotations() => Catalog.ToFogModAnnotations();
+
+        public FogCompactBackendProjection CreateBackendProjection() => new FogCompactBackendProjection(
+            Version, Fingerprint,
+            Array.AsReadOnly(Catalog.KeyItems
+                .Where(item => !item.Tags.HasFlag(FogKeyItemTags.RandomOnly) && !item.Tags.HasFlag(FogKeyItemTags.Hard))
+                .Select(item => new FogTrackedItemProjection(item.GameItemId.Category, item.GameItemId.ItemId, true)).ToArray()),
+            Array.AsReadOnly(Catalog.LotLocations.Select(lot => lot.FirstLot.Value).ToArray()));
+    }
+
     public sealed record FogTrackedItemProjection(int EquipType, int ItemId, bool Required);
     public sealed record FogCompactBackendProjection(
         string CatalogVersion,
@@ -397,6 +425,140 @@ namespace FogHost
                     "All logical Areas receive a deterministic project map-progression tier with boss and optional classifications retained by GraphConnector."),
             };
             return new FogCompactCatalogV1(catalog, coverage);
+        }
+
+        public static FogCompactCatalogV2 BuildV2(FogDsrFacts facts)
+        {
+            FogCompactCatalogV1 v1 = Build(facts);
+            // Remove V1's unconditioned Ceaseless shortcut. V2 adds back only the direction with
+            // an explicit completion predicate and separately validated same-map route evidence.
+            FogArea[] areas = v1.Catalog.Areas.Select(area =>
+            {
+                if (area.Id.Value != "demonruins_ceaseless" && area.Id.Value != "demonruins_lava") return area;
+                FogAreaLink[] links = (area.To ?? Array.Empty<FogAreaLink>())
+                    .Where(link => !(area.Id.Value == "demonruins_ceaseless" && link.Destination.Value == "demonruins_lava")
+                        && !(area.Id.Value == "demonruins_lava" && link.Destination.Value == "demonruins_ceaseless"))
+                    .ToArray();
+                return area with { To = Array.AsReadOnly(links) };
+            }).ToArray();
+
+            FogBossGatedRoute[] bossGatedRoutes = ResolveV2BossGatedRoutes(facts, v1.Catalog).ToArray();
+            foreach (FogBossGatedRoute route in bossGatedRoutes)
+            {
+                int sourceIndex = Array.FindIndex(areas, area => area.Id == route.Source);
+                if (sourceIndex < 0) throw new InvalidDataException($"Boss-gated route source '{route.Source}' is absent from Compact Fog v2.");
+                FogCondition condition = new FogCondition(FogConditionKind.Atom,
+                    Array.AsReadOnly(new[] { FogConditionReference.BossCompletion(route.CompletionEventId) }));
+                FogArea sourceArea = areas[sourceIndex];
+                areas[sourceIndex] = sourceArea with
+                {
+                    To = Array.AsReadOnly(sourceArea.To.Concat(new[] { new FogAreaLink(route.Destination, condition, FogAreaLinkTags.None) }).ToArray()),
+                };
+            }
+            if (areas.Where(area => area.Id.Value == "demonruins_lava")
+                .Any(area => area.To.Any(link => link.Destination.Value == "demonruins_ceaseless")))
+                throw new InvalidDataException("Compact Fog v2 must not add an unsupported reverse Ceaseless/lava route.");
+
+            FogEntrance[] entrances = v1.Catalog.Entrances.Select(entrance =>
+            {
+                return entrance with
+                {
+                    ASide = BossTriggerCenteredSpawn(entrance.ASide, entrance.ASide?.DestinationMap ?? entrance.Map),
+                    BSide = BossTriggerCenteredSpawn(entrance.BSide, entrance.BSide?.DestinationMap ?? entrance.Map),
+                };
+            }).ToArray();
+            FogEntranceSide ceaselessSide = entrances.Single(entrance => entrance.Name == "o4961_0000").BSide;
+            if (ceaselessSide.Area.Value != "demonruins_ceaseless" || ceaselessSide.BossTrigger != 11410410
+                || ceaselessSide.CustomWarp == null)
+                throw new InvalidDataException("Compact Fog v2 requires the verified Ceaseless boundary and boss-start trigger on the Demon Ruins side.");
+
+            FogBossCompletionTransition[] bossCompletions = ResolveV2BossCompletionTransitions(
+                facts, entrances, bossGatedRoutes.Select(route => route.CompletionEventId).ToHashSet()).ToArray();
+            if (!bossCompletions.Any(transition => transition.EventId == 11410410
+                && transition.EncounterArea.Value == "demonruins_ceaseless"
+                && transition.TriggerEntrance.Value == "o4961_0000"
+                && transition.TriggerRegionEntityId == 1412698))
+                throw new InvalidDataException("Compact Fog v2 requires Ceaseless completion 11410410 to be reachable only through trigger region 1412698 at its centered boss boundary.");
+
+            FogAnnotationCatalog source = v1.Catalog;
+            var catalog = new FogAnnotationCatalog(areas, source.KeyItems, source.Warps, entrances,
+                source.CustomStarts, source.DefaultCosts, source.Enemies, source.LotLocations,
+                source.DefaultFlagCols, source.WriterSupportEntrances, source.LotRows, bossCompletions);
+            return new FogCompactCatalogV2(catalog, v1.Coverage, bossGatedRoutes);
+        }
+
+        private static IReadOnlyList<FogBossGatedRoute> ResolveV2BossGatedRoutes(FogDsrFacts facts, FogAnnotationCatalog baseCatalog)
+        {
+            FogBossGatedRoute[] policies =
+            {
+                new FogBossGatedRoute(new FogAreaId("demonruins_ceaseless"), new FogAreaId("demonruins_lava"), 11410410,
+                    new FogMapId("demonruins"), "h0018B1",
+                    "Owner-reproduced route from the Ceaseless encounter pocket into the lava-side segment; pristine DSR binds collision h0018B1 to Ceaseless completion 11410410. The graph edge is available after that completion only.")
+            };
+            var result = new List<FogBossGatedRoute>();
+            var seen = new HashSet<(FogAreaId, FogAreaId)>();
+            foreach (FogBossGatedRoute policy in policies)
+            {
+                if (!seen.Add((policy.Source, policy.Destination))) throw new InvalidDataException("Duplicate v2 boss-gated physical route.");
+                if (string.IsNullOrWhiteSpace(policy.PhysicalRationale)) throw new InvalidDataException("A v2 boss-gated route must have separate physical evidence.");
+                FogBossAreaTagPolicy boss = FogProjectAnnotationPolicy.BossAreaTagPolicies.SingleOrDefault(candidate =>
+                    candidate.Area == policy.Source && candidate.BossEventId == policy.CompletionEventId && candidate.Map == policy.Map);
+                if (boss == null) throw new InvalidDataException($"Boss-gated route '{policy.Source}' has no matching verified boss completion event {policy.CompletionEventId}.");
+                FogAreaTagPolicy[] resolvedBoss = FogAnnotationPolicyResolver.ResolveBossAreaTagPolicies(facts, new[] { boss }).ToArray();
+                bool hasFlag = facts.BossRewardCompletionFlags.Contains(policy.CompletionEventId);
+                FogDefaultFlagCollision[] collisionFlags = baseCatalog.DefaultFlagCols.Where(flag => flag.Map == policy.Map
+                    && flag.Collision == policy.CompletionCollision && flag.BossFlag == policy.CompletionEventId).ToArray();
+                if (resolvedBoss.Length != 1 || !hasFlag || collisionFlags.Length != 1)
+                    throw new InvalidDataException($"Boss-gated route '{policy.Source}' -> '{policy.Destination}' has no unique pristine completion-flag proof for event {policy.CompletionEventId}.");
+                FogMapId sourceMap = FogProjectAnnotationPolicy.ResolveAreaMap(policy.Source);
+                FogMapId destinationMap = FogProjectAnnotationPolicy.ResolveAreaMap(policy.Destination);
+                if (sourceMap != policy.Map || destinationMap != policy.Map || !facts.Maps[policy.Map].Collisions.Contains(policy.CompletionCollision))
+                    throw new InvalidDataException($"Boss-gated route '{policy.Source}' -> '{policy.Destination}' lacks the authored same-map physical route anchor '{policy.Map}/{policy.CompletionCollision}'.");
+                result.Add(policy);
+            }
+            return Array.AsReadOnly(result.ToArray());
+        }
+
+        private static IReadOnlyList<FogBossCompletionTransition> ResolveV2BossCompletionTransitions(
+            FogDsrFacts facts, FogEntrance[] entrances, IReadOnlySet<int> requiredCompletionEvents)
+        {
+            var result = new List<FogBossCompletionTransition>();
+            foreach (FogProjectEntranceResolution resolution in FogAnnotationPolicyResolver.ResolveEntrancePoliciesV1(facts)
+                .Where(value => value.Policy.Kind == FogProjectEntranceKind.BossBoundary
+                    && requiredCompletionEvents.Contains(checked((int)value.BossTriggerEventId))))
+            {
+                FogBossAreaTagPolicy boss = FogProjectAnnotationPolicy.BossAreaTagPolicies.Single(value => value.Area == resolution.Policy.DestinationArea);
+                if (resolution.BossTriggerEventId != boss.BossEventId || resolution.BossTriggerArea == null
+                    || !facts.BossRewardCompletionFlags.Contains(checked((int)boss.BossEventId)))
+                    throw new InvalidDataException($"Boss completion {boss.BossEventId} has no matched trigger and common event-970 completion fact.");
+                FogEntrance entrance = entrances.Single(value => value.Name == resolution.ResolvedObjectPartName);
+                FogEntranceSide side = new[] { entrance.ASide, entrance.BSide }
+                    .Single(value => value.Area == resolution.Policy.DestinationArea && value.BossTrigger == boss.BossEventId);
+                if (side.CustomWarp == null || side.BossTriggerArea == null
+                    || side.CustomWarp.Position.X != side.BossTriggerArea.X || side.CustomWarp.Position.Y != side.BossTriggerArea.Y
+                    || side.CustomWarp.Position.Z != side.BossTriggerArea.Z || side.CustomWarp.Position.Yaw != side.BossTriggerArea.Yaw)
+                    throw new InvalidDataException($"Boss completion {boss.BossEventId} is not reachable from a trigger-centered arrival.");
+                result.Add(new FogBossCompletionTransition(checked((int)boss.BossEventId), boss.Area,
+                    new FogEntranceKey(resolution.ResolvedObjectPartName), resolution.Policy.Map,
+                    resolution.Policy.BossTriggerRegionEntityId.Value));
+            }
+            return Array.AsReadOnly(result.ToArray());
+        }
+
+        private static FogEntranceSide BossTriggerCenteredSpawn(FogEntranceSide side, FogMapId map)
+        {
+            if (side == null || side.BossTrigger == 0) return side;
+            FogTriggerVolume trigger = side.BossTriggerArea
+                ?? throw new InvalidDataException($"Compact Fog v2 boss side '{side.Area}' has a trigger event but no verified trigger volume.");
+            if (string.IsNullOrWhiteSpace(map.Value))
+                throw new InvalidDataException($"Compact Fog v2 boss side '{side.Area}' has no verified destination map.");
+            // FogMod's ordinary offset can place an arrival outside the region checked by the
+            // encounter event. Anchor all randomized boss-side arrivals to the verified trigger.
+            return side with
+            {
+                CustomWarp = new FogCustomWarp(map,
+                    new FogPosition(trigger.X, trigger.Y, trigger.Z, trigger.Yaw)),
+            };
         }
 
         private static FogWriterSupportEntrance[] ResolveWriterSupportEntrances(FogDsrFacts facts)

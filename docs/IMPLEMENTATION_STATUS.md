@@ -1,5 +1,100 @@
 # Implementation status
 
+## Compact Fog V2 / ds1tr-gen-v5 boss progression (2026-10-21; development only)
+
+The owner-approved Path A now represents Ceaseless completion as a typed
+V5-only graph condition. The Compact Fog V2 route
+`demonruins_ceaseless -> demonruins_lava` requires
+`boss_defeated_11410410`; the reverse edge is removed. Visiting the Area alone
+does not unlock the route. V5's graph checker adds that completion state only
+when a generated directed Entrance reaches the registered boss side, exact
+trigger map/region and centered custom spawn. This is a reachability model, not
+a combat simulator.
+
+The reproduced Asylum-to-Ceaseless arrival uses Entrance `o4961_0000` and lands
+at the center of region `1412698` in `m14_01_00_00`; pristine encounter event
+`11415371` checks that region. The old spawn was outside the trigger volume.
+This provides a trigger-safe arrival mechanism; no gameplay launch is claimed.
+
+Pristine event `11410090` is classified as a dormant/unreferenced,
+non-randomizable system script. It contains two parameter-bound `2004[41]`
+short-warp requests whose destination argument is placeholder zero, plus two
+parameter-bound `3[18]` action checks. A scan across every pristine EMEVD
+archive found no `InitializeEvent` or `InitializeEventNoSkip` caller, so there
+is no executable call site to resolve source, destination, direction, or
+prerequisite. It supplies no Ceaseless route evidence. Upstream FogMod at
+`6e6dc7886d0f8bcc53c1800d95c9e859d1f2f87f` was used only to compare its Area
+condition, Entrance record, graph solver and writer behavior; no upstream
+annotation data was copied.
+
+The profile is `ds1tr-gen-v5`, with “Compact Fog V2” identifying its catalog
+generation. V5 remains unpromoted: `CURRENT_GENERATION_PROFILE` stays v4 and
+v1-v4 behavior remains frozen.
+
+Baseline ToTG comparison used the same .NET SDK 8.0.425, pinned FogMod data
+root and read-only QA DSR source. Baseline v4 FogHost suite: **117 passed, 0
+failed**. V5 initially exposed a test-porting error in two Japanese region-name
+literals; after restoring those literals, the V5 suite passed **118/118**,
+including the ToTG anchor check. This is not a V5 product regression.
+
+### V5 golden provenance recovery and final verification (2026-10-21)
+
+- Recovered the original support package at
+  `%TEMP%\ds1tr-v5-support-1d78a3dba8d540769a501fc03e20fda8\v2\staging`;
+  all **55/55** expected hashes match the old fixture. The adjacent request
+  and response identify FogHost 0.7.0, FogMod commit
+  `6e6dc7886d0f8bcc53c1800d95c9e859d1f2f87f`, old annotation fingerprint
+  `77ab12f68523a83d4a77f28d34d9b34b9658df2f96720bb75e5a43dc5c2abab9`,
+  master seed `332055808`, and Fog seed `4009337993`.
+- Semantic comparison against current V5 output found exactly 24
+  `Parts.Enemies.NPCParamID` changes across four MSBs: 8 in `m13_01`, 7 in
+  `m13_02`, 1 in `m15_00`, and 8 in `m17_00`. No object, region, collision,
+  ConnectCollision, transform, entity ID, or event-related field differs.
+  GameParam differences are confined to `GameAreaParam` and `NpcParam`
+  scaling/reward data. Thus the old package carries earlier enemy parameter
+  assignment/scaling output; it does not carry a different Fog route or
+  arrival geometry. Current V5 uses project catalog fingerprint
+  `701f5aa84085ac2361bee382c43a05c4813e11878fac8a462dd1341a859a1d7a` and
+  world-data id `221c01fa780daba7`.
+- Classification: **STALE DEVELOPMENT FIXTURE**. V5 was never promoted or
+  published, and the old projection differs from the final isolated V5
+  projection. The recovered old package was compared semantically; the final
+  output is based on current project-owned policy and passes the route,
+  arrival, and real-format checks below. The old fixture copy is retained in
+  `%TEMP%` for audit. No v1-v4 fixture was changed.
+- The standard golden recorder now encodes the declared fixture profile in
+  its Seed Code. This permits a development V5 recording while
+  `CURRENT_GENERATION_PROFILE` remains v4; it changes no runtime default.
+- The replacement fixture was recorded through
+  `goldenCompatibility.mjs record ds1tr-gen-v5 compact-fog`:
+  `v5-support-reproduction` is 55 files, digest
+  `4ff13748e6c52ac10b845c6dfb9ba2c253dff8387fb70e5c493627b4a5cdfc34`,
+  Fog seed `4009337993`; `v5-compact-full-triple` is 73 files, digest
+  `c70b79d3fe7333b83ba7250babf78237d8a1c13d0d8067f95f2a16367c2f6024`,
+  Fog seed `2366392824`. Both succeeded on attempt 0. Two independent
+  Seed-Code verification passes regenerated both cases and matched their
+  complete package hashes.
+- The full Items + Enemies + Fog case also regenerated twice before
+  re-recording (73/73 files each time). Compact Fog's 17-configuration
+  real-format matrix passed 17/17; its support reproduction and deterministic
+  rerun checks passed. The Ceaseless route requires
+  `boss_defeated_11410410`; visiting its Area alone does not unlock the lava
+  route. Arrival is centered at `(248.5, -284, 69.7)` in region `1412698`,
+  which event `11415371` checks. Event `11410090` remains unreferenced and is
+  not used as route evidence.
+- FogHost was freshly Release-built with .NET SDK 8.0.425 (0 warnings, 0
+  errors). The real-data test suite passed **149/149** using the read-only QA
+  DSR root and verified Fog data. The separate baseline support-bundle fix is
+  commit `eaa8b680a322537b5991160ced790e34a90f602d`; no changes were made to
+  the original dirty reference worktree.
+- Final root typecheck passed for contracts, backend, desktop renderer, and
+  Electron main. Full backend suite: **615 total, 613 passed, 0 failed, 2
+  skipped**. Golden profile/Seed-Code tests passed; the optional in-test real
+  regeneration remains skipped because the dedicated Seed-Code runs above
+  already verified both V5 fixtures twice.
+- V5 remains development-only and unpromoted. `CURRENT_GENERATION_PROFILE`
+  remains `ds1tr-gen-v4`; no version bump, tag, release, or publish was made.
+
 ## Skill Issue Mode local starting loadout (2026-10-20)
 
 The former default-off post-generation loadout is now a normal local convenience switch in **Your game**, named **Skill Issue Mode / Tryb Skill Issue**. Electron persists it in `userData/settings.json` (absent means off); a narrow renderer-to-main IPC setting is sent with each generation request as `localGameplay.skillIssueMode`, outside `RandomizerConfig`. It takes effect without restarting. The existing internal `DS1TR_OWNER_QA_LOADOUT=1` override remains available. The manifest retains the separate `ownerQaLoadout: true` diagnostic marker. The canonical starting-class stats/equipment/weapon options remain stored unchanged, with an on-screen note that the resulting starting character is locally overridden.

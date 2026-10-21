@@ -1,5 +1,38 @@
 # Decisions
 
+## Compact Fog V2 uses explicit boss-completion progression in profile v5 (2026-10-21; unpromoted)
+
+The owner selected Path A: represent boss completion as a typed V5-only graph
+condition rather than restore the unconditional Ceaseless/lava shortcut or
+reject ordinary Fog combinations. The Compact Fog V2 route
+`demonruins_ceaseless -> demonruins_lava` requires
+`boss_defeated_11410410`; the reverse edge is absent. The condition is backed
+by the project-owned boss event identity, pristine event-970 completion-flow
+facts, and the independently evidenced physical-route policy. A
+`DefaultFlagCols` collision mapping does not create a route by itself.
+
+The checker keeps boss completion distinct from Area and item visitation. It
+derives an encounter opportunity only when a generated directed Entrance edge
+reaches the exact boss event/entrance/trigger side at the verified centered
+spawn. This is a reachability assumption that an accessible encounter can be
+defeated, not a combat simulation; the game sets the real completion flag on
+boss death. For the reproduced Ceaseless arrival, Entrance `o4961_0000` targets
+the center of trigger region `1412698` in map `m14_01_00_00`, which event
+`11415371` checks.
+
+This policy is assigned only to development profile `ds1tr-gen-v5`;
+`CURRENT_GENERATION_PROFILE` remains v4. Profiles v1-v4 and their generated
+behavior remain frozen. “Compact Fog V2” names the catalog/policy generation;
+it is not the historical profile `ds1tr-gen-v2`.
+
+Pristine event `11410090` was classified as an unreferenced, non-randomizable
+system script, not evidence for a Ceaseless route. It has parameter-bound
+short-warp operations but no `InitializeEvent`/`InitializeEventNoSkip` caller
+in any pristine DSR EMEVD archive; the target fields are placeholders and no
+runtime source/destination can be resolved. The actual encounter-start event
+is `11415371`. Upstream FogMod records were comparison-only and did not define
+the V5 policy. Details and evidence are in `docs/COMPACT_FULL_FOG_V2.md`.
+
 ## Skill Issue Mode is a local post-generation convenience
 
 Date: 2026-10-20

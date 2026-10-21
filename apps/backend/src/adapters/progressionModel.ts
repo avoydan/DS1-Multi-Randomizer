@@ -10,19 +10,21 @@ import type { FogPrerequisites } from './fogPrerequisites.js';
  * There is one model; this file never interprets it.
  */
 export const PROGRESSION_MODEL_FORMAT = 'ds1tr-progression-model-1';
+export const BOSS_PROGRESSION_MODEL_FORMAT = 'ds1tr-progression-model-2';
 
 /** The model variants: the vanilla world graph, and (Race Mode +) the vanilla graph plus the skips of the legacy list that FogMod models (docs/RACE_MODE.md). */
 export type ProgressionModelVariant = 'vanilla' | 'race-plus';
 
 export interface ProgressionModel {
-  format: typeof PROGRESSION_MODEL_FORMAT;
+  format: typeof PROGRESSION_MODEL_FORMAT | typeof BOSS_PROGRESSION_MODEL_FORMAT;
   /** Absent in a model exported before the variants existed: that is the vanilla graph. */
   variant?: ProgressionModelVariant;
   fogModCommit: string;
   annotationSha256: string;
   start: string;
   areas: string[];
-  edges: Array<{ from: string; to: string; when: unknown }>;
+  edges: Array<{ from: string; to: string; when: unknown; bossCompletion?: string }>;
+  bossCompletions?: Array<{ name: string; eventId: number; area: string; triggerEntrance: string; triggerMap: string; triggerRegionEntityId: number }>;
   keys: Array<{ name: string; id: string; area: string; tags: string[] }>;
   lotAreas: Record<string, string>;
   optionalAreas: string[];
@@ -37,12 +39,14 @@ const expectedLegacyAnnotationSha256 = worldDataManifest.find((entry) => entry.p
 
 export const KEY_PLACEMENT_MODEL_MESSAGE = 'Key placement needs the world data of the fog randomizer, which could not be prepared. Click Generate world again, or turn Key placement off.';
 
-function isModel(value: unknown, variant: ProgressionModelVariant, expectedAnnotationSha256: string): value is ProgressionModel {
+function isModel(value: unknown, variant: ProgressionModelVariant, expectedAnnotationSha256: string, annotationSource: string): value is ProgressionModel {
   if (!value || typeof value !== 'object') return false;
   const model = value as Partial<ProgressionModel>;
-  return model.format === PROGRESSION_MODEL_FORMAT && (model.variant ?? 'vanilla') === variant && model.fogModCommit === worldDataSourceCommit && model.annotationSha256 === expectedAnnotationSha256
+  const expectedFormat = annotationSource === 'compact-v2' ? BOSS_PROGRESSION_MODEL_FORMAT : PROGRESSION_MODEL_FORMAT;
+  return model.format === expectedFormat && (model.variant ?? 'vanilla') === variant && model.fogModCommit === worldDataSourceCommit && model.annotationSha256 === expectedAnnotationSha256
     && Array.isArray(model.areas) && Array.isArray(model.edges) && Array.isArray(model.keys) && typeof model.lotAreas === 'object' && model.lotAreas !== null
-    && typeof model.start === 'string' && typeof model.prison === 'object';
+    && typeof model.start === 'string' && typeof model.prison === 'object'
+    && (expectedFormat !== BOSS_PROGRESSION_MODEL_FORMAT || Array.isArray(model.bossCompletions));
 }
 
 export type HostRunner = (executable: string, args: string[]) => Promise<{ code: number; stderr: string }>;
@@ -60,18 +64,19 @@ export async function loadProgressionModel(
   variant: ProgressionModelVariant = 'vanilla',
 ): Promise<ProgressionModelResult> {
   const annotationSource = prerequisites.annotationSource ?? 'legacy-fogmod';
-  const expectedAnnotationSha256 = annotationSource === 'compact-v1'
+  const compact = annotationSource !== 'legacy-fogmod';
+  const expectedAnnotationSha256 = compact
     ? prerequisites.compactProjection?.catalogFingerprint
     : expectedLegacyAnnotationSha256;
   if (!expectedAnnotationSha256) return failure('The selected fog annotation source has no verified identity.');
-  if (annotationSource === 'compact-v1' && !prerequisites.pristineGameDirectory)
+  if (compact && !prerequisites.pristineGameDirectory)
     return failure('The Compact progression model requires the verified pristine game directory.');
   // One cache file per variant: a vanilla model is never served for Race Mode + (or the reverse). The vanilla name is the one of every earlier version.
-  const suffix = `${annotationSource === 'compact-v1' ? '.compact-v1' : ''}${variant === 'vanilla' ? '' : `.${variant}`}`;
+  const suffix = `${compact ? `.${annotationSource}` : ''}${variant === 'vanilla' ? '' : `.${variant}`}`;
   const cacheFile = path.join(path.dirname(prerequisites.dataRoot), `${path.basename(prerequisites.dataRoot)}${suffix}.progression-model.json`);
   try {
     const cached = JSON.parse(await readFile(cacheFile, 'utf8')) as unknown;
-    if (isModel(cached, variant, expectedAnnotationSha256)) return { ok: true, model: cached, fromCache: true };
+    if (isModel(cached, variant, expectedAnnotationSha256, annotationSource)) return { ok: true, model: cached, fromCache: true };
   } catch { /* no usable cache: export it */ }
   const temporary = `${cacheFile}.${process.pid}.tmp`;
   try {
@@ -79,7 +84,7 @@ export async function loadProgressionModel(
     const outcome = await run(prerequisites.progressionModelExecutablePath || prerequisites.executablePath, [
       'progression-model', '--data-root', prerequisites.dataRoot,
       '--annotation-source', annotationSource,
-      ...(annotationSource === 'compact-v1' ? [
+      ...(compact ? [
         '--pristine-root', prerequisites.pristineGameDirectory!,
         '--expected-annotation-fingerprint', expectedAnnotationSha256,
       ] : []),
@@ -88,7 +93,7 @@ export async function loadProgressionModel(
     ]);
     if (outcome.code !== 0) return failure(`FogHost progression-model exited with ${outcome.code}: ${outcome.stderr.trim().slice(0, 400)}`);
     const exported = JSON.parse(await readFile(temporary, 'utf8')) as unknown;
-    if (!isModel(exported, variant, expectedAnnotationSha256)) return failure('The exported progression model does not match the pinned world data.');
+    if (!isModel(exported, variant, expectedAnnotationSha256, annotationSource)) return failure('The exported progression model does not match the pinned world data.');
     await writeFile(temporary, `${JSON.stringify(exported)}\n`);
     await rename(temporary, cacheFile);
     return { ok: true, model: exported, fromCache: false };

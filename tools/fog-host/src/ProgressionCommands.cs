@@ -21,15 +21,15 @@ namespace FogHost
     /// visited); <c>progression-check</c> asks FogMod's own <c>ItemReader</c> and <c>GraphChecker</c> the same question on a real staged
     /// game tree, which is how the engine's evaluation is cross-checked and how every generated package is validated.
     ///
-    /// <c>FogHost progression-model --data-root &lt;dir&gt; --annotation-source &lt;legacy-fogmod|compact-v1&gt; --out &lt;model.json&gt;</c>
+    /// <c>FogHost progression-model --data-root &lt;dir&gt; --annotation-source &lt;legacy-fogmod|compact-v1|compact-v2&gt; --out &lt;model.json&gt;</c>
     /// <c>FogHost progression-check --data-root &lt;dir&gt; (--game &lt;staged tree&gt; | --assign &lt;key areas.json&gt;) --out &lt;result.json&gt;</c>
     ///
-    /// These commands never write game data and never change what <c>generate</c> does: the generation behaviour version
-    /// (<see cref="Program.HostVersion"/>) is unchanged, so every existing generation profile still matches.
+    /// These commands never write game data. Generation behavior is selected by the request's pinned annotation source.
     /// </summary>
     public static class ProgressionCommands
     {
         public const string ModelFormat = "ds1tr-progression-model-1";
+        public const string BossProgressionModelFormat = "ds1tr-progression-model-2";
 
         /// <summary>The vanilla rules: nothing randomized, the Kiln needs the four Lord Soul items. Anything else is a different world.</summary>
         private static readonly string[] VanillaFlags = { "lords" };
@@ -92,9 +92,10 @@ namespace FogHost
             {
                 root = Path.GetFullPath(root);
                 output = Path.GetFullPath(output);
-            if (annotationSource != HostRequest.LegacyFogModAnnotations && annotationSource != HostRequest.CompactAnnotations)
-                throw new FogHostException(HostErrors.RequestInvalid, "--annotation-source must be legacy-fogmod or compact-v1.");
-            if (annotationSource == HostRequest.CompactAnnotations
+            if (annotationSource != HostRequest.LegacyFogModAnnotations && annotationSource != HostRequest.CompactAnnotations && annotationSource != HostRequest.CompactV2Annotations)
+                throw new FogHostException(HostErrors.RequestInvalid, "--annotation-source must be legacy-fogmod, compact-v1 or compact-v2.");
+            bool compact = annotationSource != HostRequest.LegacyFogModAnnotations;
+            if (compact
                 && (string.IsNullOrWhiteSpace(pristineRoot) || !Regex.IsMatch(expectedFingerprint ?? string.Empty, "^[a-f0-9]{64}$", RegexOptions.CultureInvariant)))
                 throw new FogHostException(HostErrors.RequestInvalid, "Compact progression models require --pristine-root and a lowercase --expected-annotation-fingerprint.");
             DataRoot.Verify(root, includeLegacyAnnotations: annotationSource == HostRequest.LegacyFogModAnnotations);
@@ -135,7 +136,17 @@ namespace FogHost
             if (variant == "race-plus") opt["hard"] = true;
             Annotations ann;
             string annotationHash;
-            if (annotationSource == HostRequest.CompactAnnotations)
+            if (annotationSource == HostRequest.CompactV2Annotations)
+            {
+                FogCompactCatalogV2 compact = FogCompactCatalogBuilder.BuildV2(
+                    FogDsrFacts.Read(root, Path.GetFullPath(pristineRoot), includeLegacyAnnotations: false));
+                if (!compact.IsComplete) throw new FogHostException(HostErrors.EngineFailed, "Compact annotation coverage is incomplete.");
+                if (!string.Equals(compact.Fingerprint, expectedFingerprint, StringComparison.Ordinal))
+                    throw new FogHostException(HostErrors.RequestInvalid, "The Compact annotation fingerprint does not match the generation profile.");
+                ann = compact.CreateFreshCandidateAnnotations();
+                annotationHash = compact.Fingerprint;
+            }
+            else if (annotationSource == HostRequest.CompactAnnotations)
             {
                 FogCompactCatalogV1 compact = FogCompactCatalogBuilder.Build(
                     FogDsrFacts.Read(root, Path.GetFullPath(pristineRoot), includeLegacyAnnotations: false));
@@ -172,7 +183,7 @@ namespace FogHost
             using (var json = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = false }))
             {
                 json.WriteStartObject();
-                json.WriteString("format", ModelFormat);
+                json.WriteString("format", ann.BossCompletions.Count == 0 ? ModelFormat : BossProgressionModelFormat);
                 json.WriteString("fogModCommit", DataRoot.FogModCommit);
                 json.WriteString("annotationSha256", annotationHash);
                 json.WriteString("variant", variant);
@@ -189,28 +200,48 @@ namespace FogHost
                 json.WriteEndArray();
                 // Every traversable edge once, with the condition FogMod's checker evaluates (LinkedExpr).
                 var seen = new HashSet<string>();
-                var edges = new List<(string From, string To, string Expr, string Skip)>();
+                var edges = new List<(string From, string To, string Expr, string Skip, string BossCompletion)>();
                 foreach (Graph.Node node in graph.graph.Values)
                 {
                     foreach (Graph.Edge edge in node.To)
                     {
                         if (edge.To == null) throw new FogHostException(HostErrors.EngineFailed, $"The vanilla graph has an unconnected edge leaving {node.Area}.");
                         string expr = edge.LinkedExpr == null ? "true" : edge.LinkedExpr.ToString();
-                        if (seen.Add($"{node.Area}>{edge.To}>{expr}")) edges.Add((node.Area, edge.To, expr, SkipOf(edge)));
+                        string bossCompletion = ann.BossCompletions
+                            .SingleOrDefault(completion => GraphChecker.IsBossCompletionTriggerEdge(edge, completion))?.Name;
+                        if (seen.Add($"{node.Area}>{edge.To}>{expr}>{bossCompletion}"))
+                            edges.Add((node.Area, edge.To, expr, SkipOf(edge), bossCompletion));
                     }
                 }
                 json.WriteStartArray("edges");
-                foreach ((string from, string to, string expr, string skip) in edges.OrderBy(e => e.From, StringComparer.Ordinal).ThenBy(e => e.To, StringComparer.Ordinal).ThenBy(e => e.Expr, StringComparer.Ordinal))
+                foreach ((string from, string to, string expr, string skip, string bossCompletion) in edges.OrderBy(e => e.From, StringComparer.Ordinal).ThenBy(e => e.To, StringComparer.Ordinal).ThenBy(e => e.Expr, StringComparer.Ordinal))
                 {
                     json.WriteStartObject();
                     json.WriteString("from", from);
                     json.WriteString("to", to);
                     if (skip != null) json.WriteString("skip", skip);
+                    if (bossCompletion != null) json.WriteString("bossCompletion", bossCompletion);
                     json.WritePropertyName("when");
                     ExprJson.Write(json, expr);
                     json.WriteEndObject();
                 }
                 json.WriteEndArray();
+                if (ann.BossCompletions.Count > 0)
+                {
+                    json.WriteStartArray("bossCompletions");
+                    foreach (BossCompletionRule completion in ann.BossCompletions.OrderBy(value => value.EventId))
+                    {
+                        json.WriteStartObject();
+                        json.WriteString("name", completion.Name);
+                        json.WriteNumber("eventId", completion.EventId);
+                        json.WriteString("area", completion.Area);
+                        json.WriteString("triggerEntrance", completion.TriggerEntrance);
+                        json.WriteString("triggerMap", completion.TriggerMap);
+                        json.WriteNumber("triggerRegionEntityId", completion.TriggerRegionEntityId);
+                        json.WriteEndObject();
+                    }
+                    json.WriteEndArray();
+                }
                 json.WriteStartArray("keys");
                 foreach (Item key in ann.KeyItems)
                 {

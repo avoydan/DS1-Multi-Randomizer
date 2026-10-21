@@ -18,6 +18,8 @@ export const GENERATION_PROFILE_V2 = 'ds1tr-gen-v2';
 export const GENERATION_PROFILE_V3 = 'ds1tr-gen-v3';
 /** Owner-approved roaming-boss fit behavior, with all earlier profiles kept byte-compatible. */
 export const GENERATION_PROFILE_V4 = 'ds1tr-gen-v4';
+/** Development-only Compact Fog boss-completion model; promotion is gated on the full v5 proof matrix. */
+export const GENERATION_PROFILE_V5 = 'ds1tr-gen-v5';
 /** The profile new runs use. A later profile may replace it here; older profiles stay runnable. */
 export const CURRENT_GENERATION_PROFILE = GENERATION_PROFILE_V4;
 

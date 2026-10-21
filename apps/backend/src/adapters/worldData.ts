@@ -14,7 +14,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { copyFile, mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { COMPACT_FOG_CATALOG_FINGERPRINT, COMPACT_FOG_CATALOG_VERSION } from './compactFogProjection.js';
+import { COMPACT_FOG_CATALOG_V1_FINGERPRINT, COMPACT_FOG_CATALOG_V1_VERSION, COMPACT_FOG_CATALOG_V2_FINGERPRINT, COMPACT_FOG_CATALOG_V2_VERSION } from './compactFogProjection.js';
 
 export const worldDataSourceCommit = '6e6dc7886d0f8bcc53c1800d95c9e859d1f2f87f';
 export const worldDataBaseUrl = `https://raw.githubusercontent.com/thefifthmatt/FogMod/${worldDataSourceCommit}/`;
@@ -153,7 +153,10 @@ export const compactRuntimeWorldDataManifest = worldDataManifest
     return reconstructed ? { ...entry, ...reconstructed, origin: 'reconstructed' as const } : entry;
   });
 export const compactRuntimeWorldDataId = createHash('sha256')
-  .update(`${COMPACT_FOG_CATALOG_VERSION}\n${COMPACT_FOG_CATALOG_FINGERPRINT}\n${compactReconstructionVersion}\n${worldDataSourceCommit}\n${compactRuntimeWorldDataManifest.map((entry) => `${entry.path}:${entry.sha256}`).join('\n')}`)
+  .update(`${COMPACT_FOG_CATALOG_V1_VERSION}\n${COMPACT_FOG_CATALOG_V1_FINGERPRINT}\n${compactReconstructionVersion}\n${worldDataSourceCommit}\n${compactRuntimeWorldDataManifest.map((entry) => `${entry.path}:${entry.sha256}`).join('\n')}`)
+  .digest('hex').slice(0, 16);
+export const compactRuntimeWorldDataV2Id = createHash('sha256')
+  .update(`${COMPACT_FOG_CATALOG_V2_VERSION}\n${COMPACT_FOG_CATALOG_V2_FINGERPRINT}\n${compactReconstructionVersion}\n${worldDataSourceCommit}\n${compactRuntimeWorldDataManifest.map((entry) => `${entry.path}:${entry.sha256}`).join('\n')}`)
   .digest('hex').slice(0, 16);
 
 export function hashWorldDataContent(bytes: Uint8Array, text: boolean): string {

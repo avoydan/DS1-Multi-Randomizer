@@ -17,6 +17,7 @@ namespace FogHost
         public const int SchemaVersion = 3;
         public const string LegacyFogModAnnotations = "legacy-fogmod";
         public const string CompactAnnotations = "compact-v1";
+        public const string CompactV2Annotations = "compact-v2";
 
         /// <summary>Contract option key -> FogMod option flag (docs/FOGHOST_INTEGRATION.md).</summary>
         public static readonly IReadOnlyList<(string Key, string Flag)> OptionFlags = new[]
@@ -117,9 +118,9 @@ namespace FogHost
                     ExpectedAnnotationFingerprint = String(root, "expectedAnnotationFingerprint"),
                 };
 
-                if (request.AnnotationSource != LegacyFogModAnnotations && request.AnnotationSource != CompactAnnotations)
-                    throw Invalid($"request.annotationSource must be \"{LegacyFogModAnnotations}\" or \"{CompactAnnotations}\".");
-                if (request.AnnotationSource == CompactAnnotations && !Sha256.IsMatch(request.ExpectedAnnotationFingerprint))
+                if (request.AnnotationSource != LegacyFogModAnnotations && request.AnnotationSource != CompactAnnotations && request.AnnotationSource != CompactV2Annotations)
+                    throw Invalid($"request.annotationSource must be \"{LegacyFogModAnnotations}\", \"{CompactAnnotations}\" or \"{CompactV2Annotations}\".");
+                if (request.AnnotationSource != LegacyFogModAnnotations && !Sha256.IsMatch(request.ExpectedAnnotationFingerprint))
                     throw Invalid("request.expectedAnnotationFingerprint must be a lowercase SHA-256 for Compact annotations.");
                 if (request.AnnotationSource == LegacyFogModAnnotations && request.ExpectedAnnotationFingerprint.Length != 0)
                     throw Invalid("request.expectedAnnotationFingerprint must be empty for legacy FogMod annotations.");

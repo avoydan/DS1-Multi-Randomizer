@@ -5,6 +5,7 @@ using YamlDotNet.Serialization;
 using static FogMod.Util;
 using static FogMod.Graph;
 
+// Modified from FogMod commit 6e6dc7886d0f8bcc53c1800d95c9e859d1f2f87f by DS1 Multi Randomizer contributors under Apache-2.0; see ../UPSTREAM_PIN.md.
 namespace FogMod
 {
     public class AnnotationData
@@ -24,6 +25,18 @@ namespace FogMod
             [YamlIgnore]
             public Dictionary<int, string> CompactLotLocations { get; set; }
             public Dictionary<string, int> DefaultFlagCols { get; set; }
+            /// <summary>FogHost-only v5 progression facts; never serialized into FogMod YAML or game output.</summary>
+            [YamlIgnore]
+            public List<BossCompletionRule> BossCompletions { get; set; } = new List<BossCompletionRule>();
+        }
+        public class BossCompletionRule
+        {
+            public string Name { get; set; }
+            public string Area { get; set; }
+            public int EventId { get; set; }
+            public string TriggerEntrance { get; set; }
+            public string TriggerMap { get; set; }
+            public int TriggerRegionEntityId { get; set; }
         }
         public class ConfigAnnotation
         {

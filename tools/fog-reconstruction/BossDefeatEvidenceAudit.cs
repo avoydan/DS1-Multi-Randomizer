@@ -50,8 +50,8 @@ namespace FogReconstruction
             if (repositoryRoot != null && IsWithin(repositoryRoot, output))
                 throw new InvalidOperationException("Boss evidence report must be written outside the repository.");
 
-            DataRoot.Verify(dataRoot);
-            FogDsrFacts facts = FogDsrFacts.Read(dataRoot, pristineGameRoot);
+            DataRoot.Verify(dataRoot, includeLegacyAnnotations: false);
+            FogDsrFacts facts = FogDsrFacts.Read(dataRoot, pristineGameRoot, includeLegacyAnnotations: false);
             if (facts.EventFactSource != FogDsrEventFactSource.PristineGameInstall)
                 throw new InvalidOperationException("Boss area evidence requires EMEVD facts from the byte-verified clean DSR installation.");
 

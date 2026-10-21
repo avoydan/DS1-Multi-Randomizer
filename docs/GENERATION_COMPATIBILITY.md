@@ -16,19 +16,19 @@ deterministic behavior that turns *(master seed, canonical settings)* into a wor
 
 ## What a profile freezes (`apps/backend/src/core/generationProfiles.ts`)
 
-| Component | `ds1tr-gen-v1` | `ds1tr-gen-v2` | `ds1tr-gen-v3` | `ds1tr-gen-v4` |
+| Component | `ds1tr-gen-v1` | `ds1tr-gen-v2` | `ds1tr-gen-v3` | `ds1tr-gen-v4` | `ds1tr-gen-v5` |
 |---|---|---|---|---|
 | Seed derivation | `seed-derivation-v1`: named streams from `SHA256("ds1-triple-randomizer:v1" ...)`, retry attempts included | same | same | same |
 | Retry bounds | combined engine 3 attempts, Fog 5 attempts (every attempt draws different seeds, so the bounds are semantics) | same | same | same |
 | Combined engine (items, enemies, bosses) | `RANDOMIZER_VERSION` `0.5.66`, roaming destination policy `protected-v1` | `RANDOMIZER_VERSION` `0.5.66`, roaming destination policy `safe-handlers-v2` | same as v2 | same as v2 |
 | Roaming-boss candidate and fit behavior | historical `legacy-v1` | historical `legacy-v1` | historical `legacy-v1` | owner-approved `owner-approved-v1` |
-| World randomizer | FogHost `0.5.0`, FogMod commit `6e6dc7886d0f8bcc53c1800d95c9e859d1f2f87f`, world data id `f394fa536ba9b66d` | same | FogHost `0.6.0`, Compact catalog `ds1tr-compact-full-fog-v1` fingerprint `8c03fd3de1cd7c772d5c933753ae54eab35f9e8b70a1aef2954322330d0002d4`, world data id `compact-runtime-offline-v1` | same as v3 |
-| Item tracking for the world randomizer | `fog-item-tracking-v1` (`docs/FOG_ITEM_TRACKING.md`) | same | `compact-fog-item-tracking-v1` | same as v3 |
+| World randomizer | FogHost `0.5.0`, FogMod commit `6e6dc7886d0f8bcc53c1800d95c9e859d1f2f87f`, world data id `f394fa536ba9b66d` | same | FogHost `0.6.0`, Compact catalog `ds1tr-compact-full-fog-v1` fingerprint `8c03fd3de1cd7c772d5c933753ae54eab35f9e8b70a1aef2954322330d0002d4`, world data id `compact-runtime-offline-v1` | same as v3 | FogHost `0.7.0`, Compact catalog `ds1tr-compact-full-fog-v2` fingerprint `701f5aa84085ac2361bee382c43a05c4813e11878fac8a462dd1341a859a1d7a`, world data id `221c01fa780daba7` |
+| Item tracking for the world randomizer | `fog-item-tracking-v1` (`docs/FOG_ITEM_TRACKING.md`) | same | `compact-fog-item-tracking-v1` | same as v3 | same as v4 |
 | Settings completion | `completeSettings`: options added after the profile get the value that reproduces the profile's behavior | same | same | same |
 
 `ds1tr-gen-v1` is the behavior of desktop 0.16.1 / backend 0.29.1 / contracts 0.12.0.
 
-`ds1tr-gen-v2` preserves the audited roaming-boss destination handling described below. `ds1tr-gen-v3` added the independent Compact Fog catalog, offline reconstructed data, and required-only backend Fog item constraints. `ds1tr-gen-v4` is current for new runs and adds the owner-approved roaming-boss fit and candidate behavior while retaining the exact Compact Fog contract from v3. Profiles v1 through v3 explicitly use the historical fit behavior. Seed Code format 1, canonical setting shape, seed derivation, retry bounds, combined engine `0.5.66` RNG salt, and each profile's destination policy remain unchanged.
+`ds1tr-gen-v2` preserves the audited roaming-boss destination handling described below. `ds1tr-gen-v3` added the independent Compact Fog catalog, offline reconstructed data, and required-only backend Fog item constraints. `ds1tr-gen-v4` adds owner-approved roaming-boss fit behavior while retaining the v3 Compact Fog contract. `ds1tr-gen-v5` inherits v4 and selects the corrected Compact Fog v2 topology and boss-side arrival policy. Profiles v1 through v3 retain the historical fit behavior; v1-v4 Fog behavior and fixtures remain unchanged. Seed Code format 1, canonical setting shape, seed derivation, retry bounds, and combined engine `0.5.66` RNG salt remain unchanged. See [Compact Full Fog V2](COMPACT_FULL_FOG_V2.md).
 
 ## Recorded exception 6: roaming-boss safe destination handling (backend 0.46.0, desktop 0.39.0; 2026-10-12)
 

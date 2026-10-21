@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using static FogMod.Util;
 using static FogMod.AnnotationData;
 
+// Modified from FogMod commit 6e6dc7886d0f8bcc53c1800d95c9e859d1f2f87f by DS1 Multi Randomizer contributors under Apache-2.0; see ../UPSTREAM_PIN.md.
 namespace FogMod
 {
     public class Graph
@@ -14,6 +15,8 @@ namespace FogMod
         public Dictionary<string, Entrance> entranceIds;
         // Item areas - either from config or from param lookup
         public Dictionary<string, string> itemAreas;
+        // FogHost v5-only progression transitions, separate from Areas and key items.
+        public Dictionary<string, BossCompletionRule> bossCompletions;
 
         // All nodes in the constructed graph
         public Dictionary<string, Node> graph;
@@ -97,6 +100,8 @@ namespace FogMod
             // Collect areas and items
             areas = ann.Areas.ToDictionary(a => a.Name, a => a);
             itemAreas = ann.KeyItems.ToDictionary(item => item.Name, item => (string)null);
+            bossCompletions = (ann.BossCompletions ?? new List<BossCompletionRule>())
+                .ToDictionary(completion => completion.Name, completion => completion, StringComparer.Ordinal);
             // Some validation
             Expr getExpr(string cond)
             {
@@ -104,7 +109,7 @@ namespace FogMod
                 if (expr == null) return null;
                 foreach (string free in expr.FreeVars())
                 {
-                    if (!areas.ContainsKey(free) && !itemAreas.ContainsKey(free)) throw new Exception($"Condition {cond} has unknown variable {free}");
+                    if (!areas.ContainsKey(free) && !itemAreas.ContainsKey(free) && !bossCompletions.ContainsKey(free)) throw new Exception($"Condition {cond} has unknown variable {free}");
                 }
                 return expr;
             }

@@ -261,7 +261,7 @@ export async function generateRun(
   // historical profiles use their frozen tracking snapshot.
   let fogTrackedItems: FogTrackedItems | null = null;
   if (fogReady) {
-    if (profile.fogAnnotationSource === 'compact-v1') {
+    if (profile.fogAnnotationSource !== 'legacy-fogmod') {
       if (!fogReady.compactProjection) return fail('fog', 'FOG_COMPACT_PROJECTION_UNAVAILABLE', 'The Compact catalog projection is missing.');
       fogTrackedItems = trackedItemsFromCompactProjection(fogReady.compactProjection);
     } else fogTrackedItems = legacyFogTrackedItems();

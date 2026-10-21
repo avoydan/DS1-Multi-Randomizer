@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   COMPACT_FOG_CATALOG_VERSION,
+  COMPACT_FOG_CATALOG_V2_VERSION,
   COMPACT_FOG_PROJECTION_FORMAT,
   CompactFogProjectionError,
   parseCompactFogProjection,
@@ -23,6 +24,13 @@ test('parses a Compact projection without changing its tracked identities', () =
   projection.lotStarts.pop();
   assert.equal(source.items.length, 2);
   assert.equal(source.lotStarts.length, 2);
+});
+
+test('projection parsing requires the profile-selected immutable catalog version', () => {
+  const source = { ...valid(), catalogVersion: COMPACT_FOG_CATALOG_V2_VERSION };
+  assert.equal(parseCompactFogProjection(source, COMPACT_FOG_CATALOG_V2_VERSION).catalogVersion, COMPACT_FOG_CATALOG_V2_VERSION);
+  assert.throws(() => parseCompactFogProjection(source), CompactFogProjectionError,
+    'a v2 projection cannot silently satisfy a v1 caller');
 });
 
 test('rejects an unknown fingerprint, duplicate identity, or empty coverage', () => {

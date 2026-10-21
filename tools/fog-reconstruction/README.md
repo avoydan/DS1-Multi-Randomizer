@@ -19,6 +19,9 @@ FogReconstruction inspect-reference-area-tag-ids <fog-data-root> <comparison-jso
 FogReconstruction audit-boss-defeat-facts <fog-data-root> <pristine-dsr-root> <report-json-outside-repo>
 FogReconstruction audit-transition-events <fog-data-root> <pristine-dsr-root> <report-json-outside-repo>
 FogReconstruction audit-area-gates <fog-data-root> <pristine-dsr-root> <report-json-outside-repo>
+FogReconstruction audit-transition-facts <fog-data-root> <pristine-dsr-root> <report-json-outside-repo>
+FogReconstruction audit-default-flag-candidates <fog-data-root> <pristine-dsr-root> <report-json-outside-repo>
+FogReconstruction audit-key-item-candidates <fog-data-root> <pristine-dsr-root> <area-gate-report-outside-repo> <report-json-outside-repo>
 FogReconstruction audit-world-transition-inventory <fog-data-root> <pristine-dsr-root> <report-json-outside-repo>
 FogReconstruction inspect-map-transition-candidates <fog-data-root> <pristine-dsr-root> [map-key]
 FogReconstruction inspect-custom-start-boss-proximity <fog-data-root> <pristine-dsr-root> [custom-start-id]
@@ -58,6 +61,13 @@ When a compatible DarkScript EMEDF JSON file is supplied, `inspect-event` decode
 `audit-transition-events` indexes every name-marked transition region and nearby object on the 17 verified maps, then finds raw 4-byte `int32` windows at every argument offset in the corresponding pristine map EMEVD instructions. It records the opcode, instruction index, argument offset, and parameter-binding overlap, but does not decode or classify a hit as a gate. Confirm the instruction schema and event flow before using any match as project policy. The JSON report must remain outside the repository.
 
 `audit-area-gates` inventories pristine MSB ObjAct part/entity/parameter/flag/state bindings, all map-local `SetEventFlag` event/flag pairs, and typed `IfPlayerHasItem`, `IfActionButtonLineSegment`, event-flag and warp operations. It resolves `InitializeEvent` parameter bindings per call site, matches action entity IDs to exact region/object IDs in the same pristine MSB, and resolves short-warp entity IDs to same-map region/object/enemy anchors when unique. The report is evidence only: it does not assign logical area endpoints or decide between `Area.To`, Entrances and Warps. Keep the output outside the repository.
+
+`audit-transition-facts` emits pristine MSB `ConnectCollision` part names, collision anchors, and decoded target map-file IDs, and embeds the typed pristine EMEVD/ObjAct/flag/warp evidence from `audit-area-gates`. It resolves target maps only against the supported DSR map inventory and marks every ConnectCollision result as map-load metadata only. It does not infer a traversable route, logical Area endpoint, direction, or Fog relation type. The report must remain outside the repository.
+
+`audit-default-flag-candidates` independently derives boss completion candidates from pristine same-collision enemy ownership or a negative PlayRegion value that decodes to a same-map `HandleBossDefeat` event, then validates each ID against the event-970 flag flow before comparison with the development oracle. It inventories only collisions with `PlayRegionID < 10`, matching the writer's eligibility check; the Firelink sentinel is reported as unused. The report is evidence and comparison only; it does not generate runtime annotations.
+
+
+`audit-key-item-candidates` reads an `audit-area-gates` report and independently inventories goods IDs used by pristine `IfPlayerHasItem` conditions, resolves English FMG names, and links identities to ItemLotParam and known acquisition references. Its oracle comparison is identity-only; area and tags remain project policy and are not inferred from reference rows.
 
 `audit-world-transition-inventory` validates and lists the currently authored project Area routes, no-static-link dispositions, and evidence-backed Entrance boundary policies (currently the Depths-to-Blighttown key door and Pinwheel gate) against byte-verified clean DSR data. For required key items it reports pristine ItemLotParam rows, MSB treasure sources, enemy drop sources resolved through NpcParam, and item-lot awards from typed EMEVD operations `2003[4]`/`2003[36]`, resolving same-archive `InitializeEvent` arguments per caller. It reads no reference transition endpoints or conditions. Missing transition-owner policy remains `UNRESOLVED`; an inventory with unresolved rows is not a world-graph closure result. Keep the output outside the repository.
 

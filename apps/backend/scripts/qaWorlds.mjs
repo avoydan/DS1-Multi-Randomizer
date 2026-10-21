@@ -13,6 +13,7 @@ import { DEFAULT_GENERATION_SETTINGS } from '@ds1tr/contracts';
 import { GameStateAuthority, executableName, managedRoots } from '../dist/core/gameState.js';
 import { generateRun } from '../dist/core/generationPipeline.js';
 import { prepareRun } from '../dist/core/seededRun.js';
+import { encodeSeedCode } from '../dist/core/seedCode.js';
 import { packageDigest } from './goldenCompatibility.mjs';
 
 const merge = (base, patch) => {
@@ -70,7 +71,10 @@ export function qaWorldCodes() {
     const settings = merge(DEFAULT_GENERATION_SETTINGS, world.settings);
     const prepared = prepareRun({ gamePath: 'X:/qa', masterSeed: world.masterSeed, ...settings, output: { ...settings.output, generateSpoilerLog: false } });
     if (!prepared.ok) throw new Error(`${world.id}: ${prepared.code}: ${prepared.technical}`);
-    return { ...world, seedCode: prepared.seedCode };
+    // The checklist is explicitly frozen to the v3 profile even when the app's
+    // current profile advances. Keep those documented worlds reproducible.
+    const seedCode = encodeSeedCode({ profile: 'ds1tr-gen-v3', masterSeed: prepared.config.masterSeed, settings: prepared.envelope.settings });
+    return { ...world, seedCode };
   });
 }
 

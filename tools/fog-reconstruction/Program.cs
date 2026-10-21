@@ -35,6 +35,7 @@ namespace FogReconstruction
                     TransitionEventAuditSelfTests.Run();
                     AreaGateEvidenceAudit.SelfTest();
                     WorldTransitionInventory.SelfTest();
+                    TransitionFactAuditSelfTests.Run();
                     return 0;
                 }
                 if (args.Length == 3 && args[0] == "verify-talk-normalization")
@@ -80,6 +81,21 @@ namespace FogReconstruction
                 if (args.Length == 4 && args[0] == "audit-area-gates")
                 {
                     AreaGateEvidenceAudit.Write(args[1], args[2], args[3]);
+                    return 0;
+                }
+                if (args.Length == 4 && args[0] == "audit-transition-facts")
+                {
+                    TransitionFactAudit.Write(args[1], args[2], args[3]);
+                    return 0;
+                }
+                if (args.Length == 4 && args[0] == "audit-default-flag-candidates")
+                {
+                    DefaultFlagCandidateAudit.Write(args[1], args[2], args[3]);
+                    return 0;
+                }
+                if (args.Length == 5 && args[0] == "audit-key-item-candidates")
+                {
+                    KeyItemCandidateAudit.Write(args[1], args[2], args[3], args[4]);
                     return 0;
                 }
                 if (args.Length == 4 && args[0] == "audit-world-transition-inventory")

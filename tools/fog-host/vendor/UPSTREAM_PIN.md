@@ -20,11 +20,11 @@ some are LF, and some are mixed.
 | Vendored file | Upstream path | Blob at pin | State |
 |---|---|---|---|
 | `FogMod/LICENSE` | `LICENSE` | `e454a52586f29b8ce8a6799163eac1f875e9ac01` | identical |
-| `FogMod/AnnotationData.cs` | `FogMod/AnnotationData.cs` | `327f7432f5360ca1603b4360abeaa6a120a5c2dc` | identical |
+| `FogMod/AnnotationData.cs` | `FogMod/AnnotationData.cs` | `327f7432f5360ca1603b4360abeaa6a120a5c2dc` | **modified** (below) |
 | `FogMod/GameDataWriter.cs` | `FogMod/GameDataWriter.cs` | `8f66afdb6eea4d6c9a073c2a58b09acfac682fbb` | **modified** (below) |
-| `FogMod/Graph.cs` | `FogMod/Graph.cs` | `7abe971f08312583d2463bdfa6dcebca2a1611a1` | identical |
-| `FogMod/GraphChecker.cs` | `FogMod/GraphChecker.cs` | `4fde4bb06c85f5cb0e7b4ce6a19ce013d3508064` | identical |
-| `FogMod/GraphConnector.cs` | `FogMod/GraphConnector.cs` | `a0e12abac04074ac3ae92f33b8ceedfbc4103dbf` | identical |
+| `FogMod/Graph.cs` | `FogMod/Graph.cs` | `7abe971f08312583d2463bdfa6dcebca2a1611a1` | **modified** (below) |
+| `FogMod/GraphChecker.cs` | `FogMod/GraphChecker.cs` | `4fde4bb06c85f5cb0e7b4ce6a19ce013d3508064` | **modified** (below) |
+| `FogMod/GraphConnector.cs` | `FogMod/GraphConnector.cs` | `a0e12abac04074ac3ae92f33b8ceedfbc4103dbf` | **modified** (below) |
 | `FogMod/ItemReader.cs` | `FogMod/ItemReader.cs` | `a38b6705e4f12e42c6ec3e31947fb1a9eb7818d5` | identical |
 | `FogMod/Randomizer.cs` | `FogMod/Randomizer.cs` | `b434e39bea2c15c2c6e55af774c2e7cffe83a939` | identical (compiled, not called) |
 | `FogMod/RandomizerOptions.cs` | `FogMod/RandomizerOptions.cs` | `f376cf7a52f3dbd0457375686794a6d0100794ea` | identical |
@@ -82,6 +82,32 @@ CRLF after patching.
    parameterized instructions. The pinned template event has no skips or
    parameters, so the output is unchanged today; the patch keeps the same
    principle as patch 7.
+
+### Boss-completion progression modifications
+
+`AnnotationData.cs`, `Graph.cs`, `GraphChecker.cs`, and `GraphConnector.cs` each
+carry an Apache-2.0 section 4(b) modification notice at the file header.
+
+- `AnnotationData.cs` adds a FogHost-only, YAML-ignored `BossCompletions` list
+  and its typed encounter/trigger record. It is not emitted to FogMod YAML.
+- `Graph.cs` recognizes only explicitly declared `boss_defeated_<eventId>`
+  condition atoms; unknown atoms remain errors.
+- `GraphChecker.cs` maintains boss-completion state separately from visited
+  Areas and items. It derives an encounter as defeatable only from a traversed
+  directed edge whose FogMod destination side matches the authored boss event,
+  exact entrance, trigger map/region, and trigger-centered custom warp. Boss
+  completion dependencies resolve their distance through the encounter Area;
+  loop convergence includes both Area and completion state. This is a
+  reachability abstraction: the game still sets the real completion flag only
+  when the player defeats the boss.
+- `GraphConnector.cs` includes unmet boss-completion route conditions in its
+  bounded-solver failure details. With no completion records, v1-v4 graph
+  behavior and error text are unchanged.
+
+Tests: `BossProgressionTest` covers Area-only, wrong-trigger-side, off-center
+spawn, and trigger-centered encounter cases; `FogDsrFactsTest` checks the
+project route and spawn anchors; the Compact v2 real-generation matrix writes
+and decodes every output in separate staging directories.
 
 ## SoulsIds
 

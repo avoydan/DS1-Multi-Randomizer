@@ -33,6 +33,7 @@ export const KEY_PLACEMENT_STRATEGIES = Object.freeze({
 /** Goods the legacy holds to the race locations although the graph has no condition on them: Large Ember to Chaos Flame Ember (800-813), the Rite of Kindling, the Sewer Chamber Key and the Mystery Key. */
 export const RACE_ITEM_GOODS = Object.freeze(new Set([800, 801, 802, 806, 807, 808, 809, 810, 812, 813, 2607, 2018, 2017]));
 export const PROGRESSION_MODEL_FORMAT = "ds1tr-progression-model-1";
+const BOSS_PROGRESSION_MODEL_FORMAT = "ds1tr-progression-model-2";
 const MAX_ATTEMPTS = 32;
 
 /** A typed failure: `code` is stable (it reaches the log and the user message), `diagnostics` are counters, never a location. */
@@ -63,8 +64,8 @@ function compile(expr) {
 
 /** Validates an exported model and prepares it for evaluation. */
 export function prepareModel(model, variant = "vanilla") {
-  if (!model || model.format !== PROGRESSION_MODEL_FORMAT) {
-    throw new KeyPlacementError("KEY_PLACEMENT_MODEL_INVALID", `The progression model has the wrong format (expected ${PROGRESSION_MODEL_FORMAT}).`);
+  if (!model || ![PROGRESSION_MODEL_FORMAT, BOSS_PROGRESSION_MODEL_FORMAT].includes(model.format)) {
+    throw new KeyPlacementError("KEY_PLACEMENT_MODEL_INVALID", `The progression model has the wrong format (expected ${PROGRESSION_MODEL_FORMAT} or ${BOSS_PROGRESSION_MODEL_FORMAT}).`);
   }
   // A model exported before the variants existed is the vanilla graph. The fill must reason over the graph its mode names, never another one.
   if ((model.variant ?? "vanilla") !== variant) {
@@ -74,14 +75,31 @@ export function prepareModel(model, variant = "vanilla") {
     if (model[field] === undefined) throw new KeyPlacementError("KEY_PLACEMENT_MODEL_INVALID", `The progression model has no ${field}.`);
   }
   const areas = new Set(model.areas);
+  const bossCompletions = new Map();
+  if (model.format === BOSS_PROGRESSION_MODEL_FORMAT) {
+    if (!Array.isArray(model.bossCompletions)) throw new KeyPlacementError("KEY_PLACEMENT_MODEL_INVALID", "The boss progression model has no bossCompletions list.");
+    for (const completion of model.bossCompletions) {
+      if (!completion || typeof completion.name !== "string" || !/^boss_defeated_\d+$/.test(completion.name) ||
+          !Number.isSafeInteger(completion.eventId) || completion.eventId <= 0 || completion.name !== `boss_defeated_${completion.eventId}` ||
+          !areas.has(completion.area) || typeof completion.triggerEntrance !== "string" || typeof completion.triggerMap !== "string" ||
+          !Number.isSafeInteger(completion.triggerRegionEntityId) || completion.triggerRegionEntityId <= 0 || bossCompletions.has(completion.name)) {
+        throw new KeyPlacementError("KEY_PLACEMENT_MODEL_INVALID", "A boss completion transition is malformed or duplicated.");
+      }
+      bossCompletions.set(completion.name, completion);
+    }
+  }
   const edges = model.edges.map((edge) => {
     if (!areas.has(edge.from) || !areas.has(edge.to)) throw new KeyPlacementError("KEY_PLACEMENT_MODEL_INVALID", "An edge names an unknown area.");
-    return { from: edge.from, to: edge.to, test: compile(edge.when) };
+    if (edge.bossCompletion !== undefined) {
+      const completion = bossCompletions.get(edge.bossCompletion);
+      if (!completion || completion.area !== edge.to) throw new KeyPlacementError("KEY_PLACEMENT_MODEL_INVALID", "A boss completion edge has no matching trigger-bound transition.");
+    }
+    return { from: edge.from, to: edge.to, bossCompletion: edge.bossCompletion ?? null, test: compile(edge.when) };
   });
   const keys = new Map(model.keys.map((key) => [key.name, key]));
   for (const key of model.keys) if (!areas.has(key.area)) throw new KeyPlacementError("KEY_PLACEMENT_MODEL_INVALID", `Key ${key.name} is in an unknown area.`);
   const lotAreas = new Map(Object.entries(model.lotAreas).map(([lot, area]) => [Number(lot), area]));
-  return { raw: model, areas, edges, keys, lotAreas, optional: new Set(model.optionalAreas ?? []), start: model.start, prison: model.prison };
+  return { raw: model, areas, edges, keys, lotAreas, optional: new Set(model.optionalAreas ?? []), start: model.start, prison: model.prison, bossCompletions };
 }
 
 /**
@@ -90,15 +108,19 @@ export function prepareModel(model, variant = "vanilla") {
  */
 export function visitedAreas(prepared, keyAreas, inHand = new Set(), start = prepared.start, countOnly = null) {
   const visited = new Set([start]);
-  const has = (name) => visited.has(name) || inHand.has(name) || (keyAreas.has(name) && visited.has(keyAreas.get(name)));
+  const completedBosses = new Set();
+  const has = (name) => visited.has(name) || completedBosses.has(name) || inHand.has(name) || (keyAreas.has(name) && visited.has(keyAreas.get(name)));
   let changed = true;
   while (changed) {
     changed = false;
     for (const edge of prepared.edges) {
-      if (visited.has(edge.to) || !visited.has(edge.from)) continue;
+      if (!visited.has(edge.from)) continue;
       if (edge.test(has)) {
-        visited.add(edge.to);
-        changed = true;
+        if (!visited.has(edge.to)) { visited.add(edge.to); changed = true; }
+        if (edge.bossCompletion && !completedBosses.has(edge.bossCompletion)) {
+          completedBosses.add(edge.bossCompletion);
+          changed = true;
+        }
       }
     }
   }

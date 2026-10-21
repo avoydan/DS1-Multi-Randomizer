@@ -5,12 +5,17 @@ import path from 'node:path';
 import { promisify } from 'node:util';
 
 export const COMPACT_FOG_PROJECTION_FORMAT = 'ds1tr-compact-fog-projection-v1';
-export const COMPACT_FOG_CATALOG_VERSION = 'ds1tr-compact-full-fog-v1';
-export const COMPACT_FOG_CATALOG_FINGERPRINT = '8c03fd3de1cd7c772d5c933753ae54eab35f9e8b70a1aef2954322330d0002d4';
+export const COMPACT_FOG_CATALOG_V1_VERSION = 'ds1tr-compact-full-fog-v1';
+export const COMPACT_FOG_CATALOG_V1_FINGERPRINT = '8c03fd3de1cd7c772d5c933753ae54eab35f9e8b70a1aef2954322330d0002d4';
+export const COMPACT_FOG_CATALOG_V2_VERSION = 'ds1tr-compact-full-fog-v2';
+export const COMPACT_FOG_CATALOG_V2_FINGERPRINT = '701f5aa84085ac2361bee382c43a05c4813e11878fac8a462dd1341a859a1d7a';
+// Backward-compatible names for callers that specifically mean the historical v1 catalog.
+export const COMPACT_FOG_CATALOG_VERSION = COMPACT_FOG_CATALOG_V1_VERSION;
+export const COMPACT_FOG_CATALOG_FINGERPRINT = COMPACT_FOG_CATALOG_V1_FINGERPRINT;
 
 export interface CompactFogProjection {
   format: typeof COMPACT_FOG_PROJECTION_FORMAT;
-  catalogVersion: typeof COMPACT_FOG_CATALOG_VERSION;
+  catalogVersion: string;
   catalogFingerprint: string;
   items: Array<{ equipType: number; itemId: number; required: boolean }>;
   lotStarts: number[];
@@ -27,9 +32,9 @@ function record(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
-export function parseCompactFogProjection(value: unknown): CompactFogProjection {
+export function parseCompactFogProjection(value: unknown, expectedVersion: string = COMPACT_FOG_CATALOG_V1_VERSION): CompactFogProjection {
   if (!record(value) || value.format !== COMPACT_FOG_PROJECTION_FORMAT
-    || value.catalogVersion !== COMPACT_FOG_CATALOG_VERSION
+    || value.catalogVersion !== expectedVersion
     || typeof value.catalogFingerprint !== 'string' || !sha256Pattern.test(value.catalogFingerprint)
     || !Array.isArray(value.items) || !Array.isArray(value.lotStarts)) {
     throw new CompactFogProjectionError('The Compact catalog projection has an unsupported format or identity.');
@@ -62,7 +67,7 @@ export function parseCompactFogProjection(value: unknown): CompactFogProjection 
 
   return {
     format: COMPACT_FOG_PROJECTION_FORMAT,
-    catalogVersion: COMPACT_FOG_CATALOG_VERSION,
+    catalogVersion: expectedVersion,
     catalogFingerprint: value.catalogFingerprint,
     items,
     lotStarts,
@@ -74,6 +79,7 @@ export async function loadCompactFogProjection(
   executablePath: string,
   dataRoot: string,
   pristineGameDirectory: string,
+  expectedVersion: string = COMPACT_FOG_CATALOG_V1_VERSION,
 ): Promise<CompactFogProjection> {
   const scratch = await mkdtemp(path.join(os.tmpdir(), 'ds1tr-compact-projection-'));
   const outputPath = path.join(scratch, 'projection.json');
@@ -82,13 +88,14 @@ export async function loadCompactFogProjection(
       await execFileAsync(executablePath, [
         'compact-projection', '--data-root', dataRoot,
         '--pristine-root', pristineGameDirectory,
+        '--catalog-version', expectedVersion,
         '--out', outputPath,
       ], { windowsHide: true, timeout: 120_000, maxBuffer: 1024 * 1024 });
     } catch (error) {
       const detail = record(error) && typeof error.stderr === 'string' ? error.stderr.trim() : '';
       throw new CompactFogProjectionError(detail || (error instanceof Error ? error.message : String(error)));
     }
-    return parseCompactFogProjection(JSON.parse(await readFile(outputPath, 'utf8')) as unknown);
+    return parseCompactFogProjection(JSON.parse(await readFile(outputPath, 'utf8')) as unknown, expectedVersion);
   } catch (error) {
     if (error instanceof CompactFogProjectionError) throw error;
     throw new CompactFogProjectionError(error instanceof Error ? error.message : String(error));
