@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { DEFAULT_GENERATION_SETTINGS } from '@ds1tr/contracts';
+import { CURRENT_GENERATION_PROFILE, DEFAULT_GENERATION_SETTINGS } from '@ds1tr/contracts';
 import { AppLogger } from '../../dist/core/appLog.js';
 import { OperationTracker } from '../../dist/core/operations.js';
 import { redactionContext } from '../../dist/core/redaction.js';
@@ -13,7 +13,8 @@ import { createZip, readZip } from '../../dist/core/zipWriter.js';
 
 // Support bundle (docs/SUPPORT_BUNDLE.md): an explicit allowlist, redaction proven by planting synthetic secrets in real files and searching the archive, and a
 // bundle that is useful after a failed generation, a failed Apply and before any world exists.
-const userName = os.userInfo().username;
+// os.userInfo() may fail with uv_os_get_passwd ENOMEM in restricted test containers.
+const userName = process.env.USERNAME || path.basename(os.homedir());
 const home = os.homedir();
 const SECRETS = {
   anthropic: 'sk-ant-api03-SYNTHETICSECRETKEY0123456789',
@@ -197,7 +198,7 @@ test('diagnostics describe the application without a single folder of the person
     const diagnostics = await gatherDiagnostics(w.deps([entry]), { gamePath: w.gameDir, language: 'en' });
     const text = JSON.stringify(diagnostics);
     assert.ok(!text.includes(w.gameDir.replace(/\\/gu, '\\\\')) && !text.includes(w.root.replace(/\\/gu, '\\\\')));
-    assert.equal(diagnostics.application.generationProfile, 'ds1tr-gen-v2');
+    assert.equal(diagnostics.application.generationProfile, CURRENT_GENERATION_PROFILE);
     assert.equal(diagnostics.application.backendVersion, '0.43.0');
     assert.equal(diagnostics.application.installMode, 'installed');
     assert.equal(diagnostics.release.signing, 'unknown');
