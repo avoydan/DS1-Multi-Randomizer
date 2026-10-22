@@ -1,13 +1,16 @@
 ﻿# Compact Full Fog V2: boss progression correction
 
-Status: **promoted for local owner gameplay QA on 2026-10-21**. New worlds use
-`ds1tr-gen-v5`; v1-v4 compatibility is unchanged. This promotes the existing
-V5 behavior without changing its semantics. Gameplay QA remains outstanding.
-V2 uses the existing FogHost schema 3 with the project-owned Compact catalog
-and adds no game-data files.
+Status: **promoted for local owner gameplay QA on 2026-10-21; Ceaseless
+landing corrected on 2026-10-22, gameplay QA pending**. New worlds use
+`ds1tr-gen-v5`; v1-v4 compatibility is unchanged. The owner-reported V5
+under-map failure led to an explicitly authorized correction to V5's physical
+landing behavior. The V5 Seed Code and settings are unchanged; package output
+is not. V2 uses the existing FogHost schema 3 with the project-owned Compact
+catalog and adds no game-data files.
 
-Catalog fingerprint: `701f5aa84085ac2361bee382c43a05c4813e11878fac8a462dd1341a859a1d7a`.
-World-data identity: `221c01fa780daba7`.
+Catalog fingerprint: `111d6e06227205fa62fc43fa9d0375274753c76a11af959b2d794a63c870fa49`.
+World-data identity: `d927863b6583f1c5`.
+FogHost version: `0.7.1`.
 
 ## Boss-completion model
 
@@ -19,9 +22,11 @@ catalog validation.
 The graph checker keeps completion state separately from visited Areas and
 items. It can derive a boss encounter as defeatable only after traversing a
 specific directed randomized edge into that encounter, where the generated
-FogMod side has the expected boss event, entrance identity, trigger map/region,
-and a custom spawn centered on the verified trigger volume. A broad visit to a
-boss Area, an off-center spawn, or a non-boss side does not grant this state.
+FogMod side has the expected encounter-start event, entrance identity, and
+FogMod-default landing semantics. For Ceaseless, the exact entrance side has no
+BossTrigger, BossTriggerArea, or CustomWarp; its player landing is derived from
+the Fog object's transform. A broad visit to a boss Area, a custom warp, or a
+non-boss side does not grant this state.
 The checker treats an accessible encounter as defeatable for reachability; it
 does not simulate combat. In the actual game, vanilla boss logic sets the real
 completion flag only after the boss is killed.
@@ -43,12 +48,39 @@ that the completion event enters the common event-970 completion flow. This is
 the route-specific project policy; it is not inferred automatically from the
 collision row.
 
-The randomized Ceaseless arrival is also made safe: entrance `o4961_0000`,
-Demon Ruins side B, targets the verified `m14_01_00_00` trigger region
-`1412698`, which event `11415371` checks. V2 places that arrival at the trigger
-center (rather than FogMod's ordinary offset, which the reproduced output put
-outside the trigger). Catalog construction refuses the side if its event,
-region, entrance, or center no longer matches pristine facts.
+The randomized Ceaseless arrival uses entrance `o4961_0000`, Demon Ruins side
+B, in `m14_01_00_00`. Pinned FogMod's complete annotation record is: ID
+`1411790`, Area `demonruins`, Text `To Ceaseless Discharge`, Tags `boss`;
+ASide Area `demonruins`; BSide Area `demonruins_ceaseless`, Flag `11410900`.
+The BSide has no BossTrigger, BossTriggerArea, CustomWarp, ActionRegion,
+DestinationMap, or side Tags. Upstream `GameDataWriter` therefore uses the
+Fog object's transform for the player warp: with pristine `o4961_0000` at
+`(249, -283.15, 70.4)`, yaw `-136`, the BSide moves one metre along yaw `44`
+and keeps player yaw `-136`. The generated player arrival is
+`(249.69466, -283.15, 71.11934)`, yaw `-136` (Player part `c0000_0051`), not
+the center `(248.5, -284, 69.7)` of trigger region `1412698`.
+
+In the exact Fog-seed `4009337993` real-format support reproduction, V2 emits
+Player part `c0000_0051` and action-region entity `1815856` at
+`(249.69466, -284.15, 71.11934)`, yaw `44`. The player part is at the same
+X/Z, Y `-283.15`, yaw `-136`. The generated region ID is allocated by the
+writer for that output; it is not a fixed value from the upstream record.
+
+That arrival is not inside the trigger at spawn: relative to the trigger's
+`-135` yaw it is about 1.85 units along the depth axis, beyond the 0.75
+half-depth (the box is 5 x 2 x 1.5). The correction restores the original
+landing semantics and avoids the under-map spawn; it does not establish that
+the encounter starts immediately on arrival. Reaching the encounter trigger,
+boss activation, kill, and post-boss passage remain in-game QA checks.
+
+The trigger region remains a separate boss-start volume: encounter-start
+event `11415371` checks region `1412698`, while boss-death/progression event
+`11410410` is a distinct identity. Compact V2 retains the ordinary action
+region generated beside the fog and the default object-relative player warp;
+the trigger geometry is never used as a spawn coordinate. Catalog construction
+checks the pristine boss-start event/region and requires this exact Ceaseless
+side to have no BossTrigger, BossTriggerArea, or CustomWarp. No hand-authored
+coordinate is used.
 
 Event `11410090` is classified as **unrelated/system behavior, non-randomizable**
 for this route audit. The pristine `m14_01_00_00.emevd.dcx` contains ten event
@@ -101,13 +133,18 @@ at exact commit `6e6dc7886d0f8bcc53c1800d95c9e859d1f2f87f`. Comparison evidence:
 its `o4961_0000` Entrance record names the Ceaseless side and its legacy flag;
 the record does not classify event `11410090` or express boss-death state.
 `FogMod/Graph.cs` and `GraphChecker.cs` show that these Area conditions are
-evaluated as graph predicates, while `GameDataWriter.cs` lines 468-514 and
-553-606 show how boss trigger regions and custom warps are authored. These
-sources supported the conclusion that V5 needs project-owned boss state and a
-trigger-centered arrival; they did not supply the route policy. `GraphConnector.cs`
-was checked for bounded graph-solver behavior. No upstream annotation or
-`dist` file was copied into the repository or used as a substitute for
-project-owned policy.
+evaluated as graph predicates. `FogMod/GameDataWriter.cs` lines 483-487,
+517-547, and 553-599 show the actual ordinary placement path: find the source
+fog object, construct an action region one metre to the side, and create a
+player part one metre from the object's position using the side-relative
+rotation. For this BSide the writer's result is
+`(249.69466, -283.15, 71.11934)`, yaw `-136`. This disproved the earlier V5
+trigger-centered arrival policy; the Compact projection had incorrectly
+turned BossTriggerArea into CustomWarp, bypassing the default writer branch.
+The current correction restores that branch and keeps the separate project
+boss-completion graph policy. `GraphConnector.cs` was checked for bounded
+graph-solver behavior. No upstream annotation or `dist` file was copied into
+the repository or used as a substitute for project-owned policy.
 
 ## Verification
 
@@ -152,6 +189,41 @@ project-owned policy.
   metadata tests pass for their compatibility contracts.
 - The real QA DSR source was read-only. All generated staging outputs were
   under `%TEMP%`; the live Steam installation was not accessed.
+
+## Ceaseless landing correction verification (2026-10-22)
+
+The preceding V2 package digests and centered-spawn description are the
+pre-correction record and are superseded for current V5 by this section.
+Pinned upstream was read-only at
+`C:\Users\Adam\AppData\Local\Temp\fogmod-src`, exact HEAD
+`6e6dc7886d0f8bcc53c1800d95c9e859d1f2f87f`. `dist/fog.txt`'s exact
+`o4961_0000` BSide has `Area: demonruins_ceaseless` and `Flag: 11410900`,
+with no custom warp, action region, boss trigger, destination-map override, or
+side tag. `GameDataWriter.cs` uses the fog object position, one-metre
+side-relative offset, and fog yaw for the player rotation. Clean DSR object
+transform `(249, -283.15, 70.4)`, yaw `-136`, produces
+`(249.69466, -283.15, 71.11934)`, yaw `-136`. The separate action region is
+generated using the normal one-metre offset and the non-world Y adjustment.
+
+The implementation now validates encounter-start event `11415371` and its
+region `1412698` from pristine EMEVD facts without using the region as spawn
+geometry. It keeps completion event `11410410` separate; the graph route still
+requires `boss_defeated_11410410`, and visiting the boss Area alone remains
+insufficient. No manual coordinate was added.
+
+FogHost `0.7.1` Release build passed with 0 warnings and 0 errors. The full
+FogHost test suite passed **149/149** against the pinned read-only upstream
+fixture and clean QA DSR. Focused backend generation-profile, projection, and
+prerequisite tests passed **18/18**; final full backend/typecheck results are
+recorded in `IMPLEMENTATION_STATUS.md`. Real-format golden verification passed
+both existing V5 cases: support reproduction, 55 files, digest
+`6bdd3ab7f11e5e1fc4e46d906942cb819b0b5862e739cf7bbcf45e1be3d908a9`; full
+Items + Enemies + Bosses + Fog, 73 files, digest
+`52765e667a9d23ff6079e9aa494da981608750b7a171d2be38e7bd79aff72934`.
+Each differs from its pre-correction output in `event/common.emevd.dcx` and
+the 13 MSBs listed in `GENERATION_COMPATIBILITY.md`. V1-V4 fixtures were not
+changed. These checks establish deterministic real-format package output,
+not in-game safety; owner gameplay QA remains required.
 
 ## Golden provenance and remaining scope
 

@@ -34,6 +34,7 @@ namespace FogMod
             public string Name { get; set; }
             public string Area { get; set; }
             public int EventId { get; set; }
+            public int TriggerEventId { get; set; }
             public string TriggerEntrance { get; set; }
             public string TriggerMap { get; set; }
             public int TriggerRegionEntityId { get; set; }
@@ -158,6 +159,9 @@ namespace FogMod
             public string ExcludeIfRandomized { get; set; }
             // The map to add the warp into, if different from the entrance's map
             public string DestinationMap { get; set; }
+            /// <summary>FogHost-only pristine encounter-start event identity; never emitted in FogMod YAML.</summary>
+            [YamlIgnore]
+            public int BossEncounterStartEventId { get; set; }
             [YamlIgnore]
             public Expr Expr { get; set; }
             [YamlIgnore]

@@ -130,7 +130,8 @@ namespace FogHost
         int ActionRegion,
         FogEntranceKey? ExcludeIfRandomized,
         FogMapId? DestinationMap,
-        FogEntranceSideTags Tags);
+        FogEntranceSideTags Tags,
+        int BossEncounterStartEventId = 0);
 
     public sealed record FogWarpSide(
         FogAreaId Area,
@@ -180,6 +181,7 @@ namespace FogHost
     /// <summary>Checker-only transition: a verified trigger-side arrival makes a boss defeat achievable.</summary>
     public sealed record FogBossCompletionTransition(
         int EventId,
+        int TriggerEventId,
         FogAreaId EncounterArea,
         FogEntranceKey TriggerEntrance,
         FogMapId TriggerMap,
@@ -313,6 +315,7 @@ namespace FogHost
                     Name = transition.ConditionName,
                     Area = ResolveFogModAreaName(transition.EncounterArea).Value,
                     EventId = transition.EventId,
+                    TriggerEventId = transition.TriggerEventId,
                     TriggerEntrance = transition.TriggerEntrance.Value,
                     TriggerMap = transition.TriggerMap.Value,
                     TriggerRegionEntityId = transition.TriggerRegionEntityId,
@@ -386,6 +389,7 @@ namespace FogHost
                         {
                             json.WriteStartObject();
                             json.WriteNumber("eventId", transition.EventId);
+                            json.WriteNumber("triggerEventId", transition.TriggerEventId);
                             json.WriteString("area", transition.EncounterArea.Value);
                             json.WriteString("triggerEntrance", transition.TriggerEntrance.Value);
                             json.WriteString("triggerMap", transition.TriggerMap.Value);
@@ -485,14 +489,16 @@ namespace FogHost
             foreach (FogDefaultFlagCollision flag in DefaultFlagCols) ValidateMap(flag.Map);
             foreach (FogBossCompletionTransition transition in BossCompletions)
             {
-                if (transition.EventId <= 0 || transition.TriggerRegionEntityId <= 0)
+                if (transition.EventId <= 0 || transition.TriggerEventId <= 0 || transition.TriggerRegionEntityId <= 0)
                     throw new InvalidDataException("Boss completion transitions require positive event and trigger-region IDs.");
                 RequireArea(transition.EncounterArea, areaIds, "boss completion transition");
                 ValidateMap(transition.TriggerMap);
                 if (!Entrances.Any(entrance => entrance.Identity == transition.TriggerEntrance
                     && new[] { entrance.ASide, entrance.BSide }.Any(side => side != null && side.Area == transition.EncounterArea
-                        && side.BossTrigger == transition.EventId && side.BossTriggerArea != null && side.CustomWarp != null)))
-                    throw new InvalidDataException($"Boss completion {transition.EventId} has no trigger-centered entrance side for '{transition.EncounterArea}'.");
+                        && side.BossTrigger == 0 && side.BossTriggerArea == null && side.CustomWarp == null
+                        && side.BossEncounterStartEventId == transition.TriggerEventId
+                        && (side.DestinationMap ?? entrance.Map) == transition.TriggerMap)))
+                    throw new InvalidDataException($"Boss completion {transition.EventId} has no verified FogMod-default landing side for '{transition.EncounterArea}'.");
             }
 
             var allNames = new HashSet<FogEntranceKey>(Warps.Select(warp => warp.Identity).Concat(Entrances.Select(entrance => entrance.Identity)));
@@ -669,6 +675,7 @@ namespace FogHost
                 EntryFlag = side.EntryFlag,
                 BeforeWarpFlag = side.BeforeWarpFlag,
                 BossTrigger = side.BossTrigger,
+                BossEncounterStartEventId = side.BossEncounterStartEventId,
                 BossTriggerArea = side.BossTriggerArea == null ? null : string.Join(" ", new[]
                 {
                     side.BossTriggerArea.X, side.BossTriggerArea.Y, side.BossTriggerArea.Z,

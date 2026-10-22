@@ -1,5 +1,23 @@
 # Decisions
 
+## Restore FogMod default Ceaseless landing for pre-release V5 (2026-10-22)
+
+Owner gameplay QA showed that the trigger-region-centered spawn used by the
+initial V5 implementation fell below the map. The pinned FogMod Entrance
+`o4961_0000` BSide has no `BossTrigger`, `BossTriggerArea`, `CustomWarp`, or
+`ActionRegion`; the pinned writer derives the player warp from the fog object
+transform. Compact V2 therefore clears those spawn overrides on this exact
+side and preserves the host-only encounter-start event identity
+`11415371`. No coordinate is authored by hand.
+
+The encounter-start event `11415371` (which checks region `1412698`) is distinct
+from the boss-death progression event `11410410`. V5 graph reachability still
+requires the exact directed Ceaseless boundary with default landing semantics;
+the lava route remains gated by `boss_defeated_11410410`, and visiting the boss
+Area alone does not unlock it. This is an explicitly authorized correction to
+unreleased V5 output; V1-V4 behavior and fixtures remain frozen. It does not
+claim successful gameplay until owner in-game QA passes.
+
 ## Compact Fog V2 uses explicit boss-completion progression in profile v5 (2026-10-21)
 
 The owner selected Path A: represent boss completion as a typed V5-only graph
@@ -11,22 +29,20 @@ by the project-owned boss event identity, pristine event-970 completion-flow
 facts, and the independently evidenced physical-route policy. A
 `DefaultFlagCols` collision mapping does not create a route by itself.
 
-The checker keeps boss completion distinct from Area and item visitation. It
-derives an encounter opportunity only when a generated directed Entrance edge
-reaches the exact boss event/entrance/trigger side at the verified centered
-spawn. This is a reachability assumption that an accessible encounter can be
-defeated, not a combat simulation; the game sets the real completion flag on
-boss death. For the reproduced Ceaseless arrival, Entrance `o4961_0000` targets
-the center of trigger region `1412698` in map `m14_01_00_00`, which event
-`11415371` checks.
+The initial checker kept boss completion distinct from Area and item
+visitation, but incorrectly required a trigger-centered spawn. The 2026-10-22
+decision above supersedes that physical-placement rule: Ceaseless now uses
+FogMod's default object-relative landing. The checker still models an
+accessible encounter as defeatable for reachability; it does not simulate
+combat. The game sets the real completion flag on boss death.
 
 This policy is assigned only to `ds1tr-gen-v5`, which is now
 `CURRENT_GENERATION_PROFILE` for new worlds for local owner gameplay QA.
 Profiles v1-v4 and their generated
 behavior remain frozen. “Compact Fog V2” names the catalog/policy generation;
-it is not the historical profile `ds1tr-gen-v2`. Promotion changes only the
-default profile selection, not V5 semantics, and is not a release-readiness or
-gameplay-verification claim.
+it is not the historical profile `ds1tr-gen-v2`. Promotion initially changed
+only the default profile selection. The later landing correction is recorded
+above and is not a release-readiness or gameplay-verification claim.
 
 Pristine event `11410090` was classified as an unreferenced, non-randomizable
 system script, not evidence for a Ceaseless route. It has parameter-bound

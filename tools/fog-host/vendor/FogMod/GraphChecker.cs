@@ -200,27 +200,19 @@ namespace FogMod
 
         /// <summary>
         /// A broad Area visit is not a boss defeat. The completion state is derivable only after a
-        /// directed arrival through the authored boss side, whose registered trigger and generated
-        /// warp center match the verified trigger volume. The real game still sets the flag on kill.
+        /// directed arrival through the exact authored boss entrance with FogMod's default landing;
+        /// the pristine event/region pair is validated when the host builds this rule. The game still
+        /// sets the completion flag only when the boss dies.
         /// </summary>
         public static bool IsBossCompletionTriggerEdge(Edge edge, BossCompletionRule completion)
         {
             if (edge?.Link?.Side == null || completion == null || edge.To != completion.Area) return false;
             Side side = edge.Link.Side;
-            if (side.Area != completion.Area || side.BossTrigger != completion.EventId
-                || side.BossTriggerArea == null || side.CustomWarp == null
+            if (side.Area != completion.Area || side.BossTrigger != 0
+                || side.BossTriggerArea != null || side.CustomWarp != null
+                || completion.TriggerEventId <= 0 || side.BossEncounterStartEventId != completion.TriggerEventId
+                || completion.TriggerRegionEntityId <= 0
                 || !string.Equals(edge.Link.Name, completion.TriggerEntrance, StringComparison.Ordinal)) return false;
-            string[] trigger = side.BossTriggerArea.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            string[] warp = side.CustomWarp.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            if (trigger.Length != 7 || warp.Length != 5
-                || !string.Equals(warp[0], completion.TriggerMap, StringComparison.Ordinal)) return false;
-            for (int index = 0; index < 4; index++)
-            {
-                if (!float.TryParse(trigger[index], NumberStyles.Float, CultureInfo.InvariantCulture, out float expected)
-                    || !float.TryParse(warp[index + 1], NumberStyles.Float, CultureInfo.InvariantCulture, out float actual)
-                    || !float.IsFinite(expected) || !float.IsFinite(actual)
-                    || Math.Abs(expected - actual) > 0.0001f) return false;
-            }
             return true;
         }
     }

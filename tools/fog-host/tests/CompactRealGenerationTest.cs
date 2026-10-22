@@ -153,13 +153,20 @@ namespace FogHost.Tests
                 // v2. v1 must retain its historical graph; v2 must gate the local Ceaseless/lava
                 // route on verified boss completion while the writer still emits valid files.
                 string[] reproducedOptions = { "traversableFogs", "bossFogs", "areaWarps", "scaling", "requireLordSouls" };
-                string[] v1Output = RunCase(dataRoot, scratchRoot, v1, "support-repro-v1", reproducedOptions, 4009337993, "POLISH");
-                string[] v2Output = RunCaseV2(dataRoot, scratchRoot, v2, "support-repro-v2", reproducedOptions, 4009337993, "POLISH");
+                string v1Landing = null;
+                string v2Landing = null;
+                string[] v1Output = RunCase(dataRoot, scratchRoot, v1, "support-repro-v1", reproducedOptions, 4009337993, "POLISH",
+                    landing => v1Landing = landing);
+                string[] v2Output = RunCaseV2(dataRoot, scratchRoot, v2, "support-repro-v2", reproducedOptions, 4009337993, "POLISH",
+                    landing => v2Landing = landing);
                 AssertCeaselessRoute(v1.Catalog, "v1", expectedCompletionEventId: null);
                 AssertCeaselessRoute(v2.Catalog, "v2", expectedCompletionEventId: 11410410);
+                if (string.IsNullOrWhiteSpace(v1Landing) || string.IsNullOrWhiteSpace(v2Landing)
+                    || !string.Equals(PhysicalLanding(v1Landing), PhysicalLanding(v2Landing), StringComparison.Ordinal))
+                    throw new InvalidDataException($"Compact Fog v2 Ceaseless warp output differs from the frozen v1/FogMod default landing: v1='{v1Landing}', v2='{v2Landing}'.");
                 if (v1Output.SequenceEqual(v2Output, StringComparer.Ordinal))
                     throw new InvalidDataException("The exact reproduction produced identical v1/v2 output hashes despite the catalog correction.");
-                Console.WriteLine($"PASS support reproduction: fogSeed=4009337993; v1Files={v1Output.Length}; v2Files={v2Output.Length}; v1/v2 catalog behavior differs as expected.");
+                Console.WriteLine($"PASS support reproduction: fogSeed=4009337993; v1Files={v1Output.Length}; v2Files={v2Output.Length}; identical Ceaseless physical landing; v1={v1Landing}; v2={v2Landing}; v1/v2 progression differs as expected.");
 
                 var cases = HostRequest.OptionFlags
                     .Select(option => (Name: option.Key, Enabled: new[] { option.Key }, Seed: MatrixSeed))
@@ -245,7 +252,8 @@ namespace FogHost.Tests
             string name,
             IEnumerable<string> enabledOptions,
             uint seed,
-            string language = "ENGLISH")
+            string language = "ENGLISH",
+            Action<string> onCeaselessLanding = null)
         {
             string runRoot = Path.Combine(scratchRoot, name + "-" + seed + "-" + Guid.NewGuid().ToString("N"));
             string staging = Path.Combine(runRoot, "staging");
@@ -266,6 +274,8 @@ namespace FogHost.Tests
                 runner.ValidateLayout(request);
                 result = runner.Run(request);
                 DecodeEveryWrittenFile(staging, result);
+                if (onCeaselessLanding != null)
+                    onCeaselessLanding(VerifyCeaselessDefaultLanding(staging, RequiredDirectory("DS1TR_PRISTINE_DSR_ROOT"), catalog.Catalog));
             }
             finally
             {
@@ -284,7 +294,8 @@ namespace FogHost.Tests
             string name,
             IEnumerable<string> enabledOptions,
             uint seed,
-            string language = "ENGLISH")
+            string language = "ENGLISH",
+            Action<string> onCeaselessLanding = null)
         {
             string runRoot = Path.Combine(scratchRoot, name + "-" + seed + "-" + Guid.NewGuid().ToString("N"));
             string staging = Path.Combine(runRoot, "staging");
@@ -305,6 +316,8 @@ namespace FogHost.Tests
                 runner.ValidateLayout(request);
                 result = runner.Run(request);
                 DecodeEveryWrittenFile(staging, result);
+                if (onCeaselessLanding != null)
+                    onCeaselessLanding(VerifyCeaselessDefaultLanding(staging, RequiredDirectory("DS1TR_PRISTINE_DSR_ROOT"), catalog.Catalog));
             }
             finally
             {
@@ -403,6 +416,70 @@ namespace FogHost.Tests
                 }
             }
         }
+
+        private static string VerifyCeaselessDefaultLanding(string staging, string pristineRoot, FogAnnotationCatalog catalog)
+        {
+            FogEntrance ceaselessEntrance = catalog.Entrances.Single(entrance => entrance.Name == "o4961_0000");
+            FogEntranceSide destinationSide = ceaselessEntrance.BSide;
+            if (destinationSide.Area.Value != "demonruins_ceaseless" || destinationSide.CustomWarp != null)
+                throw new InvalidDataException("The Ceaseless B side must use FogMod's ordinary object-relative warp path.");
+
+            string mapName = "m14_01_00_00";
+            string mapPath = Path.Combine(pristineRoot, "map", "MapStudio", mapName + ".msb");
+            MSB1 pristineMap = MSB1.Read(mapPath);
+            MSB1.Part.Object fog = pristineMap.Parts.Objects.Single(part => part.Name == "o4961_0000" && part.EntityID == 1411790);
+            MSB1.Region trigger = pristineMap.Regions.Regions.Single(region => region.EntityID == 1412698);
+
+            // Pinned FogMod GameDataWriter: B-side warp is one metre along the opposite
+            // fog-object yaw, with the fog object's yaw retained for player facing.
+            float moveYaw = fog.Rotation.Y + 180f;
+            if (moveYaw >= 180f) moveYaw -= 360f;
+            double angle = moveYaw * Math.PI / 180d;
+            float expectedX = fog.Position.X + (float)Math.Sin(angle);
+            float expectedY = fog.Position.Y;
+            float expectedZ = fog.Position.Z + (float)Math.Cos(angle);
+            float expectedYaw = fog.Rotation.Y;
+
+            MSB1 outputMap = MSB1.Read(Path.Combine(staging, "map", "MapStudio", mapName + ".msb"));
+            float expectedActionY = fog.Position.Y - 1f;
+            MSB1.Region actionRegion = outputMap.Regions.Regions.Single(region =>
+                region.Name == "BR: demonruins-ceaseless-boundary");
+            if (Math.Abs(actionRegion.Position.X - expectedX) >= 0.001f
+                || Math.Abs(actionRegion.Position.Y - expectedActionY) >= 0.001f
+                || Math.Abs(actionRegion.Position.Z - expectedZ) >= 0.001f
+                || Math.Abs(actionRegion.Rotation.Y - moveYaw) >= 0.001f)
+                throw new InvalidDataException($"FogMod default action region placement failed for {mapName}/o4961_0000: region {actionRegion.EntityID}, expected ({expectedX:R}, {expectedActionY:R}, {expectedZ:R}, {moveYaw:R}).");
+
+            HashSet<string> sourcePlayerNames = pristineMap.Parts.Players.Select(player => player.Name).ToHashSet(StringComparer.Ordinal);
+            MSB1.Part.Player[] generatedPlayers = outputMap.Parts.Players.Where(player => !sourcePlayerNames.Contains(player.Name)).ToArray();
+            MSB1.Part.Player[] expectedLanding = generatedPlayers.Where(player =>
+                Math.Abs(player.Position.X - expectedX) < 0.001f
+                && Math.Abs(player.Position.Y - expectedY) < 0.001f
+                && Math.Abs(player.Position.Z - expectedZ) < 0.001f
+                && Math.Abs(player.Rotation.Y - expectedYaw) < 0.001f).ToArray();
+            bool centeredLandingExists = generatedPlayers.Any(player =>
+                Math.Abs(player.Position.X - trigger.Position.X) < 0.001f
+                && Math.Abs(player.Position.Y - trigger.Position.Y) < 0.001f
+                && Math.Abs(player.Position.Z - trigger.Position.Z) < 0.001f);
+            if (expectedLanding.Length != 1 || centeredLandingExists)
+                throw new InvalidDataException($"FogMod default landing parity failed for {mapName}/o4961_0000: expected ({expectedX:R}, {expectedY:R}, {expectedZ:R}, {expectedYaw:R}), matched={expectedLanding.Length}, trigger-center warp present={centeredLandingExists}.");
+
+            byte[] eventBytes = File.ReadAllBytes(Path.Combine(staging, "event", mapName + ".emevd.dcx"));
+            EMEVD outputEvents = EMEVD.Read(DCX.Decompress(eventBytes));
+            EMEVD.Event startEvent = outputEvents.Events.Single(evt => evt.ID == 11415371);
+            bool retainsBossStartRegion = startEvent.Instructions.Any(instruction => instruction.Bank == 3
+                && instruction.ID == 18 && instruction.ArgData.Length >= 12
+                && BitConverter.ToInt32(instruction.ArgData, 8) == 1412698);
+            if (!retainsBossStartRegion)
+                throw new InvalidDataException("The Fog output no longer preserves Ceaseless encounter-start event 11415371's check for region 1412698.");
+
+            MSB1.Part.Player player = expectedLanding[0];
+            string physicalLanding = $"{player.Name}:{player.Position.X:R},{player.Position.Y:R},{player.Position.Z:R},{player.Rotation.Y:R}";
+            string generatedActionRegion = $"actionRegion={actionRegion.EntityID}:{actionRegion.Position.X:R},{actionRegion.Position.Y:R},{actionRegion.Position.Z:R},{actionRegion.Rotation.Y:R}";
+            return $"{physicalLanding}|{generatedActionRegion}";
+        }
+
+        private static string PhysicalLanding(string landing) => landing.Split('|', 2)[0];
 
         private static string RequiredDirectory(string variable)
         {

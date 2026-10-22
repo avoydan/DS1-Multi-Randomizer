@@ -1,5 +1,79 @@
 # Implementation status
 
+## Ceaseless default landing correction (2026-10-22; V5 gameplay QA pending)
+
+The owner's manual QA of V5 reproduction Seed Code
+`DS1TR1-06NWCQQ3-K2HDEE66-RS30D9N6-2R31C11B-3KT74XF8-TRW6G1J0-5CE38MF4-582WV6E4-AGVH0B8M-TGV4HJ8W-JKKMNWTJ-HBS764X1-NV3N20D1-QDJM9NA0-S1JG2TEN-9X97WJ86-QKQ035S2-YJN7E80N-16X6QG5H-MAHG8BAS-82RG8KA0-C0FJ02D7-2R3SE92P-QAJ2D9P0-HBDD2TMC-HHN0RPQT-2ANCA016-ZGP0P`
+found that the player fell below the map after entering Asylum -> Demon Ruins.
+The immediate cause was V5 placing the player at the center of the Ceaseless
+boss trigger region. That was not FogMod's landing behavior.
+
+Pinned FogMod `6e6dc7886d0f8bcc53c1800d95c9e859d1f2f87f` was checked in the
+read-only checkout `%TEMP%\fogmod-src`. Its complete `o4961_0000` Entrance
+record is: ID `1411790`, Area `demonruins`, Text `To Ceaseless Discharge`,
+Tags `boss`; ASide Area `demonruins`; BSide Area `demonruins_ceaseless`, Flag
+`11410900`. BSide has no BossTrigger, BossTriggerArea, CustomWarp,
+ActionRegion, DestinationMap, or side Tags.
+
+In the pinned `GameDataWriter`, an ordinary BSide with no CustomWarp uses the
+Fog object's transform. With object `o4961_0000` at `(249, -283.15, 70.4)`,
+yaw `-136`, the writer moves the player one metre along the opposite facing
+(yaw `44`) and keeps player yaw `-136`. The generated arrival is
+`(249.69466, -283.15, 71.11934)`, yaw `-136`, in `m14_01_00_00`; it is not
+the trigger-region center `(248.5, -284, 69.7)`. The boss-start trigger region
+is separate from both the player spawn and the generated fog action region.
+The latter follows FogMod's ordinary one-metre offset and vertical adjustment.
+In the exact Fog-seed `4009337993` real-format support reproduction, the player
+part is `c0000_0051`; V2's generated action-region entity is `1815856` at
+`(249.69466, -284.15, 71.11934)`, yaw `44`. These entity IDs are output-local
+allocations, not IDs authored in the upstream Entrance record.
+Relative to trigger region `1412698` (yaw `-135`, box 5 x 2 x 1.5), the landing
+is about 1.85 units along its depth axis from center; the half-depth is 0.75.
+It is therefore not claimed to start the Ceaseless event immediately on
+arrival; the player must reach the physical trigger, which remains an owner
+gameplay check.
+
+The V5 center came from `FogCompactCatalogBuilder.BossTriggerCenteredSpawn`
+in `tools/fog-host/src/FogCompactCatalog.cs`, which projected the verified
+BossTriggerArea as `CustomWarp`. This conflated the event trigger's geometry
+with the player landing and bypassed the upstream default placement branch.
+V5 now clears BossTrigger, BossTriggerArea, and CustomWarp only on the exact
+Ceaseless BSide and preserves the host-only encounter-start identity
+`11415371`. The checker distinguishes that start event (which checks region
+`1412698`) from boss-death/completion event `11410410`; it still requires the
+exact directed entrance and default landing semantics before modeling an
+encounter opportunity. The graph route
+`demonruins_ceaseless -> demonruins_lava` remains gated by
+`boss_defeated_11410410`, and Area visitation alone does not unlock it.
+No hand-authored coordinate was added. A successful in-game boss start/kill
+and passage beyond the arena still require owner gameplay QA.
+
+FogHost is now `0.7.1`; backend is `0.46.1`. The V5 Compact fingerprint is
+`111d6e06227205fa62fc43fa9d0375274753c76a11af959b2d794a63c870fa49` and its
+world-data ID is `d927863b6583f1c5`. This is an explicitly authorized
+pre-release V5 correctness correction: the V5 Seed Code and settings remain
+the same, but generated V5 packages change. V1-V4 source behavior and golden
+fixtures are unchanged.
+
+Both V5 real-format golden cases were regenerated from their existing Seed
+Codes and now verify successfully: support reproduction, 55 files, digest
+`6bdd3ab7f11e5e1fc4e46d906942cb819b0b5862e739cf7bbcf45e1be3d908a9`; full
+Items + Enemies + Bosses + Fog, 73 files, digest
+`52765e667a9d23ff6079e9aa494da981608750b7a171d2be38e7bd79aff72934`.
+Each has 14 changed output hashes: `event/common.emevd.dcx` and the MSBs
+`m10_01_00_00`, `m10_02_00_00`, `m11_00_00_00`, `m12_01_00_00`,
+`m13_00_00_00`, `m13_01_00_00`, `m14_01_00_00`, `m15_00_00_00`,
+`m15_01_00_00`, `m16_00_00_00`, `m17_00_00_00`, `m18_00_00_00`, and
+`m18_01_00_00`. The golden verifier passed both cases against the read-only QA
+DSR source. The live Steam installation was not accessed.
+
+Final verification for this correction: FogHost Release build passed with 0
+warnings/errors; the full FogHost console suite passed **149/149**. Focused
+backend profile/projection/prerequisite tests passed **18/18**; the full backend
+suite passed **615 total, 613 passed, 0 failed, 2 skipped**. Root typecheck
+passed contracts, backend, desktop renderer, and Electron main. Both V5 golden
+cases passed real-format regeneration against the read-only QA source.
+
 ## ds1tr-gen-v5 promoted for local gameplay QA (2026-10-21)
 
 `CURRENT_GENERATION_PROFILE` is now `ds1tr-gen-v5` for newly created worlds,
@@ -16,8 +90,9 @@ world settings and master seed `332055808`:
 DS1TR1-06NWCQQ3-K2HDEE66-RS30D9N6-2R31C11B-3KT74XF8-TRW6G1J0-5CE38MF4-582WV6E4-AGVH0B8M-TGV4HJ8W-JKKMNWTJ-HBS764X1-NV3N20D1-QDJM9NA0-S1JG2TEN-9X97WJ86-QKQ035S2-YJN7E80N-16X6QG5H-MAHG8BAS-82RG8KA0-C0FJ02D7-2R3SE92P-QAJ2D9P0-HBDD2TMC-HHN0RPQT-2ANCA016-ZGP0P
 ```
 
-The profile-aware derivation gives combined seed
-`025aa1170ca6f73955bde4f8a2eb8f5c` and Fog seed `4009337993`. The real-format
+At the original 2026-10-21 promotion checkpoint, the profile-aware derivation
+gave combined seed `025aa1170ca6f73955bde4f8a2eb8f5c` and Fog seed `4009337993`.
+The pre-correction real-format
 V5 support reproduction passed on attempt 0 with 55 files and package digest
 `4ff13748e6c52ac10b845c6dfb9ba2c253dff8387fb70e5c493627b4a5cdfc34`.
 The V5 full Items + Enemies + Bosses + Fog golden also passed: 73 files,
@@ -36,27 +111,29 @@ published; gameplay QA remains outstanding.
 
 Packaging review found a separate historical-runtime limitation: V3/V4
 contracts require FogHost 0.6.0, but the current package builder places only
-FogHost 0.7.0 at the shared Compact-host path. The profile guard therefore
+FogHost 0.7.1 at the shared Compact-host path. The profile guard therefore
 refuses V3/V4 Fog generation in this packaged build. V1/V2 still select their
 separately pinned 0.5.0 host. This promotion leaves all those profile contracts
 unchanged; the V5 QA package is not evidence that every historical profile is
 playable from the package. Preserve this as a release compatibility blocker.
 
-## Compact Fog V2 / ds1tr-gen-v5 boss progression (2026-10-21; development only)
+## Initial Compact Fog V2 / ds1tr-gen-v5 boss progression (2026-10-21; landing policy superseded)
 
 The owner-approved Path A now represents Ceaseless completion as a typed
 V5-only graph condition. The Compact Fog V2 route
 `demonruins_ceaseless -> demonruins_lava` requires
 `boss_defeated_11410410`; the reverse edge is removed. Visiting the Area alone
-does not unlock the route. V5's graph checker adds that completion state only
-when a generated directed Entrance reaches the registered boss side, exact
-trigger map/region and centered custom spawn. This is a reachability model, not
-a combat simulator.
+does not unlock the route. The initial V5 checker required the exact trigger
+map/region and a centered custom spawn. That centered-spawn requirement was
+incorrect and is superseded by the 2026-10-22 default-landing correction above.
+The completion state remains a reachability model, not a combat simulator.
 
-The reproduced Asylum-to-Ceaseless arrival uses Entrance `o4961_0000` and lands
-at the center of region `1412698` in `m14_01_00_00`; pristine encounter event
-`11415371` checks that region. The old spawn was outside the trigger volume.
-This provides a trigger-safe arrival mechanism; no gameplay launch is claimed.
+The initial V5 Asylum-to-Ceaseless output landed at the center of region
+`1412698` in `m14_01_00_00`, but owner gameplay QA found that this location was
+below the map. The current V5 output restores FogMod's object-relative default
+landing; event `11415371` remains the encounter-start event for the trigger
+region, and `11410410` remains the boss-death progression event. Gameplay
+verification is pending.
 
 Pristine event `11410090` is classified as a dormant/unreferenced,
 non-randomizable system script. It contains two parameter-bound `2004[41]`

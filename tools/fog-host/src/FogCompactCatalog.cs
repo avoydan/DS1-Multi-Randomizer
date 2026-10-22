@@ -459,26 +459,53 @@ namespace FogHost
                 .Any(area => area.To.Any(link => link.Destination.Value == "demonruins_ceaseless")))
                 throw new InvalidDataException("Compact Fog v2 must not add an unsupported reverse Ceaseless/lava route.");
 
+            FogProjectEntranceResolution ceaselessResolution = FogAnnotationPolicyResolver.ResolveEntrancePoliciesV1(facts)
+                .Single(resolution => resolution.Policy.Id == "demonruins-ceaseless-boundary");
+            if (ceaselessResolution.Policy.InteractionEventId != 11415371
+                || ceaselessResolution.Policy.BossTriggerRegionEntityId != 1412698
+                || !facts.Maps[ceaselessResolution.Policy.Map].EventRegionChecks.Any(check =>
+                    check.EventId == ceaselessResolution.Policy.InteractionEventId.Value
+                    && check.RegionEntityId == ceaselessResolution.Policy.BossTriggerRegionEntityId.Value))
+                throw new InvalidDataException("Compact Fog v2 requires pristine Ceaseless encounter-start event 11415371 to check literal region 1412698.");
+
             FogEntrance[] entrances = v1.Catalog.Entrances.Select(entrance =>
             {
-                return entrance with
+                FogEntranceSide ProjectSide(FogEntranceSide side)
                 {
-                    ASide = BossTriggerCenteredSpawn(entrance.ASide, entrance.ASide?.DestinationMap ?? entrance.Map),
-                    BSide = BossTriggerCenteredSpawn(entrance.BSide, entrance.BSide?.DestinationMap ?? entrance.Map),
-                };
+                    if (side == null) return null;
+                    if (entrance.Name == ceaselessResolution.ResolvedObjectPartName
+                        && side.Area == ceaselessResolution.Policy.DestinationArea)
+                    {
+                        // Keep the trigger volume in host-only completion metadata. The original
+                        // event already checks region 1412698; a copied region and a center CustomWarp
+                        // are neither needed nor equivalent to FogMod's object-relative landing.
+                        return side with
+                        {
+                            BossTrigger = 0,
+                            BossTriggerArea = null,
+                            CustomWarp = null,
+                            BossEncounterStartEventId = checked((int)ceaselessResolution.Policy.InteractionEventId.Value),
+                        };
+                    }
+                    return BossTriggerCenteredSpawn(side, side.DestinationMap ?? entrance.Map);
+                }
+
+                return entrance with { ASide = ProjectSide(entrance.ASide), BSide = ProjectSide(entrance.BSide) };
             }).ToArray();
             FogEntranceSide ceaselessSide = entrances.Single(entrance => entrance.Name == "o4961_0000").BSide;
-            if (ceaselessSide.Area.Value != "demonruins_ceaseless" || ceaselessSide.BossTrigger != 11410410
-                || ceaselessSide.CustomWarp == null)
-                throw new InvalidDataException("Compact Fog v2 requires the verified Ceaseless boundary and boss-start trigger on the Demon Ruins side.");
+            if (ceaselessSide.Area.Value != "demonruins_ceaseless" || ceaselessSide.BossTrigger != 0
+                || ceaselessSide.BossTriggerArea != null || ceaselessSide.CustomWarp != null
+                || ceaselessSide.BossEncounterStartEventId != 11415371)
+                throw new InvalidDataException("Compact Fog v2 must retain FogMod's default object-relative landing on the Ceaseless side.");
 
             FogBossCompletionTransition[] bossCompletions = ResolveV2BossCompletionTransitions(
                 facts, entrances, bossGatedRoutes.Select(route => route.CompletionEventId).ToHashSet()).ToArray();
             if (!bossCompletions.Any(transition => transition.EventId == 11410410
                 && transition.EncounterArea.Value == "demonruins_ceaseless"
                 && transition.TriggerEntrance.Value == "o4961_0000"
+                && transition.TriggerEventId == 11415371
                 && transition.TriggerRegionEntityId == 1412698))
-                throw new InvalidDataException("Compact Fog v2 requires Ceaseless completion 11410410 to be reachable only through trigger region 1412698 at its centered boss boundary.");
+                throw new InvalidDataException("Compact Fog v2 requires Ceaseless completion 11410410 to be reachable only after the exact default-landing boundary whose start event 11415371 checks region 1412698.");
 
             FogAnnotationCatalog source = v1.Catalog;
             var catalog = new FogAnnotationCatalog(areas, source.KeyItems, source.Warps, entrances,
@@ -531,14 +558,19 @@ namespace FogHost
                 if (resolution.BossTriggerEventId != boss.BossEventId || resolution.BossTriggerArea == null
                     || !facts.BossRewardCompletionFlags.Contains(checked((int)boss.BossEventId)))
                     throw new InvalidDataException($"Boss completion {boss.BossEventId} has no matched trigger and common event-970 completion fact.");
+                if (!resolution.Policy.InteractionEventId.HasValue
+                    || !facts.Maps[resolution.Policy.Map].EventRegionChecks.Any(check =>
+                        check.EventId == resolution.Policy.InteractionEventId.Value
+                        && check.RegionEntityId == resolution.Policy.BossTriggerRegionEntityId))
+                    throw new InvalidDataException($"Boss completion {boss.BossEventId} has no pristine encounter-start event checking its authored trigger region.");
                 FogEntrance entrance = entrances.Single(value => value.Name == resolution.ResolvedObjectPartName);
                 FogEntranceSide side = new[] { entrance.ASide, entrance.BSide }
-                    .Single(value => value.Area == resolution.Policy.DestinationArea && value.BossTrigger == boss.BossEventId);
-                if (side.CustomWarp == null || side.BossTriggerArea == null
-                    || side.CustomWarp.Position.X != side.BossTriggerArea.X || side.CustomWarp.Position.Y != side.BossTriggerArea.Y
-                    || side.CustomWarp.Position.Z != side.BossTriggerArea.Z || side.CustomWarp.Position.Yaw != side.BossTriggerArea.Yaw)
-                    throw new InvalidDataException($"Boss completion {boss.BossEventId} is not reachable from a trigger-centered arrival.");
-                result.Add(new FogBossCompletionTransition(checked((int)boss.BossEventId), boss.Area,
+                    .Single(value => value.Area == resolution.Policy.DestinationArea);
+                if (side.CustomWarp != null || side.BossTrigger != 0 || side.BossTriggerArea != null
+                    || side.BossEncounterStartEventId != resolution.Policy.InteractionEventId)
+                    throw new InvalidDataException($"Boss completion {boss.BossEventId} does not use the verified FogMod-default landing.");
+                result.Add(new FogBossCompletionTransition(checked((int)boss.BossEventId),
+                    checked((int)resolution.Policy.InteractionEventId.Value), boss.Area,
                     new FogEntranceKey(resolution.ResolvedObjectPartName), resolution.Policy.Map,
                     resolution.Policy.BossTriggerRegionEntityId.Value));
             }

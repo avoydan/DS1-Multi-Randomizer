@@ -24,6 +24,8 @@ namespace FogHost
     public sealed record FogDsrRegionFact(string Name, int EntityId, FogDsrTransform Transform, FogDsrRegionShape Shape);
     public sealed record FogDsrEventFlagWrite(long EventId, int FlagId);
     public sealed record FogDsrEventFact(long EventId);
+    /// <summary>A literal region operand in a pristine 3[18] player-inside-area check.</summary>
+    public sealed record FogDsrEventRegionCheckFact(long EventId, int InstructionIndex, int RegionEntityId);
     public sealed record FogDsrCutsceneWarpFact(
         FogMapId SourceMap,
         long EventId,
@@ -81,6 +83,7 @@ namespace FogHost
             public IReadOnlyList<FogDsrObjectActFact> ObjectActDetails { get; init; }
             public string EventArchiveName { get; init; }
             public IReadOnlySet<long> EventIds { get; init; }
+            public IReadOnlyList<FogDsrEventRegionCheckFact> EventRegionChecks { get; init; }
             public IReadOnlyList<FogDsrCutsceneWarpFact> CutsceneWarps { get; init; }
             public IReadOnlyList<FogDsrEventFlagWrite> EventFlagWrites { get; init; }
             public IReadOnlyList<FogDsrObjectFact> ObjectDetails { get; init; }
@@ -223,6 +226,7 @@ namespace FogHost
                 itemPossessionChecks.AddRange(ReadItemPossessionChecks(eventArchivePath, new FogMapId(spec.Name)));
                 IReadOnlyList<FogDsrEventFlagWrite> eventFlagWrites = ReadEventFlagWrites(eventArchivePath);
                 IReadOnlySet<long> eventIds = ReadEventIds(eventArchivePath);
+                IReadOnlyList<FogDsrEventRegionCheckFact> eventRegionChecks = ReadEventRegionChecks(eventArchivePath);
                 IReadOnlyList<FogDsrCutsceneWarpFact> cutsceneWarps = ReadCutsceneWarps(eventArchivePath, new FogMapId(spec.Name));
                 IReadOnlyList<FogDsrBossDefeatFact> bossDefeatHandlers = ReadBossDefeatHandlers(eventArchivePath);
                 var spawnPoints = new Dictionary<int, string>();
@@ -271,6 +275,7 @@ namespace FogHost
                     ObjectActDetails = objectActDetails,
                     EventArchiveName = Path.GetFileName(eventArchivePath),
                     EventIds = eventIds,
+                    EventRegionChecks = eventRegionChecks,
                     CutsceneWarps = cutsceneWarps,
                     EventFlagWrites = eventFlagWrites,
                     ObjectDetails = objectDetails,
@@ -453,6 +458,32 @@ namespace FogHost
                 }
             }
             return Array.AsReadOnly(writes.ToArray());
+        }
+
+        private static IReadOnlyList<FogDsrEventRegionCheckFact> ReadEventRegionChecks(string eventArchivePath)
+        {
+            if (!File.Exists(eventArchivePath)) throw new FileNotFoundException("A pristine DSR EMEVD archive is missing.", eventArchivePath);
+            byte[] bytes = File.ReadAllBytes(eventArchivePath);
+            if (DCX.Is(bytes)) bytes = DCX.Decompress(bytes);
+            EMEVD archive = EMEVD.Read(bytes);
+            var checks = new List<FogDsrEventRegionCheckFact>();
+            foreach (EMEVD.Event evt in archive.Events)
+            {
+                for (int index = 0; index < evt.Instructions.Count; index++)
+                {
+                    EMEVD.Instruction instruction = evt.Instructions[index];
+                    if (instruction.Bank != 3 || instruction.ID != 18) continue;
+                    if (instruction.ArgData.Length < 12)
+                        throw new InvalidDataException($"Pristine 3[18] instruction in {Path.GetFileName(eventArchivePath)} event {evt.ID} instruction {index} is too short to contain its region operand.");
+                    bool regionIsParameterized = evt.Parameters.Any(parameter => parameter.InstructionIndex == index
+                        && parameter.TargetStartByte < 12 && parameter.TargetStartByte + parameter.ByteCount > 8);
+                    if (regionIsParameterized) continue;
+                    int regionEntityId = BitConverter.ToInt32(instruction.ArgData, 8);
+                    if (regionEntityId > 0)
+                        checks.Add(new FogDsrEventRegionCheckFact(evt.ID, index, regionEntityId));
+                }
+            }
+            return Array.AsReadOnly(checks.ToArray());
         }
 
         private static void AddItemLotAwards(string eventArchivePath, List<FogDsrItemLotAwardFact> destination, HashSet<string> indexedArchives)

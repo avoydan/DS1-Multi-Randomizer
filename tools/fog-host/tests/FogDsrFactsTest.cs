@@ -1407,7 +1407,7 @@ namespace FogHost.Tests
                     && area.To.Any(link => link.Destination.Value == "demonruins_ceaseless"));
             if (!v1CeaselessShortcut)
                 throw new InvalidDataException("Frozen Compact Fog v1 must retain its historical Ceaseless/lava shortcut; the correction belongs only to v5.");
-            VerifyCeaselessScriptClassification(pristineGameRoot);
+            VerifyCeaselessScriptClassification(facts, pristineGameRoot);
             FogCompactCatalogV2 compactV2 = FogCompactCatalogBuilder.BuildV2(facts);
             FogAreaLink ceaselessBossGatedRoute = compactV2.Catalog.Areas.Single(area => area.Id.Value == "demonruins_ceaseless")
                 .To.SingleOrDefault(link => link.Destination.Value == "demonruins_lava");
@@ -1418,26 +1418,19 @@ namespace FogHost.Tests
                 || compactV2.BossGatedRoutes[0].CompletionCollision != "h0018B1";
             FogEntranceSide ceaselessSide = compactV2.Catalog.Entrances.Single(entrance => entrance.Name == "o4961_0000").BSide;
             FogTriggerVolume ceaselessTrigger = ceaselessSide.BossTriggerArea;
-            FogPosition ceaselessSpawn = ceaselessSide.CustomWarp?.Position;
-            bool spawnInsideTrigger = ceaselessTrigger != null && ceaselessSpawn != null
-                && Math.Abs(ceaselessSpawn.X - ceaselessTrigger.X) <= ceaselessTrigger.Width / 2
-                && Math.Abs(ceaselessSpawn.Y - ceaselessTrigger.Y) <= ceaselessTrigger.Height / 2
-                && Math.Abs(ceaselessSpawn.Z - ceaselessTrigger.Z) <= ceaselessTrigger.Depth / 2
-                && ceaselessSpawn.Yaw == ceaselessTrigger.Yaw;
-            bool allBossSidesUseTriggerCenters = compactV2.Catalog.Entrances.SelectMany(entrance => new[] { entrance.ASide, entrance.BSide })
-                .Where(side => side?.BossTrigger != 0)
-                .All(side => side.BossTriggerArea != null && side.CustomWarp != null
-                    && side.CustomWarp.Position.X == side.BossTriggerArea.X
-                    && side.CustomWarp.Position.Y == side.BossTriggerArea.Y
-                    && side.CustomWarp.Position.Z == side.BossTriggerArea.Z
-                    && side.CustomWarp.Position.Yaw == side.BossTriggerArea.Yaw);
+            FogEntranceSide v1CeaselessSide = candidate.Catalog.Entrances.Single(entrance => entrance.Name == "o4961_0000").BSide;
+            bool literalEncounterStartCheck = facts.Maps[new FogMapId("demonruins")].EventRegionChecks
+                .Any(check => check.EventId == 11415371 && check.RegionEntityId == 1412698);
+            FogBossCompletionTransition ceaselessCompletion = compactV2.Catalog.BossCompletions
+                .SingleOrDefault(transition => transition.EventId == 11410410);
             if (compactV2.Fingerprint == candidate.Fingerprint || !compactV2.IsComplete
                 || ceaselessHasUnsupportedShortcut
-                || !spawnInsideTrigger
-                || !allBossSidesUseTriggerCenters
-                || ceaselessSide.BossTrigger != 11410410)
-                throw new InvalidDataException("Compact Fog v2 must gate only the evidenced Ceaseless-to-lava direction on completion and place every boss-side arrival at its verified trigger center.");
-            Console.WriteLine($"Compact Fog V2 candidate: fingerprint={compactV2.Fingerprint}; Ceaseless-to-lava route requires boss completion; reverse shortcut is absent; boss-side arrivals use verified trigger centers.");
+                || ceaselessTrigger != null || ceaselessSide.BossTrigger != 0 || ceaselessSide.CustomWarp != null
+                || v1CeaselessSide.BossTrigger != 11410410 || v1CeaselessSide.CustomWarp != null
+                || !literalEncounterStartCheck || ceaselessCompletion?.TriggerEventId != 11415371
+                || ceaselessCompletion.TriggerRegionEntityId != 1412698)
+                throw new InvalidDataException("Compact Fog v2 must preserve the Ceaseless default landing, retain V1 fields, and bind completion to the pristine 11415371/1412698 start check.");
+            Console.WriteLine($"Compact Fog V2 candidate: fingerprint={compactV2.Fingerprint}; Ceaseless arrival uses FogMod's default landing; completion remains bound to event 11415371 / region 1412698; boss-gated lava route is one-way.");
             FogWarp seathPrisonWarp = candidate.Catalog.Warps.SingleOrDefault(warp => warp.Id == FogProjectAnnotationPolicy.SeathPrisonWarpRuntimeId);
             bool rejectedMissingSeathPrisonRegion = false;
             try
@@ -1547,7 +1540,7 @@ namespace FogHost.Tests
             VerifyCompactGraphProfileMatrix(candidate);
         }
 
-        private static void VerifyCeaselessScriptClassification(string pristineGameRoot)
+        private static void VerifyCeaselessScriptClassification(FogDsrFacts facts, string pristineGameRoot)
         {
             string eventRoot = Path.Combine(pristineGameRoot, "event");
             string targetArchive = Path.Combine(eventRoot, "m14_01_00_00.emevd.dcx");
@@ -1572,9 +1565,11 @@ namespace FogHost.Tests
                         && BitConverter.ToInt32(instruction.ArgData, 4) == 11410090))
                         initializerReferences.Add($"{Path.GetFileName(archivePath)}/{evt.ID}/{instruction.Bank}[{instruction.ID}]");
             }
+            bool indexedLiteralRegionCheck = facts.Maps[new FogMapId("demonruins")].EventRegionChecks
+                .Count(check => check.EventId == 11415371 && check.RegionEntityId == 1412698) == 1;
             if (target.Parameters.Count != 10 || actionChecks.Length != 2 || shortWarps.Length != 2
                 || shortWarps.Any(instruction => instruction.ArgData.Length < 12 || BitConverter.ToInt32(instruction.ArgData, 8) != 0)
-                || initializerReferences.Count != 0 || !startEventChecksTriggerRegion)
+                || initializerReferences.Count != 0 || !startEventChecksTriggerRegion || !indexedLiteralRegionCheck)
                 throw new InvalidDataException($"Event 11410090 shape changed: parameters={target.Parameters.Count}, lineChecks={actionChecks.Length}, shortWarps={shortWarps.Length}, shortWarpArgs=[{string.Join(',', shortWarps.Select(instruction => instruction.ArgData.Length >= 12 ? BitConverter.ToInt32(instruction.ArgData, 8).ToString(CultureInfo.InvariantCulture) : "short"))}], initializerReferences=[{string.Join(',', initializerReferences)}], startRegion1412698={startEventChecksTriggerRegion}.");
             Console.WriteLine("Pristine Demon Ruins: event 11415371 checks region 1412698 in its 3[18] encounter-start instruction. Event 11410090 is an unreferenced script (10 parameter bindings; two 3[18] action checks; two parameter-bound 2004[41] short-warp requests with placeholder target field 0; no InitializeEvent/InitializeEventNoSkip caller), so it is NOT_RANDOMIZABLE and contributes no route evidence.");
         }

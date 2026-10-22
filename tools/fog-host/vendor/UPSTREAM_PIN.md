@@ -88,26 +88,31 @@ CRLF after patching.
 `AnnotationData.cs`, `Graph.cs`, `GraphChecker.cs`, and `GraphConnector.cs` each
 carry an Apache-2.0 section 4(b) modification notice at the file header.
 
-- `AnnotationData.cs` adds a FogHost-only, YAML-ignored `BossCompletions` list
-  and its typed encounter/trigger record. It is not emitted to FogMod YAML.
+- `AnnotationData.cs` adds FogHost-only, YAML-ignored boss-completion data,
+  including `BossEncounterStartEventId` on an entrance side. These properties
+  are not emitted to FogMod YAML. The start event is distinct from the boss
+  death/completion event.
 - `Graph.cs` recognizes only explicitly declared `boss_defeated_<eventId>`
   condition atoms; unknown atoms remain errors.
 - `GraphChecker.cs` maintains boss-completion state separately from visited
-  Areas and items. It derives an encounter as defeatable only from a traversed
-  directed edge whose FogMod destination side matches the authored boss event,
-  exact entrance, trigger map/region, and trigger-centered custom warp. Boss
-  completion dependencies resolve their distance through the encounter Area;
-  loop convergence includes both Area and completion state. This is a
-  reachability abstraction: the game still sets the real completion flag only
-  when the player defeats the boss.
+  Areas and items. It derives an encounter as reachable only from a traversed
+  directed edge whose destination side matches the exact entrance, host-only
+  encounter-start event, and verified default landing semantics. For Ceaseless,
+  the V5 side must have no BossTrigger, BossTriggerArea, or CustomWarp. The
+  pristine boss trigger region is used to validate the start event relationship;
+  it is not a player spawn coordinate. Boss completion dependencies resolve
+  through the encounter Area; loop convergence includes Area and completion
+  state. This is a reachability abstraction: the game still sets the real
+  completion flag only when the player defeats the boss.
 - `GraphConnector.cs` includes unmet boss-completion route conditions in its
   bounded-solver failure details. With no completion records, v1-v4 graph
   behavior and error text are unchanged.
 
-Tests: `BossProgressionTest` covers Area-only, wrong-trigger-side, off-center
-spawn, and trigger-centered encounter cases; `FogDsrFactsTest` checks the
-project route and spawn anchors; the Compact v2 real-generation matrix writes
-and decodes every output in separate staging directories.
+Tests: `BossProgressionTest` covers Area-only, wrong entrance, custom warp,
+wrong encounter-start event, and the exact default-landing Ceaseless edge;
+`FogDsrFactsTest` checks the pristine encounter-start region; the Compact v2
+real-generation test decodes the emitted Ceaseless player part and compares
+its position and yaw to the pinned upstream writer calculation.
 
 ## SoulsIds
 

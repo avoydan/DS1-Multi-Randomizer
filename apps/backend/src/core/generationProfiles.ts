@@ -51,7 +51,7 @@ export interface GenerationProfile {
  * The schema is deliberately kept separate from the application's own version.
  */
 export interface FogHostRuntimeContract {
-  readonly hostVersion: '0.5.0' | '0.6.0' | '0.7.0';
+  readonly hostVersion: '0.5.0' | '0.6.0' | '0.7.1';
   readonly schemaVersion: 2 | 3;
   readonly annotationSource: 'legacy-fogmod' | 'compact-v1' | 'compact-v2';
 }
@@ -126,7 +126,7 @@ const v4: GenerationProfile = Object.freeze({
 
 const v5: GenerationProfile = Object.freeze({
   id: GENERATION_PROFILE_V5,
-  title: 'Corrected Compact Fog and boss-side arrival',
+  title: 'Corrected Compact Fog and verified Ceaseless landing',
   seedDerivation: SEED_DERIVATION_V1,
   retryBounds: Object.freeze({ maxCombinedAttempts: 3, maxFogAttempts: 5 }),
   combinedEngine: Object.freeze({ randomizerVersions: Object.freeze(['0.5.66']) }),
@@ -134,11 +134,11 @@ const v5: GenerationProfile = Object.freeze({
   roamingBossFitPolicy: 'owner-approved-v1',
   fogAnnotationSource: 'compact-v2',
   fogEngine: Object.freeze({
-    hostVersions: Object.freeze(['0.7.0']),
+    hostVersions: Object.freeze(['0.7.1']),
     fogModCommit: v4.fogEngine.fogModCommit,
-    worldDataId: '221c01fa780daba7',
+    worldDataId: 'd927863b6583f1c5',
     compactCatalogVersion: 'ds1tr-compact-full-fog-v2',
-    compactCatalogFingerprint: '701f5aa84085ac2361bee382c43a05c4813e11878fac8a462dd1341a859a1d7a',
+    compactCatalogFingerprint: '111d6e06227205fa62fc43fa9d0375274753c76a11af959b2d794a63c870fa49',
   }),
   fogItemTracking: 'compact-fog-item-tracking-v1',
   completeSettings: v4.completeSettings,
@@ -173,10 +173,10 @@ export function fogHostRuntimeForProfile(
   }
   if (profile.fogAnnotationSource === 'compact-v2'
     && profile.fogItemTracking === 'compact-fog-item-tracking-v1'
-    && versions.includes('0.7.0')
+    && versions.includes('0.7.1')
     && typeof profile.fogEngine.compactCatalogVersion === 'string'
     && typeof profile.fogEngine.compactCatalogFingerprint === 'string') {
-    return Object.freeze({ hostVersion: '0.7.0', schemaVersion: 3, annotationSource: 'compact-v2' });
+    return Object.freeze({ hostVersion: '0.7.1', schemaVersion: 3, annotationSource: 'compact-v2' });
   }
   return null;
 }

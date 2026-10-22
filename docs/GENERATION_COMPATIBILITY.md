@@ -22,7 +22,7 @@ deterministic behavior that turns *(master seed, canonical settings)* into a wor
 | Retry bounds | combined engine 3 attempts, Fog 5 attempts (every attempt draws different seeds, so the bounds are semantics) | same | same | same |
 | Combined engine (items, enemies, bosses) | `RANDOMIZER_VERSION` `0.5.66`, roaming destination policy `protected-v1` | `RANDOMIZER_VERSION` `0.5.66`, roaming destination policy `safe-handlers-v2` | same as v2 | same as v2 |
 | Roaming-boss candidate and fit behavior | historical `legacy-v1` | historical `legacy-v1` | historical `legacy-v1` | owner-approved `owner-approved-v1` |
-| World randomizer | FogHost `0.5.0`, FogMod commit `6e6dc7886d0f8bcc53c1800d95c9e859d1f2f87f`, world data id `f394fa536ba9b66d` | same | FogHost `0.6.0`, Compact catalog `ds1tr-compact-full-fog-v1` fingerprint `8c03fd3de1cd7c772d5c933753ae54eab35f9e8b70a1aef2954322330d0002d4`, world data id `compact-runtime-offline-v1` | same as v3 | FogHost `0.7.0`, Compact catalog `ds1tr-compact-full-fog-v2` fingerprint `701f5aa84085ac2361bee382c43a05c4813e11878fac8a462dd1341a859a1d7a`, world data id `221c01fa780daba7` |
+| World randomizer | FogHost `0.5.0`, FogMod commit `6e6dc7886d0f8bcc53c1800d95c9e859d1f2f87f`, world data id `f394fa536ba9b66d` | same | FogHost `0.6.0`, Compact catalog `ds1tr-compact-full-fog-v1` fingerprint `8c03fd3de1cd7c772d5c933753ae54eab35f9e8b70a1aef2954322330d0002d4`, world data id `compact-runtime-offline-v1` | same as v3 | FogHost `0.7.1`, Compact catalog `ds1tr-compact-full-fog-v2` fingerprint `111d6e06227205fa62fc43fa9d0375274753c76a11af959b2d794a63c870fa49`, world data id `d927863b6583f1c5` |
 | Item tracking for the world randomizer | `fog-item-tracking-v1` (`docs/FOG_ITEM_TRACKING.md`) | same | `compact-fog-item-tracking-v1` | same as v3 | same as v4 |
 | Settings completion | `completeSettings`: options added after the profile get the value that reproduces the profile's behavior | same | same | same |
 
@@ -31,12 +31,44 @@ deterministic behavior that turns *(master seed, canonical settings)* into a wor
 `ds1tr-gen-v2` preserves the audited roaming-boss destination handling described below. `ds1tr-gen-v3` added the independent Compact Fog catalog, offline reconstructed data, and required-only backend Fog item constraints. `ds1tr-gen-v4` adds owner-approved roaming-boss fit behavior while retaining the v3 Compact Fog contract. `ds1tr-gen-v5` inherits v4 and selects the corrected Compact Fog v2 topology and boss-side arrival policy. Profiles v1 through v3 retain the historical fit behavior; v1-v4 Fog behavior and fixtures remain unchanged. Seed Code format 1, canonical setting shape, seed derivation, retry bounds, and combined engine `0.5.66` RNG salt remain unchanged. See [Compact Full Fog V2](COMPACT_FULL_FOG_V2.md).
 
 For local owner gameplay QA, new worlds now use `ds1tr-gen-v5` as
-`CURRENT_GENERATION_PROFILE`. This promotion changes only which already-defined
-profile is selected for a new world; it does not change V5 semantics. A loaded
+`CURRENT_GENERATION_PROFILE`. At promotion time this changed only which
+already-defined profile was selected. The later owner-authorized pre-release
+Ceaseless correction to V5 is recorded below. A loaded
 Seed Code continues to select its embedded profile. Existing v1-v4 Seed Codes
 and golden fixtures remain unchanged, including the reported V4 hard-lock
 code, which still decodes and re-encodes byte-for-byte as V4. This local QA
-promotion is not a release-readiness or gameplay-success claim.
+promotion and the later correction are not release-readiness or gameplay-success
+claims.
+
+## Pre-release V5 Ceaseless landing correction (backend 0.46.1; 2026-10-22)
+
+Owner gameplay QA found that the V5 Ceaseless B-side player landed below the
+map. The initial Compact V2 projection used the boss trigger region center as
+`CustomWarp`, but pinned FogMod `6e6dc7886d0f8bcc53c1800d95c9e859d1f2f87f`
+has no `BossTrigger`, `BossTriggerArea`, `CustomWarp`, or `ActionRegion` on
+Entrance `o4961_0000` BSide. Its writer places the player relative to the Fog
+object. The project-owned V5 projection now restores that default placement
+while keeping the `boss_defeated_11410410` route condition. Encounter-start
+event `11415371` remains distinct and validates the trigger relationship.
+
+This changes outputs for the already-recorded V5 Seed Codes, so it is an
+explicit owner-authorized pre-release correction to `ds1tr-gen-v5`. The profile
+identifier and Seed Codes are retained because V5 has not been released; old
+V5 codes now generate the corrected output. V1-V4 code, profile behavior, and
+golden fixtures remain unchanged. The two V5 goldens were updated only after
+the real-format replays passed. Support reproduction changed from 55-file
+digest `4ff13748e6c52ac10b845c6dfb9ba2c253dff8387fb70e5c493627b4a5cdfc34` to
+`6bdd3ab7f11e5e1fc4e46d906942cb819b0b5862e739cf7bbcf45e1be3d908a9`; full
+triple changed from 73-file digest
+`c70b79d3fe7333b83ba7250babf78237d8a1c13d0d8067f95f2a16367c2f6024` to
+`52765e667a9d23ff6079e9aa494da981608750b7a171d2be38e7bd79aff72934`.
+In each V5 package, the changed file hashes are `event/common.emevd.dcx` and
+MSBs `m10_01_00_00`, `m10_02_00_00`, `m11_00_00_00`, `m12_01_00_00`,
+`m13_00_00_00`, `m13_01_00_00`, `m14_01_00_00`, `m15_00_00_00`,
+`m15_01_00_00`, `m16_00_00_00`, `m17_00_00_00`, `m18_00_00_00`, and
+`m18_01_00_00`. Golden verification passed both V5 cases against the
+read-only QA DSR source. This does not claim the corrected world passed
+in-game gameplay QA. No desktop/public version, tag, or release was changed.
 
 ## Recorded exception 6: roaming-boss safe destination handling (backend 0.46.0, desktop 0.39.0; 2026-10-12)
 

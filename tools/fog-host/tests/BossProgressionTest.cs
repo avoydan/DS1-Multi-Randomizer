@@ -12,26 +12,35 @@ namespace FogHost.Tests
 
         public static void Verify()
         {
-            GraphChecker.CheckRecord areaOnly = Check(triggerSide: false, centered: false);
+            GraphChecker.CheckRecord areaOnly = Check(entranceName: "unrelated-boss-area-entry", triggerEventId: 11415371, defaultLanding: true);
             if (areaOnly.BossCompletions.Count != 0 || !areaOnly.Unvisited.Contains("lava"))
                 throw new InvalidOperationException("Visiting the Ceaseless Area alone must not grant its completion state or open the lava route.");
 
-            GraphChecker.CheckRecord wrongSpawn = Check(triggerSide: true, centered: false);
-            if (wrongSpawn.BossCompletions.Count != 0 || !wrongSpawn.Unvisited.Contains("lava"))
-                throw new InvalidOperationException("An arrival outside the verified boss trigger must not grant completion or open the route.");
+            GraphChecker.CheckRecord wrongEntrance = Check(entranceName: "different-fog", triggerEventId: 11415371, defaultLanding: true);
+            if (wrongEntrance.BossCompletions.Count != 0 || !wrongEntrance.Unvisited.Contains("lava"))
+                throw new InvalidOperationException("A default landing through a different entrance must not grant the Ceaseless completion state.");
 
-            GraphChecker.CheckRecord completed = Check(triggerSide: true, centered: true);
+            GraphChecker.CheckRecord customWarp = Check(entranceName: Entrance, triggerEventId: 11415371, defaultLanding: false);
+            if (customWarp.BossCompletions.Count != 0 || !customWarp.Unvisited.Contains("lava"))
+                throw new InvalidOperationException("A custom warp must not stand in for the verified FogMod-default landing.");
+
+            GraphChecker.CheckRecord wrongStartEvent = Check(entranceName: Entrance, triggerEventId: 11410410, defaultLanding: true);
+            if (wrongStartEvent.BossCompletions.Count != 0 || !wrongStartEvent.Unvisited.Contains("lava"))
+                throw new InvalidOperationException("The boss-death event must not be confused with its encounter-start event.");
+
+            GraphChecker.CheckRecord completed = Check(entranceName: Entrance, triggerEventId: 11415371, defaultLanding: true);
             if (!completed.BossCompletions.Contains(Condition) || completed.Unvisited.Count != 0)
-                throw new InvalidOperationException("A centered arrival through the verified Ceaseless trigger must make the boss completion transition available to the checker.");
+                throw new InvalidOperationException("The exact Ceaseless entrance with its verified default landing must make the boss completion transition available to the checker.");
         }
 
-        private static GraphChecker.CheckRecord Check(bool triggerSide, bool centered)
+        private static GraphChecker.CheckRecord Check(string entranceName, int triggerEventId, bool defaultLanding)
         {
             var completion = new BossCompletionRule
             {
                 Name = Condition,
                 Area = "boss",
                 EventId = 11410410,
+                TriggerEventId = 11415371,
                 TriggerEntrance = Entrance,
                 TriggerMap = "m14_01_00_00",
                 TriggerRegionEntityId = 1412698,
@@ -53,27 +62,20 @@ namespace FogHost.Tests
                     ["lava"] = new Graph.Node { Area = "lava" },
                 },
             };
-            Connect(graph, "start", "boss", null,
-                triggerSide
-                    ? new Side
-                    {
-                        Area = "boss",
-                        BossTrigger = 11410410,
-                        BossTriggerArea = centered ? "248.5 -284 69.7 -135 5 2 1.5" : "248.5 -284 69.7 -135 5 2 1.5",
-                        CustomWarp = centered ? "m14_01_00_00 248.5 -284 69.7 -135" : "m14_01_00_00 249.69 -283.15 71.12 -135",
-                    }
-                    : new Side { Area = "boss" });
+            Connect(graph, "start", "boss", null, defaultLanding
+                ? new Side { Area = "boss", BossEncounterStartEventId = triggerEventId }
+                : new Side { Area = "boss", CustomWarp = "m14_01_00_00 248.5 -284 69.7 -135" }, entranceName);
             Connect(graph, "boss", "lava", Expr.Named(Condition), new Side { Area = "lava" });
             var options = new RandomizerOptions();
             foreach (string flag in new[] { "explain", "dumpdist", "scalingbase" }) options[flag] = false;
             return new GraphChecker().Check(options, graph, "start");
         }
 
-        private static void Connect(Graph graph, string from, string to, Expr condition, Side destinationSide)
+        private static void Connect(Graph graph, string from, string to, Expr condition, Side destinationSide, string entranceName = null)
         {
             var exit = new Graph.Edge { Type = Graph.EdgeType.Exit, From = from, Expr = condition, Side = new Side { Area = from } };
             var entrance = new Graph.Edge { Type = Graph.EdgeType.Entrance, To = to, Side = destinationSide,
-                Name = to == "boss" ? Entrance : null };
+                Name = to == "boss" ? entranceName : null };
             exit.LinkedExpr = entrance.LinkedExpr = condition;
             graph.graph[from].To.Add(exit);
             graph.graph[to].From.Add(entrance);
