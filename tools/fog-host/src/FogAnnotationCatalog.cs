@@ -189,13 +189,15 @@ namespace FogHost
     {
         public string ConditionName => "boss_defeated_" + EventId.ToString(CultureInfo.InvariantCulture);
     }
-    /// <summary>Project-owned same-map passage whose availability follows a verified boss completion flag.</summary>
+    /// <summary>Project-owned passage whose availability follows a verified boss completion flag.</summary>
     public sealed record FogBossGatedRoute(
         FogAreaId Source,
         FogAreaId Destination,
         int CompletionEventId,
+        FogAreaId EncounterArea,
+        FogEntranceKey SeparatingEntrance,
         FogMapId Map,
-        string CompletionCollision,
+        string BossCompletionCollision,
         string PhysicalRationale);
     /// <summary>A pristine game object retained only for a pinned FogMod writer branch, never a graph edge.</summary>
     public sealed record FogWriterSupportEntrance(string Name, int Id, FogMapId Map, string Rationale);

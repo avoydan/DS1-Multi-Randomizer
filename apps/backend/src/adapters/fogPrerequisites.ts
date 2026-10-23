@@ -127,7 +127,7 @@ export async function resolveFogPrerequisites(
   const runtime = context?.fogRuntime;
   if (!runtime || !((runtime.hostVersion === '0.5.0' && runtime.schemaVersion === 2 && runtime.annotationSource === 'legacy-fogmod')
     || (runtime.hostVersion === '0.6.0' && runtime.schemaVersion === 3 && runtime.annotationSource === 'compact-v1')
-    || (runtime.hostVersion === '0.7.1' && runtime.schemaVersion === 3 && runtime.annotationSource === 'compact-v2'))) {
+    || (runtime.hostVersion === '0.7.2' && runtime.schemaVersion === 3 && runtime.annotationSource === 'compact-v2'))) {
     return { failure: {
       code: 'FOG_PROFILE_RUNTIME_INVALID',
       userMessage: 'The fog randomizer cannot run for this generation profile. Please update or reinstall DS1 Multi Randomizer.',

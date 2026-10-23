@@ -430,8 +430,8 @@ namespace FogHost
         public static FogCompactCatalogV2 BuildV2(FogDsrFacts facts)
         {
             FogCompactCatalogV1 v1 = Build(facts);
-            // Remove V1's unconditioned Ceaseless shortcut. V2 adds back only the direction with
-            // an explicit completion predicate and separately validated same-map route evidence.
+            // Remove V1's unconditioned Ceaseless/lava shortcuts. V2 adds a boss-gated route from
+            // the main Demon Ruins side; the arena's randomized fog boundary is its only exit.
             FogArea[] areas = v1.Catalog.Areas.Select(area =>
             {
                 if (area.Id.Value != "demonruins_ceaseless" && area.Id.Value != "demonruins_lava") return area;
@@ -455,9 +455,16 @@ namespace FogHost
                     To = Array.AsReadOnly(sourceArea.To.Concat(new[] { new FogAreaLink(route.Destination, condition, FogAreaLinkTags.None) }).ToArray()),
                 };
             }
-            if (areas.Where(area => area.Id.Value == "demonruins_lava")
-                .Any(area => area.To.Any(link => link.Destination.Value == "demonruins_ceaseless")))
-                throw new InvalidDataException("Compact Fog v2 must not add an unsupported reverse Ceaseless/lava route.");
+            FogAreaLink mainToLava = areas.Single(area => area.Id.Value == "demonruins")
+                .To.SingleOrDefault(link => link.Destination.Value == "demonruins_lava");
+            bool ceaselessToLava = areas.Single(area => area.Id.Value == "demonruins_ceaseless")
+                .To.Any(link => link.Destination.Value == "demonruins_lava");
+            bool lavaToCeaseless = areas.Single(area => area.Id.Value == "demonruins_lava")
+                .To.Any(link => link.Destination.Value == "demonruins_ceaseless");
+            if (ceaselessToLava || lavaToCeaseless
+                || mainToLava?.Condition is not { Kind: FogConditionKind.Atom, Terms.Count: 1 }
+                || mainToLava.Condition.Terms[0] != FogConditionReference.BossCompletion(11410410))
+                throw new InvalidDataException("Compact Fog v2 must gate the lower Demon Ruins route from the main Demon Ruins side and remove both Ceaseless/lava shortcuts.");
 
             FogProjectEntranceResolution ceaselessResolution = FogAnnotationPolicyResolver.ResolveEntrancePoliciesV1(facts)
                 .Single(resolution => resolution.Policy.Id == "demonruins-ceaseless-boundary");
@@ -518,9 +525,10 @@ namespace FogHost
         {
             FogBossGatedRoute[] policies =
             {
-                new FogBossGatedRoute(new FogAreaId("demonruins_ceaseless"), new FogAreaId("demonruins_lava"), 11410410,
+                new FogBossGatedRoute(new FogAreaId("demonruins"), new FogAreaId("demonruins_lava"), 11410410,
+                    new FogAreaId("demonruins_ceaseless"), new FogEntranceKey("o4961_0000"),
                     new FogMapId("demonruins"), "h0018B1",
-                    "Owner-reproduced route from the Ceaseless encounter pocket into the lava-side segment; pristine DSR binds collision h0018B1 to Ceaseless completion 11410410. The graph edge is available after that completion only.")
+                    "Pristine m14_01_00_00 MSB places the Ceaseless boss on collision h0018B1 and places entrance object o4961_0000 at the boundary between main Demon Ruins and the encounter area. The boundary is the arena's return route and is randomizable; after defeating Ceaseless, the player must exit to its main-side area before traversing the newly passable lower route. h0018B1 is only a boss-completion identity anchor, not the route itself.")
             };
             var result = new List<FogBossGatedRoute>();
             var seen = new HashSet<(FogAreaId, FogAreaId)>();
@@ -528,19 +536,25 @@ namespace FogHost
             {
                 if (!seen.Add((policy.Source, policy.Destination))) throw new InvalidDataException("Duplicate v2 boss-gated physical route.");
                 if (string.IsNullOrWhiteSpace(policy.PhysicalRationale)) throw new InvalidDataException("A v2 boss-gated route must have separate physical evidence.");
-                FogBossAreaTagPolicy boss = FogProjectAnnotationPolicy.BossAreaTagPolicies.SingleOrDefault(candidate =>
-                    candidate.Area == policy.Source && candidate.BossEventId == policy.CompletionEventId && candidate.Map == policy.Map);
-                if (boss == null) throw new InvalidDataException($"Boss-gated route '{policy.Source}' has no matching verified boss completion event {policy.CompletionEventId}.");
-                FogAreaTagPolicy[] resolvedBoss = FogAnnotationPolicyResolver.ResolveBossAreaTagPolicies(facts, new[] { boss }).ToArray();
+                FogBossAreaTagPolicy[] bossPolicies = FogProjectAnnotationPolicy.BossAreaTagPolicies.Where(candidate =>
+                    candidate.Area == policy.EncounterArea && candidate.BossEventId == policy.CompletionEventId && candidate.Map == policy.Map).ToArray();
+                if (bossPolicies.Length != 1 || policy.Source == policy.EncounterArea)
+                    throw new InvalidDataException($"Boss-gated route '{policy.Source}' must be distinct from its unique verified encounter area '{policy.EncounterArea}' for event {policy.CompletionEventId}.");
+                FogAreaTagPolicy[] resolvedBoss = FogAnnotationPolicyResolver.ResolveBossAreaTagPolicies(facts, bossPolicies).ToArray();
                 bool hasFlag = facts.BossRewardCompletionFlags.Contains(policy.CompletionEventId);
                 FogDefaultFlagCollision[] collisionFlags = baseCatalog.DefaultFlagCols.Where(flag => flag.Map == policy.Map
-                    && flag.Collision == policy.CompletionCollision && flag.BossFlag == policy.CompletionEventId).ToArray();
-                if (resolvedBoss.Length != 1 || !hasFlag || collisionFlags.Length != 1)
-                    throw new InvalidDataException($"Boss-gated route '{policy.Source}' -> '{policy.Destination}' has no unique pristine completion-flag proof for event {policy.CompletionEventId}.");
+                    && flag.Collision == policy.BossCompletionCollision && flag.BossFlag == policy.CompletionEventId).ToArray();
+                FogEntrance boundary = baseCatalog.Entrances.SingleOrDefault(entrance => entrance.Name == policy.SeparatingEntrance.Value);
+                bool boundarySeparatesEncounter = boundary != null && boundary.Map == policy.Map
+                    && boundary.ASide != null && boundary.BSide != null
+                    && ((boundary.ASide.Area == policy.Source && boundary.BSide.Area == policy.EncounterArea)
+                        || (boundary.BSide.Area == policy.Source && boundary.ASide.Area == policy.EncounterArea));
+                if (resolvedBoss.Length != 1 || !hasFlag || collisionFlags.Length != 1 || !boundarySeparatesEncounter)
+                    throw new InvalidDataException($"Boss-gated route '{policy.Source}' -> '{policy.Destination}' lacks unique pristine boss-completion evidence or the verified separating entrance '{policy.SeparatingEntrance}'.");
                 FogMapId sourceMap = FogProjectAnnotationPolicy.ResolveAreaMap(policy.Source);
                 FogMapId destinationMap = FogProjectAnnotationPolicy.ResolveAreaMap(policy.Destination);
-                if (sourceMap != policy.Map || destinationMap != policy.Map || !facts.Maps[policy.Map].Collisions.Contains(policy.CompletionCollision))
-                    throw new InvalidDataException($"Boss-gated route '{policy.Source}' -> '{policy.Destination}' lacks the authored same-map physical route anchor '{policy.Map}/{policy.CompletionCollision}'.");
+                if (sourceMap != policy.Map || destinationMap != policy.Map || !facts.Maps[policy.Map].Collisions.Contains(policy.BossCompletionCollision))
+                    throw new InvalidDataException($"Boss-gated route '{policy.Source}' -> '{policy.Destination}' lacks the verified same-map boss-completion anchor '{policy.Map}/{policy.BossCompletionCollision}'.");
                 result.Add(policy);
             }
             return Array.AsReadOnly(result.ToArray());

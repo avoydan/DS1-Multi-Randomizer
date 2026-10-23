@@ -102,14 +102,28 @@ carry an Apache-2.0 section 4(b) modification notice at the file header.
   pristine boss trigger region is used to validate the start event relationship;
   it is not a player spawn coordinate. Boss completion dependencies resolve
   through the encounter Area; loop convergence includes Area and completion
-  state. This is a reachability abstraction: the game still sets the real
-  completion flag only when the player defeats the boss.
+  state. Its optional initial-completion argument supports a post-defeat check
+  that starts at the encounter and treats that boss flag as set. This is a
+  reachability abstraction: the game still sets the real completion flag only
+  when the player defeats the boss.
 - `GraphConnector.cs` includes unmet boss-completion route conditions in its
   bounded-solver failure details. With no completion records, v1-v4 graph
   behavior and error text are unchanged.
 
+The project-owned `BossProgressionValidator` runs only for Compact V2 (profile
+v5), after `GraphConnector` finishes. It checks that every destination behind
+a boss-completion condition is reachable from that boss's encounter area with
+the boss flag set, after taking the encounter's named exit entrance and then
+using only fixed physical transitions. A different randomized Fog entrance
+cannot substitute for that route. The optional `GraphChecker` edge predicate
+is unrestricted when omitted; Compact V1 and legacy profile paths retain their
+previous behavior. Failure returns retryable `FOG_SEED_UNSOLVABLE` at
+`solve-graph`, and the backend tries the next deterministic Fog seed.
+
 Tests: `BossProgressionTest` covers Area-only, wrong entrance, custom warp,
 wrong encounter-start event, and the exact default-landing Ceaseless edge;
+it also verifies post-boss reachability from the encounter and the retryable
+failure for a sealed pocket;
 `FogDsrFactsTest` checks the pristine encounter-start region; the Compact v2
 real-generation test decodes the emitted Ceaseless player part and compares
 its position and yaw to the pinned upstream writer calculation.

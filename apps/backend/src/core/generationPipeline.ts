@@ -109,7 +109,7 @@ const defaults: GenerationDependencies = {
   progressionModel: (prerequisites, variant) => loadProgressionModel(prerequisites, undefined, variant),
   ownerQaLoadoutEnabled: () => ownerQaLoadoutEnabled(),
   ownerQaLoadout: (gameRoot, packagePath, onLog) => applyOwnerQaLoadout(gameRoot, packagePath, { onLog }),
-  appVersion: '0.46.0',
+  appVersion: '0.46.2',
 };
 
 async function fingerprint(file: string): Promise<{ size: number; sha256: string }> {

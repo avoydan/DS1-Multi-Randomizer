@@ -22,7 +22,7 @@ deterministic behavior that turns *(master seed, canonical settings)* into a wor
 | Retry bounds | combined engine 3 attempts, Fog 5 attempts (every attempt draws different seeds, so the bounds are semantics) | same | same | same |
 | Combined engine (items, enemies, bosses) | `RANDOMIZER_VERSION` `0.5.66`, roaming destination policy `protected-v1` | `RANDOMIZER_VERSION` `0.5.66`, roaming destination policy `safe-handlers-v2` | same as v2 | same as v2 |
 | Roaming-boss candidate and fit behavior | historical `legacy-v1` | historical `legacy-v1` | historical `legacy-v1` | owner-approved `owner-approved-v1` |
-| World randomizer | FogHost `0.5.0`, FogMod commit `6e6dc7886d0f8bcc53c1800d95c9e859d1f2f87f`, world data id `f394fa536ba9b66d` | same | FogHost `0.6.0`, Compact catalog `ds1tr-compact-full-fog-v1` fingerprint `8c03fd3de1cd7c772d5c933753ae54eab35f9e8b70a1aef2954322330d0002d4`, world data id `compact-runtime-offline-v1` | same as v3 | FogHost `0.7.1`, Compact catalog `ds1tr-compact-full-fog-v2` fingerprint `111d6e06227205fa62fc43fa9d0375274753c76a11af959b2d794a63c870fa49`, world data id `d927863b6583f1c5` |
+| World randomizer | FogHost `0.5.0`, FogMod commit `6e6dc7886d0f8bcc53c1800d95c9e859d1f2f87f`, world data id `f394fa536ba9b66d` | same | FogHost `0.6.0`, Compact catalog `ds1tr-compact-full-fog-v1` fingerprint `8c03fd3de1cd7c772d5c933753ae54eab35f9e8b70a1aef2954322330d0002d4`, world data id `compact-runtime-offline-v1` | same as v3 | FogHost `0.7.2`, Compact catalog `ds1tr-compact-full-fog-v2` fingerprint `e56423307d97617b6198776d349e1dbcb27d0ca37ebc6a26ece5e7a9f01811ff`, world data id `75a60153e8563574` |
 | Item tracking for the world randomizer | `fog-item-tracking-v1` (`docs/FOG_ITEM_TRACKING.md`) | same | `compact-fog-item-tracking-v1` | same as v3 | same as v4 |
 | Settings completion | `completeSettings`: options added after the profile get the value that reproduces the profile's behavior | same | same | same |
 
@@ -69,6 +69,26 @@ MSBs `m10_01_00_00`, `m10_02_00_00`, `m11_00_00_00`, `m12_01_00_00`,
 `m18_01_00_00`. Golden verification passed both V5 cases against the
 read-only QA DSR source. This does not claim the corrected world passed
 in-game gameplay QA. No desktop/public version, tag, or release was changed.
+
+## Pre-release V5 Ceaseless post-boss physical-route correction (backend 0.46.2; 2026-10-23)
+
+The exact owner reproduction revealed that ordinary global Fog graph
+reachability could hide a physical hard-lock: after completing Ceaseless, a
+destination behind event `11410410` could be reached only by crossing an
+unrelated randomized Fog gate. FogHost `0.7.2` now validates boss-gated
+destinations from the encounter after setting its completion condition, using
+the encounter's named exit entrance and fixed physical routes only. Another
+randomized entrance cannot satisfy the condition. Unsolvable seeds return
+retryable `FOG_SEED_UNSOLVABLE`; V1-V4 runtime checks and fixtures are unchanged.
+
+This changes pre-release V5 outputs under the existing V5 profile and does not
+change the Seed Code format or settings. The project Compact fingerprint is
+`e56423307d97617b6198776d349e1dbcb27d0ca37ebc6a26ece5e7a9f01811ff`, with
+world-data ID `75a60153e8563574`. The exact real-format support reproduction
+rejected Fog attempts 0–3 and passed on attempt 4 (seed `31341427`); a fresh
+process repeated the same attempt sequence and 55 manifest-file hashes. Full
+evidence and the remaining owner gameplay check are in
+`docs/COMPACT_FULL_FOG_V2.md` and `docs/IMPLEMENTATION_STATUS.md`.
 
 ## Recorded exception 6: roaming-boss safe destination handling (backend 0.46.0, desktop 0.39.0; 2026-10-12)
 

@@ -1409,13 +1409,17 @@ namespace FogHost.Tests
                 throw new InvalidDataException("Frozen Compact Fog v1 must retain its historical Ceaseless/lava shortcut; the correction belongs only to v5.");
             VerifyCeaselessScriptClassification(facts, pristineGameRoot);
             FogCompactCatalogV2 compactV2 = FogCompactCatalogBuilder.BuildV2(facts);
-            FogAreaLink ceaselessBossGatedRoute = compactV2.Catalog.Areas.Single(area => area.Id.Value == "demonruins_ceaseless")
+            FogAreaLink mainBossGatedRoute = compactV2.Catalog.Areas.Single(area => area.Id.Value == "demonruins")
                 .To.SingleOrDefault(link => link.Destination.Value == "demonruins_lava");
-            bool ceaselessHasUnsupportedShortcut = ceaselessBossGatedRoute?.Condition is not { Kind: FogConditionKind.Atom, Terms.Count: 1 }
-                || ceaselessBossGatedRoute.Condition.Terms[0] != FogConditionReference.BossCompletion(11410410)
+            bool ceaselessHasUnsupportedShortcut = mainBossGatedRoute?.Condition is not { Kind: FogConditionKind.Atom, Terms.Count: 1 }
+                || mainBossGatedRoute.Condition.Terms[0] != FogConditionReference.BossCompletion(11410410)
+                || compactV2.Catalog.Areas.Single(area => area.Id.Value == "demonruins_ceaseless").To.Any(link => link.Destination.Value == "demonruins_lava")
                 || compactV2.Catalog.Areas.Single(area => area.Id.Value == "demonruins_lava").To.Any(link => link.Destination.Value == "demonruins_ceaseless")
                 || compactV2.BossGatedRoutes.Count != 1
-                || compactV2.BossGatedRoutes[0].CompletionCollision != "h0018B1";
+                || compactV2.BossGatedRoutes[0].Source.Value != "demonruins"
+                || compactV2.BossGatedRoutes[0].EncounterArea.Value != "demonruins_ceaseless"
+                || compactV2.BossGatedRoutes[0].SeparatingEntrance.Value != "o4961_0000"
+                || compactV2.BossGatedRoutes[0].BossCompletionCollision != "h0018B1";
             FogEntranceSide ceaselessSide = compactV2.Catalog.Entrances.Single(entrance => entrance.Name == "o4961_0000").BSide;
             FogTriggerVolume ceaselessTrigger = ceaselessSide.BossTriggerArea;
             FogEntranceSide v1CeaselessSide = candidate.Catalog.Entrances.Single(entrance => entrance.Name == "o4961_0000").BSide;

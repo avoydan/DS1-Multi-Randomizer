@@ -232,17 +232,19 @@ namespace FogHost.Tests
 
         private static void AssertCeaselessRoute(FogAnnotationCatalog catalog, string label, int? expectedCompletionEventId)
         {
-            FogAreaLink forward = catalog.Areas.Single(area => area.Id.Value == "demonruins_ceaseless").To
+            FogAreaLink mainToLava = catalog.Areas.Single(area => area.Id.Value == "demonruins").To
                 .SingleOrDefault(link => link.Destination.Value == "demonruins_lava");
-            bool reverse = catalog.Areas.Single(area => area.Id.Value == "demonruins_lava").To
+            FogAreaLink ceaselessToLava = catalog.Areas.Single(area => area.Id.Value == "demonruins_ceaseless").To
+                .SingleOrDefault(link => link.Destination.Value == "demonruins_lava");
+            bool lavaToCeaseless = catalog.Areas.Single(area => area.Id.Value == "demonruins_lava").To
                 .Any(link => link.Destination.Value == "demonruins_ceaseless");
             bool matches = expectedCompletionEventId.HasValue
-                ? forward?.Condition is { Kind: FogConditionKind.Atom, Terms.Count: 1 }
-                    && forward.Condition.Terms[0] == FogConditionReference.BossCompletion(expectedCompletionEventId.Value)
-                    && !reverse
-                : forward?.Condition == null && reverse;
+                ? mainToLava?.Condition is { Kind: FogConditionKind.Atom, Terms.Count: 1 }
+                    && mainToLava.Condition.Terms[0] == FogConditionReference.BossCompletion(expectedCompletionEventId.Value)
+                    && ceaselessToLava == null && !lavaToCeaseless
+                : mainToLava == null && ceaselessToLava?.Condition == null && lavaToCeaseless;
             if (!matches)
-                throw new InvalidDataException($"Compact Fog {label} Ceaseless/lava route did not match its frozen condition policy.");
+                throw new InvalidDataException($"Compact Fog {label} Ceaseless/lower-Demon-Ruins route did not match its frozen condition and physical-owner policy.");
         }
 
         private static string[] RunCaseV2(

@@ -976,3 +976,22 @@ Two read-only commands next to `generate`, used by key placement (`docs/ITEM_PRO
 * `FogHost progression-check --data-root <world data> (--game <game tree> | --assign <key:area json> | --assign-many <json list>) --out <file>`: asks FogMod's own `GraphChecker` whether the world is completable and the prison can be left. `--game` reads the item lots **of a written package** with FogMod's own `ItemReader` (the same reader `generate` uses), so the answer is about the real lots; `--assign` and `--assign-many` take explicit key areas (used by `apps/backend/scripts/progressionDifferential.mjs` to compare the engine's evaluation with FogMod's on thousands of assignments).
 
 Exit codes: 0 success, 2 usage, 4 a typed host error (`CODE: message` on stderr; the data root is verified against the pinned world data first, so another annotation is refused), 5 any other failure. The output file is written atomically.
+
+## V5 post-boss physical-route validation (FogHost 0.7.2)
+
+Compact V2 invokes the project-owned `BossProgressionValidator` after
+FogMod's ordinary graph solver. For each boss-completion-gated destination,
+the validator starts at the associated encounter with that completion state
+set, allows the encounter's named exit entrance, and then traverses only fixed
+physical edges. This prevents an unrelated randomized fog entrance from
+standing in for an encounter's physical return route. The optional edge filter
+in the vendored `GraphChecker` defaults to allowing every edge, so legacy and
+non-V5 callers keep their prior behavior.
+
+For Ceaseless, the lower Demon Ruins route is owned by main `demonruins` and
+requires event `11410410`. There is no local edge between
+`demonruins_ceaseless` and `demonruins_lava`. A seed that cannot leave the
+encounter through its actual `o4961_0000` boundary and fixed routes fails with
+retryable `FOG_SEED_UNSOLVABLE` at `solve-graph`; the backend may try the next
+deterministic Fog seed. The exact reproduction and real-format evidence are
+recorded in `docs/COMPACT_FULL_FOG_V2.md`.

@@ -1,5 +1,45 @@
 # Implementation status
 
+## V5 Ceaseless post-boss physical route correction (2026-10-23)
+
+The exact owner reproduction now fails closed when the Ceaseless pocket has no
+physical post-boss route. Compact V2 removes both false local shortcuts between
+`demonruins_ceaseless` and `demonruins_lava`; the lower route is owned by the
+main `demonruins` Area and remains gated by boss completion event `11410410`.
+After ordinary world solving, FogHost now checks each boss-gated destination
+from that encounter with the boss completion set, taking the encounter's
+actual exit entrance and then following only fixed physical routes. A different
+randomized Fog gate cannot satisfy this postcondition. Failures are retryable
+`FOG_SEED_UNSOLVABLE` errors at `solve-graph`. The optional edge filter in the
+vendored `GraphChecker` is not supplied by legacy profiles, preserving their
+existing behavior.
+
+The exact V5 reproduction Seed Code from the preceding promotion entry was run
+through the real backend pipeline against the read-only pristine QA root
+`C:\Users\Adam\ds1tr-qa\game-inst\DARK SOULS REMASTERED`. The backend used
+pristine snapshot `1742ab1e6e31fb926b7780fcaf8481789dac6c9da66eba7a0a9cddbeb64b3f9b`;
+four route-relevant source files were hash-equal to the QA root. Fog attempt 0
+(`4009337993`) was correctly rejected because event `11410410` could not reach
+`demonruins_lava` from `demonruins_ceaseless` by its `o4961_0000` exit and fixed
+routes; it would require another randomized entrance. Attempts 1 to 3 were also
+rejected by the graph constraints. Attempt 4 (`31341427`) passed. The first
+Asylum Fog led to `dlc_forest`, and the generated boss-gated route was
+reachable. The accepted package contains 55 manifest-listed files; all sizes
+and SHA-256 hashes verified. Manifest SHA-256:
+`2a0788c054bce3f6463ab1ba7c9fb3bbaffc7518d308d21aa42788c4f0264132`.
+A separate-process rerun selected the same attempts and produced identical
+manifest entries and hash.
+
+FogHost is now `0.7.2`, backend `0.46.2`, V5 compact fingerprint
+`e56423307d97617b6198776d349e1dbcb27d0ca37ebc6a26ece5e7a9f01811ff`, and
+world-data ID `75a60153e8563574`. Verification: FogHost Release build clean;
+FogHost suite **118/118**; backend suite **615 total, 613 passed, 0 failed,
+2 skipped**; root typecheck passed for contracts, backend, desktop renderer,
+and Electron main. The accepted output was also checked for deterministic
+regeneration and manifest hashes. This is real-format staging proof, not a
+claim of in-game gameplay success. The QA source was read-only; the live Steam
+installation was not accessed.
+
 ## Ceaseless default landing correction (2026-10-22; V5 gameplay QA pending)
 
 The owner's manual QA of V5 reproduction Seed Code

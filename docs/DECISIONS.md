@@ -1,5 +1,23 @@
 # Decisions
 
+## V5 boss-gated routes require the encounter's physical exit (2026-10-23)
+
+Compact Fog V2 must prove a boss-gated destination is physically reachable
+after the boss is defeated. Global graph reachability is insufficient because
+an unrelated randomized Fog entrance can make a destination reachable while
+the encounter remains a physical pocket. The V5-only postcondition starts at
+the encounter with its completion condition set, traverses that encounter's
+named exit entrance, then permits only fixed physical routes. It rejects the
+seed with retryable `FOG_SEED_UNSOLVABLE` when a second randomized entrance is
+required. The optional `GraphChecker` edge predicate defaults to unrestricted,
+so V1–V4 retain their existing graph behavior. For Ceaseless, the lower Demon
+Ruins route is owned by main `demonruins`, gated by event `11410410`; the
+Ceaseless pocket has no local shortcut to `demonruins_lava`. The exact owner
+reproduction rejects Fog attempt 0 and deterministically succeeds on attempt 4.
+This is a pre-release correction to V5; V1–V4 remain unchanged. Details and
+real-format verification are recorded in `docs/COMPACT_FULL_FOG_V2.md` and
+`docs/IMPLEMENTATION_STATUS.md`.
+
 ## Restore FogMod default Ceaseless landing for pre-release V5 (2026-10-22)
 
 Owner gameplay QA showed that the trigger-region-centered spawn used by the

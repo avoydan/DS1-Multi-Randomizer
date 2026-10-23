@@ -45,14 +45,14 @@ test('v1 through v4 keep their frozen behavior while Compact v5 is current for n
   assert.equal(current.roamingBossFitPolicy, 'owner-approved-v1');
   assert.deepEqual(historicalCurrent.fogEngine.hostVersions, ['0.6.0']);
   assert.equal(historicalCurrent.fogAnnotationSource, 'compact-v1');
-  assert.deepEqual(current.fogEngine.hostVersions, ['0.7.1']);
+  assert.deepEqual(current.fogEngine.hostVersions, ['0.7.2']);
   assert.equal(current.fogAnnotationSource, 'compact-v2');
   assert.deepEqual(profile.fogEngine.hostVersions, ['0.5.0']);
   assert.deepEqual(fogHostRuntimeForProfile(profile), { hostVersion: '0.5.0', schemaVersion: 2, annotationSource: 'legacy-fogmod' });
   assert.deepEqual(fogHostRuntimeForProfile(corrected), { hostVersion: '0.5.0', schemaVersion: 2, annotationSource: 'legacy-fogmod' });
   assert.deepEqual(fogHostRuntimeForProfile(compactLegacy), { hostVersion: '0.6.0', schemaVersion: 3, annotationSource: 'compact-v1' });
   assert.deepEqual(fogHostRuntimeForProfile(historicalCurrent), { hostVersion: '0.6.0', schemaVersion: 3, annotationSource: 'compact-v1' });
-  assert.deepEqual(fogHostRuntimeForProfile(current), { hostVersion: '0.7.1', schemaVersion: 3, annotationSource: 'compact-v2' });
+  assert.deepEqual(fogHostRuntimeForProfile(current), { hostVersion: '0.7.2', schemaVersion: 3, annotationSource: 'compact-v2' });
   assert.equal(fogHostRuntimeForProfile({ ...profile, fogEngine: { ...profile.fogEngine, hostVersions: ['0.6.0'] } }), null,
     'a legacy data/tracking profile cannot be silently routed to the current host');
   assert.equal(profile.fogEngine.fogModCommit, '6e6dc7886d0f8bcc53c1800d95c9e859d1f2f87f');
@@ -61,8 +61,8 @@ test('v1 through v4 keep their frozen behavior while Compact v5 is current for n
   assert.equal(profile.fogItemTracking, 'fog-item-tracking-v1');
   assert.equal(historicalCurrent.fogEngine.compactCatalogFingerprint, '8c03fd3de1cd7c772d5c933753ae54eab35f9e8b70a1aef2954322330d0002d4');
   assert.equal(current.fogEngine.compactCatalogVersion, 'ds1tr-compact-full-fog-v2');
-  assert.equal(current.fogEngine.compactCatalogFingerprint, '111d6e06227205fa62fc43fa9d0375274753c76a11af959b2d794a63c870fa49');
-  assert.equal(current.fogEngine.worldDataId, 'd927863b6583f1c5');
+  assert.equal(current.fogEngine.compactCatalogFingerprint, 'e56423307d97617b6198776d349e1dbcb27d0ca37ebc6a26ece5e7a9f01811ff');
+  assert.equal(current.fogEngine.worldDataId, '75a60153e8563574');
   assert.notEqual(current.fogEngine.worldDataId, historicalCurrent.fogEngine.worldDataId);
   assert.notEqual(current.fogEngine.compactCatalogFingerprint, historicalCurrent.fogEngine.compactCatalogFingerprint);
   assert.match(current.fogEngine.compactCatalogFingerprint, /^[a-f0-9]{64}$/u,
@@ -90,7 +90,7 @@ test('components outside the profile lists are refused, those inside are accepte
   assert.match(checkProfileComponents(profile, { combinedRandomizerVersion: '0.5.67' }), /combined engine 0\.5\.67 is not on the list/u);
   assert.match(checkProfileComponents(profile, { fogHostVersion: '0.7.0' }), /FogHost 0\.7\.0/u);
   const current = resolveGenerationProfile('ds1tr-gen-v5');
-  assert.equal(checkProfileComponents(current, { fogHostVersion: '0.7.1' }), null);
+  assert.equal(checkProfileComponents(current, { fogHostVersion: '0.7.2' }), null);
   assert.match(checkProfileComponents(current, { fogHostVersion: '0.7.0' }), /FogHost 0\.7\.0/u);
   assert.match(checkProfileComponents(profile, { fogModCommit: 'abc' }), /FogMod abc/u);
   assert.match(checkProfileComponents(profile, { worldDataId: 'other' }), /world data other/u);

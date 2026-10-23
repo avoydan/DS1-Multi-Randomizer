@@ -175,6 +175,8 @@ namespace FogHost
 
             Enter("solve-graph", "Connecting fog gates.");
             new GraphConnector().Connect(opt, graph, ann);
+            if (request.AnnotationSource == HostRequest.CompactV2Annotations)
+                BossProgressionValidator.ValidatePostBossRoutes(opt, graph, ann);
 
             Enter("write-game-data", request.DryRun ? "Computing game data (dry run)." : "Writing game data to staging.");
             var merge = new EmevdMerge(mergeInputs);

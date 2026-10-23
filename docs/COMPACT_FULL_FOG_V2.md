@@ -1,16 +1,17 @@
 ﻿# Compact Full Fog V2: boss progression correction
 
 Status: **promoted for local owner gameplay QA on 2026-10-21; Ceaseless
-landing corrected on 2026-10-22, gameplay QA pending**. New worlds use
+landing and post-boss physical-route validation corrected on 2026-10-23;
+in-game gameplay QA pending**. New worlds use
 `ds1tr-gen-v5`; v1-v4 compatibility is unchanged. The owner-reported V5
-under-map failure led to an explicitly authorized correction to V5's physical
-landing behavior. The V5 Seed Code and settings are unchanged; package output
-is not. V2 uses the existing FogHost schema 3 with the project-owned Compact
-catalog and adds no game-data files.
+under-map and post-boss hard-lock reports led to explicitly authorized
+pre-release corrections to V5's physical landing and route validation. The V5
+Seed Code and settings are unchanged; package output changes. V2 uses FogHost
+schema 3 with the project-owned Compact catalog and adds no game-data files.
 
-Catalog fingerprint: `111d6e06227205fa62fc43fa9d0375274753c76a11af959b2d794a63c870fa49`.
-World-data identity: `d927863b6583f1c5`.
-FogHost version: `0.7.1`.
+Current catalog fingerprint: `e56423307d97617b6198776d349e1dbcb27d0ca37ebc6a26ece5e7a9f01811ff`.
+Current world-data identity: `75a60153e8563574`.
+Current FogHost version: `0.7.2`.
 
 ## Boss-completion model
 
@@ -224,6 +225,46 @@ Each differs from its pre-correction output in `event/common.emevd.dcx` and
 the 13 MSBs listed in `GENERATION_COMPATIBILITY.md`. V1-V4 fixtures were not
 changed. These checks establish deterministic real-format package output,
 not in-game safety; owner gameplay QA remains required.
+
+## Ceaseless post-boss physical route correction verification (2026-10-23)
+
+The owner-reported hard-lock is represented by the project's verified physical
+route facts: the lower route is from main `demonruins` to `demonruins_lava`,
+gated by boss completion event `11410410`. It is not a local route from the
+Ceaseless pocket. The Ceaseless boundary `o4961_0000` can be randomized, so
+after killing the boss the player must leave through that actual boundary and
+reach main Demon Ruins over fixed physical transitions before the event-gated
+lower route is considered usable.
+
+FogHost `0.7.2` adds a V5 postcondition after FogMod's general graph solver.
+For every boss-gated destination, the validator starts at the associated
+encounter with its completion state set, and checks a constrained graph in
+which the encounter may use its named exit entrance and subsequent traversal
+is limited to fixed physical routes. General reachability through another
+randomized Fog gate is logged for diagnosis but does not pass this
+postcondition. An ambiguous or missing physical route returns retryable
+`FOG_SEED_UNSOLVABLE` at `solve-graph`; ordinary Fog retries choose the next
+deterministic Fog seed. The vendored `GraphChecker` gained an optional edge
+predicate; default calls remain unrestricted for V1-V4.
+
+Real-format replay used the exact owner Seed Code and pristine read-only QA
+source. Fog attempts 0 through 3 were rejected, including original Fog seed
+`4009337993`, whose first Asylum Fog led directly into `demonruins_ceaseless`.
+Attempt 4, Fog seed `31341427`, passed. The accepted package had 55
+manifest-listed files, all independently verified by size and SHA-256; its
+manifest SHA-256 was
+`2a0788c054bce3f6463ab1ba7c9fb3bbaffc7518d308d21aa42788c4f0264132`. An
+independent process rerun reproduced the same attempt sequence, package file
+hashes, and manifest digest. Unit coverage proves the sealed encounter is
+rejected even if the destination is globally reachable only through an
+unrelated randomized entrance, while a fixed physical return succeeds.
+
+FogHost Release build and **118/118** tests passed; the backend suite and root
+typecheck are rerun for the final task record in `IMPLEMENTATION_STATUS.md`.
+This validates real-format package generation and progression graph policy;
+it is not a substitute for the owner's in-game boss-fight and post-boss route
+check. The read-only QA source was never modified, and the live Steam install
+was not accessed.
 
 ## Golden provenance and remaining scope
 

@@ -25,7 +25,8 @@ namespace FogMod
             public List<string> Visited = new List<string>();
             public Dictionary<Edge, float> InEdge = new Dictionary<Edge, float>();
         }
-        public CheckRecord Check(RandomizerOptions opt, Graph g, string start)
+        public CheckRecord Check(RandomizerOptions opt, Graph g, string start,
+            IEnumerable<string> initiallyCompletedBossCompletions = null, Func<Edge, bool> edgeAllowed = null)
         {
             Dictionary<string, Node> graph = g.graph;
             foreach (Node node in graph.Values)
@@ -42,6 +43,13 @@ namespace FogMod
             Dictionary<string, Expr> config = new Dictionary<string, Expr>();
             HashSet<string> visited = new HashSet<string>();
             HashSet<string> bossCompletions = new HashSet<string>(StringComparer.Ordinal);
+            foreach (string completion in initiallyCompletedBossCompletions ?? Array.Empty<string>())
+            {
+                if (g.bossCompletions == null || !g.bossCompletions.ContainsKey(completion))
+                    throw new ArgumentException($"Unknown initial boss-completion state '{completion}'.", nameof(initiallyCompletedBossCompletions));
+                bossCompletions.Add(completion);
+                config[completion] = Expr.TRUE;
+            }
             void visit(string area)
             {
                 visited.Add(area);
@@ -127,6 +135,7 @@ namespace FogMod
                     {
                         // Ideally shouldn't happen
                         if (edge.To == null) continue;
+                        if (edgeAllowed != null && !edgeAllowed(edge)) continue;
                         // This won't work if one-way is paired with two-way in the future
                         if (seenEdge.Contains(edge) || seenEdge.Contains(edge.Link.Pair)) continue;
                         if (edge.LinkedExpr != null)
