@@ -1,5 +1,52 @@
 # Implementation status
 
+## Fresh V5 unsigned Portable for local gameplay QA (2026-10-24)
+
+Built the local Portable from source HEAD
+`a24cc36e9df3ec78168dcb4298f30be9624e2add` on
+`fix/compact-fog-v5-progression`. The artifact is
+`apps/desktop/release/DS1-Multi-Randomizer-0.39.2-Portable-x64.exe`,
+204,923,961 bytes, SHA-256
+`2f6b7c467a18c81153ce551df03b26b2f329135921ac043cbb8a34203e4e9e10`.
+The development-mode release verifier passed; the package is unsigned and is
+for local owner QA only. No version bump, tag, release, or publication was
+performed. The packaged renderer contains the Skill Issue Mode control, and
+the packaged backend contains the separate local-gameplay request path and
+`ownerQaLoadout` manifest marker. Packaged contracts set
+`CURRENT_GENERATION_PROFILE` to `ds1tr-gen-v5`.
+
+The exact V5 reproduction Seed Code from the promotion entry was generated
+through the packaged runtime against the read-only QA DSR source. Fog seeds
+`4009337993`, `1035824285`, `3787474680`, and `899537058` were rejected as
+`FOG_SEED_UNSOLVABLE`; attempt 4, seed `31341427`, succeeded. The resulting
+55-file package digest is
+`f43eb1df06649f2ba9df12f720a53767fc06a1f54a49a0fe4b0caad41d2f6a3c` and
+matches the updated real-format V5 support golden. Its run-manifest SHA-256 is
+`2a0788c054bce3f6463ab1ba7c9fb3bbaffc7518d308d21aa42788c4f0264132`; all 55
+listed file hashes match. In this accepted world, the first Asylum Fog
+connects project Entrance `asylum-oscar-cell-wall` (side A, Area `asylum`) to
+`dlc-kalameet-boundary`: Entrance object `o2919_0000`, side A, Area
+`dlc_forest`, map `m12_01_00_00`. The generated landing Player
+`c0000_0056` (entity `1815889`) is at `(877.24274, -344.6, 751.366)`, rotation
+`(0, -140, 0)`. The Entrance object is at `(876.6, -344.6, 750.6)`, yaw 40.
+Thus this accepted package's first Fog lands in the DLC forest approach, not
+in Demon Ruins/Ceaseless. Attempt 0 was rejected because event `11410410`
+could not reach `demonruins_lava` from `demonruins_ceaseless` through its
+`o4961_0000` exit and fixed routes; attempts 1 to 3 also returned
+`FOG_SEED_UNSOLVABLE`. This is staging/package evidence, not a claim of in-game
+gameplay success.
+
+The old V5 full-Triple golden seed now fails the same route validator on every
+bounded attempt. The authorized V5-only development fixture was re-recorded
+through the standard recorder with successful master seed
+`golden-v5-route-search-2`; its package has 73 files and digest
+`e0057daaee6ee5f01b319825689bd5c90bc8f86650e856046debf02ab5c23b13`. V1-V4
+fixtures and semantics were not changed. Verification: both V5 real-format
+goldens passed, backend suite **615 total, 613 passed, 0 failed, 2 skipped**,
+and root typecheck passed. The packaged-runtime generation matched the support
+golden and all manifest hashes. The QA source remained read-only; the live
+Steam installation was not accessed. Owner gameplay QA remains outstanding.
+
 ## V5 Ceaseless post-boss physical route correction (2026-10-23)
 
 The exact owner reproduction now fails closed when the Ceaseless pocket has no

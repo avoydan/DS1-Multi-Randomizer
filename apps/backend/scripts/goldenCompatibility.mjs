@@ -260,7 +260,7 @@ export const v5ExtraCaseSets = {
       fog: { traversableFogs: true, bossFogs: true, areaWarps: true, scaling: true, requireLordSouls: true, language: 'POLISH' },
       output: { generateSpoilerLog: true },
     } },
-    { name: 'v5-compact-full-triple', masterSeed: 'golden-v5-compact-full-triple', patch: {} },
+    { name: 'v5-compact-full-triple', masterSeed: 'golden-v5-route-search-2', patch: {} },
   ],
 };
 
