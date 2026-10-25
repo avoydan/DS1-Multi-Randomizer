@@ -169,6 +169,16 @@ namespace FogHost.Tests
                     throw new InvalidDataException("The exact reproduction produced identical v1/v2 output hashes despite the catalog correction.");
                 Console.WriteLine($"PASS PvP OFF real-format accepted-world regression: fogSeed=31341427; v1Files={v1Output.Length}; v2Files={v2Output.Length}; identical Ceaseless physical landing; v1={v1Landing}; v2={v2Landing}; v1/v2 progression differs as expected.");
 
+                string capraLanding = null;
+                string[] capraOutput = RunCaseV2(dataRoot, scratchRoot, v2, "owner-o5865-to-o1413-landing",
+                    reproducedOptions, 2831875538, "POLISH",
+                    onWrittenOutput: (staging, result) =>
+                        capraLanding = VerifyCapraDefaultLanding(staging, pristineRoot, v2.Catalog),
+                    onLogWritten: VerifyOwnerCapraRouteLog);
+                if (string.IsNullOrWhiteSpace(capraLanding))
+                    throw new InvalidDataException("The confirmed o5865 to o1413 real-format route did not validate its Capra landing.");
+                Console.WriteLine($"PASS owner o5865 -> o1413 under-map landing regression: fogSeed=2831875538; outputFiles={capraOutput.Length}; {capraLanding}");
+
                 var majorPvpRejections = new List<uint>();
                 bool majorPvpWritten = false;
                 IEnumerable<uint> majorPvpSeeds = new[] { MatrixSeed, 31341427U }
@@ -350,7 +360,8 @@ namespace FogHost.Tests
             uint seed,
             string language = "ENGLISH",
             Action<string> onCeaselessLanding = null,
-            Action<string, HostResult> onWrittenOutput = null)
+            Action<string, HostResult> onWrittenOutput = null,
+            Action<string> onLogWritten = null)
         {
             string runRoot = Path.Combine(scratchRoot, name + "-" + seed + "-" + Guid.NewGuid().ToString("N"));
             string staging = Path.Combine(runRoot, "staging");
@@ -360,20 +371,23 @@ namespace FogHost.Tests
             var enabled = new HashSet<string>(enabledOptions, StringComparer.Ordinal);
             var options = new JsonObject();
             foreach ((string key, _) in HostRequest.OptionFlags) options[key] = enabled.Contains(key);
-            HostRequest request = HostRequest.Parse(Request(dataRoot, staging, Path.Combine(runRoot, "foghost.log"), options,
+            string logPath = Path.Combine(runRoot, "foghost.log");
+            HostRequest request = HostRequest.Parse(Request(dataRoot, staging, logPath, options,
                 seed, RequiredDirectory("DS1TR_PRISTINE_DSR_ROOT"), catalog.Fingerprint, HostRequest.CompactV2Annotations, language).ToJsonString());
             var runner = new HostRunner((_, _) => { });
             TextWriter originalOutput = Console.Out;
+            StringWriter capturedOutput = onLogWritten == null ? null : new StringWriter();
             HostResult result;
             try
             {
-                Console.SetOut(TextWriter.Null);
+                Console.SetOut(capturedOutput ?? TextWriter.Null);
                 runner.ValidateLayout(request);
                 result = runner.Run(request);
                 DecodeEveryWrittenFile(staging, result);
                 if (onCeaselessLanding != null)
                     onCeaselessLanding(VerifyCeaselessDefaultLanding(staging, RequiredDirectory("DS1TR_PRISTINE_DSR_ROOT"), catalog.Catalog));
                 onWrittenOutput?.Invoke(staging, result);
+                onLogWritten?.Invoke(capturedOutput?.ToString() ?? string.Empty);
             }
             finally
             {
@@ -635,6 +649,89 @@ namespace FogHost.Tests
             string physicalLanding = $"{player.Name}:{player.Position.X:R},{player.Position.Y:R},{player.Position.Z:R},{player.Rotation.Y:R}";
             string generatedActionRegion = $"actionRegion={actionRegion.EntityID}:{actionRegion.Position.X:R},{actionRegion.Position.Y:R},{actionRegion.Position.Z:R},{actionRegion.Rotation.Y:R}";
             return $"{physicalLanding}|{generatedActionRegion}";
+        }
+
+        private static void VerifyOwnerCapraRouteLog(string log)
+        {
+            const string expectedRoute = "From anorlondo_main (anorlondo-main-building-wall) to burg_capra (burg-capra-boundary)";
+            if (!log.Contains(expectedRoute, StringComparison.Ordinal))
+                throw new InvalidDataException($"Fog seed 2831875538 no longer produces the confirmed o5865 to o1413 route. Route log did not contain '{expectedRoute}'.");
+        }
+
+        private static string VerifyCapraDefaultLanding(string staging, string pristineRoot, FogAnnotationCatalog catalog)
+        {
+            FogEntrance entrance = catalog.Entrances.Single(value => value.Name == "o1413_0000");
+            FogEntranceSide side = entrance.BSide;
+            if (entrance.Map.Value != "parish" || side.Area.Value != "burg_capra"
+                || !entrance.Tags.HasFlag(FogEntranceTags.Boss)
+                || entrance.Tags.HasFlag(FogEntranceTags.Door)
+                || entrance.Tags.HasFlag(FogEntranceTags.World)
+                || side.CustomWarp != null || side.DestinationMap != null
+                || side.ActionRegion != 0 || side.CustomActionWidth != 0
+                || side.Tags.HasFlag(FogEntranceSideTags.Higher)
+                || side.BossTrigger <= 0 || side.BossTriggerArea == null)
+                throw new InvalidDataException("The o1413 burg_capra BSide no longer has the verified default fog landing plus a separate boss trigger.");
+
+            string mapName = AnnotationData.nameSpecs[entrance.Map.Value].Map;
+            MSB1 pristineMap = MSB1.Read(Path.Combine(pristineRoot, "map", "MapStudio", mapName + ".msb"));
+            MSB1.Part.Object fog = pristineMap.Parts.Objects.Single(part =>
+                part.Name == entrance.Name && part.EntityID == entrance.Id);
+
+            // FogMod's BSide default branch moves one metre opposite object yaw,
+            // keeps the object yaw for player facing, and applies no "higher" offset.
+            float oppositeYaw = fog.Rotation.Y + 180f;
+            if (oppositeYaw >= 180f) oppositeYaw -= 360f;
+            double angle = oppositeYaw * Math.PI / 180d;
+            float expectedX = fog.Position.X + (float)Math.Sin(angle);
+            float expectedY = fog.Position.Y;
+            float expectedZ = fog.Position.Z + (float)Math.Cos(angle);
+            float expectedYaw = fog.Rotation.Y;
+
+            MSB1 outputMap = MSB1.Read(Path.Combine(staging, "map", "MapStudio", mapName + ".msb"));
+            HashSet<string> sourcePlayerNames = pristineMap.Parts.Players
+                .Select(player => player.Name).ToHashSet(StringComparer.Ordinal);
+            MSB1.Part.Player[] generatedPlayers = outputMap.Parts.Players
+                .Where(player => !sourcePlayerNames.Contains(player.Name)).ToArray();
+            MSB1.Part.Player[] expectedLandings = generatedPlayers.Where(player =>
+                Math.Abs(player.Position.X - expectedX) < 0.001f
+                && Math.Abs(player.Position.Y - expectedY) < 0.001f
+                && Math.Abs(player.Position.Z - expectedZ) < 0.001f
+                && Math.Abs(player.Rotation.Y - expectedYaw) < 0.001f).ToArray();
+            FogTriggerVolume trigger = side.BossTriggerArea;
+            bool playerAtBossTriggerCenter = generatedPlayers.Any(player =>
+                Math.Abs(player.Position.X - trigger.X) < 0.001f
+                && Math.Abs(player.Position.Y - trigger.Y) < 0.001f
+                && Math.Abs(player.Position.Z - trigger.Z) < 0.001f);
+            if (expectedLandings.Length != 1 || playerAtBossTriggerCenter)
+                throw new InvalidDataException($"o1413 BSide must use the default object-relative landing at ({expectedX:R},{expectedY:R},{expectedZ:R},{expectedYaw:R}), not the boss-trigger center ({trigger.X:R},{trigger.Y:R},{trigger.Z:R}); matches={expectedLandings.Length}, centeredPlayer={playerAtBossTriggerCenter}.");
+
+            float expectedActionY = fog.Position.Y - 1f;
+            MSB1.Region action = outputMap.Regions.Regions.Single(region => region.Name == $"BR: {entrance.Text}");
+            MSB.Shape.Box actionBox = action.Shape as MSB.Shape.Box;
+            if (Math.Abs(action.Position.X - expectedX) >= 0.001f
+                || Math.Abs(action.Position.Y - expectedActionY) >= 0.001f
+                || Math.Abs(action.Position.Z - expectedZ) >= 0.001f
+                || Math.Abs(action.Rotation.Y - oppositeYaw) >= 0.001f
+                || actionBox == null
+                || Math.Abs(actionBox.Width - (side.CustomActionWidth == 0 ? 1.5f : side.CustomActionWidth)) >= 0.001f
+                || Math.Abs(actionBox.Height - 3f) >= 0.001f
+                || Math.Abs(actionBox.Depth - 1.5f) >= 0.001f)
+                throw new InvalidDataException($"o1413 BSide action region does not match FogMod's default placement at ({expectedX:R},{expectedActionY:R},{expectedZ:R},{oppositeYaw:R}).");
+
+            MSB1.Region bossStart = outputMap.Regions.Regions.Single(region => region.Name == $"Boss start for {side.Area.Value}");
+            MSB.Shape.Box bossBox = bossStart.Shape as MSB.Shape.Box;
+            if (Math.Abs(bossStart.Position.X - trigger.X) >= 0.001f
+                || Math.Abs(bossStart.Position.Y - trigger.Y) >= 0.001f
+                || Math.Abs(bossStart.Position.Z - trigger.Z) >= 0.001f
+                || Math.Abs(bossStart.Rotation.Y - trigger.Yaw) >= 0.001f
+                || bossBox == null
+                || Math.Abs(bossBox.Width - trigger.Width) >= 0.001f
+                || Math.Abs(bossBox.Height - trigger.Height) >= 0.001f
+                || Math.Abs(bossBox.Depth - trigger.Depth) >= 0.001f)
+                throw new InvalidDataException("The Capra boss-start region no longer matches its separate project-owned trigger volume.");
+
+            MSB1.Part.Player player = expectedLandings[0];
+            return $"{mapName}.msb:{player.Name} entity={player.EntityID} XYZ=({player.Position.X:R},{player.Position.Y:R},{player.Position.Z:R}) yaw={player.Rotation.Y:R}; actionRegion={action.EntityID}@({action.Position.X:R},{action.Position.Y:R},{action.Position.Z:R}); separateBossTrigger={bossStart.EntityID}@({bossStart.Position.X:R},{bossStart.Position.Y:R},{bossStart.Position.Z:R})";
         }
 
         private static string PhysicalLanding(string landing) => landing.Split('|', 2)[0];

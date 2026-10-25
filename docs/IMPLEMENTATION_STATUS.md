@@ -1,5 +1,56 @@
 # Implementation status
 
+## Confirmed V5 o5865 to o1413 under-map landing (2026-10-25)
+
+The owner's exact V5 gameplay code matches the saved attempt-4 package
+manifest 55/55. It records app 0.46.2, FogHost 0.7.2, master seed 1653231178,
+combined seed 84332a4856ced43d8ca0538e789a36a0, and Fog seed 2831875538.
+Major and Minor PvP options were off. The confirmed transition is
+o5865_0000 / anorlondo_main to o1413_0000 / burg_capra.
+
+Root cause: Compact FogHost 0.7.2 used the Capra BossTriggerArea as a
+player-centered warp. The saved player c0000_0059 / entity 1815927 appeared at
+(-72.25, -44, -17.2), exactly the boss trigger center. Pinned FogMod
+6e6dc7886d0f8bcc53c1800d95c9e859d1f2f87f's dist/fog.txt has no boss trigger or
+custom warp for o1413 BSide, and its GameDataWriter uses the default
+object-relative spawn. From pristine entity 1011790 at
+(-72.75, -43.57, -16.5), yaw 150, that spawn is
+(-73.25, -43.57, -15.633975), yaw 150. FogHost 0.7.3 restores the same
+default placement globally for boss sides; the boss trigger remains a separate
+region. This is not an o1413-specific fix.
+
+The exact-seed real-format regression in tools/fog-host/tests/
+CompactRealGenerationTest.cs verifies the route log, MSB player position,
+no player at the boss-trigger center, the separate default action region, and
+the independent Capra boss-start region. Its current output is player entity
+1815927 at the upstream position, action region 1815926, boss trigger region
+1815925.
+
+The full landing audit covers 194 Entrance sides: 144 match pinned upstream,
+42 are explicit project-owned sides without upstream identities, and 8 are
+doors that produce no player. Unexplained mismatches: 0. The per-side
+game-derived coordinate CSV remains in the temporary path recorded in
+docs/COMPACT_FULL_FOG_V2.md. The separate PvP-gate issue is unaffected.
+
+Verification:
+- FogHost and test Release build: 0 warnings, 0 errors.
+- Compact V2 real-generation mode: 17/17 matrix cases plus the exact
+  o5865-to-o1413 regression passed; deterministic repeat passed; 2 expected
+  typed FOG_SEED_UNSOLVABLE retries were observed.
+- The standard suite pointed at the reconstructed Compact data root reported
+  137 passed and 14 failed because its legacy full-root checks require the
+  original unmodified upstream hashes. The dedicated Compact V2 real-format
+  mode passed with the matching reconstructed-root verification.
+- Standard FogHost suite without a full legacy upstream data root: 104 passed,
+  0 failed, 15 data-gated skips. The reconstructed Compact data root is valid
+  for the dedicated V2 mode, but the legacy full-suite data-root checks
+  correctly reject it because its files intentionally differ from the
+  unmodified upstream hash set.
+- The corrected 0.7.3 output has not yet been played in-game. No Portable was
+  built, and neither the read-only QA DSR source nor the live Steam install was
+  modified.
+
+
 ## V5 PvP gate OFF behavior and landing-parity audit (2026-10-25)
 
 FogHost `0.7.3` / backend `0.46.3` correct Compact V2's treatment of vanilla
@@ -47,8 +98,9 @@ Compact parity report, including action region `1012600`; no Compact-only
 landing offset is evidenced. FogHost 0.7.2 instead rejects attempts 0–3 and
 accepts attempt 4 with Fog seed `31341427`, which is a different world output.
 The screenshots document the initial Asylum-to-Demon-Ruins crossing, not the
-Parish landing. The precise under-texture gameplay symptom therefore remains
-unverified and V5 is not established as gameplay-safe. A new gameplay build
+Parish landing. The later owner-confirmed o5865-to-o1413 gameplay run and its corrected
+landing are documented in the status section above. Gameplay on output
+containing FogHost 0.7.3 remains unconfirmed, so a new gameplay Portable
 remains blocked. No Steam installation was accessed, and V1-V4 profile
 behavior and fixtures were not changed.
 

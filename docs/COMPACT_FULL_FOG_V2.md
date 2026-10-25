@@ -1,10 +1,11 @@
-﻿# Compact Full Fog V2: boss progression correction
+# Compact Full Fog V2: boss progression correction
 
 Status: **promoted for local owner gameplay QA on 2026-10-21; Ceaseless
 landing and post-boss physical-route validation corrected on 2026-10-23;
 PvP-off physical gates and upstream landing parity audited on 2026-10-25;
-the supplied under-texture Seed Code has a candidate route, but its in-game
-symptom remains unverified**. New worlds use
+owner-confirmed o5865 to o1413 under-map spawn traced to the generic
+boss-trigger-centered warp and corrected in FogHost 0.7.3. The real-format
+regression passes; gameplay on the corrected output remains pending**. New worlds use
 `ds1tr-gen-v5`; v1-v4 compatibility is unchanged. The owner-reported V5
 under-map and post-boss hard-lock reports led to explicitly authorized
 pre-release corrections to V5's physical landing and route validation. The V5
@@ -74,13 +75,73 @@ Y coordinate alone does not prove that the spawn is below walkable geometry.
 Local saved manifests also show FogHost 0.7.2 rejecting attempts 0–3 with
 `FOG_SEED_UNSOLVABLE` and accepting attempt 4 with Fog seed `31341427`. That
 accepted package is a different generated world from the historical 0.7.0/
-0.7.1 attempt-0 output above. The supplied screenshots show the Asylum-to-
-Demon-Ruins arrival, not the later Parish landing, and the V4 support bundle
-does not identify which V5 package was played. Therefore the candidate route
-is identified, but the reported under-texture gameplay symptom and its cause
-remain unverified. Do not build or promote another gameplay Portable on the
-basis of parity alone.
+0.7.1 attempt-0 output above. The screenshots and V4 support bundle did not identify the later V5 package.
+The owner subsequently supplied the exact V5 gameplay code, and the saved
+accepted-attempt package matches its manifest hashes 55/55. That run and its
+o5865 to o1413 under-map landing are analyzed below. The corrected 0.7.3
+output passes a real-format regression; gameplay on that corrected output
+remains pending. Do not build or promote another gameplay Portable until that
+gameplay check is complete.
 
+## Owner-confirmed o5865 to o1413 under-map landing (2026-10-25)
+
+The exact owner-provided V5 code matches the saved attempt-4 package manifest:
+55/55 generated-file hashes match. The package records app 0.46.2, FogHost
+0.7.2, master seed 1653231178, combined seed
+84332a4856ced43d8ca0538e789a36a0, and accepted Fog seed 2831875538. Both Major
+and Minor PvP fog options are off, so this route is separate from the optional
+PvP-gate issue.
+
+The confirmed edge is Anor Londo main approach, entrance o5865_0000 / side
+anorlondo_main, to Lower Undead Burg, entrance o1413_0000 / side burg_capra.
+The owner-reported under-map arrival is the destination of this edge.
+
+At pinned FogMod commit 6e6dc7886d0f8bcc53c1800d95c9e859d1f2f87f, the
+dist/fog.txt o1413 record has Entrance Tags boss and BSide Area burg_capra.
+The BSide Flag is 11010902; Cond is null; TrapFlag, EntryFlag,
+BeforeWarpFlag, and WarpFlag default to 0. BossTrigger and BossTriggerArea are
+absent (0/null); CustomWarp and DestinationMap are null; ActionRegion and
+CustomActionWidth default to 0; Side.Tags is empty. The evidence used the
+pinned dist/fog.txt record and FogMod/GameDataWriter.cs only; upstream data
+was not copied into the repository.
+
+The pinned writer selects side.DestinationMap or the entrance map, which is
+parish and resolves to m10_01_00_00.msb. The pristine source object
+o1413_0000 / entity 1011790 is at (-72.75, -43.57, -16.5), yaw 150.
+The BSide default warp moves one metre opposite the object yaw, retains yaw
+150 for player facing, and adds no vertical offset because there is no higher
+side tag. Its effective player position is (-73.25, -43.57, -15.633975),
+yaw 150. Separately, its default action region is one metre opposite object
+yaw, one metre lower because this is not a world-tagged Entrance: position
+(-73.25, -44.57, -15.633975), yaw -30, with the standard 1.5 x 3 x 1.5 box.
+
+The saved FogHost 0.7.2 package instead put player c0000_0059, entity 1815927,
+at (-72.25, -44, -17.2), yaw 150. That is exactly the center of the
+project-owned Capra BossTriggerArea, not FogMod's fog-object-relative landing.
+The earlier Compact code generalized BossTriggerCenteredSpawn and treated a
+boss trigger volume as a player warp. Commit 15e58e9 removed that generic
+trigger-centered placement for every boss side; it did not add an o1413-specific
+position or route exception.
+
+A real-format V2 regression now reruns Fog seed 2831875538 with the accepted
+world options and checks the route log, the default landing calculated from
+the read-only QA MSB, the absence of any generated player at the boss-trigger
+center, and the separately preserved action and boss-start regions. The
+FogHost 0.7.3 output retains player c0000_0059 / entity 1815927 at
+(-73.25, -43.57, -15.633975), yaw 150; its action region is entity 1815926
+at (-73.25, -44.57, -15.633975), and its separate Capra boss-start region is
+entity 1815925 at (-72.25, -44, -17.2). The trigger remains available to the
+encounter event and is not used as the spawn. Because the old coordinates did
+not match upstream, the conditional investigation of other event or collision
+state was not needed to explain this landing.
+
+The full Compact V2 placement audit remains the 194-side real-format CSV
+described above: 144 exact upstream output matches, 42 explicit
+project-owned sides without upstream identities, and 8 door sides that create
+no player. It has zero unexplained failures. The CSV remains in the recorded
+temporary report path because it contains game-derived coordinates. The
+confirmed run had PvP options off; this finding does not resolve or alter the
+separate PvP-gate audit. No replacement Portable was built.
 ## Boss-completion model
 
 The Compact catalog adds a typed `BossCompletion` condition, represented as
