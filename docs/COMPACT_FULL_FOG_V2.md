@@ -3,7 +3,8 @@
 Status: **promoted for local owner gameplay QA on 2026-10-21; Ceaseless
 landing and post-boss physical-route validation corrected on 2026-10-23;
 PvP-off physical gates and upstream landing parity audited on 2026-10-25;
-the reported under-texture gameplay run is not yet identified**. New worlds use
+the supplied under-texture Seed Code has a candidate route, but its in-game
+symptom remains unverified**. New worlds use
 `ds1tr-gen-v5`; v1-v4 compatibility is unchanged. The owner-reported V5
 under-map and post-boss hard-lock reports led to explicitly authorized
 pre-release corrections to V5's physical landing and route validation. The V5
@@ -50,11 +51,35 @@ The full machine-readable CSV, including game-derived positions, is kept at
 `%TEMP%\fogmod-v5-physical-audit-harness-20261025-a\reports-current-rebuilt-seed4009338015\compact-v2-landing-parity.csv`
 and is not committed as extracted DSR data.
 This audit establishes Compact-to-upstream placement parity for its tested
-real-format seed. The separate owner report of an arrival under textures around
-Undead Parish is not mapped to a particular source/destination Entrance in the
-preserved evidence; its affected gameplay Seed Code or generated manifest is
-still needed before the symptom can be called resolved. Do not build or
-promote another gameplay Portable on the basis of this parity audit alone.
+real-format seed.
+
+The owner later supplied V5 Seed Code
+`DS1TR1-06NWCQQ3-K2HDEE66-RS30D9N6-2R31C11B-3KT74XF8-TRW6G1J0-5CE38MF4-582WV6E4-AGVH0B8M-TGV4HJ8W-JKKMNWTJ-HBS764X1-NV3N20D1-QDJM9NA0-S1JG2TEN-9X97WJ86-QKQ035S2-YJN7E80N-16X6QG5H-MAHG8BAS-82RG8KA0-C0FJ02D7-2R3SE92P-QAJ2D9P0-HBDD2TMC-HHN0RPQT-2ANCA016-ZGP0P`
+(master seed `332055808`, PvP options off). The supplied support bundle's
+manifest instead records a V4 Seed Code ending `...2ANCA013-N99NW`; it is not
+the generated-package manifest for this V5 code.
+
+The saved V5 package from FogHost 0.7.0/0.7.1 used Fog seed `4009337993` on
+attempt 0. Replaying that graph and writer path identifies a candidate Parish
+arrival: `o4972_0000` BSide (`demonruins_izalith`) routes to `o1419_0000`
+ASide (`parish`). Generated player entity `1815829` is in
+`m10_01_00_00.msb` at `(-50.22262, -21.81, -32.293694)`, yaw `155`. The
+pristine `o1419_0000` object is entity `1011700` at
+`(-49.8, -21.81, -33.2)`, yaw `-25`; upstream uses the ordinary one-meter
+object-relative landing. The real-format parity report records the same map,
+position, yaw, and action region `1012600` for upstream and Compact. This rules
+out a Compact-only landing-transform mismatch for this candidate. The negative
+Y coordinate alone does not prove that the spawn is below walkable geometry.
+
+Local saved manifests also show FogHost 0.7.2 rejecting attempts 0–3 with
+`FOG_SEED_UNSOLVABLE` and accepting attempt 4 with Fog seed `31341427`. That
+accepted package is a different generated world from the historical 0.7.0/
+0.7.1 attempt-0 output above. The supplied screenshots show the Asylum-to-
+Demon-Ruins arrival, not the later Parish landing, and the V4 support bundle
+does not identify which V5 package was played. Therefore the candidate route
+is identified, but the reported under-texture gameplay symptom and its cause
+remain unverified. Do not build or promote another gameplay Portable on the
+basis of parity alone.
 
 ## Boss-completion model
 

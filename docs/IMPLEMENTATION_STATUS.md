@@ -32,13 +32,25 @@ landing mismatches. Full coordinate CSV remains at
 `%TEMP%\fogmod-v5-physical-audit-harness-20261025-a\reports-current-rebuilt-seed4009338015\compact-v2-landing-parity.csv`
 because it contains game-derived MSB coordinates.
 
-The owner-reported under-texture arrival around Undead Parish is not yet tied to
-that audit's generated route: the preserved physical-parity report is for a
-separate real-format audit seed, and the task did not include the affected
-in-game run's Seed Code, manifest, or package. Therefore this record does not
-claim that the reported in-game symptom is fixed. A new gameplay build remains
-blocked; V5 gameplay safety is not established. No Steam installation was
-accessed, and V1-V4 profile behavior and fixtures were not changed.
+The owner supplied V5 Seed Code
+`DS1TR1-06NWCQQ3-K2HDEE66-RS30D9N6-2R31C11B-3KT74XF8-TRW6G1J0-5CE38MF4-582WV6E4-AGVH0B8M-TGV4HJ8W-JKKMNWTJ-HBS764X1-NV3N20D1-QDJM9NA0-S1JG2TEN-9X97WJ86-QKQ035S2-YJN7E80N-16X6QG5H-MAHG8BAS-82RG8KA0-C0FJ02D7-2R3SE92P-QAJ2D9P0-HBDD2TMC-HHN0RPQT-2ANCA016-ZGP0P`
+(master seed `332055808`, PvP off). The support bundle supplied with the
+gameplay report records a V4 code ending `...2ANCA013-N99NW`, so it does not
+identify the V5 package that produced the supplied code.
+
+The saved FogHost 0.7.0/0.7.1 attempt-0 package and a replay of its graph/writer
+path identify a candidate later route from `o4972_0000` BSide in
+`demonruins_izalith` to `o1419_0000` ASide in Parish. Player `1815829` is at
+`m10_01_00_00.msb` `(-50.22262, -21.81, -32.293694)`, yaw `155`. This matches
+the pinned FogMod default object-relative landing and the current real-format
+Compact parity report, including action region `1012600`; no Compact-only
+landing offset is evidenced. FogHost 0.7.2 instead rejects attempts 0–3 and
+accepts attempt 4 with Fog seed `31341427`, which is a different world output.
+The screenshots document the initial Asylum-to-Demon-Ruins crossing, not the
+Parish landing. The precise under-texture gameplay symptom therefore remains
+unverified and V5 is not established as gameplay-safe. A new gameplay build
+remains blocked. No Steam installation was accessed, and V1-V4 profile
+behavior and fixtures were not changed.
 
 Verification: FogHost Release build clean and FogHost suite **120/120**;
 backend suite **615 total, 613 passed, 0 failed, 2 skipped**; root typecheck
