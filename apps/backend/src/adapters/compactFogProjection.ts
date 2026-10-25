@@ -8,7 +8,7 @@ export const COMPACT_FOG_PROJECTION_FORMAT = 'ds1tr-compact-fog-projection-v1';
 export const COMPACT_FOG_CATALOG_V1_VERSION = 'ds1tr-compact-full-fog-v1';
 export const COMPACT_FOG_CATALOG_V1_FINGERPRINT = '8c03fd3de1cd7c772d5c933753ae54eab35f9e8b70a1aef2954322330d0002d4';
 export const COMPACT_FOG_CATALOG_V2_VERSION = 'ds1tr-compact-full-fog-v2';
-export const COMPACT_FOG_CATALOG_V2_FINGERPRINT = 'e56423307d97617b6198776d349e1dbcb27d0ca37ebc6a26ece5e7a9f01811ff';
+export const COMPACT_FOG_CATALOG_V2_FINGERPRINT = '774ed7c1ecaaad006646eaaf0dd6bef86aafe033a3881076d9cd3bda7ffcd36c';
 // Backward-compatible names for callers that specifically mean the historical v1 catalog.
 export const COMPACT_FOG_CATALOG_VERSION = COMPACT_FOG_CATALOG_V1_VERSION;
 export const COMPACT_FOG_CATALOG_FINGERPRINT = COMPACT_FOG_CATALOG_V1_FINGERPRINT;

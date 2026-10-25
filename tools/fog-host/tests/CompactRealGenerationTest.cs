@@ -149,16 +149,17 @@ namespace FogHost.Tests
             {
                 Environment.CurrentDirectory = dataRoot;
 
-                // Reproduce the owner's support-bundle Fog seed/options against both frozen v1 and
-                // v2. v1 must retain its historical graph; v2 must gate the local Ceaseless/lava
-                // route on verified boss completion while the writer still emits valid files.
+                // Reproduce the owner's accepted V5 QA Fog seed/options against frozen v1 and v2.
+                // v1 must retain its historical graph; v2 gates the local Ceaseless/lava route on
+                // verified boss completion while the writer still emits valid files.
                 string[] reproducedOptions = { "traversableFogs", "bossFogs", "areaWarps", "scaling", "requireLordSouls" };
                 string v1Landing = null;
                 string v2Landing = null;
-                string[] v1Output = RunCase(dataRoot, scratchRoot, v1, "support-repro-v1", reproducedOptions, 4009337993, "POLISH",
+                string[] v1Output = RunCase(dataRoot, scratchRoot, v1, "pvp-off-repro-v1", reproducedOptions, 31341427, "POLISH",
                     landing => v1Landing = landing);
-                string[] v2Output = RunCaseV2(dataRoot, scratchRoot, v2, "support-repro-v2", reproducedOptions, 4009337993, "POLISH",
-                    landing => v2Landing = landing);
+                string[] v2Output = RunCaseV2(dataRoot, scratchRoot, v2, "pvp-off-repro-v2", reproducedOptions, 31341427, "POLISH",
+                    landing => v2Landing = landing,
+                    (staging, result) => VerifyCompactPvpSoloInitializers(staging, result));
                 AssertCeaselessRoute(v1.Catalog, "v1", expectedCompletionEventId: null);
                 AssertCeaselessRoute(v2.Catalog, "v2", expectedCompletionEventId: 11410410);
                 if (string.IsNullOrWhiteSpace(v1Landing) || string.IsNullOrWhiteSpace(v2Landing)
@@ -166,7 +167,32 @@ namespace FogHost.Tests
                     throw new InvalidDataException($"Compact Fog v2 Ceaseless warp output differs from the frozen v1/FogMod default landing: v1='{v1Landing}', v2='{v2Landing}'.");
                 if (v1Output.SequenceEqual(v2Output, StringComparer.Ordinal))
                     throw new InvalidDataException("The exact reproduction produced identical v1/v2 output hashes despite the catalog correction.");
-                Console.WriteLine($"PASS support reproduction: fogSeed=4009337993; v1Files={v1Output.Length}; v2Files={v2Output.Length}; identical Ceaseless physical landing; v1={v1Landing}; v2={v2Landing}; v1/v2 progression differs as expected.");
+                Console.WriteLine($"PASS PvP OFF real-format accepted-world regression: fogSeed=31341427; v1Files={v1Output.Length}; v2Files={v2Output.Length}; identical Ceaseless physical landing; v1={v1Landing}; v2={v2Landing}; v1/v2 progression differs as expected.");
+
+                var majorPvpRejections = new List<uint>();
+                bool majorPvpWritten = false;
+                IEnumerable<uint> majorPvpSeeds = new[] { MatrixSeed, 31341427U }
+                    .Concat(Enumerable.Range(1, 127).Select(seed => checked((uint)seed)))
+                    .Distinct();
+                foreach (uint seed in majorPvpSeeds)
+                {
+                    try
+                    {
+                        RunCaseV2(dataRoot, scratchRoot, v2, "pvp-major-on-physical-" + seed.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                            new[] { "traversableFogs", "majorPvpFogs" }, seed,
+                            onWrittenOutput: (staging, result) => VerifyCompactPvpMajorRandomizedOutput(staging, result));
+                        majorPvpWritten = true;
+                        Console.WriteLine($"PASS Compact V2 PvP ON real writer output: seed={seed}, rejectedBeforeSuccess={majorPvpRejections.Count}, rejects=[{string.Join(",", majorPvpRejections)}].");
+                        break;
+                    }
+                    catch (FogHostException error) when (error.Code == HostErrors.SeedUnsolvable && error.Retryable
+                        && error.RetryScope == "fog" && error.Stage == "solve-graph")
+                    {
+                        majorPvpRejections.Add(seed);
+                    }
+                }
+                if (!majorPvpWritten)
+                    throw new InvalidDataException($"No valid major-PvP real-format seed was found in {majorPvpRejections.Count} deterministic candidates; first={majorPvpRejections.FirstOrDefault()}, last={majorPvpRejections.LastOrDefault()}.");
 
                 var cases = HostRequest.OptionFlags
                     .Select(option => (Name: option.Key, Enabled: new[] { option.Key }, Seed: MatrixSeed))
@@ -179,6 +205,7 @@ namespace FogHost.Tests
                 string[] deterministicOptions = { "areaWarps", "glitchedLogic", "requireLordSouls", "randomStart" };
                 string[] deterministicFirst = null;
                 var failures = new List<string>();
+                int expectedRetryableRejections = 0;
                 foreach (var testCase in cases)
                 {
                     try
@@ -186,6 +213,11 @@ namespace FogHost.Tests
                         string[] output = RunCaseV2(dataRoot, scratchRoot, v2, testCase.Name, testCase.Enabled, testCase.Seed);
                         if (testCase.Name == "high-risk-warp-hard-lord-start") deterministicFirst = output;
                         Console.WriteLine($"PASS Compact Fog v2 real generation: {testCase.Name}, seed={testCase.Seed}, files={output.Length}");
+                    }
+                    catch (FogHostException error) when (IsExpectedPostBossRetry(testCase.Name, error))
+                    {
+                        expectedRetryableRejections++;
+                        Console.WriteLine($"PASS Compact Fog v2 typed retry rejection: {testCase.Name}, seed={testCase.Seed}, code={error.Code}, stage={error.Stage}, retryable={error.Retryable}, scope={error.RetryScope}.");
                     }
                     catch (Exception error)
                     {
@@ -214,7 +246,7 @@ namespace FogHost.Tests
                     failures.Add("determinism-repeat: primary high-risk case failed, so deterministic comparison was unavailable");
                 }
 
-                Console.WriteLine($"Compact Fog v2 GameDataWriter matrix: {cases.Count - failures.Count} passed; {failures.Count} failed; {cases.Count} cases plus support reproduction; scratch={scratchRoot}");
+                Console.WriteLine($"Compact Fog v2 GameDataWriter matrix: {cases.Count - failures.Count} passed, including {expectedRetryableRejections} expected typed post-boss retry rejections; {failures.Count} failed; {cases.Count} cases plus support reproduction; scratch={scratchRoot}");
                 foreach (string failure in failures) Console.Error.WriteLine($"MATRIX FAILURE: {failure}");
                 return failures.Count == 0 ? 0 : 1;
             }
@@ -229,6 +261,68 @@ namespace FogHost.Tests
                 Environment.CurrentDirectory = originalDirectory;
             }
         }
+
+        public static int RunPostBossSeedSweepFromEnvironment()
+        {
+            string dataRoot = RequiredDirectory("DS1TR_FOG_DATA_ROOT");
+            string pristineRoot = RequiredDirectory("DS1TR_PRISTINE_DSR_ROOT");
+            string seedList = Environment.GetEnvironmentVariable("DS1TR_COMPACT_V2_POST_BOSS_SEEDS");
+            if (string.IsNullOrWhiteSpace(seedList))
+                throw new InvalidOperationException("DS1TR_COMPACT_V2_POST_BOSS_SEEDS must contain a comma-separated list of uint32 Fog seeds.");
+
+            uint[] seeds = seedList.Split(',').Select(value => uint.Parse(value.Trim(), System.Globalization.CultureInfo.InvariantCulture)).ToArray();
+            if (seeds.Length == 0 || seeds.Distinct().Count() != seeds.Length)
+                throw new InvalidOperationException("The post-boss seed sweep requires a non-empty list of distinct uint32 seeds.");
+
+            FogDsrFacts facts = FogDsrFacts.Read(dataRoot, pristineRoot, includeLegacyAnnotations: false);
+            FogCompactCatalogV2 catalog = FogCompactCatalogBuilder.BuildV2(facts);
+            string originalDirectory = Environment.CurrentDirectory;
+            string scratchRoot = Path.Combine(Path.GetTempPath(), "ds1tr-compact-v2-post-boss-sweep-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(scratchRoot);
+            var successes = new List<uint>();
+            var retryableRejections = new List<(uint Seed, string Message)>();
+            var unexpectedFailures = new List<(uint Seed, string Message)>();
+            string[] options = { "traversableFogs", "bossFogs", "areaWarps", "scaling", "requireLordSouls" };
+            try
+            {
+                Environment.CurrentDirectory = dataRoot;
+                foreach (uint seed in seeds)
+                {
+                    try
+                    {
+                        RunCaseV2(dataRoot, scratchRoot, catalog, "post-boss-" + seed.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                            options, seed, "POLISH");
+                        successes.Add(seed);
+                        Console.WriteLine($"PASS Compact Fog v2 post-boss seed {seed}.");
+                    }
+                    catch (FogHostException error) when (error.Code == HostErrors.SeedUnsolvable && error.Retryable
+                        && error.RetryScope == "fog" && error.Stage == "solve-graph")
+                    {
+                        retryableRejections.Add((seed, error.Message));
+                        Console.WriteLine($"RETRYABLE Compact Fog v2 post-boss seed {seed}: {error.Message}");
+                    }
+                    catch (Exception error)
+                    {
+                        unexpectedFailures.Add((seed, error.ToString()));
+                        Console.Error.WriteLine($"FAIL Compact Fog v2 post-boss seed {seed}: {error}");
+                    }
+                }
+
+                Console.WriteLine($"Compact Fog v2 post-boss seed sweep: {successes.Count}/{seeds.Length} generated; {retryableRejections.Count} typed retryable post-boss rejections; {unexpectedFailures.Count} unexpected failures; firstSuccess={(successes.Count > 0 ? successes[0].ToString(System.Globalization.CultureInfo.InvariantCulture) : "none")}; scratch={scratchRoot}");
+                return unexpectedFailures.Count == 0 && successes.Count > 0 ? 0 : 1;
+            }
+            finally
+            {
+                Environment.CurrentDirectory = originalDirectory;
+            }
+        }
+
+        private static bool IsExpectedPostBossRetry(string caseName, FogHostException error) =>
+            (caseName == "bossFogs" || caseName == "all-fog-options")
+            && error.Code == HostErrors.SeedUnsolvable
+            && error.Retryable
+            && error.RetryScope == "fog"
+            && error.Stage == "solve-graph";
 
         private static void AssertCeaselessRoute(FogAnnotationCatalog catalog, string label, int? expectedCompletionEventId)
         {
@@ -255,7 +349,8 @@ namespace FogHost.Tests
             IEnumerable<string> enabledOptions,
             uint seed,
             string language = "ENGLISH",
-            Action<string> onCeaselessLanding = null)
+            Action<string> onCeaselessLanding = null,
+            Action<string, HostResult> onWrittenOutput = null)
         {
             string runRoot = Path.Combine(scratchRoot, name + "-" + seed + "-" + Guid.NewGuid().ToString("N"));
             string staging = Path.Combine(runRoot, "staging");
@@ -278,6 +373,7 @@ namespace FogHost.Tests
                 DecodeEveryWrittenFile(staging, result);
                 if (onCeaselessLanding != null)
                     onCeaselessLanding(VerifyCeaselessDefaultLanding(staging, RequiredDirectory("DS1TR_PRISTINE_DSR_ROOT"), catalog.Catalog));
+                onWrittenOutput?.Invoke(staging, result);
             }
             finally
             {
@@ -287,6 +383,66 @@ namespace FogHost.Tests
             return result.Files.OrderBy(file => file.Path, StringComparer.Ordinal)
                 .Select(file => $"{file.Path}:{file.Size}:{file.Sha256}")
                 .ToArray();
+        }
+
+        private static void VerifyCompactPvpSoloInitializers(string staging, HostResult result)
+        {
+            OutputFile commonOutput = result.Files.SingleOrDefault(file => file.Path == "event/common.emevd.dcx")
+                ?? throw new InvalidDataException("Compact Fog V2 did not report common.emevd.dcx, where FogMod owns all Event 5700 initializers.");
+            string commonPath = Path.Combine(staging, commonOutput.Path.Replace('/', Path.DirectorySeparatorChar));
+            EMEVD common = EMEVD.Read(DCX.Decompress(File.ReadAllBytes(commonPath)));
+            EMEVD.Event eventZero = common.Events.Single(evt => evt.ID == 0);
+            EMEVD.Instruction[] modeOne = eventZero.Instructions.Where(instruction => instruction.Bank == 2000
+                && instruction.ID == 0 && instruction.ArgData.Length == 40
+                && BitConverter.ToUInt32(instruction.ArgData, 4) == 5700
+                && instruction.ArgData[8] == 1).ToArray();
+
+            FogCompactV2PvpPolicy.GateIdentity[] expected = FogCompactV2PvpPolicy.Identities
+                .Where(gate => !gate.Unused).ToArray();
+            foreach (FogCompactV2PvpPolicy.GateIdentity gate in expected)
+            {
+                EMEVD.Instruction[] matches = modeOne.Where(instruction => BitConverter.ToInt32(instruction.ArgData, 12) == gate.EntityId
+                    && BitConverter.ToInt32(instruction.ArgData, 16) == gate.EntityId + 1).ToArray();
+                string map = AnnotationData.nameSpecs[gate.Map.Value].Map;
+                byte mapArea = byte.Parse(map.Substring(1, 2), System.Globalization.CultureInfo.InvariantCulture);
+                byte mapBlock = byte.Parse(map.Substring(4, 2), System.Globalization.CultureInfo.InvariantCulture);
+                bool hasModeZero = eventZero.Instructions.Any(instruction => instruction.Bank == 2000
+                    && instruction.ID == 0 && instruction.ArgData.Length == 40
+                    && BitConverter.ToUInt32(instruction.ArgData, 4) == 5700
+                    && instruction.ArgData[8] == 0
+                    && BitConverter.ToInt32(instruction.ArgData, 12) == gate.EntityId
+                    && BitConverter.ToInt32(instruction.ArgData, 16) == gate.EntityId + 1);
+                if (matches.Length != 1 || matches[0].ArgData[9] != mapArea || matches[0].ArgData[10] != mapBlock || hasModeZero)
+                    throw new InvalidDataException($"PvP OFF must install exactly one Event 5700 mode-1 solo initializer and no mode-0 randomized dispatcher for '{gate.Name}' ({gate.Map}, entity {gate.EntityId}) in common event 0.");
+            }
+            FogCompactV2PvpPolicy.GateIdentity unused = FogCompactV2PvpPolicy.Identities.Single(gate => gate.Unused);
+            if (modeOne.Any(instruction => BitConverter.ToInt32(instruction.ArgData, 12) == unused.EntityId))
+                throw new InvalidDataException($"The upstream unused PvP record '{unused.Name}' must not receive an Event 5700 initializer.");
+            Console.WriteLine($"PASS Compact V2 PvP OFF physical parity: {expected.Length} pinned active vanilla gates have one correctly mapped common Event 5700 mode-1 initializer; unused {unused.Name} omitted.");
+        }
+
+        private static void VerifyCompactPvpMajorRandomizedOutput(string staging, HostResult result)
+        {
+            OutputFile commonOutput = result.Files.SingleOrDefault(file => file.Path == "event/common.emevd.dcx")
+                ?? throw new InvalidDataException("Compact Fog V2 did not report common.emevd.dcx for major PvP randomization.");
+            string commonPath = Path.Combine(staging, commonOutput.Path.Replace('/', Path.DirectorySeparatorChar));
+            EMEVD common = EMEVD.Read(DCX.Decompress(File.ReadAllBytes(commonPath)));
+            EMEVD.Event eventZero = common.Events.Single(evt => evt.ID == 0);
+            EMEVD.Instruction[] initializers = eventZero.Instructions.Where(instruction => instruction.Bank == 2000
+                && instruction.ID == 0 && instruction.ArgData.Length == 40
+                && BitConverter.ToUInt32(instruction.ArgData, 4) == 5700).ToArray();
+            foreach (FogCompactV2PvpPolicy.GateIdentity gate in FogCompactV2PvpPolicy.Identities.Where(identity => !identity.Unused))
+            {
+                EMEVD.Instruction[] calls = initializers
+                    .Where(instruction => BitConverter.ToInt32(instruction.ArgData, 12) == gate.EntityId)
+                    .ToArray();
+                byte expectedMode = !gate.Door && gate.Major ? (byte)0 : (byte)1;
+                bool hasExpectedMode = calls.Any(call => call.ArgData[8] == expectedMode);
+                bool hasUnexpectedMode = calls.Any(call => call.ArgData[8] != expectedMode);
+                if (!hasExpectedMode || hasUnexpectedMode)
+                    throw new InvalidDataException($"Major PvP ON expected Event 5700 mode {expectedMode} for active gate '{gate.Name}' (entity {gate.EntityId}); found {calls.Length} initializer(s) with modes [{string.Join(",", calls.Select(call => call.ArgData[8]))}].");
+            }
+            Console.WriteLine("PASS Compact V2 PvP ON physical parity: all 45 active pinned FogMod gates use randomized mode 0 only for enabled major gates and solo mode 1 otherwise.");
         }
 
         private static string[] RunCase(

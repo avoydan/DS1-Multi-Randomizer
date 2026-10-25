@@ -2,16 +2,59 @@
 
 Status: **promoted for local owner gameplay QA on 2026-10-21; Ceaseless
 landing and post-boss physical-route validation corrected on 2026-10-23;
-in-game gameplay QA pending**. New worlds use
+PvP-off physical gates and upstream landing parity audited on 2026-10-25;
+the reported under-texture gameplay run is not yet identified**. New worlds use
 `ds1tr-gen-v5`; v1-v4 compatibility is unchanged. The owner-reported V5
 under-map and post-boss hard-lock reports led to explicitly authorized
 pre-release corrections to V5's physical landing and route validation. The V5
 Seed Code and settings are unchanged; package output changes. V2 uses FogHost
 schema 3 with the project-owned Compact catalog and adds no game-data files.
 
-Current catalog fingerprint: `e56423307d97617b6198776d349e1dbcb27d0ca37ebc6a26ece5e7a9f01811ff`.
-Current world-data identity: `75a60153e8563574`.
-Current FogHost version: `0.7.2`.
+Current catalog fingerprint: `774ed7c1ecaaad006646eaaf0dd6bef86aafe033a3881076d9cd3bda7ffcd36c`.
+Current world-data identity: `c21874685396f5e2`.
+Current FogHost version: `0.7.3`.
+
+## PvP-off physical gates and full player-landing parity (2026-10-25)
+
+Compact V2 removes disabled PvP entrances from the randomization graph while
+retaining the vanilla fixed Area links. FogMod's writer normally emits
+Event 5700 mode-1 calls for fixed PvP gates; removing those records from the
+projected annotation also removes that writer behavior. `FogCompactV2PvpPolicy`
+now restores those calls for the unprojected physical gates in common event 0.
+For Parish-to-Andre `o1408_0000` / entity `1011996` and the Parish/Firelink
+elevator `o1410_0000` / entity `1011988`, real-format upstream and Compact
+outputs both contain the mode-1 initializer and preserve the same pristine MSB
+object transform. With the relevant option enabled, eligible gates remain in
+the randomization graph and use the normal FogMod writer path.
+
+Pinned upstream has 46 PvP records: 15 major and 31 minor. Twelve are doors and
+one is unused, so 33 non-door records are eligible for graph projection.
+Compact V2 adds 20 project-owned Anor Londo arena gates to those 33, yielding 53
+records: 31 major and 22 minor. The 13 upstream door/unused records are not
+shuffle inputs; their physical solo initializers are handled separately.
+
+The complete real-format landing comparison covered 194 Entrance sides:
+
+- 144 matched upstream's resulting map, player XYZ, and yaw: 130 default
+  object-relative placements, 2 custom warps, 3 destination-map overrides,
+  and 9 special-tag offsets.
+- 42 sides had no upstream identity: both sides of project-owned `o1309` and
+  the 20 project arena entrances `o2780_*`. These are explicit project-owned
+  exceptions, not parity failures.
+- 8 sides across door entrances `o2908_0000`, `o3963_0000`, `o4960_0000`, and
+  `o7907_0000` produce no player part in the upstream writer's door branch;
+  these are checked as door transitions rather than player landings.
+- Unexplained parity failures: **0**.
+
+The full machine-readable CSV, including game-derived positions, is kept at
+`%TEMP%\fogmod-v5-physical-audit-harness-20261025-a\reports-current-rebuilt-seed4009338015\compact-v2-landing-parity.csv`
+and is not committed as extracted DSR data.
+This audit establishes Compact-to-upstream placement parity for its tested
+real-format seed. The separate owner report of an arrival under textures around
+Undead Parish is not mapped to a particular source/destination Entrance in the
+preserved evidence; its affected gameplay Seed Code or generated manifest is
+still needed before the symptom can be called resolved. Do not build or
+promote another gameplay Portable on the basis of this parity audit alone.
 
 ## Boss-completion model
 

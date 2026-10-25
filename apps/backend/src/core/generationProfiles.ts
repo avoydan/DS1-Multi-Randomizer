@@ -51,7 +51,7 @@ export interface GenerationProfile {
  * The schema is deliberately kept separate from the application's own version.
  */
 export interface FogHostRuntimeContract {
-  readonly hostVersion: '0.5.0' | '0.6.0' | '0.7.2';
+  readonly hostVersion: '0.5.0' | '0.6.0' | '0.7.3';
   readonly schemaVersion: 2 | 3;
   readonly annotationSource: 'legacy-fogmod' | 'compact-v1' | 'compact-v2';
 }
@@ -134,11 +134,11 @@ const v5: GenerationProfile = Object.freeze({
   roamingBossFitPolicy: 'owner-approved-v1',
   fogAnnotationSource: 'compact-v2',
   fogEngine: Object.freeze({
-    hostVersions: Object.freeze(['0.7.2']),
+    hostVersions: Object.freeze(['0.7.3']),
     fogModCommit: v4.fogEngine.fogModCommit,
-    worldDataId: '75a60153e8563574',
+    worldDataId: 'c21874685396f5e2',
     compactCatalogVersion: 'ds1tr-compact-full-fog-v2',
-    compactCatalogFingerprint: 'e56423307d97617b6198776d349e1dbcb27d0ca37ebc6a26ece5e7a9f01811ff',
+    compactCatalogFingerprint: '774ed7c1ecaaad006646eaaf0dd6bef86aafe033a3881076d9cd3bda7ffcd36c',
   }),
   fogItemTracking: 'compact-fog-item-tracking-v1',
   completeSettings: v4.completeSettings,
@@ -173,10 +173,10 @@ export function fogHostRuntimeForProfile(
   }
   if (profile.fogAnnotationSource === 'compact-v2'
     && profile.fogItemTracking === 'compact-fog-item-tracking-v1'
-    && versions.includes('0.7.2')
+    && versions.includes('0.7.3')
     && typeof profile.fogEngine.compactCatalogVersion === 'string'
     && typeof profile.fogEngine.compactCatalogFingerprint === 'string') {
-    return Object.freeze({ hostVersion: '0.7.2', schemaVersion: 3, annotationSource: 'compact-v2' });
+    return Object.freeze({ hostVersion: '0.7.3', schemaVersion: 3, annotationSource: 'compact-v2' });
   }
   return null;
 }

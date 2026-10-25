@@ -98,7 +98,7 @@ namespace FogHost
     public enum FogWarpTags { None = 0, NoRandom = 1, Unique = 2, Unused = 4 }
 
     [Flags]
-    public enum FogEntranceSideTags { None = 0, Dnofts = 1, Higher = 4 }
+    public enum FogEntranceSideTags { None = 0, Dnofts = 1, Main = 2, Higher = 4 }
 
     [Flags]
     public enum FogWarpSideTags { None = 0, Player = 1, Temporary = 2 }
@@ -503,7 +503,9 @@ namespace FogHost
                     throw new InvalidDataException($"Boss completion {transition.EventId} has no verified FogMod-default landing side for '{transition.EncounterArea}'.");
             }
 
-            var allNames = new HashSet<FogEntranceKey>(Warps.Select(warp => warp.Identity).Concat(Entrances.Select(entrance => entrance.Identity)));
+            var allNames = new HashSet<FogEntranceKey>(Warps.Select(warp => warp.Identity)
+                .Concat(Entrances.Select(entrance => entrance.Identity))
+                .Concat(WriterSupportEntrances.Select(entrance => new FogEntranceKey(entrance.Name))));
             foreach (FogEntranceSide side in Entrances.SelectMany(entrance => new[] { entrance.ASide, entrance.BSide }).Where(side => side != null))
             {
                 if (side.ExcludeIfRandomized.HasValue && !allNames.Contains(side.ExcludeIfRandomized.Value))
@@ -715,7 +717,7 @@ namespace FogHost
             (FogWarpTags.NoRandom, "norandom"), (FogWarpTags.Unique, "unique"), (FogWarpTags.Unused, "unused"));
 
         private static string Tags(FogEntranceSideTags tags) => JoinTags(tags,
-            (FogEntranceSideTags.Dnofts, "dnofts"), (FogEntranceSideTags.Higher, "higher"));
+            (FogEntranceSideTags.Dnofts, "dnofts"), (FogEntranceSideTags.Main, "main"), (FogEntranceSideTags.Higher, "higher"));
 
         private static string Tags(FogWarpSideTags tags) => JoinTags(tags,
             (FogWarpSideTags.Player, "player"), (FogWarpSideTags.Temporary, "temp"));

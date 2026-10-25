@@ -166,6 +166,8 @@ namespace FogHost
                 ? request.ExpectedAnnotationFingerprint
                 : DataRoot.AnnotationSha256(Directory.GetCurrentDirectory());
             Console.WriteLine($"Seed: {opt.DisplaySeed}. Options: {string.Join(" ", opt.GetEnabled())}");
+            if (request.AnnotationSource == HostRequest.CompactV2Annotations)
+                FogCompactV2PvpPolicy.ApplyGraphOptions(ann, opt["major"], opt["minor"]);
             var graph = new Graph();
             graph.Construct(opt, ann);
 
@@ -232,6 +234,8 @@ namespace FogHost
                             : EMEVD.Read(Resolve(staging, Path.Combine("event", fileName)));
                         FogVanillaEventBuilder.ReplaceBedOfChaosHelpers(pristine, output);
                     }
+                    if (request.AnnotationSource == HostRequest.CompactV2Annotations)
+                        FogCompactV2PvpPolicy.AddUnprojectedSoloInitializers(fileName, output, ann);
                     merge.Merge(fileName, output);
                 },
             };

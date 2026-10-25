@@ -1,5 +1,28 @@
 # FogHost integration design
 
+## Compact V2 physical-world audit update (2026-10-25)
+
+FogHost `0.7.3` contains the current V5 Compact V2 PvP-off and landing policy.
+When a PvP category is off, its gate identities leave the randomized graph and
+the corresponding vanilla Area links stay fixed. Because those removed
+annotation records would otherwise also remove FogMod's Event 5700 mode-1
+initializers, `FogCompactV2PvpPolicy` restores the solo initializers for
+unprojected physical PvP gates. The observed Parish-to-Andre and
+Parish/Firelink dual-elevator gates match pinned FogMod's initializer and
+pristine object transform. With a category enabled, its eligible entrances use
+the normal graph/writer path.
+
+The 194-side real-format landing audit matched 144 sides to pinned FogMod
+output (130 object-relative, 2 custom warp, 3 destination-map override, 9
+special-tag offset). The 42 unmatched sides belong to project-owned `o1309`
+and the 20 `o2780_*` arenas; eight door sides intentionally have no generated
+player. There were no unexplained placement mismatches. The full coordinate
+CSV remains a local Temp artifact because it contains game-derived MSB data.
+This does not identify the separate manually reported under-texture arrival:
+the preserved run artifacts do not associate that incident with a specific
+Entrance/side. Keep gameplay readiness blocked until its exact Seed Code or
+manifest and output are available and checked.
+
 Task 9. Design of the dedicated C# host around FogMod's callable engine, the
 JSON process boundary Task 10 implements, and the concrete MSB/EMEVD/GameParam
 overlap with the combined Items + Enemies engine that Task 11 must bridge.

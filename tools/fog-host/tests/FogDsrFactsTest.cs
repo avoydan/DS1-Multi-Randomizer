@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -13,6 +13,19 @@ namespace FogHost.Tests
 {
     public static class FogDsrFactsTest
     {
+        private static AnnotationData.Annotations ReadPinnedFogModReferenceAnnotations()
+        {
+            string referenceRoot = Environment.GetEnvironmentVariable("DS1TR_FOGMOD_REFERENCE_ROOT");
+            if (string.IsNullOrWhiteSpace(referenceRoot))
+                referenceRoot = Environment.GetEnvironmentVariable("DS1TR_FOG_DATA_ROOT");
+            string annotationPath = Path.Combine(referenceRoot ?? string.Empty, "dist", "fog.txt");
+            if (string.IsNullOrWhiteSpace(referenceRoot) || !File.Exists(annotationPath))
+                throw new InvalidOperationException("DS1TR_FOGMOD_REFERENCE_ROOT must point to the exact pinned FogMod checkout containing dist/fog.txt.");
+            using StreamReader reader = File.OpenText(annotationPath);
+            return new DeserializerBuilder().Build().Deserialize<AnnotationData.Annotations>(reader)
+                ?? throw new InvalidDataException("Pinned FogMod dist/fog.txt did not deserialize to annotation data.");
+        }
+
         public static void VerifyCompactCatalogCandidateFromEnvironment()
         {
             string root = Environment.GetEnvironmentVariable("DS1TR_FOG_DATA_ROOT");
@@ -818,9 +831,7 @@ namespace FogHost.Tests
             if (facts.AdditionalTreasureSlotLots.Any(treasure => treasure.Slot is < 2 or > 5))
                 throw new InvalidDataException("An additional MSB treasure ItemLot reference has an invalid slot index.");
             var unmatchedSlotOne = facts.UnresolvedTreasureLots;
-            AnnotationData.Annotations oracle;
-            using (StreamReader reader = File.OpenText(Path.Combine(root, "dist", "fog.txt")))
-                oracle = new DeserializerBuilder().Build().Deserialize<AnnotationData.Annotations>(reader);
+            AnnotationData.Annotations oracle = ReadPinnedFogModReferenceAnnotations();
             IReadOnlyList<FogCustomStart> projectStarts = FogAnnotationPolicyResolver.ResolveCustomStarts(facts, FogProjectAnnotationPolicy.CustomStarts);
             if (projectStarts.Count != 16 || projectStarts.Select(start => start.Id).Distinct(StringComparer.Ordinal).Count() != 16)
                 throw new InvalidDataException("The initial project-owned custom-start policy did not resolve 16 uniquely named pristine DSR spawn points.");
@@ -1409,6 +1420,7 @@ namespace FogHost.Tests
                 throw new InvalidDataException("Frozen Compact Fog v1 must retain its historical Ceaseless/lava shortcut; the correction belongs only to v5.");
             VerifyCeaselessScriptClassification(facts, pristineGameRoot);
             FogCompactCatalogV2 compactV2 = FogCompactCatalogBuilder.BuildV2(facts);
+            VerifyCompactV2PvpPolicy(facts, candidate, compactV2);
             FogAreaLink mainBossGatedRoute = compactV2.Catalog.Areas.Single(area => area.Id.Value == "demonruins")
                 .To.SingleOrDefault(link => link.Destination.Value == "demonruins_lava");
             bool ceaselessHasUnsupportedShortcut = mainBossGatedRoute?.Condition is not { Kind: FogConditionKind.Atom, Terms.Count: 1 }
@@ -1509,7 +1521,7 @@ namespace FogHost.Tests
             supportGraph.Construct(new RandomizerOptions(), first);
             if (!supportGraph.entranceIds["o5869_0000"].IsFixed
                 || supportGraph.graph.Values.SelectMany(node => node.To.Concat(node.From)).Any(edge => edge.Name == "o5869_0000"))
-                throw new InvalidDataException("The Anor Londo writer support anchor must be fixed and create no graph or shuffle edges.");
+                throw new InvalidDataException("Compact's Anor Londo writer support anchor must be fixed and create no graph or shuffle edges.");
             Console.WriteLine($"Compact project graph: {defaultGraphComponents} connected component(s) in the default structural graph and {hardGraphComponents} with hard routes; condition closure is checked separately by the profile matrix.");
 
             FogCompactCategoryCoverage[] gaps = candidate.Coverage
@@ -1543,6 +1555,267 @@ namespace FogHost.Tests
                 Console.WriteLine($"  {category.Category}: {category.State}, generated={category.GeneratedCount}, authored exceptions={category.ExplicitExceptionCount}, unresolved={category.UnresolvedCount}.");
             VerifyCompactGraphProfileMatrix(candidate);
         }
+
+        private static void VerifyCompactV2PvpPolicy(FogDsrFacts facts, FogCompactCatalogV1 v1, FogCompactCatalogV2 v2)
+        {
+            FogCompactV2PvpPolicy.VerifyPhysicalIdentities(facts);
+            FogCompactV2PvpPolicy.GateIdentity[] census = FogCompactV2PvpPolicy.Identities.ToArray();
+            FogCompactV2PvpPolicy.GateIdentity[] graphPolicy = FogCompactV2PvpPolicy.GraphEntrances.ToArray();
+            FogEntrance[] projectPvp = v1.Catalog.Entrances.Where(entrance => entrance.Tags.HasFlag(FogEntranceTags.Pvp)).ToArray();
+            FogEntrance[] v2Pvp = v2.Catalog.Entrances.Where(entrance => entrance.Tags.HasFlag(FogEntranceTags.Pvp)).ToArray();
+            FogEntrance[] vanillaPvp = v2Pvp.Where(entrance => census.Any(gate => gate.Name == entrance.Name)).ToArray();
+            AnnotationData.Annotations upstream = ReadPinnedFogModReferenceAnnotations();
+            AnnotationData.Annotations projected = v2.CreateFreshCandidateAnnotations();
+            FogWriterSupportEntrance[] v2Support = v2.Catalog.WriterSupportEntrances.ToArray();
+            AnnotationData.Entrance fixedArtoriasExit = projected.Entrances.SingleOrDefault(entrance => entrance.Name == "o2916_0000");
+            FogEntrance[] v2PeerEntrance = v2.Catalog.Entrances.Where(entrance => entrance.Name == "o2920_0000").ToArray();
+            if (v2Support.Length != 1 || v2Support[0].Name != "o2916_0000" || v2Support[0].Id != 1211892
+                || fixedArtoriasExit == null || !fixedArtoriasExit.IsFixed || !fixedArtoriasExit.HasTag("unused")
+                || v2PeerEntrance.Length != 1
+                || v2PeerEntrance[0].ASide.ExcludeIfRandomized?.Value != "o2916_0000"
+                || !v2PeerEntrance[0].BSide.Tags.HasFlag(FogEntranceSideTags.Main))
+                throw new InvalidDataException("Compact V2 must preserve the pinned o2920 main-side metadata and resolve its excluded post-Artorias reference as a fixed, non-randomized anchor.");
+            var v2Graph = new Graph();
+            v2Graph.Construct(new RandomizerOptions(), projected);
+            if (!v2Graph.entranceIds["o2916_0000"].IsFixed
+                || v2Graph.graph.Values.SelectMany(node => node.To.Concat(node.From)).Any(edge => edge.Name == "o2916_0000"))
+                throw new InvalidDataException("Compact V2's post-Artorias reference anchor must remain outside all graph and shuffle edges.");
+            foreach (FogCompactV2PvpPolicy.GateIdentity gate in graphPolicy)
+            {
+                AnnotationData.Entrance source = upstream.Entrances.SingleOrDefault(entrance => entrance.Name == gate.Name);
+                AnnotationData.Entrance candidate = projected.Entrances.SingleOrDefault(entrance => entrance.Name == gate.Name);
+                if (source == null || candidate == null
+                    || source.ID != gate.EntityId || candidate.ID != gate.EntityId
+                    || source.Area != gate.Map.Value || candidate.Area != source.Area
+                    || source.HasTag("pvp") != true || source.HasTag("major") != gate.Major
+                    || source.HasTag("door") || source.HasTag("unused")
+                    || !SameFogEntranceTags(source.Tags, candidate.Tags)
+                    || !SameFogSide(source.ASide, candidate.ASide)
+                    || !SameFogSide(source.BSide, candidate.BSide))
+                    throw new InvalidDataException($"Compact V2 PvP Entrance '{gate.Name}' differs from pinned FogMod identity, major/minor classification, side identity, flags, conditions, placement fields, or tags.");
+            }
+
+            foreach (FogEntrance source in v1.Catalog.Entrances)
+            {
+                FogEntrance candidate = v2.Catalog.Entrances.SingleOrDefault(entrance => entrance.Name == source.Name);
+                FogEntranceSide ExpectedSide(FogEntranceSide side, bool isASide)
+                {
+                    if (side == null) return null;
+                    if (source.Name == "o4961_0000" && side.Area.Value == "demonruins_ceaseless")
+                        return side with
+                        {
+                            BossTrigger = 0,
+                            BossTriggerArea = null,
+                            CustomWarp = null,
+                            BossEncounterStartEventId = 11415371,
+                        };
+                    if (source.Name == "o2915_0000" || (source.Name == "o4972_0000" && !isASide))
+                        return side with { Tags = side.Tags | FogEntranceSideTags.Higher };
+                    return side;
+                }
+
+                if (candidate == null
+                    || !SameProjectSide(candidate.ASide, ExpectedSide(source.ASide, true))
+                    || !SameProjectSide(candidate.BSide, ExpectedSide(source.BSide, false))
+                    || candidate.Name != source.Name || candidate.Id != source.Id || candidate.Map != source.Map
+                    || candidate.Tags != source.Tags)
+                    throw new InvalidDataException($"Compact V2 changed physical placement semantics for project Entrance '{source.Name}' outside the reviewed Ceaseless-trigger and higher-tag exceptions. "
+                        + $"A expected [{ExpectedSide(source.ASide, true)}], actual [{candidate?.ASide}]; "
+                        + $"B expected [{ExpectedSide(source.BSide, false)}], actual [{candidate?.BSide}]; "
+                        + $"identity source={source.Id}/{source.Map}/{source.Tags}, candidate={candidate?.Id}/{candidate?.Map}/{candidate?.Tags}.");
+            }
+            var expectedDestinationMaps = new Dictionary<(string Entrance, bool ASide), string>
+            {
+                [("o2901_0000", true)] = "parish",
+                [("o2903_0000", false)] = "newlondo",
+                [("o5151_0000", true)] = "parish",
+            };
+            foreach (FogEntrance entrance in vanillaPvp)
+            foreach ((FogEntranceSide side, bool isASide) in new[] { (entrance.ASide, true), (entrance.BSide, false) })
+            {
+                expectedDestinationMaps.TryGetValue((entrance.Name, isASide), out string expectedMap);
+                if (side.DestinationMap?.Value != expectedMap)
+                    throw new InvalidDataException($"Compact V2 PvP landing map for '{entrance.Name}' {(isASide ? "ASide" : "BSide")} must match the pinned FogMod DestinationMap field (expected '{expectedMap ?? "<none>"}', got '{side.DestinationMap?.Value ?? "<none>"}').");
+            }
+            if (census.Length != 46 || census.Select(gate => gate.Name).Distinct(StringComparer.Ordinal).Count() != 46
+                || census.Count(gate => gate.Major) != 15
+                || census.Count(gate => gate.Door) != 12
+                || census.Count(gate => gate.Unused) != 1
+                || graphPolicy.Length != 33
+                || graphPolicy.Count(gate => gate.Major) != 15
+                || graphPolicy.Count(gate => !gate.Major) != 18
+                || projectPvp.Length != 20 || projectPvp.Any(entrance => !entrance.Tags.HasFlag(FogEntranceTags.Door))
+                || v2Pvp.Length != 53
+                || v2Pvp.Count(entrance => entrance.Tags.HasFlag(FogEntranceTags.Major)) != 31
+                || v2Pvp.Count(entrance => !entrance.Tags.HasFlag(FogEntranceTags.Major)) != 22
+                || vanillaPvp.Length != 33)
+                throw new InvalidDataException("Compact V2's 46-record pinned PvP census must project 33 non-door vanilla gates alongside the 20 intentionally fixed project arena gates (15/18 vanilla major/minor, 31/22 overall). ");
+
+            FogEntrance parishAndre = v2.Catalog.Entrances.Single(entrance => entrance.Name == "o1408_0000");
+            FogEntrance parishElevator = v2.Catalog.Entrances.Single(entrance => entrance.Name == "o1410_0000");
+            if (parishAndre.Id != 1011996 || parishAndre.Map.Value != "parish"
+                || parishAndre.ASide.Area.Value != "parish_andre" || parishAndre.BSide.Area.Value != "parish_church"
+                || !parishAndre.Tags.HasFlag(FogEntranceTags.Major) || parishAndre.Tags.HasFlag(FogEntranceTags.Door)
+                || parishElevator.Id != 1011988 || parishElevator.Map.Value != "parish"
+                || parishElevator.ASide.Area.Value != "firelink_elevator" || parishElevator.BSide.Area.Value != "parish_church"
+                || !parishElevator.Tags.HasFlag(FogEntranceTags.Major) || parishElevator.Tags.HasFlag(FogEntranceTags.Door)
+                || parishElevator.ASide.BeforeWarpFlag != -11020302
+                || parishElevator.ASide.CustomActionWidth != 4
+                || parishElevator.ASide.CustomWarp != new FogCustomWarp(new FogMapId("firelink"), new FogPosition(-5.132f, 28.46f, 109.28f, 90f)))
+                throw new InvalidDataException("The Parish Andre and Firelink dual-elevator PvP records must preserve their source identities and pinned side semantics.");
+
+            string Pair(FogAreaId first, FogAreaId second) => string.CompareOrdinal(first.Value, second.Value) < 0
+                ? first.Value + "|" + second.Value : second.Value + "|" + first.Value;
+            HashSet<string> projectedPairs = graphPolicy.Select(gate => Pair(new FogAreaId(gate.ASideArea), new FogAreaId(gate.BSideArea)))
+                .ToHashSet(StringComparer.Ordinal);
+            HashSet<string> v1PvpAreaLinks = v1.Catalog.Areas.SelectMany(area => area.To
+                    .Select(link => Pair(area.Id, link.Destination)))
+                .Where(projectedPairs.Contains)
+                .ToHashSet(StringComparer.Ordinal);
+            HashSet<string> v2PvpAreaLinks = v2.Catalog.Areas.SelectMany(area => area.To
+                    .Select(link => Pair(area.Id, link.Destination)))
+                .Where(projectedPairs.Contains)
+                .ToHashSet(StringComparer.Ordinal);
+            if (!v2PvpAreaLinks.SetEquals(v1PvpAreaLinks))
+                throw new InvalidDataException("Compact V2 must preserve V1's static PvP-area topology in its base catalog; only a user-enabled PvP category may replace a static route with a randomized Entrance.");
+            if (!v2.Catalog.Areas.Single(area => area.Id.Value == "parish_andre").To.Any(link => link.Destination.Value == "firelink_elevator")
+                || !facts.Maps[new FogMapId("parish")].ConnectCollisionDetails.Any(collision =>
+                    string.Equals(collision.PartName, "h1021B1_0000", StringComparison.Ordinal)
+                    || string.Equals(collision.CollisionName, "h1021B1_0000", StringComparison.Ordinal)))
+                throw new InvalidDataException("Compact V2 must retain the separate Parish Andre to Firelink elevator route anchored by pristine ConnectCollision h1021B1_0000.");
+
+            FogKeyItem orangeRing = v2.Catalog.KeyItems.Single(item => item.Name.Value == "orange_charred_ring");
+            if (orangeRing.GameItemId.ToString() != "2:139" || !orangeRing.Tags.HasFlag(FogKeyItemTags.RandomOnly))
+                throw new InvalidDataException("Compact V2 must source the Orange Charred Ring condition from verified DSR item 2:139 as a non-randomized logic fact.");
+
+            AnnotationData.Annotations BuildAnnotations(bool major, bool minor)
+            {
+                AnnotationData.Annotations annotations = v2.CreateFreshCandidateAnnotations();
+                FogCompactV2PvpPolicy.ApplyGraphOptions(annotations, major, minor);
+                return annotations;
+            }
+            Graph BuildGraph(AnnotationData.Annotations annotations, bool major, bool minor)
+            {
+                var options = new RandomizerOptions();
+                options["major"] = major;
+                options["minor"] = minor;
+                var graph = new Graph();
+                try
+                {
+                    graph.Construct(options, annotations);
+                }
+                catch (KeyNotFoundException error)
+                {
+                    throw new InvalidDataException($"Compact V2 PvP option graph failed to construct (major={major}, minor={minor}): {error.Message}", error);
+                }
+                return graph;
+            }
+            AnnotationData.Annotations offAnnotations = BuildAnnotations(major: false, minor: false);
+            AnnotationData.Annotations majorAnnotations = BuildAnnotations(major: true, minor: false);
+            AnnotationData.Annotations minorAnnotations = BuildAnnotations(major: false, minor: true);
+            AnnotationData.Annotations bothAnnotations = BuildAnnotations(major: true, minor: true);
+            Graph off = BuildGraph(offAnnotations, major: false, minor: false);
+            Graph majorOn = BuildGraph(majorAnnotations, major: true, minor: false);
+            Graph minorOn = BuildGraph(minorAnnotations, major: false, minor: true);
+            Graph bothOn = BuildGraph(bothAnnotations, major: true, minor: true);
+            bool HasGate(FogAreaId area, string name) => off.graph[area.Value].To.Any(edge => edge.Name == name);
+            bool HasPvPCount(Graph graph, int expected) => graph.entranceIds
+                .Count(entry => graphPolicy.Any(gate => gate.Name == entry.Key) && !entry.Value.HasTag("unused")) == expected;
+            bool HasAreaPair(AnnotationData.Annotations annotations, string first, string second) => annotations.Areas
+                .Where(area => area.To != null)
+                .SelectMany(area => area.To.Select(link => Pair(new FogAreaId(area.Name), new FogAreaId(link.Area))))
+                .Contains(Pair(new FogAreaId(first), new FogAreaId(second)));
+            if (!HasPvPCount(off, 0) || !HasPvPCount(majorOn, 15) || !HasPvPCount(minorOn, 18) || !HasPvPCount(bothOn, 33)
+                || HasGate(new FogAreaId("parish_andre"), "o1408_0000")
+                || HasGate(new FogAreaId("firelink_elevator"), "o1410_0000")
+                || !HasAreaPair(offAnnotations, "parish_andre", "parish_church")
+                || !HasAreaPair(offAnnotations, "parish_andre", "firelink_elevator")
+                || majorOn.entranceIds["o1408_0000"].IsFixed || majorOn.entranceIds["o1410_0000"].IsFixed
+                || minorOn.entranceIds["o1409_0000"].IsFixed
+                || minorOn.entranceIds.ContainsKey("o1408_0000")
+                || majorOn.entranceIds.ContainsKey("o1409_0000"))
+                throw new InvalidDataException($"PvP option graph counts or Parish route scope are invalid (counts off/major/minor/both={HasPvPCount(off, 0)}/{HasPvPCount(majorOn, 15)}/{HasPvPCount(minorOn, 18)}/{HasPvPCount(bothOn, 33)}; off pairs Andre/church and Andre/elevator={HasAreaPair(offAnnotations, "parish_andre", "parish_church")}/{HasAreaPair(offAnnotations, "parish_andre", "firelink_elevator")}; off gate edges={HasGate(new FogAreaId("parish_andre"), "o1408_0000")}/{HasGate(new FogAreaId("firelink_elevator"), "o1410_0000")}; major gate fixed={majorOn.entranceIds["o1408_0000"].IsFixed}/{majorOn.entranceIds["o1410_0000"].IsFixed}; minor-only 1409 fixed={minorOn.entranceIds["o1409_0000"].IsFixed}; 1408 in minor={minorOn.entranceIds.ContainsKey("o1408_0000")}; 1409 in major={majorOn.entranceIds.ContainsKey("o1409_0000")}).");
+            foreach (FogCompactV2PvpPolicy.GateIdentity gate in graphPolicy)
+            {
+                bool shouldBeInMajorRun = gate.Major;
+                bool shouldBeInMinorRun = !gate.Major;
+                bool IsActive(Graph graph) => graph.entranceIds.TryGetValue(gate.Name, out AnnotationData.Entrance entrance)
+                    && !entrance.HasTag("unused");
+                bool hasExpectedMajor = IsActive(majorOn) == shouldBeInMajorRun;
+                bool hasExpectedMinor = IsActive(minorOn) == shouldBeInMinorRun;
+                bool hasExpectedBoth = IsActive(bothOn);
+                if (!hasExpectedMajor || !hasExpectedMinor || !hasExpectedBoth
+                    || (shouldBeInMajorRun && majorOn.entranceIds[gate.Name].IsFixed)
+                    || (shouldBeInMinorRun && minorOn.entranceIds[gate.Name].IsFixed)
+                    || bothOn.entranceIds[gate.Name].IsFixed)
+                    throw new InvalidDataException($"Compact V2 PvP option projection disagrees with FogMod for '{gate.Name}' ({(gate.Major ? "major" : "minor")}).");
+            }
+            if (HasAreaPair(majorAnnotations, "parish_andre", "parish_church")
+                || !HasAreaPair(minorAnnotations, "parish_andre", "parish_church")
+                || HasAreaPair(bothAnnotations, "parish_andre", "parish_church")
+                || !HasAreaPair(majorAnnotations, "parish_andre", "firelink_elevator")
+                || !HasAreaPair(minorAnnotations, "parish_andre", "firelink_elevator"))
+                throw new InvalidDataException("Only the enabled Parish major gate may remove its parallel Area.To route; the distinct pristine h1021B1_0000 route from Andre to the Firelink elevator remains in the base graph.");
+
+            Console.WriteLine("Compact V2 PvP: pinned census 46 (15 major, 31 minor; 12 doors, one unused), project 20 fixed arenas (16/4), V2 53 total (31/22); solo-mode base topology, option-scoped randomized graph edges and Parish gate identities verified.");
+        }
+
+        private static bool SameFogTags(string upstream, string candidate) =>
+            string.Join(" ", (upstream ?? string.Empty).Split(' ', StringSplitOptions.RemoveEmptyEntries).OrderBy(tag => tag, StringComparer.Ordinal))
+            == string.Join(" ", (candidate ?? string.Empty).Split(' ', StringSplitOptions.RemoveEmptyEntries).OrderBy(tag => tag, StringComparer.Ordinal));
+
+        // FogMod's `unique` tag controls only pairing in Graph's Warps loop; `kiln` is not read from entrance tags.
+        private static bool SameFogEntranceTags(string upstream, string candidate) =>
+            string.Join(" ", (upstream ?? string.Empty).Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                .Where(tag => !string.Equals(tag, "unique", StringComparison.Ordinal)
+                    && !string.Equals(tag, "kiln", StringComparison.Ordinal))
+                .OrderBy(tag => tag, StringComparer.Ordinal))
+            == string.Join(" ", (candidate ?? string.Empty).Split(' ', StringSplitOptions.RemoveEmptyEntries).OrderBy(tag => tag, StringComparer.Ordinal));
+
+        // FogMod 6e6dc78 only reads Side.Col inside a disabled `if (false && colDesc != null)` writer branch.
+        // It is therefore not part of the pinned engine's active landing behavior.
+        private static bool SameFogSide(AnnotationData.Side first, AnnotationData.Side second) =>
+            first == null ? second == null : second != null
+                && first.Area == second.Area
+                && first.Flag == second.Flag
+                && first.TrapFlag == second.TrapFlag
+                && first.EntryFlag == second.EntryFlag
+                && first.BeforeWarpFlag == second.BeforeWarpFlag
+                && first.BossTrigger == second.BossTrigger
+                && first.BossTriggerArea == second.BossTriggerArea
+                && first.WarpFlag == second.WarpFlag
+                && first.Cutscene == second.Cutscene
+                && first.Cond == second.Cond
+                && first.CustomWarp == second.CustomWarp
+                && first.CustomActionWidth == second.CustomActionWidth
+                && first.ActionRegion == second.ActionRegion
+                && first.ExcludeIfRandomized == second.ExcludeIfRandomized
+                && first.DestinationMap == second.DestinationMap
+                && SameFogTags(first.Tags, second.Tags);
+
+        private static bool SameProjectSide(FogEntranceSide first, FogEntranceSide second) =>
+            first == null ? second == null : second != null
+                && first.Area == second.Area
+                && first.Flag == second.Flag
+                && first.TrapFlag == second.TrapFlag
+                && first.EntryFlag == second.EntryFlag
+                && first.BeforeWarpFlag == second.BeforeWarpFlag
+                && first.BossTrigger == second.BossTrigger
+                && Equals(first.BossTriggerArea, second.BossTriggerArea)
+                && first.WarpFlag == second.WarpFlag
+                && SameFogCondition(first.Condition, second.Condition)
+                && Equals(first.CustomWarp, second.CustomWarp)
+                && first.CustomActionWidth == second.CustomActionWidth
+                && first.ActionRegion == second.ActionRegion
+                && first.ExcludeIfRandomized == second.ExcludeIfRandomized
+                && first.DestinationMap == second.DestinationMap
+                && first.Tags == second.Tags
+                && first.BossEncounterStartEventId == second.BossEncounterStartEventId;
+
+        private static bool SameFogCondition(FogCondition first, FogCondition second) =>
+            first == null ? second == null : second != null
+                && first.Kind == second.Kind
+                && first.Terms.SequenceEqual(second.Terms);
 
         private static void VerifyCeaselessScriptClassification(FogDsrFacts facts, string pristineGameRoot)
         {

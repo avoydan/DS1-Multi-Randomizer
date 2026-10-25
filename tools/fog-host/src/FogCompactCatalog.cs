@@ -475,9 +475,9 @@ namespace FogHost
                     && check.RegionEntityId == ceaselessResolution.Policy.BossTriggerRegionEntityId.Value))
                 throw new InvalidDataException("Compact Fog v2 requires pristine Ceaseless encounter-start event 11415371 to check literal region 1412698.");
 
-            FogEntrance[] entrances = v1.Catalog.Entrances.Select(entrance =>
+            FogEntrance[] projectEntrances = v1.Catalog.Entrances.Select(entrance =>
             {
-                FogEntranceSide ProjectSide(FogEntranceSide side)
+                FogEntranceSide ProjectSide(FogEntranceSide side, bool isASide)
                 {
                     if (side == null) return null;
                     if (entrance.Name == ceaselessResolution.ResolvedObjectPartName
@@ -494,11 +494,32 @@ namespace FogHost
                             BossEncounterStartEventId = checked((int)ceaselessResolution.Policy.InteractionEventId.Value),
                         };
                     }
-                    return BossTriggerCenteredSpawn(side, side.DestinationMap ?? entrance.Map);
+                    if (IsV2HigherSide(entrance.Name, isASide))
+                        return side with { Tags = side.Tags | FogEntranceSideTags.Higher };
+                    // V2 may carry boss-trigger metadata for event behavior, but the trigger volume
+                    // is not a player landing. Keep FogMod's default object-relative placement
+                    // unless the side itself has an explicit, independently reviewed CustomWarp.
+                    return side;
                 }
 
-                return entrance with { ASide = ProjectSide(entrance.ASide), BSide = ProjectSide(entrance.BSide) };
+                return entrance with { ASide = ProjectSide(entrance.ASide, true), BSide = ProjectSide(entrance.BSide, false) };
             }).ToArray();
+
+            FogEntrance[] pvpEntrances = FogCompactV2PvpPolicy.BuildGraphEntrances(facts, v1.Catalog).ToArray();
+            var existingEntranceNames = projectEntrances.Select(entrance => entrance.Name).ToHashSet(StringComparer.Ordinal);
+            string[] duplicatePvpEntrances = pvpEntrances.Where(entrance => existingEntranceNames.Contains(entrance.Name))
+                .Select(entrance => entrance.Name).ToArray();
+            if (duplicatePvpEntrances.Length > 0)
+                throw new InvalidDataException("Compact Fog v2 PvP entries duplicate existing project Entrances: " + string.Join(", ", duplicatePvpEntrances));
+
+            FogKeyItem orangeCharredRing = ResolveV2OrangeCharredRing(facts, v1.Catalog);
+            FogKeyItem[] v2KeyItems = v1.Catalog.KeyItems.Concat(new[] { orangeCharredRing }).ToArray();
+            FogEntrance[] entrances = projectEntrances.Concat(pvpEntrances).ToArray();
+            FogWriterSupportEntrance[] writerSupportEntrances = v1.Catalog.WriterSupportEntrances
+                .Where(entrance => !string.Equals(entrance.Name, "o5869_0000", StringComparison.Ordinal))
+                .Append(ResolveFixedPostArtoriasExitAnchor(facts))
+                .ToArray();
+
             FogEntranceSide ceaselessSide = entrances.Single(entrance => entrance.Name == "o4961_0000").BSide;
             if (ceaselessSide.Area.Value != "demonruins_ceaseless" || ceaselessSide.BossTrigger != 0
                 || ceaselessSide.BossTriggerArea != null || ceaselessSide.CustomWarp != null
@@ -515,10 +536,34 @@ namespace FogHost
                 throw new InvalidDataException("Compact Fog v2 requires Ceaseless completion 11410410 to be reachable only after the exact default-landing boundary whose start event 11415371 checks region 1412698.");
 
             FogAnnotationCatalog source = v1.Catalog;
-            var catalog = new FogAnnotationCatalog(areas, source.KeyItems, source.Warps, entrances,
+            var catalog = new FogAnnotationCatalog(areas, v2KeyItems, source.Warps, entrances,
                 source.CustomStarts, source.DefaultCosts, source.Enemies, source.LotLocations,
-                source.DefaultFlagCols, source.WriterSupportEntrances, source.LotRows, bossCompletions);
+                source.DefaultFlagCols, writerSupportEntrances, source.LotRows, bossCompletions);
             return new FogCompactCatalogV2(catalog, v1.Coverage, bossGatedRoutes);
+        }
+
+        private static bool IsV2HigherSide(string entranceName, bool isASide) =>
+            entranceName == "o2915_0000" || (entranceName == "o4972_0000" && !isASide);
+
+        private static FogKeyItem ResolveV2OrangeCharredRing(FogDsrFacts facts, FogAnnotationCatalog v1Catalog)
+        {
+            FogGameItemId item = facts.RequireUniqueGameItem(FogGameItemCategory.Accessory, "Orange Charred Ring");
+            var sourceLotIds = facts.ItemLots.Values
+                .Where(lot => lot.Items.Any(entry => entry.Item == item))
+                .Select(lot => lot.Id)
+                .ToHashSet();
+            var indexedLots = v1Catalog.LotRows
+                .Where(lot => sourceLotIds.Contains(lot.Lot.Value))
+                .OrderBy(lot => lot.Lot.Value)
+                .ToArray();
+            if (indexedLots.Length == 0)
+                throw new InvalidDataException("Compact Fog v2 cannot model the Orange Charred Ring condition without a pristine ItemLotParam source row in the project-owned exact lot index.");
+
+            // The ring is a read-only logic fact. RandomOnly keeps both vanilla lots in place and
+            // excludes the ring from Fog's randomized item identity while allowing the lava-gate
+            // condition to follow the first verified Compact-owned source lot.
+            return new FogKeyItem(new FogItemName("orange_charred_ring"), item,
+                indexedLots[0].Area, FogKeyItemTags.RandomOnly);
         }
 
         private static IReadOnlyList<FogBossGatedRoute> ResolveV2BossGatedRoutes(FogDsrFacts facts, FogAnnotationCatalog baseCatalog)
@@ -591,22 +636,6 @@ namespace FogHost
             return Array.AsReadOnly(result.ToArray());
         }
 
-        private static FogEntranceSide BossTriggerCenteredSpawn(FogEntranceSide side, FogMapId map)
-        {
-            if (side == null || side.BossTrigger == 0) return side;
-            FogTriggerVolume trigger = side.BossTriggerArea
-                ?? throw new InvalidDataException($"Compact Fog v2 boss side '{side.Area}' has a trigger event but no verified trigger volume.");
-            if (string.IsNullOrWhiteSpace(map.Value))
-                throw new InvalidDataException($"Compact Fog v2 boss side '{side.Area}' has no verified destination map.");
-            // FogMod's ordinary offset can place an arrival outside the region checked by the
-            // encounter event. Anchor all randomized boss-side arrivals to the verified trigger.
-            return side with
-            {
-                CustomWarp = new FogCustomWarp(map,
-                    new FogPosition(trigger.X, trigger.Y, trigger.Z, trigger.Yaw)),
-            };
-        }
-
         private static FogWriterSupportEntrance[] ResolveWriterSupportEntrances(FogDsrFacts facts)
         {
             const string objectName = "o5869_0000";
@@ -626,6 +655,22 @@ namespace FogHost
                 new FogWriterSupportEntrance(objectName, matches[0].EntityId, mapId,
                     "The pinned GameDataWriter checks this identity's IsFixed value to restore the vanilla Anor Londo broken-window object. Compact intentionally does not include this one-way PvP route in its 16-major/4-minor randomization pool; an unused fixed anchor satisfies the writer without graph or shuffle effects."),
             };
+        }
+
+        private static FogWriterSupportEntrance ResolveFixedPostArtoriasExitAnchor(FogDsrFacts facts)
+        {
+            const string objectName = "o2916_0000";
+            const int expectedEntityId = 1211892;
+            FogMapId mapId = new FogMapId("dlc");
+            FogDsrFacts.Map map = facts.Maps.TryGetValue(mapId, out FogDsrFacts.Map found)
+                ? found
+                : throw new KeyNotFoundException("Compact V2 writer-support policy requires the pristine DLC map.");
+            FogDsrObjectFact[] matches = map.ObjectDetails
+                .Where(part => string.Equals(part.Name, objectName, StringComparison.Ordinal)).ToArray();
+            if (matches.Length != 1 || matches[0].EntityId != expectedEntityId)
+                throw new InvalidDataException($"Compact V2 fixed post-Artorias object '{objectName}' must resolve exactly once in pristine DLC with entity {expectedEntityId}.");
+            return new FogWriterSupportEntrance(objectName, matches[0].EntityId, mapId,
+                "Compact V2 intentionally keeps the post-Artorias exit outside its authored boss-fog randomization pool. The fixed unused identity resolves the pinned o2920_0000 ExcludeIfRandomized reference without changing graph or shuffle behavior.");
         }
 
         private static FogEntrance[] BuildPvpEntrances(FogDsrFacts facts)

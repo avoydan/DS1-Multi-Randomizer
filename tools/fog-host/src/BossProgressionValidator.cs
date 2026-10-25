@@ -39,12 +39,20 @@ namespace FogHost
                     edge => edge.IsFixed || (edge.From == completion.Area
                         && string.Equals(edge.Name, completion.TriggerEntrance, StringComparison.Ordinal)));
                 string[] unreachable = destinations.Where(destination => !physicalAfterDefeat.Records.ContainsKey(destination)).ToArray();
+                string[] triggerDestinations = graph.graph.Values
+                    .SelectMany(node => node.To)
+                    .Where(edge => edge.Name == completion.TriggerEntrance && edge.From == completion.Area)
+                    .Select(edge => edge.To)
+                    .Where(destination => destination != null)
+                    .Distinct(StringComparer.Ordinal)
+                    .OrderBy(destination => destination, StringComparer.Ordinal)
+                    .ToArray();
                 Console.WriteLine($"V5 post-boss route event {completion.EventId}: exit '{completion.TriggerEntrance}' from '{completion.Area}'; global destinations=[{string.Join(", ", destinations.Where(globalAfterDefeat.Records.ContainsKey))}]; fixed-route destinations=[{string.Join(", ", destinations.Where(physicalAfterDefeat.Records.ContainsKey))}].");
                 if (unreachable.Length > 0)
                 {
                     throw new FogHostException(
                         HostErrors.SeedUnsolvable,
-                        $"Post-boss route for event {completion.EventId} cannot reach [{string.Join(", ", unreachable)}] from encounter area '{completion.Area}' by taking its exit '{completion.TriggerEntrance}' and following fixed physical routes; it would require another randomized entrance.",
+                        $"Post-boss route for event {completion.EventId} cannot reach [{string.Join(", ", unreachable)}] from encounter area '{completion.Area}' by taking its exit '{completion.TriggerEntrance}' (currently leads to [{string.Join(", ", triggerDestinations)}]) and following fixed physical routes; it would require another randomized entrance.",
                         retryable: true,
                         retryScope: "fog")
                     { Stage = "solve-graph" };

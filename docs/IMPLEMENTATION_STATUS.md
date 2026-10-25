@@ -1,5 +1,50 @@
 # Implementation status
 
+## V5 PvP gate OFF behavior and landing-parity audit (2026-10-25)
+
+FogHost `0.7.3` / backend `0.46.3` correct Compact V2's treatment of vanilla
+PvP fog gates when both PvP options are off. The option filter removes these
+gates from the randomized graph, while `FogCompactV2PvpPolicy` installs the
+FogMod-compatible Event 5700 mode-1 solo initializers for physical PvP gates
+that are no longer present in the projected annotation. Compact V2 preserves
+the corresponding fixed `Area.To` routes. The observed Parish gates are
+`o1408_0000` (entity `1011996`, Parish to Andre) and `o1410_0000` (entity
+`1011988`, Parish / Firelink dual elevator); both are Major PvP gates. In
+pristine upstream and Compact output, both retain the same MSB object transform
+and a common Event 0 mode-1 initializer. PvP randomization ON continues to put
+enabled gates into the randomization graph. No gate is globally hidden.
+
+The pinned FogMod annotation has 46 PvP records (15 major, 31 minor). Twelve
+are door records and one is unused, leaving 33 active non-door records. Compact
+V2 includes those 33 plus 20 project-owned Anor Londo arena gates, for 53 total
+(31 major, 22 minor). The 13 upstream door/unused records remain outside the
+randomized graph; their physical solo behavior is initialized independently.
+
+The complete physical player-placement comparison against pinned FogMod was
+run on real-format QA data (audit Fog seed `4009338015`). Across 194 Compact V2
+Entrance sides, 144 matched upstream exactly: 130 default object-relative,
+2 custom warp, 3 destination-map override, and 9 special-tag offsets. The other
+42 sides are the two sides of project-owned `o1309` and the 20 `o2780_*` arena
+gates, which have no pinned upstream identity. Eight sides across
+`o2908_0000`, `o3963_0000`, `o4960_0000`, and `o7907_0000` are door transitions
+that intentionally generate no player part. The report has zero unexplained
+landing mismatches. Full coordinate CSV remains at
+`%TEMP%\fogmod-v5-physical-audit-harness-20261025-a\reports-current-rebuilt-seed4009338015\compact-v2-landing-parity.csv`
+because it contains game-derived MSB coordinates.
+
+The owner-reported under-texture arrival around Undead Parish is not yet tied to
+that audit's generated route: the preserved physical-parity report is for a
+separate real-format audit seed, and the task did not include the affected
+in-game run's Seed Code, manifest, or package. Therefore this record does not
+claim that the reported in-game symptom is fixed. A new gameplay build remains
+blocked; V5 gameplay safety is not established. No Steam installation was
+accessed, and V1-V4 profile behavior and fixtures were not changed.
+
+Verification: FogHost Release build clean and FogHost suite **120/120**;
+backend suite **615 total, 613 passed, 0 failed, 2 skipped**; root typecheck
+passed. The exact Compact V2 real-generation audit and landing-parity report
+are described in `docs/COMPACT_FULL_FOG_V2.md`.
+
 ## Fresh V5 unsigned Portable for local gameplay QA (2026-10-24)
 
 Built the local Portable from source HEAD

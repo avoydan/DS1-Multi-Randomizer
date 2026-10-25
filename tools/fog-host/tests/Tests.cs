@@ -67,6 +67,15 @@ namespace FogHost.Tests
                         return 1;
                     }
                 }
+                if (args.Contains("compact-v2-post-boss-sweep", StringComparer.Ordinal))
+                {
+                    try { return CompactRealGenerationTest.RunPostBossSeedSweepFromEnvironment(); }
+                    catch (Exception error)
+                    {
+                        Console.Error.WriteLine($"FAIL Compact Fog v2 post-boss seed sweep: {error}");
+                        return 1;
+                    }
+                }
                 Test("usage error exits 2", UsageError);
                 Test("unknown request key is FOG_REQUEST_INVALID", UnknownKey);
                 Test("non-DS1R game is FOG_REQUEST_INVALID", WrongGame);
@@ -76,6 +85,8 @@ namespace FogHost.Tests
                 Test("annotation fingerprint covers consumed semantics and preserves behavioral order", FogAnnotationFingerprintTest.Verify);
                 Test("typed annotation catalog validates and projects the active FogMod DTO", FogAnnotationCatalogTest.VerifyProjection);
                 Test("typed annotation catalog rejects unknown references", FogAnnotationCatalogTest.VerifyRejectsUnknownReferences);
+                Test("Compact V2 PvP solo initializers preserve map gate identities and avoid active gates", FogCompactV2PvpPolicyTest.VerifySoloInitializers);
+                Test("Compact V2 retains the Anor Londo writer lookup without adding a PvP-off graph edge", FogCompactV2PvpPolicyTest.VerifyWriterAnchorWhenPvpIsOff);
                 Test("v5 boss completion is a trigger-bound state, not an Area visit", BossProgressionTest.Verify);
                 if (dataRoot != null) Test("verified DSR fact index reads map, spawn-point, ItemLotParam, NpcParam drop and object-act references", FogDsrFactsTest.Verify);
                 Test("error classifier maps FogMod throw sites", Classifier);
