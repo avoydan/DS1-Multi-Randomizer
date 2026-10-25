@@ -26,8 +26,22 @@ namespace FogHost.Tests
 
         public static int Main(string[] args)
         {
+            if (args.Length == 2 && args[0] == "--foghost-test-process-tree-child")
+                return ProcessHarness.RunProcessTreeChild(args[1]);
+
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-            hostExe = Environment.GetEnvironmentVariable("FOGHOST_EXE") ?? Path.Combine(RepoRoot(), "tools", "fog-host", "bin", "Release", "net8.0", "FogHost.exe");
+            try
+            {
+                hostExe = ProcessHarness.Configure(
+                    Environment.GetEnvironmentVariable("FOGHOST_EXE"),
+                    Path.Combine(RepoRoot(), "tools", "fog-host", "bin", "Release", "net8.0", "FogHost.exe"));
+            }
+            catch (Exception error)
+            {
+                Console.Error.WriteLine($"FogHost test executable configuration failed: {error.Message}");
+                return 2;
+            }
+            ProcessHarness.CaptureBaseline(hostExe);
             dataRoot = Environment.GetEnvironmentVariable("DS1TR_FOG_DATA_ROOT");
             Directory.CreateDirectory(Scratch);
             Console.WriteLine($"FogHost: {hostExe}");
@@ -82,7 +96,19 @@ namespace FogHost.Tests
                         return 1;
                     }
                 }
+                if (args.Contains("--fog-differential", StringComparer.Ordinal))
+                {
+                    try { return FogDifferentialTest.RunFromEnvironment(args); }
+                    catch (Exception error)
+                    {
+                        Console.Error.WriteLine($"FAIL in-process Compact V5 / pinned FogMod differential: {error}");
+                        return 1;
+                    }
+                }
                 Test("usage error exits 2", UsageError);
+                Test("test harness refuses recursive FogHost test-runner launch", ProcessHarness.VerifySelfLaunchRejected);
+                Test("test harness caps concurrent FogHost children at four", () => ProcessHarness.VerifyConcurrencyLimit(hostExe, Scratch));
+                Test("test harness timeout kills and reaps a child process tree", () => ProcessHarness.VerifyTimeoutKillsProcessTree(Scratch));
                 Test("unknown request key is FOG_REQUEST_INVALID", UnknownKey);
                 Test("non-DS1R game is FOG_REQUEST_INVALID", WrongGame);
                 Test("seed outside uint32 is FOG_REQUEST_INVALID", SeedRange);
@@ -243,6 +269,8 @@ namespace FogHost.Tests
             {
                 try { Directory.Delete(Scratch, true); } catch (Exception) { }
             }
+            Test("no spawned FogHost process remains after the suite", () => ProcessHarness.VerifyNoOrphans(hostExe));
+            ProcessHarness.PrintMetrics(hostExe);
             Console.WriteLine($"\n{passed} passed, {failed} failed, {skipped} skipped");
             return failed == 0 ? 0 : 1;
         }
@@ -287,8 +315,13 @@ namespace FogHost.Tests
             return dir ?? throw new Exception("Cannot locate repository root.");
         }
 
-        private sealed record HostRun(int Exit, string Stdout, byte[] ResponseBytes)
+        private sealed record HostRun(ProcessHarness.Result Process, byte[] ResponseBytes)
         {
+            public int Exit => Process.ExitCode;
+            public string Stdout => Process.Stdout;
+            public string Stderr => Process.Stderr;
+            public bool TimedOut => Process.TimedOut;
+            public string CleanupError => Process.CleanupError;
             public JsonNode Response => JsonNode.Parse(ResponseBytes);
         }
 
@@ -299,17 +332,16 @@ namespace FogHost.Tests
             string responsePath = Path.Combine(directory, "response.json");
             if (File.Exists(responsePath)) File.Delete(responsePath);
             if (request != null) File.WriteAllText(requestPath, request.ToJsonString());
-            var start = new ProcessStartInfo(hostExe) { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
-            foreach (string arg in rawArgs.Length > 0 ? rawArgs : new[] { "generate", "--request", requestPath, "--response", responsePath }) start.ArgumentList.Add(arg);
-            using Process process = Process.Start(start);
-            string stdout = process.StandardOutput.ReadToEnd();
-            process.StandardError.ReadToEnd();
-            process.WaitForExit();
-            return new HostRun(process.ExitCode, stdout, File.Exists(responsePath) ? File.ReadAllBytes(responsePath) : null);
+            string[] arguments = rawArgs.Length > 0
+                ? rawArgs
+                : new[] { "generate", "--request", requestPath, "--response", responsePath };
+            ProcessHarness.Result process = ProcessHarness.RunHost(hostExe, arguments);
+            return new HostRun(process, File.Exists(responsePath) ? File.ReadAllBytes(responsePath) : null);
         }
-
         private static void ExpectError(HostRun run, string code, string contains = null)
         {
+            Check(!run.TimedOut, "FogHost process timed out");
+            Check(run.CleanupError == null, $"FogHost process cleanup failed: {run.CleanupError}");
             Check(run.Exit == 0, $"exit code {run.Exit}, expected 0");
             Check(run.ResponseBytes != null, "no response file");
             JsonNode response = run.Response;
@@ -323,6 +355,8 @@ namespace FogHost.Tests
 
         private static JsonNode ExpectOk(HostRun run)
         {
+            Check(!run.TimedOut, "FogHost process timed out");
+            Check(run.CleanupError == null, $"FogHost process cleanup failed: {run.CleanupError}");
             Check(run.Exit == 0, $"exit code {run.Exit}");
             Check(run.ResponseBytes != null, "no response file");
             JsonNode response = run.Response;

@@ -1,3 +1,70 @@
+## Night Shift harness and Compact V2 differential results (2026-10-26)
+
+### Process-safety audit
+
+The earlier aborted suite was reported to have created about 1,136 FogHost.exe processes. The exact historical cause cannot be assigned from retained evidence: there is no saved process snapshot, invocation environment, or FOGHOST_EXE value from that run. The previous test launcher started child processes directly without a shared concurrency cap, timeout/tree termination, or rejection of the test runner as its own executable. No intentional full-suite parallel fan-out, retry-driven process multiplication, or unawaited launch was found in the test sources. The current launcher rejects recursive self-targeting, caps children at four, drains both streams concurrently, kills and reaps process trees after a three-minute timeout, disposes handles, and verifies no new same-path process remains. Self-targeting is a credible failure mode, not a proven explanation for the historical 1,136 count.
+
+Final full-suite telemetry: 155 passed, 0 failed, 0 skipped; 47 FogHost children spawned; peak 4/4; 0 owned children and 0 new same-path processes remained; 0 executable-path read failures. The Windows QA DSR root was read-only. Pinned upstream and Compact data roots were separate and read-only. No live Steam DSR path was used.
+
+### Differential method
+
+tools/fog-host/tests/FogDifferentialTest.cs runs the pinned FogMod commit 6e6dc7886d0f8bcc53c1800d95c9e859d1f2f87f and project-owned Compact V2 in-process, for identical raw uint32 Fog seeds and option flags. It does not compare Seed Codes, does not launch FogHost once per seed, and does not use upstream dist data as production input. Core profiles each used seeds 0-9,999; extended profiles each used 0-1,999. Full case records are compressed JSONL in local Temp and are not committed because they include game-derived graph facts.
+
+### Core matrix: 40,000 cases
+
+| Profile | Options | MATCH_ACCEPT | MATCH_REJECT | COMPACT_ONLY_ACCEPT | UPSTREAM_ONLY_ACCEPT |
+|---|---|---:|---:|---:|---:|
+| A | disconnected off; Lord Souls required | 560 | 2 | 0 | 9,438 |
+| B | disconnected on; Lord Souls required | 476 | 0 | 0 | 9,524 |
+| C | disconnected off; Lord Souls not required | 549 | 4 | 0 | 9,447 |
+| D | disconnected on; Lord Souls not required | 453 | 0 | 0 | 9,547 |
+| Total | 10,000 per profile | 2,038 | 6 | 0 | 37,956 |
+
+All 37,956 upstream-only accepts were Compact V5 rejections at the post-boss physical-route validator or its required boss-completion-edge check. No Compact-only accepts and no unexplained solvability divergences occurred.
+
+### Extended matrix: 12,000 cases
+
+| Profile | MATCH_ACCEPT | MATCH_REJECT | COMPACT_ONLY_ACCEPT | Expected V5 UPSTREAM_ONLY_ACCEPT |
+|---|---:|---:|---:|---:|
+| Major PvP | 36 | 0 | 0 | 1,964 |
+| Minor PvP | 100 | 0 | 0 | 1,900 |
+| Major + Minor PvP | 55 | 0 | 0 | 1,945 |
+| Lordvessel gates | 110 | 1 | 0 | 1,889 |
+| Random Start | 115 | 0 | 0 | 1,885 |
+| Glitched Logic | 103 | 0 | 0 | 1,897 |
+| Total | 519 | 1 | 0 | 11,480 |
+
+Across the combined 52,000 cases, 49,436 upstream-only accepts were explained by the same V5 physical post-boss route policy; there were 0 unexplained solvability divergences. Compact-owned graph inputs/pools differed from the pinned upstream annotation inputs in 51,993 graph-connected comparisons; input-order divergences were 0 and unexplained topology divergences were 0. Exact topology matches counted: 0. This is a solvability classification and an explicit authored-input divergence report, not evidence of topology equality for differing catalogs.
+
+### Targeted owner QA seed
+
+The following Seed Code round-trips to profile ds1tr-gen-v5 and the current complete default settings:
+
+DS1TR1-06NWCQQ3-K1HD8E66-2S3AD5N6-CTHZBKB8-FMSNNQWC-TRVW78NY-040F30XX-F0
+
+- Master seed: 13825956.
+- Fog attempt 0: raw seed 3674583767, expected V5 safety rejection.
+- Fog attempt 1: raw seed 1588105375, expected V5 safety rejection.
+- Fog attempt 2: raw seed 6843, accepted by Compact V2 and pinned upstream in the targeted differential.
+- PvP settings: Major and Minor off; disconnected off; Lord Souls required.
+
+At raw seed 6843, the graph records:
+
+- Gaping outside side o1400_0000, depths -> totg_nito; source side is available before Gaping is defeated.
+- Artorias exit o2916_0000, dlc_artorias -> blighttown_upper, condition boss_defeated_11210001.
+- Ceaseless o4961_0000 sides connect demonruins <-> demonruins_ceaseless; the V5 physical route to lava remains boss-defeat gated by 11410410.
+- The confirmed Capra landing route is o5865_0000, anorlondo_main -> burg_lower, with the corresponding o1413_0000 side burg_lower -> anorlondo_main.
+- Parish/Andre and the Firelink dual elevator remain fixed when PvP is off; the real-format writer and candidate tests verify this policy.
+
+After the fingerprint gate is resolved and a complete package is generated, suggested manual test order: (1) at Gaping's outside physical gate before the fight, confirm the action prompt and cross it; (2) after entering and defeating Artorias, confirm o2916 offers a prompt and exits to its randomized destination; (3) defeat Ceaseless and verify the physical lava route opens; (4) inspect Parish/Andre and both directions of the Firelink elevator; (5) cross the Anor Londo o5865 side paired to o1413, and record the player landing position for under-map regression.
+
+An end-to-end backend generation was attempted for this Seed Code with the read-only QA DSR. The pipeline stopped before the combined engine with GENERATION_PROFILE_MISMATCH: its Compact projection fingerprint was 73f3c842d51490d45a836a489105b37f57d702eaa2ffda084f42781e5aaef00f, while the V5 profile requires 774ed7c1ecaaad006646eaaf0dd6bef86aafe033a3881076d9cd3bda7ffcd36c. This reproduced both when the older audit data root was supplied and when the application rebuilt its Compact world data offline from the pristine snapshot. No package was produced and the source game state remained vanilla. Therefore this code is a raw-graph QA candidate, not ready for owner gameplay until the profile/catalog mismatch is resolved. The generated MSB/EMEVD writer path is separately covered by the real-format test matrix.
+
+### Version and regression tiers
+
+FogHost project/file version 0.7.4 is the implementation version. Program.HostVersion=0.7.3 is the generation compatibility identifier; it is not the JSON wire version. The request/response DTO uses schemaVersion=3. No boundary changed, so both identifiers remain pinned. Backend version is 0.46.3.
+
+Regression tiers: normal CI should use a small deterministic differential smoke set (50 seeds per core profile plus named regressions); pre-release should use at least 2,000 per core and extended profile plus real-format writer tests; 10,000 per profile and larger remain manual deep QA. Do not run the 40,000+ matrix on every CI invocation.
 # FogHost integration design
 
 ## V5 visible boss fogs without a prompt (2026-10-25)

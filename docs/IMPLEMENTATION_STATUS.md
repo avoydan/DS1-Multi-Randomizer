@@ -1,3 +1,34 @@
+## Night Shift FogHost harness and differential sweep (2026-10-26)
+
+The FogHost test launcher now refuses FOGHOST_EXE paths that resolve to the test runner, limits owned FogHost children to 4, drains stdout/stderr concurrently, kills and reaps the full process tree on timeout (3 minutes), disposes process handles, and checks for new same-path orphans after the suite.
+
+The earlier run reported approximately 1,136 FogHost processes. The exact historical trigger cannot be proven: the aborted run's environment snapshot and process tree were not retained. Source inspection found no intentional full-suite fan-out, retry-driven child spawning, or fire-and-forget launch. Before this correction, however, the launcher had no shared concurrency cap, timeout/tree-kill policy, or self-runner path rejection. A recursive FOGHOST_EXE override is now explicitly rejected; whether it caused the earlier count remains unverified.
+
+The final full FogHost suite passed 155/155 with 0 skipped. It spawned 47 FogHost processes, peaked at 4/4, and left 0 owned or newly detected same-path processes. Per-process path reads had 0 failures. The live Steam installation was not accessed; the QA DSR root and both Fog data roots were read-only.
+
+A deterministic in-process differential compared Compact V2 with pinned FogMod 6e6dc7886d0f8bcc53c1800d95c9e859d1f2f87f, using the same raw Fog seeds and options on each side:
+
+| Core profile | MATCH_ACCEPT | MATCH_REJECT | COMPACT_ONLY_ACCEPT | UPSTREAM_ONLY_ACCEPT (expected V5 safety) |
+|---|---:|---:|---:|---:|
+| A: disconnected off, require Lord Souls on | 560 | 2 | 0 | 9,438 |
+| B: disconnected on, require Lord Souls on | 476 | 0 | 0 | 9,524 |
+| C: disconnected off, require Lord Souls off | 549 | 4 | 0 | 9,447 |
+| D: disconnected on, require Lord Souls off | 453 | 0 | 0 | 9,547 |
+| Total, 40,000 cases | 2,038 | 6 | 0 | 37,956 |
+
+Every upstream-only acceptance was rejected by the Compact post-boss physical-route validator or its required boss-completion-edge check. There were 0 unexplained solvability divergences and 0 Compact-only accepts.
+
+Extended profiles used 2,000 raw seeds each: Major PvP 36 accept / 1,964 expected V5 rejects; Minor PvP 100 / 1,900; Major + Minor PvP 55 / 1,945; Lordvessel gates 110 accept / 1 reject by both / 1,889 expected V5 rejects; Random Start 115 / 1,885; Glitched Logic 103 / 1,897. Across 12,000 cases: 519 MATCH_ACCEPT, 1 MATCH_REJECT, 0 COMPACT_ONLY_ACCEPT, 11,480 expected V5 safety divergences, and 0 unexplained solvability divergences.
+
+Across all 52,000 cases, authored Compact graph inputs/pools differed from the upstream annotation oracle in 51,993 graph-connected comparisons; input-order differences were 0 and unexplained topology differences were 0. There were no exact-topology matches counted, so this sweep does not claim topology parity where the authored graph inputs differ. The case-level gzip reports remain in local Temp because they contain game-derived graph data.
+
+The raw-seed/profile selector was added to the test harness for focused follow-up. The owner QA Seed Code below round-trips exactly as ds1tr-gen-v5 with the current full settings. Its Fog attempts 0 and 1 (raw seeds 3,674,583,767 and 1,588,105,375) are expected V5 safety rejects; attempt 2 (raw Fog seed 6,843) is accepted by both systems. That accepted topology includes o5865_0000 from Anor Londo Main to burg_lower, paired through o1413_0000; o2916_0000 from the defeated Artorias arena to blighttown_upper, gated by 11210001; and the Ceaseless encounter edges. A full backend generation attempt was also made from the Seed Code with the read-only QA DSR and Temp-only state/workspace. It stopped before the combined engine with GENERATION_PROFILE_MISMATCH: the generated Compact catalog fingerprint was 73f3c842d51490d45a836a489105b37f57d702eaa2ffda084f42781e5aaef00f while ds1tr-gen-v5 pins 774ed7c1ecaaad006646eaaf0dd6bef86aafe033a3881076d9cd3bda7ffcd36c. The same mismatch occurred with both the older audit root and the app's offline reconstruction. No generated package was produced; the QA source still reports vanilla. The code below is therefore a graph-tested candidate, not ready for owner gameplay.
+
+Owner gameplay QA Seed Code: DS1TR1-06NWCQQ3-K1HD8E66-2S3AD5N6-CTHZBKB8-FMSNNQWC-TRVW78NY-040F30XX-F0 (master seed 13825956, Fog attempt 2, Fog seed 6843; PvP options off). The candidate graph covers the Gaping entrance side, Artorias post-defeat exit, Ceaseless route, Parish/Andre/Firelink PvP-off routes, and the o5865 to o1413 landing. Do not use it for gameplay until the catalog fingerprint mismatch is resolved and a complete package is generated. Exact graph pairings and proposed test steps are in docs/FOGHOST_INTEGRATION.md.
+
+Normal CI should run a small deterministic differential set (for example 50 seeds per core profile plus named lifecycle/landing seeds). Pre-release should run 2,000 seeds per core and extended profile plus the real-format GameDataWriter matrix. The 10,000-seed-per-profile core sweep and other deep sweeps remain manual QA; do not make the 40,000+ case matrix a default CI job.
+
+FogHost implementation/project version is 0.7.4; source Program.HostVersion remains 0.7.3 as the generation compatibility identifier. The JSON request/response wire schema is schemaVersion=3; it did not change. Backend version is 0.46.3. No version bump, Portable build, publish, tag, or release was made. V1-V4 code paths and fixtures were not changed.
 # Implementation status
 
 ## V5 visible boss fogs without interaction (2026-10-25)
