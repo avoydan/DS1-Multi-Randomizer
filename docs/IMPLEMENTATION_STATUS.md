@@ -1,5 +1,58 @@
 # Implementation status
 
+## V5 visible boss fogs without interaction (2026-10-25)
+
+The owner reported two separate cases in V5 Seed Code
+`DS1TR1-06NWCQQ3-K2HDEE79-Z4WJJR09-VPHFSMMJ-AKEY5N64-MBJ0RQD3-T7X6FD7Y-36PQYHQB-KXGN3ZR0-01B27F77`
+(FogHost 0.7.3, backend 0.46.3, attempt 0, Fog seed `2098234880`, PvP off,
+boss Fog on):
+
+- Gaping Dragon: outside the arena, before the fight, at `o1400_0000`, entity
+  `1001990`, Depths map `m10_00_00_00`, ASide `depths`.
+- Artorias: inside the arena after the boss was defeated, at the exit-side
+  `o2916_0000`, entity `1211892`, DLC map `m12_01_00_00`, ASide
+  `dlc_artorias`.
+
+The saved package retained both visible MSB objects but projected neither
+entrance into Compact V2's active graph. Its generated world therefore had no
+randomized pair/destination for either side, no side action region and no
+Event 5700 mode-0 dispatcher. The original boss-start action checks are not
+randomized transitions, and the corresponding completion events do not
+deactivate these objects. This was a coverage mismatch between visible boss
+fog scenery and the Compact catalog, not a graph edge that GraphChecker
+considered traversable while the writer omitted its prompt. Source interaction
+was missing; destination entry conditions were not evaluated.
+
+Compact V2 now resolves and activates both project-owned boss gates from
+pristine DSR facts, matching pinned FogMod's flags and side policy. Gaping's
+outside source is flag-free and usable before the fight; its inside side
+retains completion flag `2`. Artorias's arena exit side requires completion
+flag `11210001`; its opposite side retains the upstream
+`ExcludeIfRandomized=o2920_0000` behavior. The separate Artorias entrance
+`o2915_0000` still permits entry from the forest and keeps its post-defeat
+arena-side gating. Details and upstream comparison are in
+`docs/FOGHOST_INTEGRATION.md`, “V5 visible boss fogs without a prompt.”
+
+The complete boss actionability audit covers 24 active boss gates / 48 sides.
+The boss-enabled graph test verifies all active sides are in the randomized
+graph. On real-format outputs for Fog seeds `42` and `56`, all 24 gates had the
+expected object, side action regions and Event 5700 mode-0 source dispatchers;
+both runs also passed the Ceaseless and Capra physical landing checks. No
+unexplained actionability mismatch remained. The exact reported seed and the
+previous Capra-pair seed now fail as typed, retryable
+`FOG_SEED_UNSOLVABLE` cases under the existing Ceaseless physical-route guard.
+Across the exact seed plus seeds `1..60` and the previous Capra seed, 2/62
+generated and 60/62 were typed retryable rejections; there were no unexpected
+failures. The accepted seeds verify generation mechanics, not post-fix manual
+gameplay.
+
+FogHost project/file version is `0.7.4`; its generation protocol
+`HostVersion` remains `0.7.3` because the request/response schema is unchanged;
+backend remains `0.46.3`. V1–V4 code paths and fixtures were not modified. The
+QA DSR source was read-only; the live installation was not accessed, and no
+Portable was built. Manual gameplay QA with a new V5 package remains
+outstanding.
+
 ## Confirmed V5 o5865 to o1413 under-map landing (2026-10-25)
 
 The owner's exact V5 gameplay code matches the saved attempt-4 package

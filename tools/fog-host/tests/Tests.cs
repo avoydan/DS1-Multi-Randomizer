@@ -67,6 +67,12 @@ namespace FogHost.Tests
                         return 1;
                     }
                 }
+                if (args.Contains("compact-v2-boss-policy", StringComparer.Ordinal))
+                {
+                    Test("Compact V2 boss gates are graph-eligible on both lifecycle sides when boss randomization is enabled", FogDsrFactsTest.VerifyCompactV2BossGraphFromEnvironment);
+                    Console.WriteLine($"Compact V2 boss policy checks: {passed} passed, {failed} failed.");
+                    return failed == 0 ? 0 : 1;
+                }
                 if (args.Contains("compact-v2-post-boss-sweep", StringComparer.Ordinal))
                 {
                     try { return CompactRealGenerationTest.RunPostBossSeedSweepFromEnvironment(); }

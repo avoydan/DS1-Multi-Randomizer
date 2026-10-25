@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -470,9 +470,9 @@ namespace FogHost
                 .Single(resolution => resolution.Policy.Id == "demonruins-ceaseless-boundary");
             if (ceaselessResolution.Policy.InteractionEventId != 11415371
                 || ceaselessResolution.Policy.BossTriggerRegionEntityId != 1412698
-                || !facts.Maps[ceaselessResolution.Policy.Map].EventRegionChecks.Any(check =>
+                || !facts.Maps[ceaselessResolution.Policy.Map].EventActionButtonFacts.Any(check =>
                     check.EventId == ceaselessResolution.Policy.InteractionEventId.Value
-                    && check.RegionEntityId == ceaselessResolution.Policy.BossTriggerRegionEntityId.Value))
+                    && check.TargetEntityId == ceaselessResolution.Policy.BossTriggerRegionEntityId.Value))
                 throw new InvalidDataException("Compact Fog v2 requires pristine Ceaseless encounter-start event 11415371 to check literal region 1412698.");
 
             FogEntrance[] projectEntrances = v1.Catalog.Entrances.Select(entrance =>
@@ -480,6 +480,19 @@ namespace FogHost
                 FogEntranceSide ProjectSide(FogEntranceSide side, bool isASide)
                 {
                     if (side == null) return null;
+                    if (entrance.Name == "o2915_0000" && side.Area.Value == "dlc_artorias")
+                    {
+                        // Keep the vanilla encounter-start area check, use the source-side completion
+                        // flag for the post-fight exit, and retain FogMod's object-relative landing.
+                        return side with
+                        {
+                            Flag = 11210001,
+                            BossTrigger = 0,
+                            BossTriggerArea = null,
+                            CustomWarp = null,
+                            BossEncounterStartEventId = 11215011,
+                        };
+                    }
                     if (entrance.Name == ceaselessResolution.ResolvedObjectPartName
                         && side.Area == ceaselessResolution.Policy.DestinationArea)
                     {
@@ -503,6 +516,10 @@ namespace FogHost
                 }
 
                 return entrance with { ASide = ProjectSide(entrance.ASide, true), BSide = ProjectSide(entrance.BSide, false) };
+            }).Concat(new[]
+            {
+                ResolveV2GapingDragonBoundary(facts),
+                ResolveV2PostArtoriasExit(facts),
             }).ToArray();
 
             FogEntrance[] pvpEntrances = FogCompactV2PvpPolicy.BuildGraphEntrances(facts, v1.Catalog).ToArray();
@@ -517,7 +534,6 @@ namespace FogHost
             FogEntrance[] entrances = projectEntrances.Concat(pvpEntrances).ToArray();
             FogWriterSupportEntrance[] writerSupportEntrances = v1.Catalog.WriterSupportEntrances
                 .Where(entrance => !string.Equals(entrance.Name, "o5869_0000", StringComparison.Ordinal))
-                .Append(ResolveFixedPostArtoriasExitAnchor(facts))
                 .ToArray();
 
             FogEntranceSide ceaselessSide = entrances.Single(entrance => entrance.Name == "o4961_0000").BSide;
@@ -526,8 +542,10 @@ namespace FogHost
                 || ceaselessSide.BossEncounterStartEventId != 11415371)
                 throw new InvalidDataException("Compact Fog v2 must retain FogMod's default object-relative landing on the Ceaseless side.");
 
+            HashSet<int> fixedPostBossRoutes = bossGatedRoutes.Select(route => route.CompletionEventId).ToHashSet();
+            HashSet<int> requiredCompletions = fixedPostBossRoutes.Concat(new[] { 11000001, 11210001 }).ToHashSet();
             FogBossCompletionTransition[] bossCompletions = ResolveV2BossCompletionTransitions(
-                facts, entrances, bossGatedRoutes.Select(route => route.CompletionEventId).ToHashSet()).ToArray();
+                facts, entrances, requiredCompletions, fixedPostBossRoutes).ToArray();
             if (!bossCompletions.Any(transition => transition.EventId == 11410410
                 && transition.EncounterArea.Value == "demonruins_ceaseless"
                 && transition.TriggerEntrance.Value == "o4961_0000"
@@ -543,7 +561,67 @@ namespace FogHost
         }
 
         private static bool IsV2HigherSide(string entranceName, bool isASide) =>
-            entranceName == "o2915_0000" || (entranceName == "o4972_0000" && !isASide);
+            entranceName == "o2915_0000" || entranceName == "o2916_0000" || (entranceName == "o4972_0000" && !isASide);
+
+        private static FogEntrance ResolveV2GapingDragonBoundary(FogDsrFacts facts)
+        {
+            const string objectName = "o1400_0000";
+            const int entityId = 1001990;
+            const int completionEventId = 11000001;
+            const int completionFlag = 2;
+            FogMapId mapId = new FogMapId("depths");
+            FogDsrFacts.Map map = facts.Maps.TryGetValue(mapId, out FogDsrFacts.Map found)
+                ? found
+                : throw new KeyNotFoundException("Compact V2 Gaping boundary requires the pristine Depths map.");
+            FogDsrObjectFact[] objects = map.ObjectDetails
+                .Where(part => string.Equals(part.Name, objectName, StringComparison.Ordinal)).ToArray();
+            if (objects.Length != 1 || objects[0].EntityId != entityId
+                || !facts.BossRewardCompletionFlags.Contains(completionFlag)
+                || !map.EventFlagWrites.Contains(new FogDsrEventFlagWrite(completionEventId, completionFlag))
+                || !map.EventActionButtonFacts.Any(check => check.EventId == 11005391
+                    && check.InstructionId == 19 && check.TargetEntityId == 1002998
+                    && check.LineSegmentEntityId == entityId)
+                || map.RegionDetails.Count(region => region.EntityId == 1002998) != 1)
+                throw new InvalidDataException("Compact V2 Gaping boundary must resolve pristine o1400_0000/entity 1001990, completion flag 2 written by event 11000001, and event 11005391's 3[19] boss-room action bound to target 1002998 and line-segment entity 1001990.");
+
+            FogEntranceSide Side(FogAreaId area, int flag) => new FogEntranceSide(
+                area, flag, 0, 0, 0, 0, null, 0, null, null, 0, 0, null, null, FogEntranceSideTags.None);
+            return new FogEntrance(objectName, entityId, mapId, "To Gaping Dragon", null,
+                FogEntranceTags.Boss,
+                Side(new FogAreaId("depths"), 0),
+                Side(new FogAreaId("depths_gaping"), completionFlag) with
+                {
+                    BossEncounterStartEventId = 11005391,
+                });
+        }
+
+        private static FogEntrance ResolveV2PostArtoriasExit(FogDsrFacts facts)
+        {
+            const string objectName = "o2916_0000";
+            const int entityId = 1211892;
+            const int completionFlag = 11210001;
+            FogMapId mapId = new FogMapId("dlc");
+            FogDsrFacts.Map map = facts.Maps.TryGetValue(mapId, out FogDsrFacts.Map found)
+                ? found
+                : throw new KeyNotFoundException("Compact V2 Artorias exit requires the pristine DLC map.");
+            FogDsrObjectFact[] objects = map.ObjectDetails
+                .Where(part => string.Equals(part.Name, objectName, StringComparison.Ordinal)).ToArray();
+            FogBossAreaTagPolicy[] boss = FogProjectAnnotationPolicy.BossAreaTagPolicies
+                .Where(policy => policy.Area.Value == "dlc_artorias" && policy.BossEventId == completionFlag && policy.Map == mapId).ToArray();
+            if (objects.Length != 1 || objects[0].EntityId != entityId || boss.Length != 1
+                || !facts.BossRewardCompletionFlags.Contains(completionFlag))
+                throw new InvalidDataException("Compact V2 post-Artorias exit must resolve pristine o2916_0000/entity 1211892 and the verified Artorias completion flag 11210001.");
+
+            FogCondition completion = new FogCondition(FogConditionKind.Atom,
+                Array.AsReadOnly(new[] { FogConditionReference.BossCompletion(completionFlag) }));
+            FogEntranceSide arenaSide = new FogEntranceSide(new FogAreaId("dlc_artorias"), completionFlag,
+                0, 0, 0, 0, null, 0, completion, null, 0, 0, null, null, FogEntranceSideTags.Higher);
+            FogEntranceSide beyondArenaSide = new FogEntranceSide(new FogAreaId("dlc_postartorias"),
+                0, 0, 0, 0, 0, null, 0, null, null, 0, 0,
+                new FogEntranceKey("o2920_0000"), null, FogEntranceSideTags.Higher);
+            return new FogEntrance(objectName, entityId, mapId, "After Artorias", null,
+                FogEntranceTags.Boss, arenaSide, beyondArenaSide);
+        }
 
         private static FogKeyItem ResolveV2OrangeCharredRing(FogDsrFacts facts, FogAnnotationCatalog v1Catalog)
         {
@@ -606,7 +684,8 @@ namespace FogHost
         }
 
         private static IReadOnlyList<FogBossCompletionTransition> ResolveV2BossCompletionTransitions(
-            FogDsrFacts facts, FogEntrance[] entrances, IReadOnlySet<int> requiredCompletionEvents)
+            FogDsrFacts facts, FogEntrance[] entrances, IReadOnlySet<int> requiredCompletionEvents,
+            IReadOnlySet<int> fixedPostBossRoutes)
         {
             var result = new List<FogBossCompletionTransition>();
             foreach (FogProjectEntranceResolution resolution in FogAnnotationPolicyResolver.ResolveEntrancePoliciesV1(facts)
@@ -618,9 +697,9 @@ namespace FogHost
                     || !facts.BossRewardCompletionFlags.Contains(checked((int)boss.BossEventId)))
                     throw new InvalidDataException($"Boss completion {boss.BossEventId} has no matched trigger and common event-970 completion fact.");
                 if (!resolution.Policy.InteractionEventId.HasValue
-                    || !facts.Maps[resolution.Policy.Map].EventRegionChecks.Any(check =>
+                    || !facts.Maps[resolution.Policy.Map].EventActionButtonFacts.Any(check =>
                         check.EventId == resolution.Policy.InteractionEventId.Value
-                        && check.RegionEntityId == resolution.Policy.BossTriggerRegionEntityId))
+                        && check.TargetEntityId == resolution.Policy.BossTriggerRegionEntityId))
                     throw new InvalidDataException($"Boss completion {boss.BossEventId} has no pristine encounter-start event checking its authored trigger region.");
                 FogEntrance entrance = entrances.Single(value => value.Name == resolution.ResolvedObjectPartName);
                 FogEntranceSide side = new[] { entrance.ASide, entrance.BSide }
@@ -631,9 +710,40 @@ namespace FogHost
                 result.Add(new FogBossCompletionTransition(checked((int)boss.BossEventId),
                     checked((int)resolution.Policy.InteractionEventId.Value), boss.Area,
                     new FogEntranceKey(resolution.ResolvedObjectPartName), resolution.Policy.Map,
-                    resolution.Policy.BossTriggerRegionEntityId.Value));
+                    resolution.Policy.BossTriggerRegionEntityId.Value,
+                    fixedPostBossRoutes.Contains(checked((int)boss.BossEventId))));
             }
+            if (requiredCompletionEvents.Contains(11000001))
+                result.Add(ResolveV2GapingDragonCompletionTransition(facts, entrances));
             return Array.AsReadOnly(result.ToArray());
+        }
+
+        private static FogBossCompletionTransition ResolveV2GapingDragonCompletionTransition(
+            FogDsrFacts facts, FogEntrance[] entrances)
+        {
+            const int completionEventId = 11000001;
+            const int encounterStartEventId = 11005391;
+            const int triggerRegionEntityId = 1002998;
+            const int completionFlag = 2;
+            var mapId = new FogMapId("depths");
+            FogDsrFacts.Map map = facts.Maps[mapId];
+            FogEntrance entrance = entrances.Single(value => value.Name == "o1400_0000");
+            FogEntranceSide bossSide = entrance.BSide?.Area.Value == "depths_gaping" ? entrance.BSide
+                : entrance.ASide?.Area.Value == "depths_gaping" ? entrance.ASide
+                : throw new InvalidDataException("Compact V2 Gaping Dragon completion must resolve the boss side of o1400_0000.");
+            bool hasCompletion = facts.BossRewardCompletionFlags.Contains(completionFlag)
+                && map.EventFlagWrites.Contains(new FogDsrEventFlagWrite(completionEventId, completionFlag));
+            bool hasEncounterTrigger = map.EventActionButtonFacts.Any(check =>
+                check.EventId == encounterStartEventId && check.InstructionId == 19
+                && check.TargetEntityId == triggerRegionEntityId && check.LineSegmentEntityId == entrance.Id)
+                && map.RegionDetails.Count(region => region.EntityId == triggerRegionEntityId) == 1;
+            bool defaultLanding = bossSide.BossTrigger == 0 && bossSide.BossTriggerArea == null
+                && bossSide.CustomWarp == null && bossSide.BossEncounterStartEventId == encounterStartEventId;
+            if (!hasCompletion || !hasEncounterTrigger || !defaultLanding)
+                throw new InvalidDataException("Compact V2 Gaping Dragon completion must be anchored to pristine event 11000001/flag 2, event 11005391's boss-room action for target 1002998 and fog entity 1001990, and the o1400_0000 default fog landing.");
+            return new FogBossCompletionTransition(completionEventId, encounterStartEventId,
+                new FogAreaId("depths_gaping"), new FogEntranceKey("o1400_0000"), mapId,
+                triggerRegionEntityId, RequireFixedPostBossRoute: false);
         }
 
         private static FogWriterSupportEntrance[] ResolveWriterSupportEntrances(FogDsrFacts facts)
@@ -657,21 +767,7 @@ namespace FogHost
             };
         }
 
-        private static FogWriterSupportEntrance ResolveFixedPostArtoriasExitAnchor(FogDsrFacts facts)
-        {
-            const string objectName = "o2916_0000";
-            const int expectedEntityId = 1211892;
-            FogMapId mapId = new FogMapId("dlc");
-            FogDsrFacts.Map map = facts.Maps.TryGetValue(mapId, out FogDsrFacts.Map found)
-                ? found
-                : throw new KeyNotFoundException("Compact V2 writer-support policy requires the pristine DLC map.");
-            FogDsrObjectFact[] matches = map.ObjectDetails
-                .Where(part => string.Equals(part.Name, objectName, StringComparison.Ordinal)).ToArray();
-            if (matches.Length != 1 || matches[0].EntityId != expectedEntityId)
-                throw new InvalidDataException($"Compact V2 fixed post-Artorias object '{objectName}' must resolve exactly once in pristine DLC with entity {expectedEntityId}.");
-            return new FogWriterSupportEntrance(objectName, matches[0].EntityId, mapId,
-                "Compact V2 intentionally keeps the post-Artorias exit outside its authored boss-fog randomization pool. The fixed unused identity resolves the pinned o2920_0000 ExcludeIfRandomized reference without changing graph or shuffle behavior.");
-        }
+
 
         private static FogEntrance[] BuildPvpEntrances(FogDsrFacts facts)
         {

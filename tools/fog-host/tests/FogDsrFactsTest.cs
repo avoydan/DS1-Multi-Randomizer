@@ -37,6 +37,21 @@ namespace FogHost.Tests
             VerifyCompactCatalogCandidate(FogDsrFacts.Read(root, pristineGameRoot, includeLegacyAnnotations: false));
         }
 
+        public static void VerifyCompactV2BossGraphFromEnvironment()
+        {
+            string root = Environment.GetEnvironmentVariable("DS1TR_FOG_DATA_ROOT");
+            string pristineGameRoot = Environment.GetEnvironmentVariable("DS1TR_PRISTINE_DSR_ROOT");
+            if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root))
+                throw new InvalidOperationException("DS1TR_FOG_DATA_ROOT is required for Compact V2 boss-graph verification.");
+            if (string.IsNullOrWhiteSpace(pristineGameRoot) || !Directory.Exists(pristineGameRoot))
+                throw new InvalidOperationException("DS1TR_PRISTINE_DSR_ROOT must point to a clean DSR directory for Compact V2 boss-graph verification.");
+
+            FogDsrFacts facts = FogDsrFacts.Read(root, pristineGameRoot, includeLegacyAnnotations: false);
+            FogCompactCatalogV1 v1 = FogCompactCatalogBuilder.Build(facts);
+            FogCompactCatalogV2 v2 = FogCompactCatalogBuilder.BuildV2(facts);
+            VerifyCompactV2PvpPolicy(facts, v1, v2);
+        }
+
         private static FogKeyItem[] ResolveProjectPolicyKeyItems(FogDsrFacts facts)
         {
             IReadOnlyList<FogKeyItemIdentity> identities = FogAnnotationPolicyResolver.ResolveKeyItemIdentities(
@@ -1435,8 +1450,8 @@ namespace FogHost.Tests
             FogEntranceSide ceaselessSide = compactV2.Catalog.Entrances.Single(entrance => entrance.Name == "o4961_0000").BSide;
             FogTriggerVolume ceaselessTrigger = ceaselessSide.BossTriggerArea;
             FogEntranceSide v1CeaselessSide = candidate.Catalog.Entrances.Single(entrance => entrance.Name == "o4961_0000").BSide;
-            bool literalEncounterStartCheck = facts.Maps[new FogMapId("demonruins")].EventRegionChecks
-                .Any(check => check.EventId == 11415371 && check.RegionEntityId == 1412698);
+            bool literalEncounterStartCheck = facts.Maps[new FogMapId("demonruins")].EventActionButtonFacts
+                .Any(check => check.EventId == 11415371 && check.TargetEntityId == 1412698);
             FogBossCompletionTransition ceaselessCompletion = compactV2.Catalog.BossCompletions
                 .SingleOrDefault(transition => transition.EventId == 11410410);
             if (compactV2.Fingerprint == candidate.Fingerprint || !compactV2.IsComplete
@@ -1567,19 +1582,63 @@ namespace FogHost.Tests
             AnnotationData.Annotations upstream = ReadPinnedFogModReferenceAnnotations();
             AnnotationData.Annotations projected = v2.CreateFreshCandidateAnnotations();
             FogWriterSupportEntrance[] v2Support = v2.Catalog.WriterSupportEntrances.ToArray();
-            AnnotationData.Entrance fixedArtoriasExit = projected.Entrances.SingleOrDefault(entrance => entrance.Name == "o2916_0000");
+            FogEntrance gapingBoundary = v2.Catalog.Entrances.Single(entrance => entrance.Name == "o1400_0000");
+            FogEntrance artoriasBoundary = v2.Catalog.Entrances.Single(entrance => entrance.Name == "o2915_0000");
+            FogEntrance artoriasExit = v2.Catalog.Entrances.Single(entrance => entrance.Name == "o2916_0000");
             FogEntrance[] v2PeerEntrance = v2.Catalog.Entrances.Where(entrance => entrance.Name == "o2920_0000").ToArray();
-            if (v2Support.Length != 1 || v2Support[0].Name != "o2916_0000" || v2Support[0].Id != 1211892
-                || fixedArtoriasExit == null || !fixedArtoriasExit.IsFixed || !fixedArtoriasExit.HasTag("unused")
+            AnnotationData.Entrance projectedGaping = projected.Entrances.Single(entrance => entrance.Name == "o1400_0000");
+            AnnotationData.Entrance projectedArtoriasBoundary = projected.Entrances.Single(entrance => entrance.Name == "o2915_0000");
+            AnnotationData.Entrance projectedArtoriasExit = projected.Entrances.Single(entrance => entrance.Name == "o2916_0000");
+            AnnotationData.BossCompletionRule gapingCompletion = projected.BossCompletions.Single(rule => rule.EventId == 11000001);
+            AnnotationData.BossCompletionRule artoriasCompletion = projected.BossCompletions.Single(rule => rule.EventId == 11210001);
+            bool gapingBossRoomAction = facts.Maps[new FogMapId("depths")].EventActionButtonFacts.Any(check =>
+                check.EventId == 11005391 && check.InstructionId == 19
+                && check.TargetEntityId == 1002998 && check.LineSegmentEntityId == 1001990);
+            if (v2Support.Any(entrance => entrance.Name == "o2916_0000")
+                || !gapingBoundary.Tags.HasFlag(FogEntranceTags.Boss) || gapingBoundary.Id != 1001990
+                || gapingBoundary.ASide.Area.Value != "depths" || gapingBoundary.ASide.Flag != 0
+                || gapingBoundary.BSide.Area.Value != "depths_gaping" || gapingBoundary.BSide.Flag != 2
+                || gapingBoundary.BSide.BossEncounterStartEventId != 11005391
+                || projectedGaping.ASide.Flag != 0 || projectedGaping.BSide.Flag != 2
+                || projectedGaping.BSide.BossEncounterStartEventId != 11005391
+                || gapingCompletion.TriggerEventId != 11005391
+                || gapingCompletion.TriggerRegionEntityId != 1002998
+                || gapingCompletion.TriggerEntrance != "o1400_0000"
+                || gapingCompletion.RequireFixedPostBossRoute
+                || !artoriasBoundary.Tags.HasFlag(FogEntranceTags.Boss)
+                || artoriasBoundary.BSide.Area.Value != "dlc_artorias" || artoriasBoundary.BSide.Flag != 11210001
+                || projectedArtoriasBoundary.BSide.Flag != 11210001
+                || projectedArtoriasBoundary.BSide.BossTrigger != 0
+                || projectedArtoriasBoundary.BSide.BossEncounterStartEventId != 11215011
+                || !artoriasExit.Tags.HasFlag(FogEntranceTags.Boss) || artoriasExit.Id != 1211892
+                || artoriasExit.ASide.Area.Value != "dlc_artorias" || artoriasExit.ASide.Flag != 11210001
+                || artoriasExit.ASide.Condition?.Terms.Single() != FogConditionReference.BossCompletion(11210001)
+                || artoriasExit.BSide.Area.Value != "dlc_postartorias"
+                || artoriasExit.BSide.ExcludeIfRandomized?.Value != "o2920_0000"
+                || !artoriasExit.ASide.Tags.HasFlag(FogEntranceSideTags.Higher)
+                || !artoriasExit.BSide.Tags.HasFlag(FogEntranceSideTags.Higher)
+                || projectedArtoriasExit.ASide.Flag != 11210001
+                || projectedArtoriasExit.ASide.Cond != "boss_defeated_11210001"
                 || v2PeerEntrance.Length != 1
                 || v2PeerEntrance[0].ASide.ExcludeIfRandomized?.Value != "o2916_0000"
-                || !v2PeerEntrance[0].BSide.Tags.HasFlag(FogEntranceSideTags.Main))
-                throw new InvalidDataException("Compact V2 must preserve the pinned o2920 main-side metadata and resolve its excluded post-Artorias reference as a fixed, non-randomized anchor.");
+                || !v2PeerEntrance[0].BSide.Tags.HasFlag(FogEntranceSideTags.Main)
+                || artoriasCompletion.TriggerEventId != 11215011
+                || artoriasCompletion.TriggerRegionEntityId != 1212898
+                || artoriasCompletion.TriggerEntrance != "o2915_0000"
+                || artoriasCompletion.RequireFixedPostBossRoute
+                || !gapingBossRoomAction
+                || !facts.BossRewardCompletionFlags.Contains(2)
+                || !facts.Maps[new FogMapId("depths")].EventFlagWrites.Contains(new FogDsrEventFlagWrite(11000001, 2)))
+                throw new InvalidDataException("Compact V2 boss actionability must retain pre-fight Gaping entry and enable the post-defeat Artorias exit from verified DSR object, event, and completion-flag facts.");
             var v2Graph = new Graph();
             v2Graph.Construct(new RandomizerOptions(), projected);
-            if (!v2Graph.entranceIds["o2916_0000"].IsFixed
-                || v2Graph.graph.Values.SelectMany(node => node.To.Concat(node.From)).Any(edge => edge.Name == "o2916_0000"))
-                throw new InvalidDataException("Compact V2's post-Artorias reference anchor must remain outside all graph and shuffle edges.");
+            if (v2Graph.entranceIds["o1400_0000"].IsFixed == false
+                || v2Graph.entranceIds["o1400_0000"].HasTag("unused")
+                || v2Graph.entranceIds["o2916_0000"].IsFixed == false
+                || v2Graph.entranceIds["o2916_0000"].HasTag("unused")
+                || !v2Graph.bossCompletions.ContainsKey("boss_defeated_11000001")
+                || !v2Graph.bossCompletions.ContainsKey("boss_defeated_11210001"))
+                throw new InvalidDataException("Compact V2 must expose both lifecycle gates as fixed active entrances when boss randomization is off and register their verified Gaping Dragon and Artorias completion conditions.");
             foreach (FogCompactV2PvpPolicy.GateIdentity gate in graphPolicy)
             {
                 AnnotationData.Entrance source = upstream.Entrances.SingleOrDefault(entrance => entrance.Name == gate.Name);
@@ -1601,6 +1660,15 @@ namespace FogHost.Tests
                 FogEntranceSide ExpectedSide(FogEntranceSide side, bool isASide)
                 {
                     if (side == null) return null;
+                    if (source.Name == "o2915_0000" && side.Area.Value == "dlc_artorias")
+                        return side with
+                        {
+                            Flag = 11210001,
+                            BossTrigger = 0,
+                            BossTriggerArea = null,
+                            CustomWarp = null,
+                            BossEncounterStartEventId = 11215011,
+                        };
                     if (source.Name == "o4961_0000" && side.Area.Value == "demonruins_ceaseless")
                         return side with
                         {
@@ -1694,11 +1762,12 @@ namespace FogHost.Tests
                 FogCompactV2PvpPolicy.ApplyGraphOptions(annotations, major, minor);
                 return annotations;
             }
-            Graph BuildGraph(AnnotationData.Annotations annotations, bool major, bool minor)
+            Graph BuildGraph(AnnotationData.Annotations annotations, bool major, bool minor, bool boss = false)
             {
                 var options = new RandomizerOptions();
                 options["major"] = major;
                 options["minor"] = minor;
+                options["boss"] = boss;
                 var graph = new Graph();
                 try
                 {
@@ -1718,7 +1787,17 @@ namespace FogHost.Tests
             Graph majorOn = BuildGraph(majorAnnotations, major: true, minor: false);
             Graph minorOn = BuildGraph(minorAnnotations, major: false, minor: true);
             Graph bothOn = BuildGraph(bothAnnotations, major: true, minor: true);
+            Graph bossOn = BuildGraph(BuildAnnotations(major: false, minor: false), major: false, minor: false, boss: true);
             bool HasGate(FogAreaId area, string name) => off.graph[area.Value].To.Any(edge => edge.Name == name);
+            bool HasBossSide(Graph graph, string entranceName, string area) =>
+                graph.graph.TryGetValue(area, out Graph.Node node) && node.To.Any(edge => edge.Name == entranceName);
+            string[] missingBossGraphSides = bossOn.entranceIds.Values
+                .Where(entrance => !entrance.HasTag("unused") && entrance.HasTag("boss"))
+                .SelectMany(entrance => entrance.Sides()
+                    .Where(side => entrance.IsFixed || !HasBossSide(bossOn, entrance.Name, side.Area))
+                    .Select(side => $"{entrance.Name}@{side.Area}"))
+                .OrderBy(value => value, StringComparer.Ordinal)
+                .ToArray();
             bool HasPvPCount(Graph graph, int expected) => graph.entranceIds
                 .Count(entry => graphPolicy.Any(gate => gate.Name == entry.Key) && !entry.Value.HasTag("unused")) == expected;
             bool HasAreaPair(AnnotationData.Annotations annotations, string first, string second) => annotations.Areas
@@ -1726,6 +1805,11 @@ namespace FogHost.Tests
                 .SelectMany(area => area.To.Select(link => Pair(new FogAreaId(area.Name), new FogAreaId(link.Area))))
                 .Contains(Pair(new FogAreaId(first), new FogAreaId(second)));
             if (!HasPvPCount(off, 0) || !HasPvPCount(majorOn, 15) || !HasPvPCount(minorOn, 18) || !HasPvPCount(bothOn, 33)
+                || !off.entranceIds["o1400_0000"].IsFixed || !off.entranceIds["o2916_0000"].IsFixed
+                || bossOn.entranceIds["o1400_0000"].IsFixed || bossOn.entranceIds["o2916_0000"].IsFixed
+                || missingBossGraphSides.Length != 0
+                || !HasBossSide(bossOn, "o1400_0000", "depths") || !HasBossSide(bossOn, "o1400_0000", "depths_gaping")
+                || !HasBossSide(bossOn, "o2916_0000", "dlc_artorias") || !HasBossSide(bossOn, "o2916_0000", "dlc_postartorias")
                 || HasGate(new FogAreaId("parish_andre"), "o1408_0000")
                 || HasGate(new FogAreaId("firelink_elevator"), "o1410_0000")
                 || !HasAreaPair(offAnnotations, "parish_andre", "parish_church")
@@ -1734,7 +1818,7 @@ namespace FogHost.Tests
                 || minorOn.entranceIds["o1409_0000"].IsFixed
                 || minorOn.entranceIds.ContainsKey("o1408_0000")
                 || majorOn.entranceIds.ContainsKey("o1409_0000"))
-                throw new InvalidDataException($"PvP option graph counts or Parish route scope are invalid (counts off/major/minor/both={HasPvPCount(off, 0)}/{HasPvPCount(majorOn, 15)}/{HasPvPCount(minorOn, 18)}/{HasPvPCount(bothOn, 33)}; off pairs Andre/church and Andre/elevator={HasAreaPair(offAnnotations, "parish_andre", "parish_church")}/{HasAreaPair(offAnnotations, "parish_andre", "firelink_elevator")}; off gate edges={HasGate(new FogAreaId("parish_andre"), "o1408_0000")}/{HasGate(new FogAreaId("firelink_elevator"), "o1410_0000")}; major gate fixed={majorOn.entranceIds["o1408_0000"].IsFixed}/{majorOn.entranceIds["o1410_0000"].IsFixed}; minor-only 1409 fixed={minorOn.entranceIds["o1409_0000"].IsFixed}; 1408 in minor={minorOn.entranceIds.ContainsKey("o1408_0000")}; 1409 in major={majorOn.entranceIds.ContainsKey("o1409_0000")}).");
+                throw new InvalidDataException($"Compact V2 PvP counts, boss-gate eligibility, or Parish route scope are invalid (PvP counts off/major/minor/both={HasPvPCount(off, 0)}/{HasPvPCount(majorOn, 15)}/{HasPvPCount(minorOn, 18)}/{HasPvPCount(bothOn, 33)}; boss off fixed Gaping/Artorias={off.entranceIds["o1400_0000"].IsFixed}/{off.entranceIds["o2916_0000"].IsFixed}; boss on fixed Gaping/Artorias={bossOn.entranceIds["o1400_0000"].IsFixed}/{bossOn.entranceIds["o2916_0000"].IsFixed}; missing graph sides=[{string.Join(",", missingBossGraphSides)}]; boss source/destination sides Gaping={HasBossSide(bossOn, "o1400_0000", "depths")}/{HasBossSide(bossOn, "o1400_0000", "depths_gaping")}, Artorias={HasBossSide(bossOn, "o2916_0000", "dlc_artorias")}/{HasBossSide(bossOn, "o2916_0000", "dlc_postartorias")}; off pairs Andre/church and Andre/elevator={HasAreaPair(offAnnotations, "parish_andre", "parish_church")}/{HasAreaPair(offAnnotations, "parish_andre", "firelink_elevator")}; off gate edges={HasGate(new FogAreaId("parish_andre"), "o1408_0000")}/{HasGate(new FogAreaId("firelink_elevator"), "o1410_0000")}; major gate fixed={majorOn.entranceIds["o1408_0000"].IsFixed}/{majorOn.entranceIds["o1410_0000"].IsFixed}; minor-only 1409 fixed={minorOn.entranceIds["o1409_0000"].IsFixed}; 1408 in minor={minorOn.entranceIds.ContainsKey("o1408_0000")}; 1409 in major={majorOn.entranceIds.ContainsKey("o1409_0000")}).");
             foreach (FogCompactV2PvpPolicy.GateIdentity gate in graphPolicy)
             {
                 bool shouldBeInMajorRun = gate.Major;
@@ -1842,8 +1926,8 @@ namespace FogHost.Tests
                         && BitConverter.ToInt32(instruction.ArgData, 4) == 11410090))
                         initializerReferences.Add($"{Path.GetFileName(archivePath)}/{evt.ID}/{instruction.Bank}[{instruction.ID}]");
             }
-            bool indexedLiteralRegionCheck = facts.Maps[new FogMapId("demonruins")].EventRegionChecks
-                .Count(check => check.EventId == 11415371 && check.RegionEntityId == 1412698) == 1;
+            bool indexedLiteralRegionCheck = facts.Maps[new FogMapId("demonruins")].EventActionButtonFacts
+                .Count(check => check.EventId == 11415371 && check.TargetEntityId == 1412698) == 1;
             if (target.Parameters.Count != 10 || actionChecks.Length != 2 || shortWarps.Length != 2
                 || shortWarps.Any(instruction => instruction.ArgData.Length < 12 || BitConverter.ToInt32(instruction.ArgData, 8) != 0)
                 || initializerReferences.Count != 0 || !startEventChecksTriggerRegion || !indexedLiteralRegionCheck)

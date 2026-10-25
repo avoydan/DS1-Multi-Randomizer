@@ -104,9 +104,15 @@ namespace FogHost
             // reference each other through ExcludeIfRandomized, so an option-scoped graph may
             // remove one while the other remains active. Retain inactive referenced identities
             // only as fixed, unused lookup anchors: they add no graph edge or shuffle input.
-            foreach (string anchorName in new[] { "o5869_0000", "o3970_0000", "o4954_0000" })
+            bool postArtoriasExitReferencesO2920 = annotations.Entrances.Any(entrance =>
+                entrance.Name == "o2916_0000" && entrance.BSide?.ExcludeIfRandomized == "o2920_0000");
+            string[] anchorNames = new[] { "o5869_0000", "o3970_0000", "o4954_0000" }
+                .Concat(postArtoriasExitReferencesO2920 ? new[] { "o2920_0000" } : Array.Empty<string>())
+                .ToArray();
+            foreach (string anchorName in anchorNames)
             {
-                if (activeNames.Contains(anchorName)) continue;
+                if (activeNames.Contains(anchorName)
+                    || annotations.Entrances.Any(entrance => entrance.Name == anchorName)) continue;
                 GateIdentity anchor = identities.Single(gate => gate.Name == anchorName);
                 annotations.Entrances.Add(new Entrance
                 {

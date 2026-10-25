@@ -149,17 +149,23 @@ namespace FogHost.Tests
             {
                 Environment.CurrentDirectory = dataRoot;
 
-                // Reproduce the owner's accepted V5 QA Fog seed/options against frozen v1 and v2.
-                // v1 must retain its historical graph; v2 gates the local Ceaseless/lava route on
-                // verified boss completion while the writer still emits valid files.
+                // Adding the two previously omitted boss gates changes the randomized pool, so old
+                // accepted seeds may now correctly retry under the independent Ceaseless route guard.
+                // Compare v1/v2 output on a currently accepted seed and assert the old seeds retry.
                 string[] reproducedOptions = { "traversableFogs", "bossFogs", "areaWarps", "scaling", "requireLordSouls" };
                 string v1Landing = null;
                 string v2Landing = null;
-                string[] v1Output = RunCase(dataRoot, scratchRoot, v1, "pvp-off-repro-v1", reproducedOptions, 31341427, "POLISH",
+                const uint acceptedRegressionSeed = 42;
+                string[] v1Output = RunCase(dataRoot, scratchRoot, v1, "pvp-off-repro-v1", reproducedOptions, acceptedRegressionSeed, "POLISH",
                     landing => v1Landing = landing);
-                string[] v2Output = RunCaseV2(dataRoot, scratchRoot, v2, "pvp-off-repro-v2", reproducedOptions, 31341427, "POLISH",
+                string[] v2Output = RunCaseV2(dataRoot, scratchRoot, v2, "pvp-off-repro-v2", reproducedOptions, acceptedRegressionSeed, "POLISH",
                     landing => v2Landing = landing,
-                    (staging, result) => VerifyCompactPvpSoloInitializers(staging, result));
+                    (staging, result) =>
+                    {
+                        VerifyCompactPvpSoloInitializers(staging, result);
+                        VerifyCompactBossFogActionability(staging, result, v2.Catalog);
+                        VerifyCapraDefaultLanding(staging, pristineRoot, v2.Catalog);
+                    });
                 AssertCeaselessRoute(v1.Catalog, "v1", expectedCompletionEventId: null);
                 AssertCeaselessRoute(v2.Catalog, "v2", expectedCompletionEventId: 11410410);
                 if (string.IsNullOrWhiteSpace(v1Landing) || string.IsNullOrWhiteSpace(v2Landing)
@@ -167,17 +173,14 @@ namespace FogHost.Tests
                     throw new InvalidDataException($"Compact Fog v2 Ceaseless warp output differs from the frozen v1/FogMod default landing: v1='{v1Landing}', v2='{v2Landing}'.");
                 if (v1Output.SequenceEqual(v2Output, StringComparer.Ordinal))
                     throw new InvalidDataException("The exact reproduction produced identical v1/v2 output hashes despite the catalog correction.");
-                Console.WriteLine($"PASS PvP OFF real-format accepted-world regression: fogSeed=31341427; v1Files={v1Output.Length}; v2Files={v2Output.Length}; identical Ceaseless physical landing; v1={v1Landing}; v2={v2Landing}; v1/v2 progression differs as expected.");
+                Console.WriteLine($"PASS PvP OFF real-format accepted-world regression: fogSeed={acceptedRegressionSeed}; v1Files={v1Output.Length}; v2Files={v2Output.Length}; identical Ceaseless physical landing; V2 boss actionability and Capra default landing checked; v1={v1Landing}; v2={v2Landing}; v1/v2 progression differs as expected.");
 
-                string capraLanding = null;
-                string[] capraOutput = RunCaseV2(dataRoot, scratchRoot, v2, "owner-o5865-to-o1413-landing",
-                    reproducedOptions, 2831875538, "POLISH",
-                    onWrittenOutput: (staging, result) =>
-                        capraLanding = VerifyCapraDefaultLanding(staging, pristineRoot, v2.Catalog),
-                    onLogWritten: VerifyOwnerCapraRouteLog);
-                if (string.IsNullOrWhiteSpace(capraLanding))
-                    throw new InvalidDataException("The confirmed o5865 to o1413 real-format route did not validate its Capra landing.");
-                Console.WriteLine($"PASS owner o5865 -> o1413 under-map landing regression: fogSeed=2831875538; outputFiles={capraOutput.Length}; {capraLanding}");
+                RequireV2RetryableSeed(dataRoot, scratchRoot, v2, reproducedOptions, 31341427,
+                    "previous Ceaseless seed whose post-boss exit no longer reaches the gated lava route");
+                RequireV2RetryableSeed(dataRoot, scratchRoot, v2, reproducedOptions, 2098234880,
+                    "owner no-prompt world under the expanded boss-gate graph");
+                RequireV2RetryableSeed(dataRoot, scratchRoot, v2, reproducedOptions, 2831875538,
+                    "previous Capra-pair seed under the expanded boss-gate graph");
 
                 var majorPvpRejections = new List<uint>();
                 bool majorPvpWritten = false;
@@ -286,6 +289,7 @@ namespace FogHost.Tests
 
             FogDsrFacts facts = FogDsrFacts.Read(dataRoot, pristineRoot, includeLegacyAnnotations: false);
             FogCompactCatalogV2 catalog = FogCompactCatalogBuilder.BuildV2(facts);
+            WriteBossGatePolicyInventory(catalog.Catalog);
             string originalDirectory = Environment.CurrentDirectory;
             string scratchRoot = Path.Combine(Path.GetTempPath(), "ds1tr-compact-v2-post-boss-sweep-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(scratchRoot);
@@ -300,10 +304,21 @@ namespace FogHost.Tests
                 {
                     try
                     {
+                        string ceaselessLanding = null;
+                        string capraLanding = null;
                         RunCaseV2(dataRoot, scratchRoot, catalog, "post-boss-" + seed.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                            options, seed, "POLISH");
+                            options, seed, "POLISH",
+                            onCeaselessLanding: landing => ceaselessLanding = landing,
+                            onWrittenOutput: (staging, result) =>
+                            {
+                                VerifyCompactBossFogActionability(staging, result, catalog.Catalog);
+                                capraLanding = VerifyCapraDefaultLanding(staging, pristineRoot, catalog.Catalog);
+                            });
+                        if (string.IsNullOrWhiteSpace(ceaselessLanding) || string.IsNullOrWhiteSpace(capraLanding))
+                            throw new InvalidDataException("A generated post-boss seed did not validate both the Ceaseless and o1413 default physical landings.");
                         successes.Add(seed);
-                        Console.WriteLine($"PASS Compact Fog v2 post-boss seed {seed}.");
+                        int activeBossGates = catalog.Catalog.Entrances.Count(entrance => entrance.Tags.HasFlag(FogEntranceTags.Boss));
+                        Console.WriteLine($"PASS Compact Fog v2 boss actionability seed {seed}: {activeBossGates} active boss gates; both source sides dispatched; Ceaseless and o1413 default landings verified.");
                     }
                     catch (FogHostException error) when (error.Code == HostErrors.SeedUnsolvable && error.Retryable
                         && error.RetryScope == "fog" && error.Stage == "solve-graph")
@@ -327,12 +342,42 @@ namespace FogHost.Tests
             }
         }
 
+        private static void WriteBossGatePolicyInventory(FogAnnotationCatalog catalog)
+        {
+            FogEntrance[] gates = catalog.Entrances
+                .Where(entrance => entrance.Tags.HasFlag(FogEntranceTags.Boss))
+                .OrderBy(entrance => entrance.Name, StringComparer.Ordinal)
+                .ToArray();
+            Console.WriteLine($"Compact V2 boss actionability policy: {gates.Length} active boss gates / {gates.Length * 2} sides.");
+            string Side(FogEntranceSide side) =>
+                $"area={side.Area.Value};flag={side.Flag};trap={side.TrapFlag};entry={side.EntryFlag};beforeWarp={side.BeforeWarpFlag};warp={side.WarpFlag};condition={side.Condition};exclude={side.ExcludeIfRandomized?.Value ?? "none"};destinationMap={side.DestinationMap?.Value ?? "default"};tags={side.Tags};bossTrigger={side.BossTrigger};bossTriggerArea={(side.BossTriggerArea == null ? "none" : side.BossTriggerArea.ToString())};bossStartEvent={side.BossEncounterStartEventId};actionRegion={side.ActionRegion};customWidth={side.CustomActionWidth}";
+            foreach (FogEntrance gate in gates)
+                Console.WriteLine($"BOSS-GATE {gate.Name} object={gate.Id} map={gate.Map.Value}; A[{Side(gate.ASide)}]; B[{Side(gate.BSide)}]");
+        }
+
         private static bool IsExpectedPostBossRetry(string caseName, FogHostException error) =>
             (caseName == "bossFogs" || caseName == "all-fog-options")
             && error.Code == HostErrors.SeedUnsolvable
             && error.Retryable
             && error.RetryScope == "fog"
             && error.Stage == "solve-graph";
+
+        private static void RequireV2RetryableSeed(
+            string dataRoot, string scratchRoot, FogCompactCatalogV2 catalog,
+            IEnumerable<string> enabledOptions, uint seed, string label)
+        {
+            try
+            {
+                RunCaseV2(dataRoot, scratchRoot, catalog, "expected-post-boss-retry-" + seed,
+                    enabledOptions, seed, "POLISH");
+            }
+            catch (FogHostException error) when (IsExpectedPostBossRetry("all-fog-options", error))
+            {
+                Console.WriteLine($"PASS expected V2 retry: seed={seed}; {label}; code={error.Code}; stage={error.Stage}; retryable={error.Retryable}; scope={error.RetryScope}.");
+                return;
+            }
+            throw new InvalidDataException($"V2 seed {seed} ({label}) must be rejected as a typed retryable Fog solve-graph failure after adding the active boss-gate pool.");
+        }
 
         private static void AssertCeaselessRoute(FogAnnotationCatalog catalog, string label, int? expectedCompletionEventId)
         {
@@ -397,6 +442,111 @@ namespace FogHost.Tests
             return result.Files.OrderBy(file => file.Path, StringComparer.Ordinal)
                 .Select(file => $"{file.Path}:{file.Size}:{file.Sha256}")
                 .ToArray();
+        }
+
+        private static void VerifyCompactBossFogActionability(string staging, HostResult result, FogAnnotationCatalog catalog)
+        {
+            OutputFile commonOutput = result.Files.SingleOrDefault(file => file.Path == "event/common.emevd.dcx")
+                ?? throw new InvalidDataException("Compact Fog V2 did not report common.emevd.dcx for boss-fog actionability.");
+            string commonPath = Path.Combine(staging, commonOutput.Path.Replace('/', Path.DirectorySeparatorChar));
+            EMEVD common = EMEVD.Read(DCX.Decompress(File.ReadAllBytes(commonPath)));
+            EMEVD.Event eventZero = common.Events.Single(evt => evt.ID == 0);
+            EMEVD.Instruction[] modeZero = eventZero.Instructions.Where(instruction => instruction.Bank == 2000
+                && instruction.ID == 0 && instruction.ArgData.Length == 40
+                && BitConverter.ToUInt32(instruction.ArgData, 4) == 5700
+                && instruction.ArgData[8] == 0).ToArray();
+
+            FogEntrance[] activeBossGates = catalog.Entrances
+                .Where(entrance => entrance.Tags.HasFlag(FogEntranceTags.Boss)).ToArray();
+            FogEntrance gapingBoundary = activeBossGates.Single(entrance => entrance.Name == "o1400_0000");
+            FogEntrance artoriasExit = activeBossGates.Single(entrance => entrance.Name == "o2916_0000");
+            if (gapingBoundary.ASide.Area.Value != "depths" || gapingBoundary.ASide.Flag != 0
+                || gapingBoundary.BSide.Area.Value != "depths_gaping" || gapingBoundary.BSide.Flag != 2
+                || artoriasExit.ASide.Area.Value != "dlc_artorias" || artoriasExit.ASide.Flag != 11210001
+                || artoriasExit.ASide.Condition?.Terms.Single() != FogConditionReference.BossCompletion(11210001))
+                throw new InvalidDataException("The lifecycle audit must retain the pre-fight Gaping outside source and post-defeat Artorias arena exit as distinct source sides with their verified flags.");
+            foreach (FogEntrance entrance in activeBossGates)
+            {
+                string mapName = AnnotationData.nameSpecs[entrance.Map.Value].Map;
+                string mapPath = Path.Combine(staging, "map", "MapStudio", mapName + ".msb");
+                MSB1 outputMap = MSB1.Read(mapPath);
+                if (outputMap.Parts.Objects.Count(part => part.Name == entrance.Name && part.EntityID == entrance.Id) != 1)
+                    throw new InvalidDataException($"Active boss fog '{entrance.Name}' ({entrance.Id}) is missing from generated {mapName}.msb.");
+
+                foreach ((FogEntranceSide side, bool isASide) in new[] { (entrance.ASide, true), (entrance.BSide, false) })
+                {
+                    if (side == null) throw new InvalidDataException($"Active boss fog '{entrance.Name}' has a missing side.");
+                    string prefix = isASide ? "FR: " : "BR: ";
+                    MSB1.Region action = outputMap.Regions.Regions.SingleOrDefault(region => region.Name == prefix + entrance.Text)
+                        ?? throw new InvalidDataException($"Active boss fog '{entrance.Name}' side {(isASide ? "A" : "B")} has no generated action region.");
+                    EMEVD.Instruction[] initializers = modeZero.Where(instruction =>
+                        BitConverter.ToInt32(instruction.ArgData, 12) == entrance.Id
+                        && BitConverter.ToInt32(instruction.ArgData, 24) == action.EntityID).ToArray();
+                    if (initializers.Length != 1 || BitConverter.ToInt32(initializers[0].ArgData, 28) != side.Flag)
+                        throw new InvalidDataException($"Active boss fog '{entrance.Name}' side {(isASide ? "A" : "B")} must have one Event 5700 mode-0 dispatcher for action region {action.EntityID} with source flag {side.Flag}; found {initializers.Length}.");
+                }
+            }
+
+            VerifyGeneratedActionButton(staging, result, "event/m10_00_00_00.emevd.dcx",
+                11005391, null, 1002998, 1001990, "Gaping Dragon pre-fight outside-to-arena interaction");
+            VerifyGeneratedActionButton(staging, result, "event/m12_01_00_00.emevd.dcx",
+                11215011, null, 1212898, 1211890, "Artorias encounter interaction");
+            VerifyNoObjectDeactivation(staging, result, 11000001, 1001990, "Gaping Dragon");
+            VerifyNoObjectDeactivation(staging, result, 11210001, 1211890, "Artorias entrance");
+            VerifyNoObjectDeactivation(staging, result, 11210001, 1211892, "Artorias post-fight exit");
+            Console.WriteLine($"PASS boss actionability audit: {activeBossGates.Length} active Compact V2 boss gates have both generated action regions and matching Event 5700 source dispatchers.");
+        }
+
+        private static void VerifyGeneratedActionButton(
+            string staging, HostResult result, string eventPath, long eventId,
+            int? instructionId, int targetEntityId, int lineSegmentEntityId, string label)
+        {
+            OutputFile output = result.Files.SingleOrDefault(file => file.Path == eventPath)
+                ?? throw new InvalidDataException($"Generated output did not report '{eventPath}' for {label}.");
+            EMEVD archive = EMEVD.Read(DCX.Decompress(File.ReadAllBytes(Path.Combine(
+                staging, eventPath.Replace('/', Path.DirectorySeparatorChar)))));
+            EMEVD.Event evt = archive.Events.SingleOrDefault(candidate => candidate.ID == eventId)
+                ?? throw new InvalidDataException($"Generated event {eventId} is missing for {label}.");
+            EMEVD.Instruction.ArgType[] argumentTypes =
+            {
+                EMEVD.Instruction.ArgType.SByte, EMEVD.Instruction.ArgType.Int32,
+                EMEVD.Instruction.ArgType.Int32, EMEVD.Instruction.ArgType.Single,
+                EMEVD.Instruction.ArgType.Int16, EMEVD.Instruction.ArgType.Single,
+                EMEVD.Instruction.ArgType.Int32, EMEVD.Instruction.ArgType.Byte,
+                EMEVD.Instruction.ArgType.Int32, EMEVD.Instruction.ArgType.Int32,
+            };
+            bool found = evt.Instructions.Where(instruction => instruction.Bank == 3
+                    && instruction.ID is 18 or 19
+                    && (!instructionId.HasValue || instruction.ID == instructionId.Value)
+                    && instruction.ArgData.Length == 40)
+                .Any(instruction =>
+                {
+                    object[] args = instruction.UnpackArgs(argumentTypes).ToArray();
+                    return Convert.ToInt32(args[2], System.Globalization.CultureInfo.InvariantCulture) == targetEntityId
+                        && Convert.ToInt32(args[9], System.Globalization.CultureInfo.InvariantCulture) == lineSegmentEntityId;
+                });
+            if (!found)
+                throw new InvalidDataException($"Generated event {eventId} does not retain the {label} action-button target {targetEntityId}/line-segment entity {lineSegmentEntityId}.");
+        }
+
+        private static void VerifyNoObjectDeactivation(string staging, HostResult result, long eventId, int objectEntityId, string label)
+        {
+            var matches = new List<EMEVD.Event>();
+            foreach (OutputFile file in result.Files.Where(file => file.Path.StartsWith("event/", StringComparison.Ordinal)
+                && file.Path.EndsWith(".emevd.dcx", StringComparison.Ordinal)))
+            {
+                EMEVD archive = EMEVD.Read(DCX.Decompress(File.ReadAllBytes(Path.Combine(
+                    staging, file.Path.Replace('/', Path.DirectorySeparatorChar)))));
+                EMEVD.Event evt = archive.Events.SingleOrDefault(candidate => candidate.ID == eventId);
+                if (evt != null) matches.Add(evt);
+            }
+            if (matches.Count != 1)
+                throw new InvalidDataException($"Expected one generated event {eventId} for {label}; found {matches.Count}.");
+            bool deactivates = matches[0].Instructions.Any(instruction => instruction.Bank == 2005 && instruction.ID == 3
+                && instruction.ArgData.Length >= sizeof(int)
+                && BitConverter.ToInt32(instruction.ArgData, 0) == objectEntityId);
+            if (deactivates)
+                throw new InvalidDataException($"Event {eventId} still deactivates the visible {label} fog object {objectEntityId}.");
         }
 
         private static void VerifyCompactPvpSoloInitializers(string staging, HostResult result)

@@ -17,6 +17,7 @@ namespace FogHost
         {
             foreach (BossCompletionRule completion in annotations.BossCompletions?.AsEnumerable() ?? Enumerable.Empty<BossCompletionRule>())
             {
+                if (!completion.RequireFixedPostBossRoute) continue;
                 string[] destinations = graph.graph.Values
                     .SelectMany(node => node.To)
                     .Where(edge => edge.LinkedExpr != null && edge.LinkedExpr.FreeVars().Contains(completion.Name, StringComparer.Ordinal))

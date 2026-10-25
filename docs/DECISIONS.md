@@ -13,10 +13,30 @@ required. The optional `GraphChecker` edge predicate defaults to unrestricted,
 so V1–V4 retain their existing graph behavior. For Ceaseless, the lower Demon
 Ruins route is owned by main `demonruins`, gated by event `11410410`; the
 Ceaseless pocket has no local shortcut to `demonruins_lava`. The exact owner
-reproduction rejects Fog attempt 0 and deterministically succeeds on attempt 4.
+reproduction rejected Fog attempt 0 and succeeded on attempt 4 under the
+catalog that existed when this decision was recorded. The later boss-gate
+actionability expansion changes the randomized pool, so that attempt result is
+historical, not a current V5 generation guarantee. Current retry outcomes are
+recorded in `docs/IMPLEMENTATION_STATUS.md`.
 This is a pre-release correction to V5; V1–V4 remain unchanged. Details and
 real-format verification are recorded in `docs/COMPACT_FULL_FOG_V2.md` and
 `docs/IMPLEMENTATION_STATUS.md`.
+
+## V5 boss fog actionability follows each gate's lifecycle state (2026-10-25)
+
+Compact Fog V2 must create a randomized source action for every active boss
+fog side and preserve the verified source-state flags. A visible MSB fog object
+alone does not prove that the player can interact with it. The Gaping Dragon
+outside side is available before the fight (`o1400_0000`, flag `0`); its arena
+side uses the verified completion flag `2`. The Artorias arena exit side is
+available after completion flag `11210001` is set (`o2916_0000`); the separate
+forest-to-arena entrance remains a distinct transition. Tests verify the
+generated action regions and Event 5700 mode-0 dispatchers for both sides of
+all 24 active boss gates, in addition to the two pristine encounter action
+checks. The post-boss fixed-route validator remains required for Ceaseless;
+Gaping and Artorias are represented by their own randomized, completion-gated
+entrances and do not use that fixed-route postcondition. This policy is limited
+to Compact V2 and does not change V1–V4.
 
 ## Restore FogMod default Ceaseless landing for pre-release V5 (2026-10-22)
 

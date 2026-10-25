@@ -185,7 +185,8 @@ namespace FogHost
         FogAreaId EncounterArea,
         FogEntranceKey TriggerEntrance,
         FogMapId TriggerMap,
-        int TriggerRegionEntityId)
+        int TriggerRegionEntityId,
+        bool RequireFixedPostBossRoute = true)
     {
         public string ConditionName => "boss_defeated_" + EventId.ToString(CultureInfo.InvariantCulture);
     }
@@ -321,6 +322,7 @@ namespace FogHost
                     TriggerEntrance = transition.TriggerEntrance.Value,
                     TriggerMap = transition.TriggerMap.Value,
                     TriggerRegionEntityId = transition.TriggerRegionEntityId,
+                    RequireFixedPostBossRoute = transition.RequireFixedPostBossRoute,
                 }).ToList(),
             };
         }
@@ -396,6 +398,7 @@ namespace FogHost
                             json.WriteString("triggerEntrance", transition.TriggerEntrance.Value);
                             json.WriteString("triggerMap", transition.TriggerMap.Value);
                             json.WriteNumber("triggerRegionEntityId", transition.TriggerRegionEntityId);
+                            json.WriteBoolean("requireFixedPostBossRoute", transition.RequireFixedPostBossRoute);
                             json.WriteEndObject();
                         }
                         json.WriteEndArray();

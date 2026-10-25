@@ -1,8 +1,83 @@
 # FogHost integration design
 
+## V5 visible boss fogs without a prompt (2026-10-25)
+
+The supplied V5 run was FogHost `0.7.3`, backend `0.46.3`, Compact V2,
+PvP off, `bossFogs` on, attempt 0, Fog seed `2098234880`. Its Seed Code was
+`DS1TR1-06NWCQQ3-K2HDEE79-Z4WJJR09-VPHFSMMJ-AKEY5N64-MBJ0RQD3-T7X6FD7Y-36PQYHQB-KXGN3ZR0-01B27F77`.
+
+The two observations are different lifecycle directions:
+
+| Observation | Exact side | Required source state | Required source action |
+|---|---|---|---|
+| Before Gaping Dragon | Depths, outside → arena: `o1400_0000`, entity `1001990`, `m10_00_00_00`, ASide `depths` | No boss-completion flag (`Flag=0`) | Available before the fight |
+| After Artorias | Arena → randomized destination: `o2916_0000`, entity `1211892`, `m12_01_00_00`, ASide `dlc_artorias` | Event/flag `11210001` completed | Available after Artorias is defeated |
+
+**Cause in the reported package:** both physical fog objects remained in their
+generated MSBs, but neither entrance was represented in Compact V2's active
+boss graph. FogMod's writer only creates its action region, player entry and
+Event 5700 mode-0 initializer for projected, non-ignored sides. The package
+therefore had no randomized pair or destination for either reported side, no
+generated action region for either object, and no mode-0 dispatcher keyed by
+entity `1001990` or `1211892`. The original boss-start event checks are not a
+randomized transition. Neither completion event deactivates the observed fog
+object. This was an annotation-coverage/visible-object mismatch; the old graph
+did not treat either omitted side as a usable transition, so it was not a
+GraphChecker edge that the writer failed to realize. Destination entry gating
+was never reached in those two cases.
+
+**Compact V2 correction:** the project-owned catalog now resolves both gates
+from pristine DSR object, event and boss-flag facts and matches their pinned
+FogMod records:
+
+- `o1400_0000` has ASide `depths`, `Flag=0`, so the outside entrance is
+  actionable before the fight. BSide is `depths_gaping`, `Flag=2`, with the
+  verified Gaping encounter-start event `11005391`; the inside source remains
+  gated until completion. The pristine `11005391` action-button check targets
+  region `1002998` and line-segment entity `1001990`.
+- `o2916_0000` has ASide `dlc_artorias`, `Flag=11210001`, a boss-completion
+  condition and the upstream `higher` landing tag. BSide is
+  `dlc_postartorias`, `Flag=0`, `higher`, with upstream
+  `ExcludeIfRandomized=o2920_0000`. That exclusion can suppress only the
+  post-arena BSide when `o2920_0000` is randomized; the reported arena ASide
+  remains available after Artorias dies. PvP was off in the reported run, so
+  the exclusion was inactive.
+- The separate Artorias entrance `o2915_0000` remains distinct: entering from
+  `dlc_forest` uses its flag-0 side; leaving `dlc_artorias` uses the
+  `11210001` side. Its pristine event `11215011` action check targets region
+  `1212898` and line-segment entity `1211890`.
+
+Pinned FogMod `dist/fog.txt` contains the same Gaping and post-Artorias side
+flags/tags/exclusion. Pinned `GameDataWriter.cs` creates the side action
+regions and mode-0 warp dispatchers from those entries. In the FogHost
+real-format writer tests, generated common event 0 has one mode-0 dispatcher
+per active boss side with the expected source flag; generated MSBs contain
+the matching `FR:`/`BR:` region; and the Gaping/Artorias source EMEVD action
+checks and completion-object persistence remain intact.
+
+The complete Compact V2 audit covers 24 active boss gates / 48 sides. The
+boss-enabled, PvP-off graph test confirms every side remains eligible in the
+graph. Real-format seeds `42` and `56` each passed the writer audit for all 24
+gates, both action regions/dispatchers per gate, and the Ceaseless and Capra
+default landings. No unexplained missing interaction remained. The exact old
+owner seed and the previous landing seed now fail closed with typed,
+retryable `FOG_SEED_UNSOLVABLE` at `solve-graph` because their randomized
+Ceaseless exit cannot reach the newly boss-gated lava route; they do not emit
+partially usable packages. This is the existing general post-boss validator,
+not a seed-specific rule.
+
+Verification used the read-only QA DSR source and supplied Fog data root;
+the live installation was not accessed. FogHost is `0.7.4`; backend remains
+`0.46.3`. The generation protocol `HostVersion` remains `0.7.3` because the
+request/response schema is unchanged; the FogHost project/file version is
+`0.7.4`. The updated outputs still require manual gameplay QA; no new Portable
+was built. V1–V4 generation paths and fixtures were not modified.
+
 ## Compact V2 physical-world audit update (2026-10-25)
 
-FogHost `0.7.3` contains the current V5 Compact V2 PvP-off and landing policy.
+FogHost `0.7.3` established the V5 Compact V2 PvP-off and landing policy;
+FogHost `0.7.4` retains it and adds the boss-gate actionability correction
+documented above.
 When a PvP category is off, its gate identities leave the randomized graph and
 the corresponding vanilla Area links stay fixed. Because those removed
 annotation records would otherwise also remove FogMod's Event 5700 mode-1
@@ -18,10 +93,9 @@ special-tag offset). The 42 unmatched sides belong to project-owned `o1309`
 and the 20 `o2780_*` arenas; eight door sides intentionally have no generated
 player. There were no unexplained placement mismatches. The full coordinate
 CSV remains a local Temp artifact because it contains game-derived MSB data.
-This does not identify the separate manually reported under-texture arrival:
-the preserved run artifacts do not associate that incident with a specific
-Entrance/side. Keep gameplay readiness blocked until its exact Seed Code or
-manifest and output are available and checked.
+This placement audit is separate from the boss-fog actionability finding
+documented above and the confirmed Capra landing correction in
+`docs/IMPLEMENTATION_STATUS.md`.
 
 Task 9. Design of the dedicated C# host around FogMod's callable engine, the
 JSON process boundary Task 10 implements, and the concrete MSB/EMEVD/GameParam

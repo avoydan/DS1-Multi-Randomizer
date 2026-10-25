@@ -24,8 +24,11 @@ namespace FogHost
     public sealed record FogDsrRegionFact(string Name, int EntityId, FogDsrTransform Transform, FogDsrRegionShape Shape);
     public sealed record FogDsrEventFlagWrite(long EventId, int FlagId);
     public sealed record FogDsrEventFact(long EventId);
-    /// <summary>A literal region operand in a pristine 3[18] player-inside-area check.</summary>
-    public sealed record FogDsrEventRegionCheckFact(long EventId, int InstructionIndex, int RegionEntityId);
+
+    /// <summary>A pristine 3[18]/3[19] action-button check bound to a target and line-segment entity.</summary>
+    public sealed record FogDsrEventActionButtonFact(
+        long EventId, int InstructionIndex, int InstructionId, int TargetEntityType,
+        int TargetEntityId, int LineSegmentEntityId);
     public sealed record FogDsrCutsceneWarpFact(
         FogMapId SourceMap,
         long EventId,
@@ -83,7 +86,8 @@ namespace FogHost
             public IReadOnlyList<FogDsrObjectActFact> ObjectActDetails { get; init; }
             public string EventArchiveName { get; init; }
             public IReadOnlySet<long> EventIds { get; init; }
-            public IReadOnlyList<FogDsrEventRegionCheckFact> EventRegionChecks { get; init; }
+
+            public IReadOnlyList<FogDsrEventActionButtonFact> EventActionButtonFacts { get; init; }
             public IReadOnlyList<FogDsrCutsceneWarpFact> CutsceneWarps { get; init; }
             public IReadOnlyList<FogDsrEventFlagWrite> EventFlagWrites { get; init; }
             public IReadOnlyList<FogDsrObjectFact> ObjectDetails { get; init; }
@@ -226,7 +230,8 @@ namespace FogHost
                 itemPossessionChecks.AddRange(ReadItemPossessionChecks(eventArchivePath, new FogMapId(spec.Name)));
                 IReadOnlyList<FogDsrEventFlagWrite> eventFlagWrites = ReadEventFlagWrites(eventArchivePath);
                 IReadOnlySet<long> eventIds = ReadEventIds(eventArchivePath);
-                IReadOnlyList<FogDsrEventRegionCheckFact> eventRegionChecks = ReadEventRegionChecks(eventArchivePath);
+
+                IReadOnlyList<FogDsrEventActionButtonFact> eventActionButtonFacts = ReadEventActionButtonFacts(eventArchivePath);
                 IReadOnlyList<FogDsrCutsceneWarpFact> cutsceneWarps = ReadCutsceneWarps(eventArchivePath, new FogMapId(spec.Name));
                 IReadOnlyList<FogDsrBossDefeatFact> bossDefeatHandlers = ReadBossDefeatHandlers(eventArchivePath);
                 var spawnPoints = new Dictionary<int, string>();
@@ -275,7 +280,8 @@ namespace FogHost
                     ObjectActDetails = objectActDetails,
                     EventArchiveName = Path.GetFileName(eventArchivePath),
                     EventIds = eventIds,
-                    EventRegionChecks = eventRegionChecks,
+
+                    EventActionButtonFacts = eventActionButtonFacts,
                     CutsceneWarps = cutsceneWarps,
                     EventFlagWrites = eventFlagWrites,
                     ObjectDetails = objectDetails,
@@ -460,27 +466,41 @@ namespace FogHost
             return Array.AsReadOnly(writes.ToArray());
         }
 
-        private static IReadOnlyList<FogDsrEventRegionCheckFact> ReadEventRegionChecks(string eventArchivePath)
+        private static IReadOnlyList<FogDsrEventActionButtonFact> ReadEventActionButtonFacts(string eventArchivePath)
         {
             if (!File.Exists(eventArchivePath)) throw new FileNotFoundException("A pristine DSR EMEVD archive is missing.", eventArchivePath);
             byte[] bytes = File.ReadAllBytes(eventArchivePath);
             if (DCX.Is(bytes)) bytes = DCX.Decompress(bytes);
             EMEVD archive = EMEVD.Read(bytes);
-            var checks = new List<FogDsrEventRegionCheckFact>();
+            var checks = new List<FogDsrEventActionButtonFact>();
+            EMEVD.Instruction.ArgType[] argumentTypes =
+            {
+                EMEVD.Instruction.ArgType.SByte,
+                EMEVD.Instruction.ArgType.Int32,
+                EMEVD.Instruction.ArgType.Int32,
+                EMEVD.Instruction.ArgType.Single,
+                EMEVD.Instruction.ArgType.Int16,
+                EMEVD.Instruction.ArgType.Single,
+                EMEVD.Instruction.ArgType.Int32,
+                EMEVD.Instruction.ArgType.Byte,
+                EMEVD.Instruction.ArgType.Int32,
+                EMEVD.Instruction.ArgType.Int32,
+            };
             foreach (EMEVD.Event evt in archive.Events)
             {
                 for (int index = 0; index < evt.Instructions.Count; index++)
                 {
                     EMEVD.Instruction instruction = evt.Instructions[index];
-                    if (instruction.Bank != 3 || instruction.ID != 18) continue;
-                    if (instruction.ArgData.Length < 12)
-                        throw new InvalidDataException($"Pristine 3[18] instruction in {Path.GetFileName(eventArchivePath)} event {evt.ID} instruction {index} is too short to contain its region operand.");
-                    bool regionIsParameterized = evt.Parameters.Any(parameter => parameter.InstructionIndex == index
-                        && parameter.TargetStartByte < 12 && parameter.TargetStartByte + parameter.ByteCount > 8);
-                    if (regionIsParameterized) continue;
-                    int regionEntityId = BitConverter.ToInt32(instruction.ArgData, 8);
-                    if (regionEntityId > 0)
-                        checks.Add(new FogDsrEventRegionCheckFact(evt.ID, index, regionEntityId));
+                    if (instruction.Bank != 3 || instruction.ID is not (18 or 19)) continue;
+                    if (instruction.ArgData.Length != 40)
+                        throw new InvalidDataException($"Pristine 3[{instruction.ID}] action-button instruction in {Path.GetFileName(eventArchivePath)} event {evt.ID} instruction {index} has {instruction.ArgData.Length} argument bytes; expected 40.");
+                    object[] args = instruction.UnpackArgs(argumentTypes).ToArray();
+                    int targetEntityType = Convert.ToInt32(args[1], CultureInfo.InvariantCulture);
+                    int targetEntityId = Convert.ToInt32(args[2], CultureInfo.InvariantCulture);
+                    int lineSegmentEntityId = Convert.ToInt32(args[9], CultureInfo.InvariantCulture);
+                    if (targetEntityId > 0 && lineSegmentEntityId > 0)
+                        checks.Add(new FogDsrEventActionButtonFact(evt.ID, index, instruction.ID,
+                            targetEntityType, targetEntityId, lineSegmentEntityId));
                 }
             }
             return Array.AsReadOnly(checks.ToArray());

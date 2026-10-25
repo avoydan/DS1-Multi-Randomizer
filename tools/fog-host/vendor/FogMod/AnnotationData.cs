@@ -38,6 +38,9 @@ namespace FogMod
             public string TriggerEntrance { get; set; }
             public string TriggerMap { get; set; }
             public int TriggerRegionEntityId { get; set; }
+            /// <summary>FogHost-only: require a verified fixed physical route after this boss.</summary>
+            [YamlIgnore]
+            public bool RequireFixedPostBossRoute { get; set; } = true;
         }
         public class ConfigAnnotation
         {

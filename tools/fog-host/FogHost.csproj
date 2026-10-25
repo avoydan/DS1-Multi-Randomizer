@@ -8,7 +8,7 @@
     <TargetFramework>net8.0</TargetFramework>
     <AssemblyName>FogHost</AssemblyName>
     <RootNamespace>FogHost</RootNamespace>
-    <Version>0.7.3</Version>
+    <Version>0.7.4</Version>
     <!-- Windows file properties (what Explorer, SmartScreen and antivirus consoles show): this project's own, never the game's publisher. -->
     <Company>DS1 Multi Randomizer project</Company>
     <Product>DS1 Multi Randomizer</Product>

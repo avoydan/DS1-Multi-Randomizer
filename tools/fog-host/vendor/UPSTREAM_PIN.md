@@ -89,9 +89,13 @@ CRLF after patching.
 carry an Apache-2.0 section 4(b) modification notice at the file header.
 
 - `AnnotationData.cs` adds FogHost-only, YAML-ignored boss-completion data,
-  including `BossEncounterStartEventId` on an entrance side. These properties
-  are not emitted to FogMod YAML. The start event is distinct from the boss
-  death/completion event.
+  including `BossEncounterStartEventId` on an entrance side and
+  `RequireFixedPostBossRoute` on a boss-completion rule. These properties are
+  not emitted to FogMod YAML. The start event is distinct from the boss
+  death/completion event. The route switch defaults to `true`; Compact V2 sets
+  it to `false` only for the Gaping/Artorias actionability transitions, whose
+  availability is represented by verified source-side flags and whose gates
+  are randomized. Ceaseless retains the fixed physical post-boss route check.
 - `Graph.cs` recognizes only explicitly declared `boss_defeated_<eventId>`
   condition atoms; unknown atoms remain errors.
 - `GraphChecker.cs` maintains boss-completion state separately from visited

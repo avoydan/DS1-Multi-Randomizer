@@ -10,10 +10,9 @@ namespace FogHost.Tests
     {
         public static void VerifyWriterAnchorWhenPvpIsOff()
         {
-            AnnotationData.Annotations MakeAnnotations() => new AnnotationData.Annotations
+            AnnotationData.Annotations MakeAnnotations()
             {
-                Areas = new System.Collections.Generic.List<AnnotationData.Area>(),
-                Entrances = FogCompactV2PvpPolicy.GraphEntrances.Select(gate => new AnnotationData.Entrance
+                var entrances = FogCompactV2PvpPolicy.GraphEntrances.Select(gate => new AnnotationData.Entrance
                 {
                     Name = gate.Name,
                     ID = gate.EntityId,
@@ -29,17 +28,34 @@ namespace FogHost.Tests
                         Area = gate.BSideArea,
                         ExcludeIfRandomized = gate.Name == "o3970_0000" ? "o4954_0000" : null,
                     },
-                }).ToList(),
-            };
+                }).ToList();
+                entrances.Add(new AnnotationData.Entrance
+                {
+                    Name = "o2916_0000",
+                    ID = 1211892,
+                    Area = "dlc",
+                    Tags = "boss",
+                    IsFixed = true,
+                    ASide = new AnnotationData.Side { Area = "dlc_artorias", Flag = 11210001 },
+                    BSide = new AnnotationData.Side { Area = "dlc_postartorias", ExcludeIfRandomized = "o2920_0000" },
+                });
+                return new AnnotationData.Annotations
+                {
+                    Areas = new System.Collections.Generic.List<AnnotationData.Area>(),
+                    Entrances = entrances,
+                };
+            }
 
             AnnotationData.Annotations off = MakeAnnotations();
             FogCompactV2PvpPolicy.ApplyGraphOptions(off, majorPvpFogs: false, minorPvpFogs: false);
-            string[] anchorNames = { "o3970_0000", "o4954_0000", "o5869_0000" };
-            AnnotationData.Entrance[] anchors = off.Entrances.OrderBy(entrance => entrance.Name, StringComparer.Ordinal).ToArray();
+            string[] anchorNames = { "o2920_0000", "o3970_0000", "o4954_0000", "o5869_0000" };
+            AnnotationData.Entrance[] anchors = off.Entrances.Where(entrance => entrance.HasTag("unused"))
+                .OrderBy(entrance => entrance.Name, StringComparer.Ordinal).ToArray();
+            AnnotationData.Entrance activeArtoriasExit = off.Entrances.Single(entrance => entrance.Name == "o2916_0000");
             if (!anchors.Select(entrance => entrance.Name).SequenceEqual(anchorNames, StringComparer.Ordinal)
-                || anchors.Any(entrance => !entrance.HasTag("unused") || !entrance.IsFixed
-                    || entrance.ASide != null || entrance.BSide != null))
-                throw new InvalidOperationException("PvP-off Compact V2 must retain only o3970_0000, o4954_0000 and o5869_0000 as fixed unused lookup anchors, with no graph sides or randomized PvP entrances.");
+                || anchors.Any(entrance => !entrance.IsFixed || entrance.ASide != null || entrance.BSide != null)
+                || activeArtoriasExit.HasTag("unused") || activeArtoriasExit.BSide?.ExcludeIfRandomized != "o2920_0000")
+                throw new InvalidOperationException("PvP-off Compact V2 must retain the Artorias exit as an active gate and resolve its o2920_0000 reference with a fixed unused anchor alongside the three existing writer anchors.");
 
             EMEVD common = ArchiveWithEventZero();
             FogCompactV2PvpPolicy.AddUnprojectedSoloInitializers("common.emevd.dcx", common, off);
@@ -51,6 +67,9 @@ namespace FogHost.Tests
 
             AnnotationData.Annotations minorOn = MakeAnnotations();
             FogCompactV2PvpPolicy.ApplyGraphOptions(minorOn, majorPvpFogs: false, minorPvpFogs: true);
+            AnnotationData.Entrance activeO2920 = minorOn.Entrances.Single(entrance => entrance.Name == "o2920_0000");
+            if (activeO2920.HasTag("unused") || activeO2920.ASide == null || activeO2920.BSide == null)
+                throw new InvalidOperationException("When minor PvP gates are enabled, o2920_0000 must remain the single active Entrance referenced by the post-Artorias exit, without a duplicate anchor.");
             AnnotationData.Entrance active = minorOn.Entrances.Single(entrance => entrance.Name == "o5869_0000");
             AnnotationData.Entrance activeReference = minorOn.Entrances.Single(entrance => entrance.Name == "o3970_0000");
             AnnotationData.Entrance minorReferenceAnchor = minorOn.Entrances.Single(entrance => entrance.Name == "o4954_0000");
