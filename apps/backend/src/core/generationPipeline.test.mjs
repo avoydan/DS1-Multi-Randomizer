@@ -611,7 +611,7 @@ test('a fog layout that cannot be found around the shuffled keys is the typed FO
     combined: combinedStub(),
     fog: unsolvable,
   });
-  assert.notEqual(plain.code, 'FOG_KEY_CONFLICT');
+  assert.equal(plain.code, 'FOG_RETRIES_EXHAUSTED');
 }));
 
 test('with the fog randomizer off, exhausted key placement retries report the key placement itself, never a fog conflict', async () => fixture(async ({ root, game, pristine, workspace }) => {

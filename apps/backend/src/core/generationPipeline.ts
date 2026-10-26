@@ -415,7 +415,9 @@ export async function generateRun(
         const decision = decideFogRetry(response.error, { combinedAttempt, fogAttempt }, bounds);
         if (decision.action === 'retry-fog') continue;
         if (decision.action === 'retry-combined') { retryCombined = true; break; }
-        return fail('fog', /retries exhausted/u.test(decision.reason) ? fogFailureCode(response.error.code) : response.error.code, decision.reason);
+        const retriesExhausted = /retries exhausted/u.test(decision.reason);
+        const failureCode = retriesExhausted ? fogFailureCode('FOG_RETRIES_EXHAUSTED') : response.error.code;
+        return fail('fog', failureCode, decision.reason);
       }
       manifest.engines.fog = `${response.hostVersion} / ${response.fogModCommit}`;
       const fogDrift = drift({ fogHostVersion: response.hostVersion, fogModCommit: response.fogModCommit });

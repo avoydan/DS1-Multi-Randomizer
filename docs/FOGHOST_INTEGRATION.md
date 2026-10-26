@@ -56,16 +56,29 @@ At raw seed 6843, the graph records:
 - The confirmed Capra landing route is o5865_0000, anorlondo_main -> burg_lower, with the corresponding o1413_0000 side burg_lower -> anorlondo_main.
 - Parish/Andre and the Firelink dual elevator remain fixed when PvP is off; the real-format writer and candidate tests verify this policy.
 
-After the fingerprint gate is resolved and a complete package is generated, suggested manual test order: (1) at Gaping's outside physical gate before the fight, confirm the action prompt and cross it; (2) after entering and defeating Artorias, confirm o2916 offers a prompt and exits to its randomized destination; (3) defeat Ceaseless and verify the physical lava route opens; (4) inspect Parish/Andre and both directions of the Firelink elevator; (5) cross the Anor Londo o5865 side paired to o1413, and record the player landing position for under-map regression.
+The fingerprint gate and full backend package generation have since passed, but this Seed Code is not released for manual QA: the measured 1,000-master success rate is 24.8%, and the physical-itinerary safety decision remains open. If that gate is resolved, the suggested manual test order is: (1) at Gaping's outside physical gate before the fight, confirm the action prompt and cross it; (2) after entering and defeating Artorias, confirm o2916 offers a prompt and exits to its randomized destination; (3) defeat Ceaseless and verify the physical lava route opens; (4) inspect Parish/Andre and both directions of the Firelink elevator; (5) cross the Anor Londo o5865 side paired to o1413, and record the player landing position for under-map regression.
 
 An end-to-end backend generation was attempted for this Seed Code with the read-only QA DSR. The pipeline stopped before the combined engine with GENERATION_PROFILE_MISMATCH: its Compact projection fingerprint was 73f3c842d51490d45a836a489105b37f57d702eaa2ffda084f42781e5aaef00f, while the V5 profile requires 774ed7c1ecaaad006646eaaf0dd6bef86aafe033a3881076d9cd3bda7ffcd36c. This reproduced both when the older audit data root was supplied and when the application rebuilt its Compact world data offline from the pristine snapshot. No package was produced and the source game state remained vanilla. Therefore this code is a raw-graph QA candidate, not ready for owner gameplay until the profile/catalog mismatch is resolved. The generated MSB/EMEVD writer path is separately covered by the real-format test matrix.
 
 ### Version and regression tiers
 
-FogHost project/file version 0.7.4 is the implementation version. Program.HostVersion=0.7.3 is the generation compatibility identifier; it is not the JSON wire version. The request/response DTO uses schemaVersion=3. No boundary changed, so both identifiers remain pinned. Backend version is 0.46.3.
+FogHost project/file version 0.7.4 is the implementation version. Program.HostVersion=0.7.3 is the generation compatibility identifier; it is not the JSON wire version. The request/response DTO uses schemaVersion=3. No boundary changed, so both identifiers remain pinned. Backend version at this Night Shift checkpoint was 0.46.3; the fingerprint reconciliation task below bumps it to 0.46.4.
 
 Regression tiers: normal CI should use a small deterministic differential smoke set (50 seeds per core profile plus named regressions); pre-release should use at least 2,000 per core and extended profile plus real-format writer tests; 10,000 per profile and larger remain manual deep QA. Do not run the 40,000+ matrix on every CI invocation.
 # FogHost integration design
+
+## V5 fingerprint reconciliation and rejection sample (2026-10-26)
+
+The backend profile was reconciled to the deterministic project-owned Compact V2 projection (`73f3c842d51490d45a836a489105b37f57d702eaa2ffda084f42781e5aaef00f`; world-data id `ef625777d6aa5abf`). The full semantic diff and deterministic export proof are in `docs/COMPACT_FULL_FOG_V2.md`.
+
+To investigate the dominant end-to-end rejection, 20 distinct failed raw Fog seeds were selected at evenly spaced positions from the 4,241 Ceaseless rejections in the 1,000-master study. Each was run through pinned FogMod commit `6e6dc7886d0f8bcc53c1800d95c9e859d1f2f87f` and project Compact V2 with the same raw seed and options. The read-only upstream checkout was `C:\Users\Adam\AppData\Local\Temp\FogMod-pvp-audit-6e6dc7886d0f8bcc53c1800d95c9e859d1f2f87f`; `git rev-parse HEAD` matched the pin and its status was clean. Upstream files were evidence only, never runtime inputs.
+
+Sample raw seeds: `2523019318, 1419856727, 1601858271, 1921150979, 2881388170, 2148038623, 2504885823, 2863148536, 1403912807, 1423837092, 825675921, 3853363190, 838554256, 487350443, 3904732990, 838461611, 2980667340, 630547729, 1691606682, 590893233`.
+
+Classification: all 20 are `INTENTIONAL_V5_POLICY` divergences because the project rule requires a fixed post-boss route; whether any individual case is physically unsolvable or a false-positive rejection is unproven. Results: 20/20 were `UPSTREAM_ONLY_ACCEPT`, 20/20 were rejected by the expected V5 post-boss physical-route rule for event `11410410`, and there were zero unexplained solvability or topology differences. The exact Compact rejection says the exit `o4961_0000` from `demonruins_ceaseless` leads to a destination that cannot reach `demonruins_lava` using fixed physical routes; another randomized entrance would be required. Relevant comparison evidence was pinned `dist/fog.txt`, `FogMod/Graph.cs`, `GraphChecker.cs`, and `GameDataWriter.cs`. The upstream graph checker does not establish actual physical landing/actionability, so upstream acceptance alone is insufficient to call these cases safe or validator false positives.
+
+The compressed differential sample is retained locally at `C:\Users\Adam\AppData\Local\Temp\ds1tr-v5-rejection-differential-20.jsonl.gz` (SHA-256 `79E0BAC7A206CB9A9C2552175B88CC25B8613DCF68198E66D0DD678234EDCE56`). It is not committed because it contains game-derived graph facts. The 1,000-master logs and their hashes are recorded in `docs/IMPLEMENTATION_STATUS.md`.
+
 
 ## V5 visible boss fogs without a prompt (2026-10-25)
 

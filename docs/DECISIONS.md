@@ -1,5 +1,12 @@
 # Decisions
 
+## Keep the Ceaseless fixed-route safety gate pending itinerary proof (2026-10-26)
+
+The V5 catalog fingerprint was updated only after a semantic comparison showed that all changes were previously approved boss-fog actionability and Ceaseless route work, with zero unexplained changes, and independent exports reproduced the new value. This reconciles the unpublished profile pin; it does not loosen Fog validation. V1-V4 remain frozen.
+
+A real backend study over 1,000 deterministic master seeds found a 24.8% generation success rate. Every failed Fog attempt was rejected by the existing Ceaseless post-boss rule for event `11410410`; 20 sampled cases were accepted by pinned FogMod's graph checker but remained unproven as physically safe itineraries. Keep the current fixed-only return requirement and retry budget unchanged until an itinerary-based model is independently grounded in physical routes and boss lifecycle/actionability. Do not treat upstream graph acceptance as proof and do not raise retries to hide the rejection rate. The product-level choice to authorize an itinerary model remains open.
+
+
 ## V5 boss-gated routes require the encounter's physical exit (2026-10-23)
 
 Compact Fog V2 must prove a boss-gated destination is physically reachable

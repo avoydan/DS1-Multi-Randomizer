@@ -136,9 +136,9 @@ const v5: GenerationProfile = Object.freeze({
   fogEngine: Object.freeze({
     hostVersions: Object.freeze(['0.7.3']),
     fogModCommit: v4.fogEngine.fogModCommit,
-    worldDataId: 'c21874685396f5e2',
+    worldDataId: 'ef625777d6aa5abf',
     compactCatalogVersion: 'ds1tr-compact-full-fog-v2',
-    compactCatalogFingerprint: '774ed7c1ecaaad006646eaaf0dd6bef86aafe033a3881076d9cd3bda7ffcd36c',
+    compactCatalogFingerprint: '73f3c842d51490d45a836a489105b37f57d702eaa2ffda084f42781e5aaef00f',
   }),
   fogItemTracking: 'compact-fog-item-tracking-v1',
   completeSettings: v4.completeSettings,

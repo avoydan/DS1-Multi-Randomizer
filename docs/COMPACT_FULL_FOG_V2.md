@@ -1,20 +1,31 @@
 # Compact Full Fog V2: boss progression correction
 
-Status: **promoted for local owner gameplay QA on 2026-10-21; Ceaseless
-landing and post-boss physical-route validation corrected on 2026-10-23;
-PvP-off physical gates and upstream landing parity audited on 2026-10-25;
-owner-confirmed o5865 to o1413 under-map spawn traced to the generic
-boss-trigger-centered warp and corrected in FogHost 0.7.3. The real-format
-regression passes; gameplay on the corrected output remains pending**. New worlds use
-`ds1tr-gen-v5`; v1-v4 compatibility is unchanged. The owner-reported V5
-under-map and post-boss hard-lock reports led to explicitly authorized
-pre-release corrections to V5's physical landing and route validation. The V5
-Seed Code and settings are unchanged; package output changes. V2 uses FogHost
-schema 3 with the project-owned Compact catalog and adds no game-data files.
+Status: **promoted for local owner gameplay QA on 2026-10-21; Ceaseless landing and post-boss physical-route validation corrected on 2026-10-23; PvP-off gates and landing parity audited on 2026-10-25; Gaping/Artorias actionability and o5865-to-o1413 landing evidence recorded; catalog fingerprint reconciled and 1,000-master end-to-end study completed on 2026-10-26.** Real-format output tests pass. Gameplay remains blocked because measured generation success is 24.8% and the physical-itinerary false-positive question is unresolved. V1-V4 behavior remains unchanged.
 
-Current catalog fingerprint: `774ed7c1ecaaad006646eaaf0dd6bef86aafe033a3881076d9cd3bda7ffcd36c`.
-Current world-data identity: `c21874685396f5e2`.
-Current FogHost version: `0.7.3`.
+Current catalog fingerprint: `73f3c842d51490d45a836a489105b37f57d702eaa2ffda084f42781e5aaef00f`.
+Current world-data identity: `ef625777d6aa5abf`.
+Current FogHost compatibility version: 0.7.3 (implementation/file 0.7.4).
+
+## Catalog fingerprint reconciliation and backend generation study (2026-10-26)
+
+The generated Compact V2 projection was `73f3c842d51490d45a836a489105b37f57d702eaa2ffda084f42781e5aaef00f`, while the unpublished V5 profile still pinned `774ed7c1ecaaad006646eaaf0dd6bef86aafe033a3881076d9cd3bda7ffcd36c`. The old/current semantic fingerprints are `6d01e20879755c5d1368a99c747cdc4b8a5b794a7b7dd9e0b97881db5a5c5b0d` and `6c73ee8777629c43759403d0c156cd928107cfcc8d21439ca5f1eff09686e5f0`.
+
+The semantic diff was reconstructed and classified in full:
+
+- Added records: `bossCompletions[11000001]` (Gaping, trigger `11005391`, entrance `o1400_0000`); `bossCompletions[11210001]` (Artorias, trigger `11215011`, entrance `o2915_0000`); active entrances `o1400_0000` and `o2916_0000`.
+- Removed record: `writerSupportEntrances[o2916_0000]`; that identity is now the active Artorias arena exit entrance.
+- Changed fields: `bossCompletions[11410410].requireFixedPostBossRoute` is now `true`; `o2915_0000` BSide `bossEncounterStartEventId` changed `0 -> 11215011`, `bossTrigger` changed `11210001 -> 0`, `bossTriggerArea` changed from the authored trigger box to `null`, `flag` changed `0 -> 11210001`, and `tags` changed `Higher -> None`.
+- Record order changes: zero. Classification: EXPECTED_FROM_BOSS_FOG_FIX for the four added records, the removed writer-support record, and the five changed o2915_0000 fields; EXPECTED_FROM_PREVIOUS_APPROVED_V5_FIX for bossCompletions[11410410].requireFixedPostBossRoute; UNEXPECTED: zero. Three derived fingerprint values changed as a consequence of the semantic records.
+
+The added Gaping/Artorias records and the `o2915_0000` values are expected from the previously approved boss-fog actionability correction. Converting `o2916_0000` from writer support into an active exit is expected from the approved post-defeat Artorias exit correction. Requiring a fixed post-boss route for event `11410410` is expected from the earlier approved Ceaseless physical-return rule. No separate catalog edit was made to bypass validation.
+
+Three separate export processes from the clean, read-only QA DSR source reproduced the new fingerprint. The normalized semantic JSON was byte-identical across separate output/temp directories (503,325 bytes; SHA-256 `E83D21BF79E1C8384C79E414B6735E4CCD792207C2CB34D4EC0170C90A94E586`). The projection uses key-addressed records, so filesystem enumeration order does not affect the result. No Steam path, network fetch, prior output, or stale audit file was used as an input.
+
+The previously blocked owner QA Seed Code `DS1TR1-06NWCQQ3-K1HD8E66-2S3AD5N6-CTHZBKB8-FMSNNQWC-TRVW78NY-040F30XX-F0` (master `13825956`) now completed full backend generation on Fog attempt 2, Fog seed `6843`. Attempts 0 and 1 were rejected by the V5 Ceaseless rule. The successful 73-file package had both expected combined/Fog validations and all 73 manifest file hashes verified. The QA DSR source remained read-only.
+
+A real backend study then exercised master seeds `1..1000`, one combined attempt per master, unchanged Fog retry bounds, Triple settings with bosses and Fog enabled, and the owner overlay off. Results: 248 successes, 752 failures (24.8% success). There were 4,489 Fog calls: 4,241 rejected with the same Ceaseless physical-return reason and 248 accepted. Every failure exhausted all five Fog attempts; no other rejection category or technical failure occurred. The successful attempt indices 0-4 were respectively 50, 52, 55, 45, and 46; successful worlds used a mean 2.94 Fog attempts, median 3, p95 5. All 248 manifests verified 73/73 output files and both combined/Fog hash validations. Retry limits were not changed.
+
+The 20-seed differential sample of rejected raw Fog seeds was accepted by pinned FogMod but rejected by V5's fixed-only Ceaseless postcondition. This is an intentional policy divergence; upstream graph acceptance does not establish a physically safe post-boss itinerary, so these results do not prove 20 false positives. No false positive was confirmed, but the sample also cannot prove the validator has none. At 24.8% end-to-end success, ordinary Randomize use is unreliable. Portable creation and new manual QA seeds remain gated until the owner decides whether to keep the fixed-route guarantee or authorize a separately proven itinerary-based validator. Full metrics and evidence hashes are in `docs/IMPLEMENTATION_STATUS.md`; differential method and seeds are in `docs/FOGHOST_INTEGRATION.md`.
 
 ## PvP-off physical gates and full player-landing parity (2026-10-25)
 

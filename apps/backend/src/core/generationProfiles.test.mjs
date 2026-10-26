@@ -61,8 +61,8 @@ test('v1 through v4 keep their frozen behavior while Compact v5 is current for n
   assert.equal(profile.fogItemTracking, 'fog-item-tracking-v1');
   assert.equal(historicalCurrent.fogEngine.compactCatalogFingerprint, '8c03fd3de1cd7c772d5c933753ae54eab35f9e8b70a1aef2954322330d0002d4');
   assert.equal(current.fogEngine.compactCatalogVersion, 'ds1tr-compact-full-fog-v2');
-  assert.equal(current.fogEngine.compactCatalogFingerprint, '774ed7c1ecaaad006646eaaf0dd6bef86aafe033a3881076d9cd3bda7ffcd36c');
-  assert.equal(current.fogEngine.worldDataId, 'c21874685396f5e2');
+  assert.equal(current.fogEngine.compactCatalogFingerprint, '73f3c842d51490d45a836a489105b37f57d702eaa2ffda084f42781e5aaef00f');
+  assert.equal(current.fogEngine.worldDataId, 'ef625777d6aa5abf');
   assert.notEqual(current.fogEngine.worldDataId, historicalCurrent.fogEngine.worldDataId);
   assert.notEqual(current.fogEngine.compactCatalogFingerprint, historicalCurrent.fogEngine.compactCatalogFingerprint);
   assert.match(current.fogEngine.compactCatalogFingerprint, /^[a-f0-9]{64}$/u,

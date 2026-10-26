@@ -22,13 +22,19 @@ deterministic behavior that turns *(master seed, canonical settings)* into a wor
 | Retry bounds | combined engine 3 attempts, Fog 5 attempts (every attempt draws different seeds, so the bounds are semantics) | same | same | same |
 | Combined engine (items, enemies, bosses) | `RANDOMIZER_VERSION` `0.5.66`, roaming destination policy `protected-v1` | `RANDOMIZER_VERSION` `0.5.66`, roaming destination policy `safe-handlers-v2` | same as v2 | same as v2 |
 | Roaming-boss candidate and fit behavior | historical `legacy-v1` | historical `legacy-v1` | historical `legacy-v1` | owner-approved `owner-approved-v1` |
-| World randomizer | FogHost `0.5.0`, FogMod commit `6e6dc7886d0f8bcc53c1800d95c9e859d1f2f87f`, world data id `f394fa536ba9b66d` | same | FogHost `0.6.0`, Compact catalog `ds1tr-compact-full-fog-v1` fingerprint `8c03fd3de1cd7c772d5c933753ae54eab35f9e8b70a1aef2954322330d0002d4`, world data id `compact-runtime-offline-v1` | same as v3 | FogHost `0.7.2`, Compact catalog `ds1tr-compact-full-fog-v2` fingerprint `e56423307d97617b6198776d349e1dbcb27d0ca37ebc6a26ece5e7a9f01811ff`, world data id `75a60153e8563574` |
+| World randomizer | FogHost `0.5.0`, FogMod commit `6e6dc7886d0f8bcc53c1800d95c9e859d1f2f87f`, world data id `f394fa536ba9b66d` | same | FogHost `0.6.0`, Compact catalog `ds1tr-compact-full-fog-v1` fingerprint `8c03fd3de1cd7c772d5c933753ae54eab35f9e8b70a1aef2954322330d0002d4`, world data id `compact-runtime-offline-v1` | same as v3 | FogHost `0.7.3` (implementation 0.7.4), Compact catalog `ds1tr-compact-full-fog-v2` fingerprint `73f3c842d51490d45a836a489105b37f57d702eaa2ffda084f42781e5aaef00f`, world data id `ef625777d6aa5abf` |
 | Item tracking for the world randomizer | `fog-item-tracking-v1` (`docs/FOG_ITEM_TRACKING.md`) | same | `compact-fog-item-tracking-v1` | same as v3 | same as v4 |
 | Settings completion | `completeSettings`: options added after the profile get the value that reproduces the profile's behavior | same | same | same |
 
 `ds1tr-gen-v1` is the behavior of desktop 0.16.1 / backend 0.29.1 / contracts 0.12.0.
 
 `ds1tr-gen-v2` preserves the audited roaming-boss destination handling described below. `ds1tr-gen-v3` added the independent Compact Fog catalog, offline reconstructed data, and required-only backend Fog item constraints. `ds1tr-gen-v4` adds owner-approved roaming-boss fit behavior while retaining the v3 Compact Fog contract. `ds1tr-gen-v5` inherits v4 and selects the corrected Compact Fog v2 topology and boss-side arrival policy. Profiles v1 through v3 retain the historical fit behavior; v1-v4 Fog behavior and fixtures remain unchanged. Seed Code format 1, canonical setting shape, seed derivation, retry bounds, and combined engine `0.5.66` RNG salt remain unchanged. See [Compact Full Fog V2](COMPACT_FULL_FOG_V2.md).
+
+## Unpublished V5 catalog reconciliation (backend 0.46.4; 2026-10-26)
+
+The V5 projection fingerprint was stale relative to the already-approved Compact V2 boss-gate/actionability data. The profile now pins fingerprint `73f3c842d51490d45a836a489105b37f57d702eaa2ffda084f42781e5aaef00f` and world-data id `ef625777d6aa5abf`. The semantic diff contains four added records, one removed writer-support record, and six changed fields; every difference maps to the Gaping/Artorias actionability work or the previously approved Ceaseless fixed-route rule. There are no unexpected differences or order changes. Independent process exports reproduce the exact fingerprint.
+
+This is an internal correction while V5 remains unpublished. Earlier internal V5 Seed Codes retain their bytes but can produce a different candidate graph under the corrected catalog identity. V1-V4 profiles, code, and golden fixtures remain unchanged. See the detailed semantic diff and generation study in `docs/COMPACT_FULL_FOG_V2.md` and `docs/IMPLEMENTATION_STATUS.md`.
 
 For local owner gameplay QA, new worlds now use `ds1tr-gen-v5` as
 `CURRENT_GENERATION_PROFILE`. At promotion time this changed only which
