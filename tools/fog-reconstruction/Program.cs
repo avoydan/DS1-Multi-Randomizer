@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using FogHost;
+using FogReconstruction.PhysicalWitness;
 using SoulsFormats;
 using SoulsIds;
 
@@ -15,6 +16,11 @@ namespace FogReconstruction
         {
             try
             {
+                if (args.Length == 4 && args[0] == "audit-physical-witness-331")
+                {
+                    Certified331PhysicalWitnessAudit.Write(args[1], args[2], args[3]);
+                    return 0;
+                }
                 if (args.Length == 1 && args[0] == "inspect-api")
                 {
                     InspectApi();
@@ -29,6 +35,8 @@ namespace FogReconstruction
                     TalkNormalizationPlanSelfTests.Run();
                     Event5700BehaviorHarness.VerifyBuiltBehavior();
                     FogDsrSpatialIndexSelfTests.Run();
+                    ExperimentalPhysicalWitnessSelfTests.Run();
+                    Certified331PhysicalWitnessAudit.SelfTestPathSafety();
                     AreaCatalogAuditSelfTests.Run();
                     CombinedTransitionGraphAuditSelfTests.Run();
                     AreaGraphBehaviorAuditSelfTests.Run();
@@ -223,6 +231,7 @@ namespace FogReconstruction
                 Console.Error.WriteLine("Usage:");
                 Console.Error.WriteLine("  FogReconstruction inspect-api");
                 Console.Error.WriteLine("  FogReconstruction self-test");
+                Console.Error.WriteLine("  FogReconstruction audit-physical-witness-331 <canonical-331.json> <staging-root> <report-json-outside-repo>");
                 Console.Error.WriteLine("  FogReconstruction verify-talk-normalization <pristine-game-root> <fog-reference-root>");
                 Console.Error.WriteLine("  FogReconstruction analyze-treasure-regions <fog-data-root> <pristine-game-root> <output-json-outside-repo>");
                 Console.Error.WriteLine("  FogReconstruction compare-start-area-shape <fog-reference-root>");

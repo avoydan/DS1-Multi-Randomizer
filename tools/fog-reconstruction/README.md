@@ -8,6 +8,7 @@ Commands:
 
 ```text
 FogReconstruction self-test
+FogReconstruction audit-physical-witness-331 <canonical-331.json> <existing-staging-root> <new-report.json-outside-repo>
 FogReconstruction verify-reference <root-containing-dist>
 FogReconstruction verify-inputs <pristine-dsr-root> <root-containing-dist>
 FogReconstruction inspect-paramdefs <pristine-dsr-root>
@@ -78,3 +79,14 @@ When a compatible DarkScript EMEDF JSON file is supplied, `inspect-event` decode
 The Event 5700 builder uses named DS1 EMEVD operations and the same 32-byte initializer payload used by the pinned FogMod caller. Its static behavior verifier compares named route/condition/effect contracts and parameter bindings, then applies those contracts to every supplied generated-call row. It is not a full EMEVD VM or a substitute for in-game traversal tests. Detailed event disassembly and value-level call matrices must be written outside the repository.
 
 The area graph behavior audit runs FogMod graph construction, item placement, connector, and progression checking for fixed and randomized profiles. It compares the project Area projection with reference Areas while holding the remaining categories equal. The report may include project-owned Area IDs left unreachable by the project graph, to support diagnosis; it never includes reference Area edge endpoints or conditions. A passing sample is observational evidence, not a proof of equivalence. Keep the report outside the repository.
+
+
+## Experimental physical-witness audit
+
+Run the shadow comparison only against the existing certified 331-case dataset and its staging trees; it never regenerates worlds or invokes the production validator:
+
+    FogReconstruction audit-physical-witness-331 <canonical-331.json> <existing-staging-root> <new-report.json-outside-repo>
+
+The output parent directory must already exist. JSON and Markdown are created with create-new semantics; existing reports are never overwritten. Inputs and output ancestors may not contain reparse points, and report outputs may not alias the dataset or overlap staging. Keep the report in Temp.
+
+This audit requires the pinned canonical dataset SHA-256 and 59 files per case with an identical relative-path inventory. It hashes current package trees but does not authenticate those bytes against historical package hashes, because the dataset has no expected per-case manifest. Dataset structural rows remain claims and are never promoted to PROVEN_ACTIONABLE. The current 331-case report and telemetry design are documented in docs/EXPERIMENTAL_PHYSICAL_WITNESS.md.

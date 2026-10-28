@@ -31,6 +31,17 @@ Normal CI should run a small deterministic differential set (for example 50 seed
 At that Night Shift checkpoint, FogHost implementation/project version was 0.7.4, source Program.HostVersion was 0.7.3, and the JSON wire schema was schemaVersion=3. Backend was then 0.46.3. No version bump, Portable, publish, tag, or release was made at that checkpoint. The follow-on profile reconciliation and terminal failure-code correction are recorded below; backend is now 0.46.4. V1-V4 code paths and fixtures remain unchanged.
 # Implementation status
 
+## Experimental physical-witness shadow tool (2026-10-28; dev tool 0.2.0)
+
+Added a development-only evidence graph and a read-only audit over the existing certified 331 STRICT cases. Production validation/generation remains unchanged; no cases were regenerated and the production validator was not rerun. Safe dispositions are inherited from the canonical dataset selection.
+
+Results: 0 PROVEN_ACTIONABLE, 0 PROVEN_NON_ACTIONABLE, 2,823 UNKNOWN edges; 0 solvable, 0 unsolvable, 331 UNRESOLVED_MODEL_GAP. All 331 have a reachable UNKNOWN candidate escape. No positive witness classes or manual QA candidates exist. Of 1,102 randomized transition rows, 1,019 carry complete structural claims (864 ordinary, 131 PvP, 24 boss-boundary); they were not promoted because current staging bytes have no historical per-case expected hashes and runtime actionability/physical approach remain unverified. All 331 staging trees had 59 files and the same relative-path inventory. Three full audits produced byte-identical JSON and Markdown reports.
+
+The audit follows each certified postBossPath by source-object identity, leaves ambiguous identity unresolved, requires the main Demon Ruins waypoint before the lower-lava target, and never turns Area.To or ConnectCollision into traversal proof. Report paths, data provenance, mechanism coverage, read-only telemetry design, and limitations are in docs/EXPERIMENTAL_PHYSICAL_WITNESS.md. The QA telemetry helper itself is not implemented or run. Only tools/fog-reconstruction was versioned to 0.2.0; product, backend, and FogHost versions are unchanged.
+
+Verification: FogReconstruction Release build passed with 0 errors and 14 existing SoulsFormats obsolete-API warnings. The tool self-test passed, including 6 physical-witness groups and 4 path-safety cases. The same certified 331 cases completed three times with deterministic report hashes. No production validator, retry limit, generation profile, game files, QA DSR, or Steam DSR were touched.
+
+
 ## V5 fingerprint reconciliation and real backend study (2026-10-26; backend 0.46.4)
 
 ### Catalog provenance
