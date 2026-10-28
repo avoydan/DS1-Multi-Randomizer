@@ -42,6 +42,8 @@ namespace FogReconstruction
                     AreaGraphBehaviorAuditSelfTests.Run();
                     TransitionEventAuditSelfTests.Run();
                     AreaGateEvidenceAudit.SelfTest();
+                    GeneratedTransitionCertifier.SelfTest();
+                    StagedTransitionEvidenceReader.SelfTest();
                     WorldTransitionInventory.SelfTest();
                     TransitionFactAuditSelfTests.Run();
                     return 0;

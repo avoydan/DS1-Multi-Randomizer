@@ -35,7 +35,10 @@ namespace FogReconstruction.PhysicalWitness
         IReadOnlyList<int> RequiredItems,
         IReadOnlyList<int> SetEventFlags,
         IReadOnlyList<int> ClearEventFlags,
-        IReadOnlyList<PhysicalEvidence> Evidence);
+        IReadOnlyList<PhysicalEvidence> Evidence)
+    {
+        public PhysicalEdgeCertification Certification { get; init; }
+    }
 
     public sealed record PhysicalCoverage(
         string Scope,
@@ -60,7 +63,10 @@ namespace FogReconstruction.PhysicalWitness
         int[] EventFlagsAfter,
         int[] ItemsBefore,
         int[] ItemsAfter,
-        PhysicalEvidence[] Evidence);
+        PhysicalEvidence[] Evidence)
+    {
+        public PhysicalEdgeCertification Certification { get; init; }
+    }
 
     public sealed record PhysicalWitnessResult(
         PhysicalWitnessVerdict Verdict,
@@ -79,6 +85,11 @@ namespace FogReconstruction.PhysicalWitness
         private static readonly string[] RequiredActionProofKinds =
         {
             "SourceActionRegion", "GeneratedDispatcher", "VerifiedDestinationPlayer"
+        };
+        private static readonly string[] RequiredSeathProofKinds =
+        {
+            "VerifiedSourceObject", "SeathInteractionChain", "GeneratedDispatcher", "VerifiedDestinationPlayer",
+            "VerifiedDestinationMap", "VerifiedLanding"
         };
 
         private static readonly HashSet<string> NonActionProofKinds = new(StringComparer.Ordinal)
@@ -175,7 +186,10 @@ namespace FogReconstruction.PhysicalWitness
                         Sorted(nextFlags),
                         Sorted(state.Items),
                         Sorted(nextItems),
-                        edge.Evidence.ToArray());
+                        edge.Evidence.ToArray())
+                    {
+                        Certification = edge.Certification,
+                    };
                     queue.Enqueue(new SearchState(edge.To, nextFlags, nextItems, nextWaypoints, state.Steps.Append(step).ToArray()));
                 }
             }
@@ -222,6 +236,7 @@ namespace FogReconstruction.PhysicalWitness
                     || expected.From != supplied.From
                     || expected.To != supplied.To
                     || expected.Mechanism != supplied.Mechanism
+                    || expected.Certification != supplied.Certification
                     || !expected.Evidence.SequenceEqual(supplied.Evidence)
                     || !expected.EventFlagsBefore.SequenceEqual(supplied.EventFlagsBefore)
                     || !expected.EventFlagsAfter.SequenceEqual(supplied.EventFlagsAfter)
@@ -255,6 +270,11 @@ namespace FogReconstruction.PhysicalWitness
                 if (mechanism.Contains("fog", StringComparison.OrdinalIgnoreCase)) randomizedFog++;
                 if (mechanism.Contains("fixed", StringComparison.OrdinalIgnoreCase)) fixedTransitions++;
                 directions.Add(step.From.Map == step.To.Map ? "same-map" : "cross-map");
+                if (step.Certification != null)
+                    directions.Add("cert=" + string.Join("/", step.Certification.RuleId, step.Certification.Mode,
+                        step.Certification.RequiredState, step.Certification.ActionRegion, step.Certification.Dispatcher,
+                        step.Certification.DestinationPlayer, step.Certification.DestinationMap,
+                        step.Certification.Landing, step.Certification.Provenance, step.Certification.Status));
             }
 
             string canonical = string.Join("|", new[]
@@ -312,9 +332,40 @@ namespace FogReconstruction.PhysicalWitness
                 ValidateEvidence(edge.Evidence, edge.Id);
                 if (edge.Certainty == PhysicalEdgeCertainty.PROVEN_ACTIONABLE)
                 {
-                    string[] required = RequiredActionProofKinds;
+                    string[] required = edge.Certification?.MechanismClass == GeneratedTransitionCertifier.SeathMode2P05308
+                        ? RequiredSeathProofKinds
+                        : RequiredActionProofKinds;
                     if (required.Any(kind => !edge.Evidence.Any(item => item.Kind == kind)))
                         throw new ArgumentException($"Actionable edge '{edge.Id}' lacks source, dispatcher, or destination proof.", nameof(edges));
+                    if (edge.Certification == null || edge.Certification.Status != "PROVEN_ACTIONABLE"
+                        || string.IsNullOrWhiteSpace(edge.Certification.RuleId)
+                        || string.IsNullOrWhiteSpace(edge.Certification.MechanismClass)
+                        || string.IsNullOrWhiteSpace(edge.Certification.Source)
+                        || string.IsNullOrWhiteSpace(edge.Certification.Destination)
+                        || string.IsNullOrWhiteSpace(edge.Certification.RequiredState)
+                        || string.IsNullOrWhiteSpace(edge.Certification.ActionRegion)
+                        || string.IsNullOrWhiteSpace(edge.Certification.Dispatcher)
+                        || string.IsNullOrWhiteSpace(edge.Certification.DestinationPlayer)
+                        || string.IsNullOrWhiteSpace(edge.Certification.DestinationMap)
+                        || string.IsNullOrWhiteSpace(edge.Certification.Landing)
+                        || string.IsNullOrWhiteSpace(edge.Certification.Provenance))
+                        throw new ArgumentException($"Actionable edge '{edge.Id}' lacks complete rule-bound certification metadata.", nameof(edges));
+                    if (!edge.Evidence.Any(item => item.Kind == "VerifiedSourceObject")
+                        || !edge.Evidence.Any(item => item.Kind == "VerifiedDestinationMap")
+                        || !edge.Evidence.Any(item => item.Kind == "VerifiedLanding"))
+                        throw new ArgumentException($"Actionable edge '{edge.Id}' lacks independently verified source, map, or landing evidence.", nameof(edges));
+                    if (edge.Certification.MechanismClass == GeneratedTransitionCertifier.PvpMode0
+                        && !edge.Evidence.Any(item => item.Kind == "ProjectPolicyIdentity"))
+                        throw new ArgumentException($"PvP edge '{edge.Id}' lacks project-owned gate identity evidence.", nameof(edges));
+                    if (edge.Certification.MechanismClass == GeneratedTransitionCertifier.ProjectCustomWarpMode0
+                        && !edge.Evidence.Any(item => item.Kind == "ProjectCustomWarpPolicy"))
+                        throw new ArgumentException($"CustomWarp edge '{edge.Id}' lacks exact project policy evidence.", nameof(edges));
+                    if (edge.Certification.MechanismClass == GeneratedTransitionCertifier.SeathMode2P05308
+                        && !edge.Evidence.Any(item => item.Kind == "SeathInteractionChain"))
+                        throw new ArgumentException($"Seath edge '{edge.Id}' lacks the crystal/event/flag producer chain.", nameof(edges));
+                    if (edge.Certification.MechanismClass == GeneratedTransitionCertifier.BossBoundaryMode0
+                        && !edge.Evidence.Any(item => item.Kind == "BossLifecyclePolicy"))
+                        throw new ArgumentException($"Boss edge '{edge.Id}' lacks complete boss lifecycle policy evidence.", nameof(edges));
                     if (edge.Evidence.All(item => item.Kind is "Area.To" or "ConnectCollision"))
                         throw new ArgumentException($"Area.To or ConnectCollision alone cannot prove edge '{edge.Id}'.", nameof(edges));
                 }
@@ -390,7 +441,8 @@ namespace FogReconstruction.PhysicalWitness
             BossFlagAndSequentialStateArePreserved();
             AreaAndConnectCollisionAloneCannotProveTraversal();
             DirectionAndFingerprintAreDeterministic();
-            Console.WriteLine("Experimental physical witness self-tests passed (6 groups).");
+            SeathMode2RequiresItsProducerChainInsteadOfActionRegion();
+            Console.WriteLine("Experimental physical witness self-tests passed (7 groups).");
         }
 
         private static void ProvenDirectedRouteProducesReplayableWitness()
@@ -418,6 +470,10 @@ namespace FogReconstruction.PhysicalWitness
             PhysicalWitnessStep evidenceChanged = result.Steps[0] with { Evidence = changedEvidence };
             if (ExperimentalPhysicalWitness.VerifyWitness(query, edges, IncompleteCoverage(), result with { Steps = new[] { evidenceChanged, result.Steps[1] } }))
                 throw new InvalidOperationException("Witness replay accepted altered provenance.");
+            PhysicalEdgeCertification changedCertification = result.Steps[0].Certification with { RuleId = "unreviewed-rule" };
+            PhysicalWitnessStep certificationChanged = result.Steps[0] with { Certification = changedCertification };
+            if (ExperimentalPhysicalWitness.VerifyWitness(query, edges, IncompleteCoverage(), result with { Steps = new[] { certificationChanged, result.Steps[1] } }))
+                throw new InvalidOperationException("Witness replay accepted altered edge certification metadata.");
             if (ExperimentalPhysicalWitness.VerifyWitness(query, edges, IncompleteCoverage(), result with { RouteClassFingerprint = new string('0', 64) }))
                 throw new InvalidOperationException("Witness replay accepted an altered route fingerprint.");
         }
@@ -515,6 +571,49 @@ namespace FogReconstruction.PhysicalWitness
                 throw new InvalidOperationException("A one-way edge was traversed in reverse.");
         }
 
+        private static void SeathMode2RequiresItsProducerChainInsteadOfActionRegion()
+        {
+            PhysicalNode crystal = new("dukes", "seath-crystal:1701801");
+            PhysicalNode prison = new("dukes", "player:1815800");
+            PhysicalEvidence[] evidence =
+            {
+                new("VerifiedSourceObject", "MSB crystal entity 1701801", Hash),
+                new("SeathInteractionChain", "event0 initializes 11700005; event sets 5308", Hash),
+                new("GeneratedDispatcher", "common/event0 mode 2 p0=5308", Hash),
+                new("VerifiedDestinationPlayer", "dukes/player 1815800", Hash),
+                new("VerifiedDestinationMap", "dukes map", Hash),
+                new("VerifiedLanding", "runtime prison region", Hash),
+            };
+            var edge = new PhysicalEdge("seath-mode2", crystal, prison,
+                PhysicalEdgeCertainty.PROVEN_ACTIONABLE, GeneratedTransitionCertifier.SeathMode2P05308,
+                "flag 5308 ON; system warp flag 15 OFF", new[] { 5308 }, new[] { 15 },
+                Array.Empty<int>(), Array.Empty<int>(), new[] { 5308 }, evidence)
+            {
+                Certification = new PhysicalEdgeCertification("seath-mode2-p0-5308-v1",
+                    GeneratedTransitionCertifier.SeathMode2P05308, 2, "dukes/crystal:1701801", "dukes/player:1815800",
+                    "flag 5308 ON; system warp flag 15 OFF", "N/A: crystal interaction event 11700005",
+                    "common/event0/init[81]/slot[0]", "1815800", "dukes", "runtime prison region 1702901",
+                    "current synthetic evidence", "PROVEN_ACTIONABLE", "test"),
+            };
+            var query = new PhysicalQuery(crystal, prison, new[] { 5308 }, Array.Empty<int>(),
+                Array.Empty<int>(), Array.Empty<PhysicalNode>(), 10);
+            PhysicalWitnessResult result = ExperimentalPhysicalWitness.Evaluate(query, new[] { edge }, IncompleteCoverage());
+            if (result.Verdict != PhysicalWitnessVerdict.PHYSICALLY_SOLVABLE_PROVEN)
+                throw new InvalidOperationException("The exact Seath Mode 2 producer chain did not satisfy its proof-specific edge requirements.");
+
+            PhysicalEdge missingChain = edge with { Evidence = evidence.Where(item => item.Kind != "SeathInteractionChain").ToArray() };
+            bool rejected = false;
+            try
+            {
+                ExperimentalPhysicalWitness.Evaluate(query, new[] { missingChain }, IncompleteCoverage());
+            }
+            catch (ArgumentException)
+            {
+                rejected = true;
+            }
+            if (!rejected) throw new InvalidOperationException("A Seath Mode 2 edge without its producer chain was accepted.");
+        }
+
         private static PhysicalQuery Query(PhysicalNode start, PhysicalNode goal, int[] initialFlags, PhysicalNode[] waypoints = null) =>
             new(start, goal, initialFlags, Array.Empty<int>(), initialFlags, waypoints ?? Array.Empty<PhysicalNode>(), 100);
 
@@ -525,14 +624,23 @@ namespace FogReconstruction.PhysicalWitness
             new("synthetic complete test inventory", true, new[] { new PhysicalEvidence("TestFixture", "complete synthetic inventory", Hash) });
 
         private static PhysicalEdge ActionEdge(string id, PhysicalNode from, PhysicalNode to, string mechanism, int[] requiredFlags) =>
-            new(id, from, to, PhysicalEdgeCertainty.PROVEN_ACTIONABLE, mechanism, "verified",
+            new PhysicalEdge(id, from, to, PhysicalEdgeCertainty.PROVEN_ACTIONABLE, mechanism, "verified",
                 requiredFlags, Array.Empty<int>(), Array.Empty<int>(), Array.Empty<int>(), Array.Empty<int>(),
                 new[]
                 {
+                    new PhysicalEvidence("VerifiedSourceObject", "verified source fog object", Hash),
                     new PhysicalEvidence("SourceActionRegion", "verified trigger region", Hash),
                     new PhysicalEvidence("GeneratedDispatcher", "verified Event 5700 dispatch", Hash),
-                    new PhysicalEvidence("VerifiedDestinationPlayer", "verified player landing", Hash)
-                });
+                    new PhysicalEvidence("VerifiedDestinationPlayer", "verified player landing", Hash),
+                    new PhysicalEvidence("VerifiedDestinationMap", "verified destination map", Hash),
+                    new PhysicalEvidence("VerifiedLanding", "verified object-relative landing", Hash)
+                })
+            {
+                Certification = new PhysicalEdgeCertification("synthetic-reviewed-rule-v1", mechanism, 0,
+                    from.Map + "/" + from.Anchor, to.Map + "/" + to.Anchor, "verified test state",
+                    "1234", "common/event0/init[0]", "5678", to.Map, "synthetic exact landing",
+                    "synthetic unit test evidence", "PROVEN_ACTIONABLE", "Synthetic test-only certificate."),
+            };
 
         private static PhysicalEdge UnknownEdge(string id, PhysicalNode from, PhysicalNode to) =>
             new(id, from, to, PhysicalEdgeCertainty.UNKNOWN, "unknown", "unresolved",

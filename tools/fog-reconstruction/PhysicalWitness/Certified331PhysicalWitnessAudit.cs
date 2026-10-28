@@ -15,7 +15,16 @@ namespace FogReconstruction.PhysicalWitness
     public sealed record PhysicalWitnessResultCounts(int SafeRejectExperimentalSolvable, int SafeRejectExperimentalUnsolvable, int SafeRejectExperimentalUnresolved);
     public sealed record PhysicalWitnessDatasetIdentity(string Path, string Sha256, int Cases, string StagingRoot, string RelativePathInventorySha256, string PackageByteAuthentication);
     public sealed record PhysicalWitnessBaseline(string Branch, string Commit, string CatalogFingerprint, string SemanticFingerprint, string WorldDataId, string FogHostVersion, int FogHostProtocol, string BackendVersion, string LocalTag);
-    public sealed record PhysicalWitnessMechanismCoverage(string Mechanism, string Status, int EvidenceCount, string ProvenFact, string RemainingUnknown);
+    public sealed record PhysicalWitnessMechanismCoverage(
+        string Mechanism,
+        string Status,
+        int EvidenceCount,
+        string ProvenFact,
+        string RemainingUnknown,
+        int CertifiedEdges = 0,
+        int AffectedWorlds = 0,
+        int UnknownEdges = 0,
+        int UnknownAffectedWorlds = 0);
     public sealed record PhysicalWitnessCaseResult(string Profile, int Seed, string SafeValidatorDisposition, string ExperimentalWitness, string PackageTreeSha256ObservedUnanchored, int PackageTreeFileCount, int CertifiedOutputFileClaim, string RouteClassFingerprint, bool ReachableUnknownEscape, string Explanation, PhysicalWitnessStep[] WitnessSteps, string[] InputErrors);
     public sealed record PhysicalWitnessAuditReport(
         int SchemaVersion,
@@ -26,6 +35,7 @@ namespace FogReconstruction.PhysicalWitness
         int WitnessClassCount,
         int ManualQaCandidateCount,
         PhysicalWitnessMechanismCoverage[] MechanismCoverage,
+        PhysicalEdge[] CertifiedEdges,
         PhysicalWitnessCaseResult[] Cases);
 
     /// <summary>Read-only comparison of the canonical rejected 331 worlds against the experimental model.</summary>
@@ -128,8 +138,10 @@ namespace FogReconstruction.PhysicalWitness
                 else if (!string.Equals(expectedInventoryHash, tree.RelativePathInventorySha256, StringComparison.Ordinal))
                     throw new InvalidDataException("Staging relative-path inventory changed across cases at " + identity + ".");
                 int certifiedOutputFiles = RequiredInt(record, "outputFiles");
-                var edges = BuildGeneratedTransitionEdges(record, profile, seed, datasetHash, tree.Sha256);
-                edges.AddRange(BuildCeaselessUnknownCandidates(record, profile, seed, datasetHash, tree.Sha256));
+                var stagedReader = new StagedTransitionEvidenceReader(caseRoot);
+                var edges = BuildGeneratedTransitionEdges(record, profile, seed, datasetHash, tree.Sha256, stagedReader);
+                edges.AddRange(stagedReader.ReadMode2Edges(identity, datasetHash, tree.Sha256));
+                edges.AddRange(BuildCeaselessUnknownCandidates(record, profile, seed, datasetHash, tree.Sha256, edges));
 
                 PhysicalNode start = new("demonruins", "post-ceaseless-arena-state");
                 PhysicalNode mainSide = new("demonruins", "main-demonruins-physical-side-unverified");
@@ -178,7 +190,7 @@ namespace FogReconstruction.PhysicalWitness
             string[] positiveFingerprints = evaluated.Select(item => item.Result.RouteClassFingerprint)
                 .Where(value => !string.IsNullOrEmpty(value)).Distinct(StringComparer.Ordinal).OrderBy(value => value, StringComparer.Ordinal).ToArray();
             var report = new PhysicalWitnessAuditReport(
-                2,
+                3,
                 new PhysicalWitnessBaseline(
                     "fix/compact-fog-v5-progression",
                     BaselineCommit,
@@ -195,6 +207,7 @@ namespace FogReconstruction.PhysicalWitness
                 positiveFingerprints.Length,
                 0,
                 BuildMechanismCoverage(allEdges, evaluated),
+                allEdges.Where(edge => edge.Certainty == PhysicalEdgeCertainty.PROVEN_ACTIONABLE).ToArray(),
                 evaluated.Select(item => item.Result).ToArray());
             var options = new JsonSerializerOptions { WriteIndented = true };
             options.Converters.Add(new JsonStringEnumConverter());
@@ -205,12 +218,19 @@ namespace FogReconstruction.PhysicalWitness
             Console.WriteLine("Markdown: " + markdown);
         }
 
-        private static List<PhysicalEdge> BuildGeneratedTransitionEdges(JsonElement record, string profile, int seed, string datasetHash, string packageHash)
+        private static List<PhysicalEdge> BuildGeneratedTransitionEdges(
+            JsonElement record,
+            string profile,
+            int seed,
+            string datasetHash,
+            string packageHash,
+            StagedTransitionEvidenceReader reader)
         {
             var result = new List<PhysicalEdge>();
             JsonElement[] transitions = RequiredArray(record, "randomTransitions").EnumerateArray().ToArray();
             JsonElement[] pairings = RequiredArray(record, "generatedPairings").EnumerateArray().ToArray();
             var pairingIndex = BuildPairingIndex(pairings);
+            string identity = profile + "/" + seed.ToString(CultureInfo.InvariantCulture);
 
             for (int index = 0; index < transitions.Length; index++)
             {
@@ -220,10 +240,10 @@ namespace FogReconstruction.PhysicalWitness
                 string sourceMap = OptionalString(transition, "sourceMap") ?? "unknown-map";
                 string destinationMap = OptionalString(transition, "destinationMap") ?? "unknown-map";
                 string sourceObject = match.Success ? match.Groups["object"].Value : "unresolved-source-" + index.ToString(CultureInfo.InvariantCulture);
+                string sourceAction = OptionalString(transition, "sourceAction") ?? "unclassified";
                 string destinationPlayer = OptionalString(transition, "destinationPlayer") ?? "unresolved";
                 string condition = "unresolved";
                 string pairingLocator = "no unique generated pairing";
-                bool pairingVerified = false;
 
                 if (match.Success)
                 {
@@ -232,66 +252,23 @@ namespace FogReconstruction.PhysicalWitness
                     {
                         condition = matches[0].Condition;
                         pairingLocator = matches[0].Locator;
-                        pairingVerified = true;
                     }
                 }
 
-                bool structureVerified =
-                    BoolIsTrue(transition, "sourceObjectFound")
-                    && BoolIsTrue(transition, "sourceActionRegionFound")
-                    && BoolIsTrue(transition, "event5700DispatcherFound")
-                    && BoolIsTrue(transition, "destinationPlayerFound")
-                    && BoolIsTrue(transition, "destinationMapMatches")
-                    && BoolIsTrue(transition, "destinationTransformMatches")
-                    && match.Success
-                    && pairingVerified
-                    && string.Equals(condition, "true", StringComparison.Ordinal)
-                    && int.TryParse(destinationPlayer, NumberStyles.Integer, CultureInfo.InvariantCulture, out _);
-
-                string identity = profile + "/" + seed.ToString(CultureInfo.InvariantCulture);
-                string rowLocator = $"cases[{identity}].randomTransitions[{index}]";
-                var evidence = new List<PhysicalEvidence>
-                {
-                    new("CertifiedTransitionRecord", rowLocator, datasetHash),
-                    new("ObservedStagingTreeUnanchored", "current bytes for staging package " + identity, packageHash)
-                };
-                if (BoolIsTrue(transition, "sourceActionRegionFound"))
-                    evidence.Add(new PhysicalEvidence("DatasetClaim.SourceActionRegion", rowLocator + ".sourceActionRegionFound", datasetHash));
-                if (BoolIsTrue(transition, "event5700DispatcherFound"))
-                    evidence.Add(new PhysicalEvidence("DatasetClaim.GeneratedDispatcher", rowLocator + ".event5700DispatcherFound", datasetHash));
-                if (BoolIsTrue(transition, "destinationPlayerFound") && BoolIsTrue(transition, "destinationMapMatches") && BoolIsTrue(transition, "destinationTransformMatches"))
-                    evidence.Add(new PhysicalEvidence("DatasetClaim.DestinationPlayerMapTransform", rowLocator + ".destinationPlayer/map/transform", datasetHash));
-                evidence.Add(new PhysicalEvidence("DatasetClaim.GeneratedPairing", pairingLocator + "; condition=" + condition, datasetHash));
-                if (structureVerified)
-                    evidence.Add(new PhysicalEvidence("DatasetClaim.StructurallyComplete", rowLocator, datasetHash));
-
-                PhysicalEdgeCertainty certainty = PhysicalEdgeCertainty.UNKNOWN;
-                string action = OptionalString(transition, "sourceAction") ?? "unclassified";
-                string mechanism = action.Contains("pvp", StringComparison.OrdinalIgnoreCase)
-                    ? "randomized-fog-pvp"
-                    : action.Contains("boss", StringComparison.OrdinalIgnoreCase)
-                        ? "randomized-fog-boss"
-                        : "randomized-fog";
-
-                result.Add(new PhysicalEdge(
-                    StableId(identity + "|" + text),
-                    new PhysicalNode(sourceMap, "fog-action:" + sourceObject),
-                    new PhysicalNode(destinationMap, "player:" + destinationPlayer),
-                    certainty,
-                    mechanism,
-                    condition,
-                    Array.Empty<int>(),
-                    Array.Empty<int>(),
-                    Array.Empty<int>(),
-                    Array.Empty<int>(),
-                    Array.Empty<int>(),
-                    evidence.ToArray()));
+                result.Add(reader.ReadRandomTransition(identity, index, text, sourceMap, sourceAction,
+                    destinationMap, destinationPlayer, condition, pairingLocator, datasetHash, packageHash));
             }
 
             return result;
         }
 
-        private static List<PhysicalEdge> BuildCeaselessUnknownCandidates(JsonElement record, string profile, int seed, string datasetHash, string packageHash)
+        private static List<PhysicalEdge> BuildCeaselessUnknownCandidates(
+            JsonElement record,
+            string profile,
+            int seed,
+            string datasetHash,
+            string packageHash,
+            IReadOnlyList<PhysicalEdge> generatedTransitions)
         {
             string identity = profile + "/" + seed.ToString(CultureInfo.InvariantCulture);
             string eventDigest = StableId(record.TryGetProperty("event11410090", out JsonElement eventBody) ? eventBody.GetRawText() : "missing-event11410090");
@@ -318,7 +295,10 @@ namespace FogReconstruction.PhysicalWitness
                 {
                     string text = OptionalString(item, "transition") ?? "";
                     Match match = Regex.Match(text, @"^(?<object>\S+)\s+(?<sourceArea>[^>]+)>(?<destinationArea>\S+)\s+target=");
-                    return match.Success && match.Groups["object"].Value == sourceObject;
+                    return match.Success
+                        && match.Groups["object"].Value == sourceObject
+                        && match.Groups["sourceArea"].Value == sourceArea
+                        && match.Groups["destinationArea"].Value == destinationArea;
                 }).ToArray();
 
                 matched++;
@@ -349,11 +329,26 @@ namespace FogReconstruction.PhysicalWitness
                 }
 
                 JsonElement transition = sourceMatches[0];
-                string sourceMap = OptionalString(transition, "sourceMap") ?? "unknown-map";
-                string destinationMap = OptionalString(transition, "destinationMap") ?? "unknown-map";
-                string destinationPlayer = OptionalString(transition, "destinationPlayer") ?? "unresolved";
-                PhysicalNode trigger = new(sourceMap, "fog-action:" + sourceObject);
-                PhysicalNode destination = new(destinationMap, "player:" + destinationPlayer);
+                string transitionText = OptionalString(transition, "transition") ?? "";
+                string transitionId = StableId(identity + "|" + transitionText);
+                PhysicalEdge generated = generatedTransitions.SingleOrDefault(edge => edge.Id == transitionId);
+                if (generated == null)
+                {
+                    PhysicalNode unresolved = new("unresolved-map", "post-boss-trigger:" + sourceObject + ":side:" + sourceArea);
+                    result.Add(new PhysicalEdge(
+                        StableId(identity + "|unmatched-physical-approach|" + matched.ToString(CultureInfo.InvariantCulture)),
+                        current,
+                        unresolved,
+                        PhysicalEdgeCertainty.UNKNOWN,
+                        "unresolved-post-boss-trigger-identity",
+                        "No independently parsed staging edge maps to this exact source object and side.",
+                        new[] { BossCompletionFlag }, Array.Empty<int>(), Array.Empty<int>(), Array.Empty<int>(), Array.Empty<int>(),
+                        new[] { new PhysicalEvidence("CertifiedPostBossPathRow", pathLocator, datasetHash), evidence[0], evidence[1] }));
+                    current = unresolved;
+                    continue;
+                }
+                PhysicalNode trigger = generated.From;
+                PhysicalNode destination = generated.To;
                 matched++;
                 result.Add(new PhysicalEdge(
                     StableId(identity + "|physical-approach|" + matched.ToString(CultureInfo.InvariantCulture)),
@@ -426,57 +421,127 @@ namespace FogReconstruction.PhysicalWitness
 
         private static PhysicalWitnessMechanismCoverage[] BuildMechanismCoverage(PhysicalEdge[] edges, IReadOnlyList<EvaluatedCase> cases)
         {
-            int structural = edges.Count(edge => edge.Evidence.Any(item => item.Kind == "DatasetClaim.StructurallyComplete"));
-            int ordinary = edges.Count(edge => edge.Mechanism == "randomized-fog"
-                && edge.Evidence.Any(item => item.Kind == "DatasetClaim.StructurallyComplete"));
-            int pvp = edges.Count(edge => edge.Mechanism == "randomized-fog-pvp"
-                && edge.Evidence.Any(item => item.Kind == "DatasetClaim.StructurallyComplete"));
-            int bossTransitions = edges.Count(edge => edge.Mechanism == "randomized-fog-boss"
-                && edge.Evidence.Any(item => item.Kind == "DatasetClaim.StructurallyComplete"));
-            int seath = cases.Sum(item => CountTrace(item.Source, "mode2Trace", "p0Flag=5308"));
+            PhysicalWitnessMechanismCoverage ByRule(string name, string mechanismClass, string provenFact, string remaining)
+            {
+                PhysicalEdge[] members = edges.Where(edge =>
+                    edge.Certification?.MechanismClass == mechanismClass
+                    || edge.Mechanism == mechanismClass).ToArray();
+                PhysicalEdge[] proven = members.Where(edge => edge.Certainty == PhysicalEdgeCertainty.PROVEN_ACTIONABLE).ToArray();
+                PhysicalEdge[] unknown = members.Where(edge => edge.Certainty == PhysicalEdgeCertainty.UNKNOWN).ToArray();
+                string status = proven.Length > 0 ? "STAGED_BYTES_CERTIFIED" : members.Length > 0 ? "UNKNOWN" : "NO_CANDIDATE_ROWS";
+                string reasonSummary = string.Join("; ", members.Where(edge => edge.Certainty == PhysicalEdgeCertainty.UNKNOWN)
+                    .Select(edge => edge.Certification?.Reason ?? edge.Condition)
+                    .Where(reason => !string.IsNullOrWhiteSpace(reason))
+                    .GroupBy(reason => reason, StringComparer.Ordinal)
+                    .OrderByDescending(group => group.Count()).ThenBy(group => group.Key, StringComparer.Ordinal)
+                    .Take(3)
+                    .Select(group => group.Key + " (" + group.Count().ToString(CultureInfo.InvariantCulture) + ")"));
+                string bossPolicySummary = mechanismClass == GeneratedTransitionCertifier.BossBoundaryMode0
+                    ? " Project-owned boss entrance policies observed: " + members.SelectMany(edge => edge.Evidence)
+                        .Where(item => item.Kind == "BossLifecyclePolicy")
+                        .Select(item => Regex.Match(item.Locator, @"boss-policy (?<id>\S+) side", RegexOptions.CultureInvariant))
+                        .Where(match => match.Success).Select(match => match.Groups["id"].Value)
+                        .Distinct(StringComparer.Ordinal).Count().ToString(CultureInfo.InvariantCulture) + "."
+                    : string.Empty;
+                return new PhysicalWitnessMechanismCoverage(name, status, members.Length,
+                    provenFact + " Direct certified edges: " + proven.Length.ToString(CultureInfo.InvariantCulture) + "." + bossPolicySummary,
+                    string.IsNullOrEmpty(reasonSummary) ? remaining : reasonSummary,
+                    proven.Length,
+                    members.Select(CaseIdentity).Where(value => value != null).Distinct(StringComparer.Ordinal).Count(),
+                    unknown.Length,
+                    unknown.Select(CaseIdentity).Where(value => value != null).Distinct(StringComparer.Ordinal).Count());
+            }
+
+            int seathTraces = cases.Sum(item => CountTrace(item.Source, "mode2Trace", "p0Flag=5308"));
             int bossFlag = cases.Count(item => item.Source.TryGetProperty("bossEvent11410410", out JsonElement value)
                 && value.ValueKind == JsonValueKind.Array && value.GetArrayLength() > 0);
-            int ceaselessCandidates = edges.Count(edge => edge.Mechanism == "unverified-physical-approach-to-post-boss-fog");
+            string[] ceaselessMechanisms =
+            {
+                "unverified-physical-approach-to-post-boss-fog",
+                "unresolved-post-boss-trigger-identity",
+                "unverified-arrival-to-main-demonruins-side",
+                "main-demonruins-to-lower-lava",
+            };
+            PhysicalEdge[] ceaselessEdges = edges.Where(edge => ceaselessMechanisms.Contains(edge.Mechanism, StringComparer.Ordinal)).ToArray();
+            int ceaselessCandidates = ceaselessEdges.Length;
+            int ceaselessWorlds = ceaselessEdges.Select(CaseIdentity).Where(value => value != null).Distinct(StringComparer.Ordinal).Count();
+            int ceaselessApproachEdges = ceaselessEdges.Count(edge => edge.Mechanism == "unverified-physical-approach-to-post-boss-fog"
+                || edge.Mechanism == "unresolved-post-boss-trigger-identity");
+            int ceaselessArrivalEdges = ceaselessEdges.Count(edge => edge.Mechanism == "unverified-arrival-to-main-demonruins-side");
+            int ceaselessLowerRouteEdges = ceaselessEdges.Count(edge => edge.Mechanism == "main-demonruins-to-lower-lava");
+            int p0Zero = edges.Count(edge => edge.Certification?.MechanismClass == "mode2-unsupported"
+                && edge.Certification.Dispatcher.Contains("p0=0", StringComparison.Ordinal));
 
             return new[]
             {
-                Coverage("all structurally complete transition rows", structural, "STRUCTURAL_CLAIMS_ONLY",
-                    "Rows satisfy the dataset structural predicates, including unique pairing condition=true and destination transform claims.",
-                    "This is a dataset assertion, not authenticated package evidence or proof of runtime actionability."),
-                Coverage("ordinary fog", ordinary, "STRUCTURAL_CLAIMS_ONLY",
-                    structural + " rows claim source ActionRegion, Event 5700 dispatch, condition=true pairing, and destination player/map/transform.",
-                    "Current package bytes are unanchored and trigger runtime state/physical approach are unknown; no edge is PROVEN_ACTIONABLE."),
-                Coverage("PvP", pvp, "STRUCTURAL_CLAIMS_ONLY",
-                    "Dataset rows label these transitions as PvP and carry structural source/dispatcher/landing claims.",
-                    "Interaction actionability and physical approach remain unknown; no edge is PROVEN_ACTIONABLE."),
-                Coverage("Seath p0=5308", seath, seath > 0 ? "TRACE_ROWS_ONLY" : "UNKNOWN",
-                    seath > 0 ? "Certified trace text includes p0=5308 rows." : "No p0=5308 trace row was found.",
-                    "Trace text is not a physical route witness; source and destination traversal remain unknown."),
-                Coverage("fixed links", 0, "UNKNOWN",
-                    "No fixed traversal edge is admitted from Area.To or ConnectCollision alone.",
-                    "Requires exact directed anchors and traversal evidence."),
-                Coverage("doors", 0, "UNKNOWN", "No door edge is currently proven.",
-                    "Requires exact interaction, state, and destination-side evidence."),
-                Coverage("elevators", 0, "UNKNOWN", "No elevator edge is currently proven.",
-                    "Requires verified platform states, call/ride behavior, and destination state."),
-                Coverage("boss-boundary randomized fog", bossTransitions, "STRUCTURAL_CLAIMS_ONLY",
-                    "Dataset rows claim boss-boundary transition and generated pairing structure.",
-                    "Current package bytes and runtime action state are unverified; no edge is PROVEN_ACTIONABLE."),
-                Coverage("boss state", bossFlag, bossFlag > 0 ? "TRACE_ROWS_ONLY" : "UNKNOWN",
-                    bossFlag > 0 ? "Event 11410410 trace rows are present; the query begins post-boss." : "The certified event 11410410 record is missing.",
-                    "Flag presence does not prove an exit or physical route."),
-                Coverage("Mode-2 p0=0", 0, "UNKNOWN", "No p0=0 Area Warp is promoted to traversal proof.",
-                    "The identified p0=0 families still need exact semantics."),
-                Coverage("Ceaseless post-boss path", ceaselessCandidates, "CANDIDATES_ONLY",
-                    "Case-specific postBossPath trigger candidates are connected in order from the arena state; the target query requires the main Demon Ruins waypoint before lower lava.",
-                    "All approach, randomized edge, arrival-to-main-side, and main-to-lava edges remain UNKNOWN."),
+                ByRule("ordinary Event5700 Mode 0", GeneratedTransitionCertifier.OrdinaryMode0,
+                    "Current staged object, ActionRegion, initializer, dispatcher contract, destination player/map, and landing bytes were reparsed.",
+                    "Physical approach to each trigger remains outside the certified edge."),
+                ByRule("PvP randomized Mode 0", GeneratedTransitionCertifier.PvpMode0,
+                    "Current staging was checked against exact project PvP gate identity/side policy; Mode 1 is excluded.",
+                    "Conditional PvP sides and physical approach remain UNKNOWN."),
+                ByRule("project CustomWarp", GeneratedTransitionCertifier.ProjectCustomWarpMode0,
+                    "Only the two explicit Firelink CustomWarp policy sides are eligible; generated coordinates and yaw are checked exactly.",
+                    "Any other map override or unmatched CustomWarp remains UNKNOWN."),
+                ByRule("Seath Mode 2 p0=5308", GeneratedTransitionCertifier.SeathMode2P05308,
+                    "The staged crystal object, map event-0 initializer, event 11700005 flag producer, Mode 2 dispatcher, map/player, and runtime prison region are independently checked.",
+                    seathTraces.ToString(CultureInfo.InvariantCulture) + " dataset traces are locators only; current package hashes are not historically anchored."),
+                ByRule("boss-boundary Mode 0", GeneratedTransitionCertifier.BossBoundaryMode0,
+                    "Staged boundary bindings are checked against project-owned boss entrance identities.",
+                    "Encounter activation, defeat-state ownership, and post-boss exit lifecycle are not fully proven."),
+                Coverage("Mode-2 p0=0", p0Zero, "UNKNOWN",
+                    "Mode-2 p0=0 call sites are retained as UNKNOWN candidates; they are never generalized from Seath.",
+                    "Each source producer and destination semantic still needs a separate exact rule."),
+                Coverage("boss completion state", bossFlag, bossFlag > 0 ? "TRACE_ROWS_ONLY" : "UNKNOWN",
+                    bossFlag > 0 ? "Event 11410410 trace rows are present; the query starts after the boss." : "The certified event 11410410 record is missing.",
+                    "Flag presence does not establish an exit or a physical route.", 0, bossFlag, 0, 0),
+                Coverage("Ceaseless post-boss physical approach/route", ceaselessCandidates, "CANDIDATES_ONLY",
+                    "Case-specific trigger sides retain exact object/area identity from staged transition parsing; breakdown: "
+                    + ceaselessApproachEdges.ToString(CultureInfo.InvariantCulture) + " trigger-approach/identity, "
+                    + ceaselessArrivalEdges.ToString(CultureInfo.InvariantCulture) + " arrival-to-main-side, "
+                    + ceaselessLowerRouteEdges.ToString(CultureInfo.InvariantCulture) + " main-to-lower-lava.",
+                    "All listed edges remain UNKNOWN; fixed physical walking and approach evidence is absent.", 0, ceaselessWorlds,
+                    ceaselessCandidates, ceaselessWorlds),
+                Coverage("fixed walkable links", 0, "UNKNOWN",
+                    "No fixed traversal edge is promoted from logical Area.To metadata.",
+                    "Needs exact directed source/destination anchors plus physical traversal proof across the affected worlds."),
+                Coverage("doors", 0, "UNKNOWN", "No door edge is promoted.",
+                    "Needs interaction, lock/state, and destination-side evidence."),
+                Coverage("elevators", 0, "UNKNOWN", "No elevator edge is promoted.",
+                    "Needs platform positions, call/ride state, and destination evidence."),
                 Coverage("collision and walkability", 0, "UNKNOWN",
-                    "No collision or map-load metadata is used as traversal proof.",
-                    "Requires complete physical geometry/path evidence or gameplay telemetry.")
+                    "No ConnectCollision or geometry-only edge is promoted.",
+                    "Needs a complete physical path/walkability proof or verified gameplay observation.")
             };
         }
-        private static PhysicalWitnessMechanismCoverage Coverage(string name, int count, string status, string proven, string unknown) =>
-            new(name, status, count, proven, unknown);
+
+        private static string CaseIdentity(PhysicalEdge edge)
+        {
+            PhysicalEvidence locator = edge.Evidence.FirstOrDefault(item => item.Kind == "CertifiedDatasetLocator");
+            if (locator != null)
+            {
+                int marker = locator.Locator.IndexOf(".randomTransitions[", StringComparison.Ordinal);
+                if (marker > 0) return locator.Locator.Substring(0, marker);
+            }
+            PhysicalEvidence caseLocator = edge.Evidence.FirstOrDefault(item => item.Kind is "CertifiedPostBossPathRow" or "UnresolvedEventTrace");
+            if (caseLocator != null)
+            {
+                Match match = Regex.Match(caseLocator.Locator, @"cases\[(?<identity>[^\]]+)\]", RegexOptions.CultureInvariant);
+                if (match.Success) return match.Groups["identity"].Value;
+            }
+            PhysicalEvidence staging = edge.Evidence.FirstOrDefault(item => item.Kind == "ObservedStagingTreeUnanchored");
+            if (staging == null) return null;
+            const string packagePrefix = "current bytes for staging package ";
+            return staging.Locator.StartsWith(packagePrefix, StringComparison.Ordinal)
+                ? staging.Locator.Substring(packagePrefix.Length)
+                : staging.Locator.Split(' ')[0];
+        }
+        private static PhysicalWitnessMechanismCoverage Coverage(string name, int count, string status,
+            string proven, string unknown, int certifiedEdges = 0, int affectedWorlds = 0,
+            int unknownEdges = -1, int unknownAffectedWorlds = -1) =>
+            new(name, status, count, proven, unknown, certifiedEdges, affectedWorlds,
+                unknownEdges < 0 ? Math.Max(0, count - certifiedEdges) : unknownEdges,
+                unknownAffectedWorlds < 0 ? affectedWorlds : unknownAffectedWorlds);
 
         private static int CountTrace(JsonElement record, string property, string marker)
         {
@@ -522,10 +587,12 @@ namespace FogReconstruction.PhysicalWitness
             builder.AppendLine();
             builder.AppendLine("## Mechanism coverage");
             builder.AppendLine();
-            builder.AppendLine("| Mechanism | Status | Evidence rows | What is proved / remains unknown |");
-            builder.AppendLine("|---|---|---:|---|");
+            builder.AppendLine("| Mechanism | Status | Candidate rows | Certified edges | UNKNOWN edges | Worlds with candidates | Worlds with UNKNOWN edges | What is proved / remains unknown |");
+            builder.AppendLine("|---|---|---:|---:|---:|---:|---:|---|");
             foreach (PhysicalWitnessMechanismCoverage item in report.MechanismCoverage)
-                builder.AppendLine("| " + item.Mechanism + " | " + item.Status + " | " + item.EvidenceCount + " | " + item.ProvenFact + " " + item.RemainingUnknown + " |");
+                builder.AppendLine("| " + item.Mechanism + " | " + item.Status + " | " + item.EvidenceCount + " | " + item.CertifiedEdges
+                    + " | " + item.UnknownEdges + " | " + item.AffectedWorlds + " | " + item.UnknownAffectedWorlds
+                    + " | " + item.ProvenFact + " " + item.RemainingUnknown + " |");
             builder.AppendLine();
             builder.AppendLine("Positive witness classes: " + report.WitnessClassCount + ". Manual QA candidates: " + report.ManualQaCandidateCount + ".");
             foreach (PhysicalWitnessCaseResult item in report.Cases.Where(value => value.ExperimentalWitness == "PHYSICALLY_SOLVABLE_PROVEN"))

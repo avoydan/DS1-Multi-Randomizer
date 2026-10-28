@@ -50,14 +50,7 @@ namespace FogReconstruction
             EMEVD.Event candidate,
             IEnumerable<WarpEventCallMatrix.WarpEventCall> calls)
         {
-            BehaviorProfile referenceContract = Describe(reference);
-            BehaviorProfile candidateContract = Describe(candidate);
-            if (!referenceContract.Terms.SetEquals(candidateContract.Terms))
-            {
-                string missing = string.Join(", ", referenceContract.Terms.Except(candidateContract.Terms).OrderBy(value => value, StringComparer.Ordinal));
-                string added = string.Join(", ", candidateContract.Terms.Except(referenceContract.Terms).OrderBy(value => value, StringComparer.Ordinal));
-                throw new InvalidDataException($"Event 5700 mode contracts differ. Missing from candidate: [{missing}]. Candidate-only: [{added}].");
-            }
+            VerifyBodyContract(reference, candidate);
 
             WarpEventCallMatrix.WarpEventCall[] callRows = calls.ToArray();
             byte[] modes = callRows.Select(call => call.Mode).Distinct().OrderBy(mode => mode).ToArray();
@@ -69,11 +62,24 @@ namespace FogReconstruction
                 if (call.P6 < 0) throw new InvalidDataException("Event5700 initializer p6 must carry a non-negative magnitude; its sign is stored separately.");
             }
 
+            BehaviorProfile candidateContract = Describe(candidate);
             return new Event5700Verification(
                 callRows.Length,
                 callRows.Select(Shape).Distinct(StringComparer.Ordinal).Count(),
                 candidateContract.Terms.Count,
                 modes);
+        }
+
+        public static void VerifyBodyContract(EMEVD.Event reference, EMEVD.Event candidate)
+        {
+            BehaviorProfile referenceContract = Describe(reference);
+            BehaviorProfile candidateContract = Describe(candidate);
+            if (!referenceContract.Terms.SetEquals(candidateContract.Terms))
+            {
+                string missing = string.Join(", ", referenceContract.Terms.Except(candidateContract.Terms).OrderBy(value => value, StringComparer.Ordinal));
+                string added = string.Join(", ", candidateContract.Terms.Except(referenceContract.Terms).OrderBy(value => value, StringComparer.Ordinal));
+                throw new InvalidDataException($"Event 5700 mode contracts differ. Missing from candidate: [{missing}]. Candidate-only: [{added}].");
+            }
         }
 
         public static void VerifyBuiltBehavior()

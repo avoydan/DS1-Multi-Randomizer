@@ -1,6 +1,6 @@
 # Experimental Physical Witness
 
-Status: partial shadow-analysis tool; not production validation and not yet ready to certify gameplay route classes.
+Status: development-only shadow audit that certifies selected staged transition edges from exact bytes. It does not establish complete physical routes or production validity.
 
 ## Safe baseline
 
@@ -13,7 +13,7 @@ Status: partial shadow-analysis tool; not production validation and not yet read
 - World data ID: ef625777d6aa5abf
 - FogHost project version: 0.7.4; HostVersion: 0.7.3; protocol: 3
 - Backend version: 0.46.4
-- Development-only FogReconstruction version: 0.2.0
+- Development-only FogReconstruction version: 0.3.0
 
 The tag points at the exact baseline commit and was not moved. The experimental code lives under tools/fog-reconstruction and has no production dependency.
 
@@ -23,7 +23,9 @@ Each directed edge carries source provenance, locator, and SHA-256. The only cer
 
 Positive search traverses only PROVEN_ACTIONABLE edges whose typed event-flag and item conditions hold. A reachable UNKNOWN edge prevents an impossibility claim. A negative result is permitted only after a complete physical inventory with no reachable UNKNOWN escape and no exhausted search budget. Non-actionability is state-scoped unless direct telemetry proves a global refusal.
 
-PROVEN_ACTIONABLE validation requires separate source-action-region, generated-dispatcher, and destination-player evidence. Area.To and ConnectCollision by themselves are rejected. Witness replay recomputes the route fingerprint and compares every edge, state transition, mechanism, and evidence record to the supplied graph.
+Ordinary Event5700 Mode 0 certification requires staged source object and ActionRegion evidence, a unique matching event-0 initializer, exact dispatcher bytes and body contract, destination player/map evidence, and a matching default landing. Source and destination maps are resolved using project-owned Area-to-Map policy; dataset map claims are only a fail-closed cross-check. PvP certification additionally requires an exact project-owned PvP gate identity and side; conditional sides remain UNKNOWN and Mode 1 cleanup calls are excluded. CustomWarp certification is limited to two project-owned Firelink sides and their exact landing anchors.
+
+Seath Mode 2 p0=5308 uses a separate proof chain: the staged crystal object, the map event-0 initializer, event 11700005 producing flag 5308, the common dispatcher call, destination player/map, and the runtime prison landing region must all agree. This specific chain is not generalized to other Mode 2 calls. Boss-boundary calls remain UNKNOWN until encounter entry, completion, exit-side actionability, and lifecycle semantics are established. Area.To and ConnectCollision by themselves are rejected. Witness replay recomputes the route fingerprint and compares every edge, state transition, mechanism, and evidence record to the supplied graph.
 
 The Ceaseless query starts in the arena after flag 11410410 is set, requires the main Demon Ruins physical-side waypoint, then requires the lower Demon Ruins/lava goal. The model does not create a Ceaseless-to-lava shortcut.
 
@@ -42,11 +44,13 @@ The dataset does not contain historical per-case package manifests or expected p
 
 ### Results
 
+The audit re-read the same 331 existing STRICT cases and staging trees. No worlds were regenerated. There were zero per-case input errors.
+
 | Measure | Result |
 |---|---:|
-| PROVEN_ACTIONABLE edges | 0 |
+| PROVEN_ACTIONABLE edges | 483 |
 | PROVEN_NON_ACTIONABLE edges | 0 |
-| UNKNOWN edges | 2,823 |
+| UNKNOWN edges | 4,639 |
 | Safe REJECT / PHYSICALLY_SOLVABLE_PROVEN | 0 |
 | Safe REJECT / PHYSICALLY_UNSOLVABLE_PROVEN | 0 |
 | Safe REJECT / UNRESOLVED_MODEL_GAP | 331 |
@@ -54,33 +58,31 @@ The dataset does not contain historical per-case package manifests or expected p
 | Positive witness classes | 0 |
 | Manual QA candidates | 0 |
 
-The safe REJECT disposition is inherited from the certified dataset selection and was not rerun. UNRESOLVED_MODEL_GAP is not a finding that those worlds are physically impossible.
+The 331 SAFE REJECT dispositions are inherited from the selected dataset; the production validator was not rerun. `UNRESOLVED_MODEL_GAP` is not a finding that those worlds are physically impossible. All 331 remain unresolved because every explored world has a reachable UNKNOWN escape. The certification is about current observed staging bytes only: the dataset has no historical per-package hashes, so those bytes are not authenticated against the earlier generation run.
 
-The 1,019 structurally complete transition rows are dataset claims only: 864 ordinary, 131 PvP, and 24 boss-boundary rows. None is promoted to PROVEN_ACTIONABLE because the bytes are not authenticated and trigger-state actionability and physical approach are unverified. The post-boss graph contains 695 case-specific trigger-approach candidates. It joins route hints by source object identity only; ambiguous identities remain UNKNOWN. It never uses logical Area labels as physical destinations.
+Mechanism coverage (candidate evidence rows can overlap across mechanisms):
 
-Mechanism coverage:
+| Mechanism | Status | Candidates | Certified | Unknown | Worlds | Worlds with unknown |
+|---|---|---:|---:|---:|---:|---:|
+| Ordinary Event5700 Mode 0 | STAGED_BYTES_CERTIFIED | 178 | 132 | 46 | 118 | 42 |
+| PvP randomized Mode 0 | STAGED_BYTES_CERTIFIED | 130 | 105 | 25 | 65 | 25 |
+| Project CustomWarp | STAGED_BYTES_CERTIFIED | 7 | 6 | 1 | 7 | 1 |
+| Seath Mode 2 p0=5308 | STAGED_BYTES_CERTIFIED | 331 | 240 | 91 | 331 | 91 |
+| Boss-boundary Mode 0 | UNKNOWN | 787 | 0 | 787 | 241 | 241 |
+| Mode-2 p0=0 | UNKNOWN | 0 | 0 | 0 | 0 | 0 |
+| Boss completion state 11410410 | TRACE_ROWS_ONLY | 331 | 0 | 0 | 331 | 0 |
+| Ceaseless post-boss approach/route | CANDIDATES_ONLY | 1,703 | 0 | 1,703 | 331 | 331 |
 
-| Mechanism | Status | Rows |
-|---|---|---:|
-| All structurally complete randomized transitions | STRUCTURAL_CLAIMS_ONLY | 1,019 |
-| Ordinary fog | STRUCTURAL_CLAIMS_ONLY | 864 |
-| PvP fog | STRUCTURAL_CLAIMS_ONLY | 131 |
-| Boss-boundary randomized fog | STRUCTURAL_CLAIMS_ONLY | 24 |
-| Seath p0=5308 | TRACE_ROWS_ONLY | 331 |
-| Boss completion state 11410410 | TRACE_ROWS_ONLY | 331 |
-| Fixed links | UNKNOWN | 0 |
-| Doors | UNKNOWN | 0 |
-| Elevators | UNKNOWN | 0 |
-| Mode-2 p0=0 warps | UNKNOWN | 0 |
-| Ceaseless exit and route to lower lava | CANDIDATES_ONLY | 695 |
-| Collision and walkability | UNKNOWN | 0 |
+Ordinary and PvP UNKNOWN rows mostly lack a unique staged source object/ActionRegion, disagree with project-owned source-map policy, or have a destination-map/landing mismatch. The Seath unknowns are 86 parameter-to-player/map binding mismatches and 5 prison-landing mismatches. Boss-boundary candidates include 738 calls whose entry/completion/exit semantics remain unverified, 31 missing or ambiguous source objects, and 11 source-map-policy mismatches. No boss transition is certified.
 
-Reports are outside the repository:
+The 1,703 Ceaseless route candidates break down into 1,459 trigger-approach/identity edges, 122 arrival-to-main-side edges, and 122 main-to-lower-lava edges. Every one remains UNKNOWN because fixed physical walking and approach evidence is absent. Event 11410410 is only a completion-state trace; its presence does not prove an exit or route. Fixed walkable links, doors, elevators, generic Mode-2 p0=0 warps, and collision/walkability still have no certified edges; this audit does not establish that they are irrelevant.
 
-- C:\Users\Adam\AppData\Local\Temp\ds1tr-physical-witness-shadow-final3-20261028\physical-witness-331.json
-- C:\Users\Adam\AppData\Local\Temp\ds1tr-physical-witness-shadow-final3-20261028\physical-witness-331.md
+Final reports are outside the repository:
 
-A third complete audit run after the final build produced byte-identical JSON and Markdown. JSON SHA-256: 71C2EC05ABC6933F5D79257405BF59CB7EC2D58AF74FFBBB330B156753E07DEB. Markdown SHA-256: A92DB9E3192DD0641925E57871472FD4E806C609888511A58B26F1E2F37DFFD7. The replay report is in C:\Users\Adam\AppData\Local\Temp\ds1tr-physical-witness-shadow-final2-replay-20261028 and had the same hashes. JSON includes complete step and evidence arrays for any future positive witness.
+- JSON: `C:\Users\Adam\AppData\Local\Temp\ds1tr-v5-short-shift-physical-witness-report-20261028-final-v5.json` — SHA-256 `68421EA830AC0EAC3ABE19DE1CFECD37BDC7D040AE64A0B990E9257685F2DC53`
+- Markdown: `C:\Users\Adam\AppData\Local\Temp\ds1tr-v5-short-shift-physical-witness-report-20261028-final-v5.md` — SHA-256 `EDA76BB225BAB8BABBEC5DE7C5C5A19556CA2B4E7F7B6D0AE880803F4E41E3FA`
+
+A separate complete repeat against the same inputs produced byte-identical JSON and Markdown, with the same hashes. The repeat reports are under `C:\Users\Adam\AppData\Local\Temp\ds1tr-v5-short-shift-physical-witness-report-20261028-repeat.*`. JSON retains complete per-case step and evidence arrays for future positive witnesses.
 
 ## Read-only QA telemetry design
 
@@ -92,10 +94,10 @@ Potential observations are current map, player XYZ, map transitions, boss comple
 
 ## Verification and invariants
 
-- FogReconstruction Release build: passed, 0 errors; 14 existing SoulsFormats obsolete-API warnings.
-- Development tool self-test: passed, including 6 physical-witness rule groups, 4 report path-safety cases, and existing tool self-tests.
-- 331-case read-only audit: 331/331 unresolved; deterministic repeat hashes match.
+- FogReconstruction Release build with .NET 8: passed, 0 errors; 14 existing SoulsFormats obsolete-API warnings.
+- Development tool self-test: passed, including 7 experimental physical-witness groups, 7 generated-transition certification groups, two exact Firelink CustomWarp anchors with four rejection cases, 4 report path-safety cases, and existing tool self-tests.
+- 331-case read-only audit: 0 input errors, 483 actionable / 0 non-actionable / 4,639 unknown edges, and 331/331 worlds unresolved; deterministic repeat JSON/Markdown hashes match.
 - Report-path safety rejects output aliases to the dataset, outputs under staging, pre-existing output files, and colliding JSON/Markdown paths. Input traversal rejects reparse points and checks all ancestors.
 - V1-V5 generation semantics, production validator, retry limits, package versions, and app/backend/FogHost versions were not changed.
 - The verified QA DSR and live Steam DSR were not accessed or modified.
-- No positive witness classes exist, so there are no manual QA candidates yet.
+- No positive whole-world witness classes exist, so there are no manual QA candidates yet, despite the newly certified individual transition edges.
