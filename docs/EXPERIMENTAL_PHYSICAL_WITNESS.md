@@ -101,3 +101,50 @@ Potential observations are current map, player XYZ, map transitions, boss comple
 - V1-V5 generation semantics, production validator, retry limits, package versions, and app/backend/FogHost versions were not changed.
 - The verified QA DSR and live Steam DSR were not accessed or modified.
 - No positive whole-world witness classes exist, so there are no manual QA candidates yet, despite the newly certified individual transition edges.
+
+## Focused shift: boss-boundary lifecycle and Ceaseless exit (2026-10-28)
+
+This was a read-only source/staging audit. It did not modify production generation, the safe Ceaseless validator, retry limits, profile semantics, or live Steam DSR. The designated QA DSR source was `C:\Users\Adam\ds1tr-qa\game-inst\DARK SOULS REMASTERED`; its project reference subset had previously verified 19/19 files. Event and MSB hashes below are observations from that source, not hashes anchored by the project reference manifest.
+
+### Boss-boundary classification
+
+The existing 331-case shadow dataset contains 787 UNKNOWN boss-boundary Mode-0 rows in 241 worlds. Resolving against the project's 21 `BossEntrancePoliciesV1` entries and the existing dispatcher classifier yielded:
+
+| Directional endpoint role | Rows | Worlds | Dispatcher classification |
+|---|---:|---:|---|
+| Boss-policy/arena endpoint appears only as source | 303 | 223 | 303 Mode 0 |
+| Policy exterior endpoint appears only as source | 371 | 210 | 343 Mode 0; 28 without a dispatcher |
+| Boss-policy/arena endpoint appears only as target | 86 | 73 | 81 Mode 0; 5 without a dispatcher |
+| Arena-to-arena | 27 | 25 | 27 Mode 0 |
+| **Total** | **787** | **241 unique** | **754 Mode 0; 33 without a dispatcher** |
+
+These are endpoint roles, not evidence that a side is an alive-state entrance, defeated-state exit, or re-entry. No subtype was promoted. The dataset contains no per-candidate lifecycle metadata except the Ceaseless 11410410 trace rows. The 21-policy resolver also does not resolve Pinwheel's null `ObjectPartName`: 15 of 24 Pinwheel-tagged rows (14 FR, 1 BR) fail at both ends; nine can match through another endpoint. Those rows remain a separate coverage gap. Three policy-matched rows dispatched as already-certified CustomWarp are not included in the 787 boss-boundary UNKNOWN rows.
+
+Future certification must separately prove pre-fight entry, post-defeat exit, re-entry, and arena-to-arena cases. Required evidence includes exact gate object/collision and action region; source-side physical approach in the relevant state; event-0 initialization and dispatcher bindings; destination player/map/landing; boss-start and completion flags; entity death, AI/backread/HP-bar behavior; and gate/collision state after defeat and reload. Without the complete applicable chain, retain UNKNOWN.
+
+### Ceaseless lifecycle and exit evidence
+
+Observed pristine QA EMEVD `event/m14_01_00_00.emevd.dcx` SHA-256: `dc0e348fc53082dd8dfbefa6573c774d0157c2880afaa640daa4e59a819b1deb`. This is an observed source hash only.
+
+- Event 11415371 (boss start) retains the same instruction and event-parameter content under the preservation scan in all **331/331** current staging packages. Its action-line-segment check uses region 1412698; its following behavior rotates/animates the player and does not warp. A randomized spawn or logical transition alone therefore does not establish that the player can activate this region.
+- Event 11410410 waits for boss entity 1410400 to be dead, sets completion flag 11410410, and calls `HandleBossDefeat`. Vanilla then deactivates barrier objects 1411410 and 1411412 and deletes their associated map SFX. The objects are `o4962_0000` / collision `m1030B1` and `o4963_0000` / collision `h0018B1`; both are light-wall barriers.
+- Event 11415342 is a restartable boss-state controller initialized twice from event 0. Its vanilla defeated-state branch also deactivates those two barriers while handling boss AI/backread/health-bar state.
+- Vanilla event 0 has a defeated-state cleanup block for the same barrier pair. In generated staging, both barriers and collision names remain present, while their deactivation calls are absent from event 0, 11410410, and 11415342.
+- Event 11410400, the elevator controller, is initialized and instruction-equivalent to vanilla in **331/331** staging packages. It checks completion flag 11410410 and the four elevator regions. Event 11410402 is also identical in 331/331 and displays the English message “Contraption does not move” when that flag is off. Its direct body is a dialog/condition check, not a movement or warp event.
+- Event 11410090 has two `IssueShortWarpRequest` instructions and two action-line-segment checks, but an exhaustive scan found no `InitializeEvent` call targeting it in either pristine QA EMEVD (32 archives, 1,401 events, 3,153 initializer sites) or the 331 staging corpus (18 archives, 1,281 events, 3,051 sites). It is instruction-identical to vanilla in 331/331 staging packages. This supports `NOT_ROUTE_RELEVANT_PROVEN IN THIS PINNED CORPUS`, not a universal dead-code claim.
+
+The 331-package preservation scan returned no mismatches: 11415371, 11410400, 11410402, and 11410090 are all instruction-equivalent; the elevator/completion/controller initializers remain; both barriers remain in the MSB; and all three defeated-state barrier cleanup blocks are missing in all 331. The source/staging comparison therefore identifies a generated-package Ceaseless exit-state regression: the vanilla boss-death progression that releases the two light walls is not preserved. This is strong evidence for the lifecycle defect, but it does **not** certify the full physical path from the arena through the released barrier to the elevator/main route; collision connectivity and walkable geometry remain unproven.
+
+EMEDF instruction names used in interpreting the event bodies: `IfActionButtonLineSegment` 3[18], `IfEventFlag` 3[0], `IfMultiplayerState` 3[6], `IfCharacterDeadalive` 4[0], `InitializeEvent` 2000[0], `SetNetworkSyncState` 2000[2], `HandleBossDefeat` 2003[12], `RotateCharacter` 2004[14], `DeactivateObject` 2005[3], `DeleteMapSFX` 2006[1], and `IssueShortWarpRequest` 2004[41]. These IDs are documented in the DS1 EMEDF reference.
+
+### Same-input 331-case rerun and interpretation
+
+The same canonical dataset and existing staging trees were reread; no world was regenerated. Fresh reports are `C:\Users\Adam\AppData\Local\Temp\ds1tr-ceaseless-focused-shift-20261028\audit-331.json` (SHA-256 `68421ea830ac0eac3abe19de1cfecd37bdc7d040ae64a0b990e9257685f2dc53`) and `C:\Users\Adam\AppData\Local\Temp\ds1tr-ceaseless-focused-shift-20261028\audit-331.md` (SHA-256 `eda76bb225bab8babbec5de7c5c5a19556ca2b4e7f7b6d0ae880803f4e41e3fa`). JSON matched the prior canonical report byte-for-byte. Results remain 483 PROVEN_ACTIONABLE, 0 PROVEN_NON_ACTIONABLE, 4,639 UNKNOWN; all 331 cases remain UNRESOLVED with reachable UNKNOWN escapes. There are no positive whole-world witnesses.
+
+Even if the post-boss barrier-release issue were hypothetically fixed, all 331 cases remain unresolved because UNKNOWN physical approach/trigger identity edges occur in all 331 worlds (1,459 rows), in addition to arrival-to-main-side and main-to-lower-lava route gaps. Hypothetically accepting every boss-boundary row would also leave 331/331 unresolved: a boss crossing classification does not prove approach to the gate or fixed Demon Ruins walkability. These are impact calculations, not certifications.
+
+### Staging authenticity recommendation
+
+At generation time, preserve a canonical per-case attestation outside the mutable staging tree: Seed Code and profile; attempt and derived seeds; exact app/backend/engine and input-data identities; sorted relative-path inventory with size and SHA-256 for every package file; and a digest over a canonical serialization. Anchor that attestation in an immutable, access-controlled CI artifact or sign it with a key unavailable to the staging writer. The auditor should verify the attestation before parsing or classifying staging bytes. Keep the canonical dataset, attestation, tool build identity, and audit report together. A hash computed during a later audit is useful for repeatability only; without a contemporaneous trusted expected digest it cannot authenticate historical package content.
+
+No production code, validator, retry limit, generation profile, package version, or DECISIONS entry changed. No game process or live Steam installation was accessed.
