@@ -37,6 +37,7 @@ namespace FogReconstruction
                     FogDsrSpatialIndexSelfTests.Run();
                     ExperimentalPhysicalWitnessSelfTests.Run();
                     Certified331PhysicalWitnessAudit.SelfTestPathSafety();
+                    Certified331PhysicalWitnessAudit.SelfTestMode2P0ZeroCoverage();
                     AreaCatalogAuditSelfTests.Run();
                     CombinedTransitionGraphAuditSelfTests.Run();
                     AreaGraphBehaviorAuditSelfTests.Run();

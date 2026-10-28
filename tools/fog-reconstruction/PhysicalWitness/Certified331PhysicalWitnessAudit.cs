@@ -25,7 +25,7 @@ namespace FogReconstruction.PhysicalWitness
         int AffectedWorlds = 0,
         int UnknownEdges = 0,
         int UnknownAffectedWorlds = 0);
-    public sealed record PhysicalWitnessCaseResult(string Profile, int Seed, string SafeValidatorDisposition, string ExperimentalWitness, string PackageTreeSha256ObservedUnanchored, int PackageTreeFileCount, int CertifiedOutputFileClaim, string RouteClassFingerprint, bool ReachableUnknownEscape, string Explanation, PhysicalWitnessStep[] WitnessSteps, string[] InputErrors);
+    public sealed record PhysicalWitnessCaseResult(string Profile, int Seed, string SafeValidatorDisposition, string ExperimentalWitness, string PackageTreeSha256ObservedUnanchored, int PackageTreeFileCount, int CertifiedOutputFileClaim, string RouteClassFingerprint, bool ReachableUnknownEscape, string Explanation, PhysicalWitnessStep[] WitnessSteps, PhysicalEdge[] CandidateEdges, string[] InputErrors);
     public sealed record PhysicalWitnessAuditReport(
         int SchemaVersion,
         PhysicalWitnessBaseline Baseline,
@@ -79,6 +79,41 @@ namespace FogReconstruction.PhysicalWitness
             {
                 Directory.Delete(root, recursive: true);
             }
+        }
+
+        public static void SelfTestMode2P0ZeroCoverage()
+        {
+            PhysicalEdge MakeEdge(string evidenceLocator, int mode, string mechanismClass) => new(
+                "test", new PhysicalNode("source", "trigger"), new PhysicalNode("target", "player"),
+                PhysicalEdgeCertainty.UNKNOWN, "mode2-unsupported", "unknown",
+                Array.Empty<int>(), Array.Empty<int>(), Array.Empty<int>(), Array.Empty<int>(), Array.Empty<int>(),
+                new[] { new PhysicalEvidence("GeneratedDispatcher", evidenceLocator, "test-hash") })
+            {
+                Certification = new PhysicalEdgeCertification("test-rule", mechanismClass, mode,
+                    "source", "target", "unknown", "N/A", "dispatcher", "player", "target", "unknown",
+                    "test", "UNKNOWN", "test")
+            };
+
+            if (!IsMode2P0ZeroCandidate(MakeEdge("common/event0/instruction[1]; mode=2; p0=0", 2, "mode2-unsupported")))
+                throw new InvalidOperationException("The exact Mode-2 p0=0 evidence locator was not classified.");
+            if (IsMode2P0ZeroCandidate(MakeEdge("common/event0/instruction[1]; mode=2; p0=5308", 2, "mode2-unsupported")))
+                throw new InvalidOperationException("A nonzero Mode-2 trigger flag was classified as p0=0.");
+            if (IsMode2P0ZeroCandidate(MakeEdge("common/event0/instruction[1]; mode=1; p0=0", 1, "mode2-unsupported")))
+                throw new InvalidOperationException("A non-Mode-2 call was classified as a Mode-2 p0=0 candidate.");
+            if (IsMode2P0ZeroCandidate(MakeEdge("common/event0/instruction[1]; mode=2; p0=0", 2, "seath-mode2-p0-5308")))
+                throw new InvalidOperationException("A separately classified mechanism was counted as unsupported Mode-2 p0=0.");
+
+            PhysicalEdge dispatcherOnly = MakeEdge("common/event0/instruction[1]; mode=2; p0=5308", 2, "mode2-unsupported") with
+            {
+                Certification = MakeEdge("common/event0/instruction[1]; mode=2; p0=0", 2, "mode2-unsupported").Certification with
+                {
+                    Dispatcher = "common/event0/instruction[1]; mode=2; p0=0",
+                }
+            };
+            if (IsMode2P0ZeroCandidate(dispatcherOnly))
+                throw new InvalidOperationException("A p0=0 value in the descriptive dispatcher field was accepted without the generated-call evidence.");
+
+            Console.WriteLine("Mode-2 p0=0 coverage self-test passed (5 cases).");
         }
 
         private static void AssertPathRejected(Action action, string failure)
@@ -172,6 +207,7 @@ namespace FogReconstruction.PhysicalWitness
                     witness.ReachableUnknownEscape,
                     witness.Explanation,
                     witness.Steps,
+                    edges.ToArray(),
                     Array.Empty<string>());
                 evaluated.Add(new EvaluatedCase(caseResult, edges.ToArray(), record));
             }
@@ -190,7 +226,7 @@ namespace FogReconstruction.PhysicalWitness
             string[] positiveFingerprints = evaluated.Select(item => item.Result.RouteClassFingerprint)
                 .Where(value => !string.IsNullOrEmpty(value)).Distinct(StringComparer.Ordinal).OrderBy(value => value, StringComparer.Ordinal).ToArray();
             var report = new PhysicalWitnessAuditReport(
-                3,
+                4,
                 new PhysicalWitnessBaseline(
                     "fix/compact-fog-v5-progression",
                     BaselineCommit,
@@ -465,12 +501,17 @@ namespace FogReconstruction.PhysicalWitness
             PhysicalEdge[] ceaselessEdges = edges.Where(edge => ceaselessMechanisms.Contains(edge.Mechanism, StringComparer.Ordinal)).ToArray();
             int ceaselessCandidates = ceaselessEdges.Length;
             int ceaselessWorlds = ceaselessEdges.Select(CaseIdentity).Where(value => value != null).Distinct(StringComparer.Ordinal).Count();
-            int ceaselessApproachEdges = ceaselessEdges.Count(edge => edge.Mechanism == "unverified-physical-approach-to-post-boss-fog"
-                || edge.Mechanism == "unresolved-post-boss-trigger-identity");
+            PhysicalEdge[] ceaselessApproachEdges = ceaselessEdges.Where(edge => edge.Mechanism == "unverified-physical-approach-to-post-boss-fog").ToArray();
+            PhysicalEdge[] ceaselessIdentityEdges = ceaselessEdges.Where(edge => edge.Mechanism == "unresolved-post-boss-trigger-identity").ToArray();
+            int ceaselessApproachWorlds = ceaselessApproachEdges.Select(CaseIdentity).Where(value => value != null)
+                .Distinct(StringComparer.Ordinal).Count();
+            int ceaselessIdentityWorlds = ceaselessIdentityEdges.Select(CaseIdentity).Where(value => value != null)
+                .Distinct(StringComparer.Ordinal).Count();
             int ceaselessArrivalEdges = ceaselessEdges.Count(edge => edge.Mechanism == "unverified-arrival-to-main-demonruins-side");
             int ceaselessLowerRouteEdges = ceaselessEdges.Count(edge => edge.Mechanism == "main-demonruins-to-lower-lava");
-            int p0Zero = edges.Count(edge => edge.Certification?.MechanismClass == "mode2-unsupported"
-                && edge.Certification.Dispatcher.Contains("p0=0", StringComparison.Ordinal));
+            PhysicalEdge[] p0ZeroEdges = edges.Where(IsMode2P0ZeroCandidate).ToArray();
+            int p0ZeroWorlds = p0ZeroEdges.Select(CaseIdentity).Where(value => value != null)
+                .Distinct(StringComparer.Ordinal).Count();
 
             return new[]
             {
@@ -489,15 +530,19 @@ namespace FogReconstruction.PhysicalWitness
                 ByRule("boss-boundary Mode 0", GeneratedTransitionCertifier.BossBoundaryMode0,
                     "Staged boundary bindings are checked against project-owned boss entrance identities.",
                     "Encounter activation, defeat-state ownership, and post-boss exit lifecycle are not fully proven."),
-                Coverage("Mode-2 p0=0", p0Zero, "UNKNOWN",
+                Coverage("Mode-2 p0=0", p0ZeroEdges.Length, "UNKNOWN",
                     "Mode-2 p0=0 call sites are retained as UNKNOWN candidates; they are never generalized from Seath.",
-                    "Each source producer and destination semantic still needs a separate exact rule."),
+                    "Each source producer and destination semantic still needs a separate exact rule.",
+                    0, p0ZeroWorlds, p0ZeroEdges.Length, p0ZeroWorlds),
                 Coverage("boss completion state", bossFlag, bossFlag > 0 ? "TRACE_ROWS_ONLY" : "UNKNOWN",
                     bossFlag > 0 ? "Event 11410410 trace rows are present; the query starts after the boss." : "The certified event 11410410 record is missing.",
                     "Flag presence does not establish an exit or a physical route.", 0, bossFlag, 0, 0),
                 Coverage("Ceaseless post-boss physical approach/route", ceaselessCandidates, "CANDIDATES_ONLY",
                     "Case-specific trigger sides retain exact object/area identity from staged transition parsing; breakdown: "
-                    + ceaselessApproachEdges.ToString(CultureInfo.InvariantCulture) + " trigger-approach/identity, "
+                    + ceaselessIdentityEdges.Length.ToString(CultureInfo.InvariantCulture) + " unresolved path-to-transition identity ("
+                    + ceaselessIdentityWorlds.ToString(CultureInfo.InvariantCulture) + " worlds), "
+                    + ceaselessApproachEdges.Length.ToString(CultureInfo.InvariantCulture) + " exact trigger-side physical-approach candidates ("
+                    + ceaselessApproachWorlds.ToString(CultureInfo.InvariantCulture) + " worlds), "
                     + ceaselessArrivalEdges.ToString(CultureInfo.InvariantCulture) + " arrival-to-main-side, "
                     + ceaselessLowerRouteEdges.ToString(CultureInfo.InvariantCulture) + " main-to-lower-lava.",
                     "All listed edges remain UNKNOWN; fixed physical walking and approach evidence is absent.", 0, ceaselessWorlds,
@@ -513,6 +558,15 @@ namespace FogReconstruction.PhysicalWitness
                     "No ConnectCollision or geometry-only edge is promoted.",
                     "Needs a complete physical path/walkability proof or verified gameplay observation.")
             };
+        }
+
+        private static bool IsMode2P0ZeroCandidate(PhysicalEdge edge)
+        {
+            if (edge?.Certification?.MechanismClass != "mode2-unsupported" || edge.Certification.Mode != 2)
+                return false;
+            return edge.Evidence.Any(item => item.Kind == "GeneratedDispatcher"
+                && Regex.IsMatch(item.Locator ?? string.Empty,
+                    @"(?:^|;\s*)mode=2;\s*p0=0(?:;|$)", RegexOptions.CultureInvariant));
         }
 
         private static string CaseIdentity(PhysicalEdge edge)
@@ -566,6 +620,7 @@ namespace FogReconstruction.PhysicalWitness
             builder.AppendLine("- Production validator: not invoked or changed by this shadow audit.");
             builder.AppendLine("- Safe disposition is inherited from the certified dataset selection and was not rerun.");
             builder.AppendLine("- Package bytes are NOT authenticated: " + report.Dataset.PackageByteAuthentication);
+            builder.AppendLine("- Schema 4 JSON retains each case's complete CandidateEdges, including UNKNOWN candidates; these records preserve evidence and do not increase certainty.");
 
             builder.AppendLine("- Staging relative-path inventory SHA-256 (shape only): " + report.Dataset.RelativePathInventorySha256 + ".");
             builder.AppendLine();

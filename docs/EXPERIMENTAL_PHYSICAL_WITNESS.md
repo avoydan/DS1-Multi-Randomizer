@@ -148,3 +148,83 @@ Even if the post-boss barrier-release issue were hypothetically fixed, all 331 c
 At generation time, preserve a canonical per-case attestation outside the mutable staging tree: Seed Code and profile; attempt and derived seeds; exact app/backend/engine and input-data identities; sorted relative-path inventory with size and SHA-256 for every package file; and a digest over a canonical serialization. Anchor that attestation in an immutable, access-controlled CI artifact or sign it with a key unavailable to the staging writer. The auditor should verify the attestation before parsing or classifying staging bytes. Keep the canonical dataset, attestation, tool build identity, and audit report together. A hash computed during a later audit is useful for repeatability only; without a contemporaneous trusted expected digest it cannot authenticate historical package content.
 
 No production code, validator, retry limit, generation profile, package version, or DECISIONS entry changed. No game process or live Steam installation was accessed.
+
+## Overnight physical-witness audit (2026-10-28; shadow-only)
+
+The completed focused boss-boundary lifecycle shift is recorded in commit `fb1c312092384399d225fea9f995ea7ceabee556`. The overnight continuation used the same baseline, canonical dataset, and staging trees. It did not regenerate worlds. The local tag `v5-safe-ceaseless-baseline` still resolves to `abc6a5286353618a1087b8363bf9438236b8fb10`.
+
+The read-only source was `C:\Users\Adam\ds1tr-qa\game-inst\DARK SOULS REMASTERED`; its project reference subset had previously verified 19/19 files. This continuation reread the relevant `map/MapStudio/m14_01_00_00.msb`. The QA `map/` tree contains 35 loose MSB files and no collision mesh/archive assets, so its MSB positions and collision names cannot prove a continuous walkable route. The live Steam installation and game process were not accessed.
+
+### Result evolution
+
+| Checkpoint | PROVEN_ACTIONABLE | PROVEN_NON_ACTIONABLE | UNKNOWN | Solvable | Unsolvable | Unresolved |
+|---|---:|---:|---:|---:|---:|---:|
+| Focused-shift start / 0.3.0 report | 483 | 0 | 4,639 | 0 | 0 | 331 |
+| Overnight final / 0.3.2 report | 483 | 0 | 4,639 | 0 | 0 | 331 |
+
+No physical mechanism class was newly promoted. The correction from 0.3.0 to 0.3.1 fixed the Mode-2 p0=0 coverage display; it did not change edge certainty. Version 0.3.2 adds each world's full `CandidateEdges` to schema-4 JSON, making the blocker frontier reproducible from per-case graph/evidence records. These edges remain subject to the existing strict certification rules.
+
+Fresh audit: `C:\Users\Adam\AppData\Local\Temp\ds1tr-ceaseless-focused-shift-20261028\audit-331-v4-final.json` (SHA-256 `DA16DDF3376CB667FE43AB4FDB7760B26516411CD8DE9A970FFC7F56FB040DEB`), and `.md` (SHA-256 `61AE337F0E19B5B1DBD559749079259B53429676EA435C7A1EE4910D9028A521`). The JSON retains 5,122 per-case candidate edges. A second final run produced byte-identical JSON and Markdown. Results are 483 actionable, 0 non-actionable, 4,639 unknown, 0 positive whole-world witnesses, and 331 unresolved. Historical package hashes are not anchored by the dataset; current staging-tree hashes remain untrusted observations.
+
+### Fixed-transition evidence rules and current status
+
+No row is classified from `Area.To`, a matching map name, or `ConnectCollision` alone. The required evidence and current classification are:
+
+| Mechanism class | Current status in this corpus | Evidence required before promotion |
+|---|---|---|
+| Fixed map-boundary traversal | UNKNOWN; no candidate rows | Exact directed boundary anchors, connected collision/approach, destination-side anchor, and state conditions. |
+| Doors | UNKNOWN; no candidate rows | Exact door and collision identity, interaction/open event, lock/item/flag condition, opened-state persistence, and destination-side connection. |
+| Elevators | UNKNOWN as physical edges; no candidate rows | Platform and floor positions, call/ride/arrival state, collision ownership, and reachable approach at both ends. A live controller is not proof that the player can reach it. |
+| Ladders | UNKNOWN; no candidate rows | Exact ladder identity, top/bottom anchors, interaction and attachment behavior, state/one-way rules, and connected approaches. |
+| One-way drops | UNKNOWN; no candidate rows | Reachable source platform, collision-supported landing, survival/no-clipping evidence, and a connected route after landing. |
+| Boss-unlocked routes | UNKNOWN as physical edges; Ceaseless evidence below | Boss-defeat flag producer, barrier/door state transition, post-defeat actionability, and a connected physical route in that state. |
+| Item-gated doors | UNKNOWN; no candidate rows | Exact required item and event condition, possession/consumption semantics, door state transition, and both physical approaches. |
+| Lordvessel-gated routes | UNKNOWN; no candidate rows | Exact Lordvessel state/flag, route activation event, physical entrance and destination proof. A warp/menu option is not a physical edge. |
+| Fixed fog boundaries | UNKNOWN; no candidate rows | Exact object, ActionRegion, event binding, gating state, destination player/map, landing, and physical approach. |
+| Scripted non-random transitions | UNKNOWN generally; event 11410090 is not route-relevant in this pinned corpus | Exact caller chain, trigger conditions, warp target and resulting player/map state. The event-11410090 finding is corpus-scoped and does not classify other scripts. |
+
+“No candidate rows” means this 331-case query graph did not contain a row for that class; it does not mean the class is absent from Lordran. Existing exact certifications remain limited to ordinary Mode 0, the enumerated PvP gate subset, two Firelink CustomWarp sides, and the Seath Mode-2 p0=5308 chain. No certification was generalized to unobserved mechanisms.
+
+### Ceaseless route and minimum candidate frontier
+
+The exact QA MSB positions corroborate object identity, not reachability: boss-side object `o4961_0000` / entity 1411790 is at `(249, -283.15, 70.4)` with collision `h0005B1`; boss-start region 1412698 is centered at `(248.5, -284, 69.7)`. The two boss-completion light walls are `o4962_0000` / entity 1411410 / collision `m1030B1` at `(148.9, -341.04, 94.6)` and `o4963_0000` / entity 1411412 / collision `h0018B1` at `(110.38, -341, 140.5)`. Elevator regions 1412400–1412403 are present and the controller is preserved, but map coordinates cannot prove walkability between those locations.
+
+Vanilla event 11410410 and the defeated-state branches in event 11415342/event 0 release the two light walls. All 331 current staging trees labeled as generated packages retain the barrier objects but omit those three known release blocks. The dataset has no historical per-package hashes, so this is an observed source-to-staging lifecycle mismatch, not authenticated proof about the original run bytes and not proof that every alternate route is blocked or that a post-defeat physical exit exists. Event 11410090 has no initializer caller in the scanned pristine or staged corpus and is not used as a route edge.
+
+The canonical dataset's `postBossPath` has 1,459 random steps: 574 uniquely match a `randomTransitions` identity, 885 match none, and zero match multiple rows. By world, 94 paths match every step, 41 have a mix of matching and unmatched steps, and 196 have no exact matching step. These mismatches are an identity/provenance blocker; they are not evidence that generation itself is wrong.
+
+Using schema-4 per-case candidate edges and the recorded start/goal anchors, 119 worlds have a candidate directed graph path from post-Ceaseless arena to lower Demon Ruins/lava when UNKNOWN edges are treated only as possible. **None is a witness.** The shortest candidate paths contain six UNKNOWN edges in 13 worlds. Across the 119 selected shortest graph paths, every path requires all four classes below; these are potential candidate worlds, not worlds shown playable:
+
+| Required unresolved class | Candidate paths/worlds affected | Evidence still missing |
+|---|---:|---|
+| Physical approach to each post-boss Fog trigger | 119 worlds; 506 candidate edges on selected shortest paths | Reachable player-side/collision evidence at each trigger, after boss completion where applicable. |
+| Boss-boundary Mode 0 transitions | 119 worlds; 413 candidate edges on selected shortest paths | Full gate lifecycle and exact event/landing/actionability proof for each edge. |
+| Arrival player to main Demon Ruins physical side | 119 paths (122 raw candidate rows exist) | Collision geometry and a connected walkable route from the exact generated landing. |
+| Main Demon Ruins side to lower lava route | 119 paths (122 raw candidate rows exist) | A connected, state-correct physical route; Area.To and collision linkage are insufficient. |
+
+Some shortest candidates also include unresolved path-to-transition identity (34 worlds) or ordinary Mode 0 edges (15 worlds). For representative `A-disconnected-off-lords-on/5351`, the six-edge lower-bound path is: approach `o4961_0000` on `demonruins_ceaseless` → its boss-boundary Mode 0 edge to Painted World player 1815827 → approach `o1600_0000` → its boss-boundary Mode 0 edge back to Demon Ruins player 1815855 → landing-to-main route → main-to-lower-lava route. Each arrow remains UNKNOWN. The invalid `demonruins_ceaseless -> demonruins_lava` shortcut is not present.
+
+The smallest evidence package for a first trustworthy positive witness is one contemporaneously authenticated generated package plus a complete proof of those six edges for a six-edge candidate world: boss-state and barrier behavior; both trigger approaches and boss-boundary transitions/landings; and collision-backed player traversal from player 1815855 to the main route and then lower lava. The current QA `map/` read set lacks collision meshes, and historical staging has no package hashes. Static files available in this corpus therefore cannot close the physical route; read-only runtime observation or a separately verified collision-geometry source is required. This is a candidate-level frontier, not a global shortest physical path.
+
+### Mode-2 p0=0 families
+
+The corrected report counts 1,986 Mode-2 p0=0 edges across all 331 worlds (six families per world), all UNKNOWN. They remain classified D: unresolved. No conclusion that zero means unconditional or broken is supported. Flag zero appears in vanilla conditions and as a parameter value, while no direct source producer was established for the generated p0=0 calls. The six source families retained in the dataset are:
+
+| Family | Source event | Observed source flags | Landing |
+|---|---|---|---|
+| Firelink crow → Asylum | m10_02_00_00 / 11020021 | 5301, 11020000 | asylum / 1812110 |
+| Asylum crow → Firelink | m18_01_00_00 / 11810150 | 5307 | firelink / 1022121 |
+| Anor Londo painting entry | m15_01_00_00 / 11510230 | 5305 | paintedworld / 1102510 |
+| Painted World return | m11_00_00_00 / 11100710 | 5302, 11105380 | anorlondo / 1512500 |
+| Catacombs coffin → Tomb | m13_00_00_00 / 11305000 | 5309 | totg / 1312110 |
+| Tomb coffin → Catacombs | m13_01_00_00 / 11310052 | 5310 | catacombs / 1302010 |
+
+Event5700Builder passes p0 unchanged; pinned FogMod does the same for mode 2. Those are implementation facts, not proof of runtime sentinel semantics. Comparable vanilla flag-zero conditions and parameterized callers prevent classifying p0=0 as automatically invalid. These six classes stay out of the actionable graph until a full source/caller/runtime proof exists.
+
+### Staged authenticity, telemetry, and verification
+
+The existing package hashes are still current staging observations, not historical authentication. A future analysis manifest proposal (not implemented) is: schema and dataset identity; Seed Code/profile/options; raw and derived seeds; attempt; app/backend/FogHost/DsrDataTool versions; source commit plus dirty-tree fingerprint; catalog and world-data fingerprints; sorted relative file paths, sizes and SHA-256 values; and a canonical package digest. A self-hash alone is not trust. The manifest must be anchored by an immutable CI artifact or signature key unavailable to the staging writer before an audit can treat it as provenance.
+
+Read-only telemetry is needed to prove the missing runtime collision/actionability facts if verified geometry is unavailable. A future helper must be locked to the exact QA executable and package hashes, request query/read process rights only, and record current map, player XYZ, boss flag 11410410, transition/action observations, and barrier state with timestamps. Offsets must be independently derived and validated against known map/position/flag markers before observations are accepted. It must fail closed on hash/marker mismatch and must never request write rights. No telemetry helper was implemented or run in this shift.
+
+Verification for the development-only FogReconstruction tool v0.3.2: .NET 8 Release build succeeded with 0 errors and 14 pre-existing obsolete-SoulsFormats API warnings; full tool self-test passed, including the new five-case Mode-2 p0=0 coverage check; the 331-case audit passed twice with byte-identical schema-4 JSON/Markdown. No worlds were regenerated. V1–V5 production semantics, production validator, retry limits, production catalog, safe baseline tag, and live Steam DSR were unchanged. No game process was opened and no process memory was read or written. No architectural decision was made; `docs/DECISIONS.md` is unchanged.
