@@ -67,6 +67,16 @@ The established QA DSR root is an extracted data-only snapshot with 199 files, n
 
 Verification: standalone .NET 8 Release build passed with 0 warnings/errors; focused synthetic QA helper tests passed 24/24. The actual selected package passes `verify-case`; preflight returns the expected `QA_RUNTIME_INCOMPLETE` with no process rights requested and no game launched. V5 backend, generation, retry, FogHost, and release behavior were not changed or rerun.
 
+### Runtime completion follow-up (2026-10-29)
+
+This supersedes the preceding section's runtime-incomplete status; its 24-test count and preflight result describe the earlier checkpoint. Steam metadata identified the installed DSR source (AppID 570940, build 10943698). The source was inventoried/read only, then copied to two isolated runtime trees outside Git: a clean baseline and a separate test runtime. The full runtime inventory has 6,013 files / 7,366,427,395 bytes and matches the source appmanifest `SizeOnDisk`. This proves a complete copy of the installed source, not official depot authentication or vanilla provenance. No Steam file was changed or game launched.
+
+The selected package was reverified before application. Its declared game files were applied only to the separate test runtime; all 73 changed runtime paths are package-listed, and the executable is unchanged. The clean baseline is preserved. External canonical manifests and hashes remain local and are not committed.
+
+Final Release build: 0 warnings / 0 errors. Focused QA helper suite: 30/30. The selected package verifies, and preflight returns `QA_RUNTIME_COMPLETE`, zero blockers, required runtime assets present, `processRightsRequested: 0`, `gameLaunched: false`, and telemetry `UNVERIFIED`. The updated launcher was smoke-tested through the preflight path only. Static Demon Ruins inspection decoded MSB1 (119 collision models / 119 parts), MCP (49 rooms), MCG (51 nodes / 65 edges), H/L BXF3 collision archives (119 entries each), and NVM BND3 (52 entries). The available SoulsFormats dependency cannot decode HKX triangles, so continuous Ceaseless-to-lava traversability remains `UNKNOWN`.
+
+No exact-build telemetry markers or live reader are implemented. Therefore the overall task remains **PARTIAL**: isolated runtime/package preflight is complete, but telemetry-backed gameplay is not ready. Production validator, V1–V5 semantics, retry limits, safe baseline tag, app version, and release artifacts were unchanged.
+
 ## Experimental physical-witness shadow tool (2026-10-28; dev tool 0.2.0)
 
 Added a development-only evidence graph and a read-only audit over the existing certified 331 STRICT cases. Production validation/generation remains unchanged; no cases were regenerated and the production validator was not rerun. Safe dispositions are inherited from the canonical dataset selection.

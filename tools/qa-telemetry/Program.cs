@@ -11,6 +11,27 @@ internal static class Program
             if (args.Length == 0 || args[0] is "--help" or "-h") return Help();
             string command = args[0];
             Dictionary<string, string> options = ParseOptions(args.Skip(1).ToArray());
+
+            if (command == "attest-runtime")
+            {
+                if (options.Count != 0) throw new ArgumentException("attest-runtime uses repository-locked QA paths and takes no options.");
+                RuntimeManifestWriteResult result = RuntimeManifestService.AttestCleanBaseline(QaRuntimePolicy.Default);
+                Console.WriteLine(JsonSerializer.Serialize(new
+                {
+                    status = "QA_RUNTIME_CLEAN_ATTESTED",
+                    result.ManifestPath,
+                    result.ManifestSha256,
+                    result.Manifest.CanonicalDigest,
+                    result.Manifest.FileCount,
+                    result.Manifest.TotalBytes,
+                    result.Manifest.ExecutableSha256,
+                    gameLaunched = false
+                }, CaseDescriptor.JsonOptions));
+                return 0;
+            }
+
+            bool needsCase = command is "verify-case" or "preflight" or "trace-import" or "apply-package";
+            if (!needsCase) throw new ArgumentException("Unknown command: " + command);
             if (!options.TryGetValue("case", out string? casePath)) throw new ArgumentException("Required option: --case <descriptor.json>");
             CaseDescriptor descriptor = CaseDescriptor.Load(casePath);
 
@@ -37,12 +58,27 @@ internal static class Program
                     package = new { package.TreeSha256, package.RunManifestSha256, package.FileCount, package.TotalBytes },
                     runtime.Blockers,
                     runtime.ExecutableSha256,
-                    runtime.HasArchivePair,
+                    runtime.HasRequiredRuntimeAssets,
+                    runtime.CleanManifestSha256,
+                    runtime.ModifiedManifestSha256,
                     processRightsRequested = ProcessAccessPolicy.RightsRequestedByThisBuild,
                     gameLaunched = false,
                     telemetryStatus = "UNVERIFIED"
                 }, CaseDescriptor.JsonOptions));
                 return runtime.Ok ? 0 : 3;
+            }
+
+            if (command == "apply-package")
+            {
+                if (options.Keys.Any(key => key != "case")) throw new ArgumentException("apply-package accepts only --case.");
+                RuntimePolicy policy = QaRuntimePolicy.Default;
+                RuntimeApplyResult result = RuntimeManifestService.ApplyCertifiedPackage(
+                    descriptor,
+                    policy.CleanManifestPath,
+                    policy.ModifiedManifestPath,
+                    policy);
+                Console.WriteLine(JsonSerializer.Serialize(result, CaseDescriptor.JsonOptions));
+                return result.Ok ? 0 : 5;
             }
 
             if (command == "trace-import")
@@ -71,8 +107,10 @@ internal static class Program
 
     private static int Help()
     {
-        Console.WriteLine("QaTelemetry 0.1.0 (standalone development tool)");
+        Console.WriteLine("QaTelemetry 0.2.0 (standalone development tool)");
         Console.WriteLine("  verify-case --case <descriptor.json>");
+        Console.WriteLine("  attest-runtime");
+        Console.WriteLine("  apply-package --case <descriptor.json>");
         Console.WriteLine("  preflight --case <descriptor.json>");
         Console.WriteLine("  trace-import --case <descriptor.json> --trace <trace.jsonl> --summary <summary.json> --summary-sha <summary.sha256>");
         Console.WriteLine("This build never launches or attaches to a game process. Live telemetry is disabled until runtime and offsets are independently verified.");

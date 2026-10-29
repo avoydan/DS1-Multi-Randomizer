@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -23,8 +24,14 @@ internal static class Program
         Run("process write and operation rights are rejected", RightsRejectWrite);
         Run("Steam target path is rejected", SteamPathRejected);
         Run("trace output outside Temp is rejected", TraceOutsideTempRejected);
-        Run("QA runtime missing archives fails closed", RuntimeMissingArchives);
-        Run("unverified runtime profile blocks even with archive pair", RuntimeProfileUnverified);
+        Run("QA runtime without manifest binding fails closed", RuntimeMissingManifestBinding);
+        Run("clean runtime manifest attests exact copied tree and QA subset", CleanRuntimeManifestRoundTrip);
+        Run("package applies only to a separate runtime copy and preflight verifies it", PackageAppliedRuntimePreflight);
+        Run("runtime tree mutation fails its manifest", RuntimeTreeMutationRejected);
+        Run("reparse point in runtime inventory fails closed", RuntimeReparsePointRejected);
+        Run("Steam runtime path is rejected without reading it", RuntimeSteamPathRejected);
+        Run("non-approved isolated runtime path is rejected", RuntimePathMismatchRejected);
+        Run("package identity change after application is rejected", RuntimePackageMismatchRejected);
         Run("unexpected QA executable hash fails closed", RuntimeExecutableHashMismatch);
         Run("unexpected QA executable path fails closed", RuntimeExecutablePathMismatch);
         Run("trace writer is create-new and summary is hash sealed", SyntheticTraceRoundTrip);
@@ -116,22 +123,134 @@ internal static class Program
         Throws<InvalidDataException>(() => SafePaths.EnsureUnderTemp(outside));
     }
 
-    private static void RuntimeMissingArchives()
+    private static void RuntimeMissingManifestBinding()
     {
         using var f = new Fixture();
         RuntimePreflightResult result = RuntimePreflight.Run(f.Descriptor);
-        Check(!result.Ok && result.Code == "QA_RUNTIME_INCOMPLETE", "Missing archives did not fail closed.");
-        Check(!result.HasArchivePair, "Fixture unexpectedly has game archives.");
+        Check(!result.Ok && result.Code == "QA_RUNTIME_PREFLIGHT_BLOCKED", "Missing runtime attestations did not fail closed.");
+        Check(result.Blockers.Any(b => b.StartsWith("QA_RUNTIME_MANIFEST_MISSING", StringComparison.Ordinal)), "Missing runtime attestation was not reported.");
+        Check(!result.HasRequiredRuntimeAssets, "Unattested runtime was accepted.");
     }
 
-    private static void RuntimeProfileUnverified()
+    private static void CleanRuntimeManifestRoundTrip()
+    {
+        using var f = new RuntimeFixture();
+        RuntimeManifestWriteResult written = f.AttestClean();
+        RuntimeManifestVerification verified = RuntimeManifestService.VerifyManifest(
+            written.ManifestPath, f.Policy.CleanRuntimeRoot, "QA_RUNTIME_CLEAN_BASELINE", written.ManifestSha256, f.Policy);
+        Check(verified.Ok, verified.Message);
+        Check(written.Manifest.FileCount >= 1000, "Runtime inventory was unexpectedly small.");
+        Check(written.Manifest.QaDataSubsetFileCount == 1, "Established QA snapshot subset was not bound.");
+        Check(written.Manifest.CanonicalDigest == SafePaths.InventoryDigest(written.Manifest.Files), "Canonical inventory digest is inconsistent.");
+        Check(written.Manifest.TopLevelArchivePairs.Length == 0, "Synthetic loose-tree fixture unexpectedly has archive pairs.");
+    }
+
+    private static void PackageAppliedRuntimePreflight()
+    {
+        using var package = new Fixture();
+        using var runtime = new RuntimeFixture();
+        RuntimeManifestWriteResult clean = runtime.AttestClean();
+        RuntimeApplyResult applied = RuntimeManifestService.ApplyCertifiedPackage(
+            package.Descriptor, runtime.Policy.CleanManifestPath, runtime.Policy.ModifiedManifestPath, runtime.Policy);
+        Check(applied.Ok, applied.Message);
+        Check(applied.ChangedFileCount == 1, "Expected exactly one package-owned changed path.");
+
+        RuntimeManifestVerification verified = RuntimeManifestService.VerifyPackageRuntime(
+            package.Descriptor,
+            runtime.Policy.CleanManifestPath,
+            runtime.Policy.ModifiedManifestPath,
+            clean.ManifestSha256,
+            applied.ManifestSha256,
+            runtime.Policy);
+        Check(verified.Ok, verified.Message);
+        Check(verified.Manifest!.ChangedFiles.Select(file => file.Path).SequenceEqual(["event/fixture.bin"], StringComparer.Ordinal), "Changed-file list includes a path outside the selected package.");
+        Check(SafePaths.HashFile(Path.Combine(runtime.Policy.CleanRuntimeRoot, "event", "fixture.bin")) != SafePaths.HashFile(Path.Combine(runtime.Policy.ModifiedRuntimeRoot, "event", "fixture.bin")), "Clean baseline was modified or package was not applied.");
+        Check(SafePaths.HashFile(Path.Combine(runtime.SourceRoot, "event", "fixture.bin")) == SafePaths.HashFile(Path.Combine(runtime.Policy.CleanRuntimeRoot, "event", "fixture.bin")), "Package application modified the read-only source runtime.");
+
+        string exe = Path.Combine(runtime.Policy.ModifiedRuntimeRoot, "DarkSoulsRemastered.exe");
+        package.Descriptor.Runtime = new RuntimeLock
+        {
+            RootPath = runtime.Policy.ModifiedRuntimeRoot,
+            ExecutablePath = exe,
+            ExecutableSha256 = SafePaths.HashFile(exe),
+            RuntimeProfileStatus = "UNVERIFIED",
+            CleanRootPath = runtime.Policy.CleanRuntimeRoot,
+            CleanManifestPath = runtime.Policy.CleanManifestPath,
+            CleanManifestSha256 = clean.ManifestSha256,
+            ModifiedManifestPath = runtime.Policy.ModifiedManifestPath,
+            ModifiedManifestSha256 = applied.ManifestSha256
+        };
+        RuntimePreflightResult preflight = RuntimePreflight.Run(package.Descriptor, runtime.Policy);
+        Check(preflight.Ok && preflight.Code == "QA_RUNTIME_COMPLETE", string.Join("; ", preflight.Blockers));
+        Check(preflight.HasRequiredRuntimeAssets, "Complete runtime assets were not reported.");
+        Check(preflight.CleanManifestSha256 == clean.ManifestSha256 && preflight.ModifiedManifestSha256 == applied.ManifestSha256, "Preflight did not return both locked manifest hashes.");
+        Check(package.Descriptor.TelemetryProfile!.Status == "UNVERIFIED", "Runtime preflight promoted the telemetry marker profile.");
+    }
+
+    private static void RuntimeTreeMutationRejected()
+    {
+        using var f = new RuntimeFixture();
+        RuntimeManifestWriteResult written = f.AttestClean();
+        File.AppendAllText(Path.Combine(f.Policy.CleanRuntimeRoot, "event", "fixture.bin"), "changed");
+        RuntimeManifestVerification result = RuntimeManifestService.VerifyManifest(
+            written.ManifestPath, f.Policy.CleanRuntimeRoot, "QA_RUNTIME_CLEAN_BASELINE", written.ManifestSha256, f.Policy);
+        Check(!result.Ok && result.Code == "QA_RUNTIME_MANIFEST_INVALID", "Mutated runtime tree unexpectedly verified.");
+    }
+
+    private static void RuntimeReparsePointRejected()
+    {
+        using var f = new RuntimeFixture();
+        string link = Path.Combine(f.SourceRoot, "map", "linked-assets");
+        string target = Path.Combine(f.Root, "external-link-target");
+        Directory.CreateDirectory(target);
+        using var process = Process.Start(new ProcessStartInfo
+        {
+            FileName = "cmd.exe",
+            Arguments = "/d /c mklink /J \"" + link + "\" \"" + target + "\"",
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardError = true,
+            RedirectStandardOutput = true
+        }) ?? throw new IOException("Could not start the Windows junction test helper.");
+        process.WaitForExit();
+        if (process.ExitCode != 0) throw new IOException("Could not create an isolated test junction: " + process.StandardError.ReadToEnd());
+        Check((File.GetAttributes(link) & FileAttributes.ReparsePoint) != 0, "Test link was not created as a reparse point.");
+        Throws<InvalidDataException>(() => SafePaths.Inventory(f.SourceRoot, rejectHardLinks: true));
+    }
+
+    private static void RuntimeSteamPathRejected()
     {
         using var f = new Fixture();
-        File.WriteAllBytes(Path.Combine(f.RuntimeRoot, "DataA.bhd"), [1, 2]);
-        File.WriteAllBytes(Path.Combine(f.RuntimeRoot, "DataA.bdt"), [3, 4]);
+        f.Descriptor.Runtime!.RootPath = @"C:\Program Files (x86)\Steam\steamapps\common\DARK SOULS REMASTERED";
+        f.Descriptor.Runtime.ExecutablePath = Path.Combine(f.Descriptor.Runtime.RootPath, "DarkSoulsRemastered.exe");
         RuntimePreflightResult result = RuntimePreflight.Run(f.Descriptor);
-        Check(!result.Ok && result.HasArchivePair, "Runtime profile gate did not remain closed.");
-        Check(result.Blockers.Any(b => b.StartsWith("QA_RUNTIME_PROFILE_UNVERIFIED", StringComparison.Ordinal)), "Missing profile blocker not reported.");
+        Check(!result.Ok && result.Code == "LIVE_RUNTIME_REJECTED", "Live Steam runtime path was not rejected before filesystem inspection.");
+    }
+
+    private static void RuntimePathMismatchRejected()
+    {
+        using var f = new Fixture();
+        RuntimePreflightResult result = RuntimePreflight.Run(f.Descriptor);
+        Check(!result.Ok && result.Blockers.Any(b => b.StartsWith("QA_RUNTIME_PATH_MISMATCH", StringComparison.Ordinal)), "An unapproved isolated runtime path was not rejected.");
+    }
+
+    private static void RuntimePackageMismatchRejected()
+    {
+        using var package = new Fixture();
+        using var runtime = new RuntimeFixture();
+        RuntimeManifestWriteResult clean = runtime.AttestClean();
+        RuntimeApplyResult applied = RuntimeManifestService.ApplyCertifiedPackage(
+            package.Descriptor, runtime.Policy.CleanManifestPath, runtime.Policy.ModifiedManifestPath, runtime.Policy);
+        Check(applied.Ok, applied.Message);
+        package.Descriptor.Package!.TreeSha256 = new string('0', 64);
+        RuntimeManifestVerification result = RuntimeManifestService.VerifyPackageRuntime(
+            package.Descriptor,
+            runtime.Policy.CleanManifestPath,
+            runtime.Policy.ModifiedManifestPath,
+            clean.ManifestSha256,
+            applied.ManifestSha256,
+            runtime.Policy);
+        Check(!result.Ok && result.Code == "QA_RUNTIME_PACKAGE_IDENTITY_MISMATCH", "Changed package identity was accepted by runtime verification.");
     }
 
     private static void RuntimeExecutableHashMismatch()
@@ -269,6 +388,88 @@ internal static class Program
         string hash = SafePaths.HashFile(tracePath);
         File.WriteAllText(summaryPath, JsonSerializer.Serialize(new TraceSummary { SessionId = session, RecordCount = File.ReadAllLines(tracePath).Length, TraceSha256 = hash, Completed = true }, CaseDescriptor.JsonOptions), new UTF8Encoding(false));
         File.WriteAllText(summaryShaPath, SafePaths.HashFile(summaryPath) + "\n", Encoding.ASCII);
+    }
+
+    private sealed class RuntimeFixture : IDisposable
+    {
+        private static readonly string[] RequiredDirectories =
+        [
+            "chr", "event", "facegen", "font", "map", "menu", "movww", "msg", "mtd", "obj", "other",
+            "param", "paramdef", "parts", "remo", "script", "sfx", "shader", "sound"
+        ];
+
+        private static readonly string[] RequiredSupportFiles =
+        [
+            "DarkSoulsRemastered.exe", "binkw64.dll", "fmodex64.dll", "fmod_event64.dll",
+            "fmod_event_net64.dll", "steam_api64.dll", "xinput1_3.dll"
+        ];
+
+        public string Root { get; } = Path.Combine(Path.GetTempPath(), "ds1tr-runtime-manifest-test-" + Guid.NewGuid().ToString("N"));
+        public string SourceRoot => Path.Combine(Root, "source-runtime");
+        public string QaSubsetRoot => Path.Combine(Root, "qa-data-subset");
+        public string AppManifestPath => Path.Combine(Root, "appmanifest_570940.acf");
+        public RuntimePolicy Policy { get; }
+
+        public RuntimeFixture()
+        {
+            string cleanRoot = Path.Combine(Root, "clean-runtime");
+            string modifiedRoot = Path.Combine(Root, "package-runtime");
+            string attestationRoot = Path.Combine(Root, "attestations");
+            Policy = new RuntimePolicy(
+                SourceRoot,
+                AppManifestPath,
+                QaSubsetRoot,
+                cleanRoot,
+                modifiedRoot,
+                attestationRoot,
+                Path.Combine(attestationRoot, "clean.json"),
+                Path.Combine(attestationRoot, "modified.json"));
+
+            foreach (string directory in RequiredDirectories)
+            {
+                string path = Path.Combine(SourceRoot, directory);
+                Directory.CreateDirectory(path);
+                File.WriteAllBytes(Path.Combine(path, "fixture.dat"), [(byte)directory.Length, 0x5a]);
+            }
+            File.WriteAllBytes(Path.Combine(SourceRoot, "event", "fixture.bin"), [9, 8, 7]);
+            for (int i = 0; i < 1000; i++)
+                File.WriteAllBytes(Path.Combine(SourceRoot, "map", $"fixture-{i:D4}.bin"), [(byte)(i % 251), (byte)(i % 127)]);
+            for (int i = 0; i < RequiredSupportFiles.Length; i++)
+                File.WriteAllBytes(Path.Combine(SourceRoot, RequiredSupportFiles[i]), [(byte)(40 + i), 0x11]);
+
+            Directory.CreateDirectory(QaSubsetRoot);
+            Directory.CreateDirectory(Path.Combine(QaSubsetRoot, "event"));
+            File.Copy(Path.Combine(SourceRoot, "event", "fixture.bin"), Path.Combine(QaSubsetRoot, "event", "fixture.bin"));
+            CopyTree(SourceRoot, cleanRoot);
+
+            long bytes = SafePaths.Inventory(SourceRoot, rejectHardLinks: true).Sum(file => file.Size);
+            File.WriteAllText(AppManifestPath,
+                "\"appid\" \"570940\"\n" +
+                "\"buildid\" \"10943698\"\n" +
+                "\"SizeOnDisk\" \"" + bytes.ToString(System.Globalization.CultureInfo.InvariantCulture) + "\"\n" +
+                "\"InstalledDepots\"\n{\n" +
+                "  \"570941\" { \"manifest\" \"2900566705832487094\" }\n" +
+                "  \"570943\" { \"manifest\" \"2385633508013979570\" }\n}\n",
+                new UTF8Encoding(false));
+        }
+
+        public RuntimeManifestWriteResult AttestClean() => RuntimeManifestService.AttestCleanBaseline(Policy);
+
+        public void Dispose()
+        {
+            try { Directory.Delete(Root, recursive: true); } catch { }
+        }
+
+        private static void CopyTree(string source, string target)
+        {
+            Directory.CreateDirectory(target);
+            foreach (FileDigest file in SafePaths.Inventory(source, rejectHardLinks: true))
+            {
+                string destination = Path.Combine(target, file.Path.Replace('/', Path.DirectorySeparatorChar));
+                Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+                File.Copy(Path.Combine(source, file.Path.Replace('/', Path.DirectorySeparatorChar)), destination);
+            }
+        }
     }
 
     private sealed class Fixture : IDisposable

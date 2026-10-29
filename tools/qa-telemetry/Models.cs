@@ -7,6 +7,7 @@ public sealed class CaseDescriptor
 {
     // Hash of the owner-specific external case.json, pinned after its generation.
     public const string PinnedDescriptorSha256 = "2b1ff04c7e8b8cef8b6fa61859128911a195dee0cf7ee31b5e9d3f480ddae9ab";
+    public const string PinnedRuntimeDescriptorSha256 = "5b78fc8fca21cf950b784a8dd830818181c498275d4139a634a80be695c95547";
 
     public int SchemaVersion { get; set; }
     public string? CaseId { get; set; }
@@ -37,7 +38,8 @@ public sealed class CaseDescriptor
         var info = new FileInfo(path);
         if (info.Length > 256 * 1024) throw new InvalidDataException("Case descriptor exceeds 256 KiB.");
         string descriptorHash = SafePaths.HashFile(path);
-        if (!string.Equals(descriptorHash, PinnedDescriptorSha256, StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(descriptorHash, PinnedDescriptorSha256, StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(descriptorHash, PinnedRuntimeDescriptorSha256, StringComparison.OrdinalIgnoreCase))
             throw new InvalidDataException("Case descriptor SHA-256 is not the pinned owner QA case.");
         var descriptor = JsonSerializer.Deserialize<CaseDescriptor>(File.ReadAllText(path), JsonOptions)
             ?? throw new InvalidDataException("Case descriptor is empty or invalid.");
@@ -122,16 +124,28 @@ public sealed class RuntimeLock
     public string? ExecutablePath { get; set; }
     public string? ExecutableSha256 { get; set; }
     public string? RuntimeProfileStatus { get; set; }
-    public string[] RequiredArchiveExtensions { get; set; } = [".bhd", ".bdt"];
+    public string? CleanRootPath { get; set; }
+    public string? CleanManifestPath { get; set; }
+    public string? CleanManifestSha256 { get; set; }
+    public string? ModifiedManifestPath { get; set; }
+    public string? ModifiedManifestSha256 { get; set; }
 
     public void Validate()
     {
         if (string.IsNullOrWhiteSpace(RootPath) || !Path.IsPathFullyQualified(RootPath)) throw new InvalidDataException("QA runtime root must be absolute.");
         if (string.IsNullOrWhiteSpace(ExecutablePath) || !Path.IsPathFullyQualified(ExecutablePath)) throw new InvalidDataException("QA executable path must be absolute.");
         SafePaths.RequireSha256(ExecutableSha256, "QA executable hash");
-        if (RuntimeProfileStatus != "UNVERIFIED") throw new InvalidDataException("No complete QA runtime inventory has been independently verified.");
-        if (RequiredArchiveExtensions.Length != 2 || !RequiredArchiveExtensions.Contains(".bhd", StringComparer.OrdinalIgnoreCase) || !RequiredArchiveExtensions.Contains(".bdt", StringComparer.OrdinalIgnoreCase))
-            throw new InvalidDataException("Runtime archive requirements are malformed.");
+        if (RuntimeProfileStatus != "UNVERIFIED") throw new InvalidDataException("Telemetry marker profile must remain UNVERIFIED until owner marker validation.");
+        bool hasBinding = CleanRootPath is not null || CleanManifestPath is not null || CleanManifestSha256 is not null || ModifiedManifestPath is not null || ModifiedManifestSha256 is not null;
+        if (hasBinding)
+        {
+            if (string.IsNullOrWhiteSpace(CleanRootPath) || !Path.IsPathFullyQualified(CleanRootPath) ||
+                string.IsNullOrWhiteSpace(CleanManifestPath) || !Path.IsPathFullyQualified(CleanManifestPath) ||
+                string.IsNullOrWhiteSpace(ModifiedManifestPath) || !Path.IsPathFullyQualified(ModifiedManifestPath))
+                throw new InvalidDataException("Runtime manifest binding paths must be absolute and complete.");
+            SafePaths.RequireSha256(CleanManifestSha256, "clean runtime manifest hash");
+            SafePaths.RequireSha256(ModifiedManifestSha256, "modified runtime manifest hash");
+        }
     }
 }
 
@@ -174,7 +188,7 @@ public sealed record FileDigest(string Path, long Size, string Sha256);
 
 public sealed record PackageVerification(bool Ok, string Code, string Message, string? TreeSha256 = null, string? RunManifestSha256 = null, int FileCount = 0, long TotalBytes = 0);
 
-public sealed record RuntimePreflightResult(bool Ok, string Code, string[] Blockers, string ExecutableSha256, bool HasArchivePair);
+public sealed record RuntimePreflightResult(bool Ok, string Code, string[] Blockers, string ExecutableSha256, bool HasRequiredRuntimeAssets, string? CleanManifestSha256 = null, string? ModifiedManifestSha256 = null);
 
 public sealed class TraceRecord
 {

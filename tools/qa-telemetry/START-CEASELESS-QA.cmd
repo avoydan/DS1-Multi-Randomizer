@@ -2,7 +2,7 @@
 setlocal
 set "TOOL_DIR=%~dp0"
 set "TOOL_DLL=%TOOL_DIR%bin\Release\net8.0\QaTelemetry.dll"
-set "CASE=%TEMP%\ds1tr-ceaseless-certified-v2-lord-souls-off-05634a7e78b443e6910b317721e86b50\sweep-1-certified-lord-souls-off-1\qa-telemetry\case.json"
+set "CASE=%TEMP%\ds1tr-ceaseless-certified-v2-lord-souls-off-05634a7e78b443e6910b317721e86b50\sweep-1-certified-lord-souls-off-1\qa-telemetry\case-runtime.json"
 set "DOTNET=C:\Users\Adam\dn8sdk\dotnet.exe"
 
 echo Ceaseless single-case QA preflight
@@ -31,8 +31,8 @@ if not exist "%DOTNET%" (
 "%DOTNET%" "%TOOL_DLL%" preflight --case "%CASE%"
 if errorlevel 1 goto :failed
 
-echo Package/runtime preflight passed. Live telemetry is still disabled in this build.
-echo This helper cannot start the game or generate a trusted gameplay trace.
+echo Package/runtime preflight passed. The game was not launched or opened.
+echo Live telemetry remains UNVERIFIED and is disabled in this build.
 pause
 exit /b 0
 

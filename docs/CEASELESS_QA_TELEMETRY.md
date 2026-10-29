@@ -2,9 +2,9 @@
 
 ## State
 
-**PARTIAL.** The selected package remains verified, the exact external case descriptor and one-click fail-closed preflight are prepared, and the offline trace/import tests pass. No gameplay telemetry was captured. `START-CEASELESS-QA.cmd` will stop before starting a game because the established QA root is not a complete runtime and there is no independently verified telemetry offset profile.
+**PARTIAL.** The selected package is installed in a complete, isolated QA runtime, and the final preflight returns `QA_RUNTIME_COMPLETE`. Telemetry remains `UNVERIFIED`: no exact-build marker profile or live read-only reader exists, so this is runtime/package readiness rather than gameplay or telemetry readiness. The launcher performs preflight only and never starts or attaches to the game.
 
-No application code, production validator, V1–V5 semantics, generation profile, retry limit, public version, safe baseline tag, QA game data, live Steam data, or game process was changed or accessed.
+Production validator, V1–V5 semantics, generation profile, retry limit, public version, and safe baseline tag were not changed. The Steam installation was read-only; no live Steam file was modified, no game was launched, and no process was opened. Runtime copies and local manifests are outside Git.
 
 ## Repository and baseline checks
 
@@ -20,7 +20,7 @@ External package:
 
 `C:\Users\Adam\AppData\Local\Temp\ds1tr-ceaseless-certified-v2-lord-souls-off-05634a7e78b443e6910b317721e86b50\sweep-1-certified-lord-souls-off-1\package`
 
-External descriptor: `C:\Users\Adam\AppData\Local\Temp\ds1tr-ceaseless-certified-v2-lord-souls-off-05634a7e78b443e6910b317721e86b50\sweep-1-certified-lord-souls-off-1\qa-telemetry\case.json`; descriptor SHA-256 `2b1ff04c7e8b8cef8b6fa61859128911a195dee0cf7ee31b5e9d3f480ddae9ab`. The tool pins this exact descriptor hash in code, so editing its target paths/options invalidates preflight.
+Original external descriptor: `C:\Users\Adam\AppData\Local\Temp\ds1tr-ceaseless-certified-v2-lord-souls-off-05634a7e78b443e6910b317721e86b50\sweep-1-certified-lord-souls-off-1\qa-telemetry\case.json`; descriptor SHA-256 `2b1ff04c7e8b8cef8b6fa61859128911a195dee0cf7ee31b5e9d3f480ddae9ab`. A separate `case-runtime.json` binds the same certified case to the approved isolated runtimes. Both descriptors are pinned in the helper; changes to package identity, runtime paths, or options fail closed.
 
 | Identity | Verified value |
 |---|---|
@@ -41,19 +41,19 @@ The package records backend `0.46.4`, FogHost project `0.7.4`, FogHost host `0.7
 
 Expected route identity: event flag `11410410`, entrance `o4961_0000`, graph-side destination `Demon Ruins Lava`. That is the generated graph destination label; actual landing and physical traversal remain unverified.
 
-## QA runtime fail-closed result
+## Isolated runtime completion (2026-10-29)
 
-Locked executable: `C:\Users\Adam\ds1tr-qa\game-inst\DARK SOULS REMASTERED\DarkSoulsRemastered.exe`
+The earlier 199-file QA data snapshot remains unchanged and is still not a playable runtime. Steam library metadata identified the installed DSR source (AppID 570940, build 10943698); its files were inventoried and read only. A separate runtime copy was created, with no symlink, junction, reparse-point, or hard-link dependency on Steam. The copy has 6,013 files totaling 7,366,427,395 bytes, includes the executable and required support/runtime directories, and its inventory agrees with the local Steam appmanifest `SizeOnDisk`. This establishes a complete local copy of the installed source, not official depot authentication or a guarantee that the installed source is vanilla.
 
-Expected executable SHA-256: `a45aaa36dd2f6cc151670a639ea5547043cf38ea79ff4178b963c6ed71f98d7b`.
+Two independent runtime trees are retained outside the repository: a clean baseline and a separate package-applied test runtime. Local canonical manifests and their SHA-256 sidecars are stored beside those trees. The baseline digest was recorded before package application. The certified package was reverified before application; its declared game files were applied only to the separate test runtime. All 73 changed runtime paths are package-listed, the executable is unchanged, and the clean baseline remains recoverable. A full read-only inventory/hash verification passed for both trees.
 
-The QA root is an extracted data-only snapshot: 199 files, approximately 151,579,320 bytes, with `event`, `map`, `msg`, `param`, `paramdef`, `script`, `sfx`, and the executable. It has no matching top-level `.bhd`/`.bdt` game-data archive pair and no complete collision/NVM/HKX runtime assets. The executable by itself is not treated as a complete playable installation. The directory and executable were only inspected/read; neither this source nor Steam was modified.
+The final helper preflight verified the pinned package (74 files, 78,082,827 bytes), both runtime manifests, executable identity, required runtime assets, and package-applied file identities. Result: `QA_RUNTIME_COMPLETE`, no blockers, `processRightsRequested: 0`, `gameLaunched: false`, and `telemetryStatus: UNVERIFIED`. The selected case descriptor is externally bound to the isolated runtime; its local paths and runtime hashes are not committed.
 
-Even if archives later appear, the helper still refuses until an exact full-runtime inventory/build profile is independently pinned. It rejects Steam-path segments, mismatched executable path or SHA-256, reparse paths, and hard-linked certified files. No attempt is made to repair, copy, activate, restore, launch, or attach to the game.
+The helper fails closed for an unbound or non-approved runtime path, the known Steam path, executable path/hash mismatch, changed clean or package runtime, changed package identity, and reparse points. Package application writes only to the dedicated QA runtime. It never repairs or modifies the Steam source, launches a game, or opens a process.
 
 ## Telemetry implementation and boundaries
 
-Standalone tool: `tools/qa-telemetry`, version `0.1.0`, .NET 8, BCL-only, no reference to production projects. It is not wired into the desktop app, backend, activation, or release packaging.
+Standalone tool: `tools/qa-telemetry`, version `0.2.0`, .NET 8, BCL-only, no reference to production projects. It is not wired into the desktop app, backend, activation, or release packaging.
 
 - Process rights requested by this build: **none (`0x0000`)**.
 - The documented future allowlist is query-limited-information (`0x1000`) plus read-only memory (`0x0010`) only. No process-open/read-memory call exists in this build.
@@ -62,6 +62,14 @@ Standalone tool: `tools/qa-telemetry`, version `0.1.0`, .NET 8, BCL-only, no ref
 - The live trace writer is disabled. Its synthetic-only writer uses `CreateNew`, appends compact one-record-per-line JSONL, and creates a session summary plus separate summary SHA-256 file. These hashes detect post-write changes; they do not make local data tamper-proof.
 - The analysis importer verifies trace/session/package hashes, sequence, session ID, schema, provenance, and declared observation-status fields. It does not independently validate known-marker procedures. A synthetic trace returns `SYNTHETIC_TEST_PASS` only; any live-provenance input remains `TELEMETRY_UNVERIFIED`. This build has no `GAMEPLAY_CONFIRMED` promotion path.
 - The importer associates a future validated route trace with these analysis selectors: `boss-completion:11410410`, `post-boss-approach:o4961_0000`, `post-boss-crossing:o4961_0000`, `arrival:main-demon-ruins`, and `route:main-to-lower-lava`. It emits `UNKNOWN` for each unless a future independently validated profile is pinned and every route checkpoint passes. These selectors are analysis-side classifications, not a claim that current opaque per-package witness edge IDs have already been matched. The importer does not modify the physical-witness graph or production validator.
+
+## Demon Ruins collision and navigation asset audit
+
+The package changes `map/MapStudio/m14_01_00_00.msb` and `event/m14_01_00_00.emevd.dcx`. Its corresponding `MapStudioNew` MSB, H/L collision archives, MCP, MCG, and NVM bundle are byte-identical to the clean baseline.
+
+The clean runtime contains `map/MapStudio/m14_01_00_00.msb`, `map/m14_01_00_00.mcp`, `map/m14_01_00_00.mcg`, `map/h14_01_00_00.hkxbhd` + `.hkxbdt`, `map/l14_01_00_00.hkxbhd` + `.hkxbdt`, and `map/m14_01_00_00.nvmbnd.dcx`. The MSB parses as MSB1 (119 collision models and 119 collision parts); MCP has 49 rooms; MCG has 51 nodes and 65 edges. H/L collision archives are BXF3, each with 119 entries. The NVM bundle is DCX containing BND3 with 52 `.nvm` entries.
+
+The pinned `JuicerMV.SoulsFormats` dependency decodes these containers and the MSB/MCP/MCG structures, but the available dependency does not decode the HKX collision mesh triangles. No continuous player traversability proof can be made from approximate coordinates or navmesh connectivity alone. The Ceaseless arena-to-`o4961_0000`-to-main-Demon-Ruins-to-lower-lava physical route therefore remains `UNKNOWN` pending trustworthy geometry/engine evidence or owner gameplay.
 
 ## Marker validation required before telemetry can be trusted
 
@@ -93,6 +101,6 @@ The case descriptor preserves raw Fog seed `3695053466` and the accepted attempt
 
 ## Tests and remaining action
 
-Focused offline self-tests cover exact package/manifest/attestation hashes, changed bytes, path escape, query/read rights allowlist, refusal of excess process rights, Steam path, runtime archives/profile, executable path/hash, append-only/no-overwrite trace creation, session and summary hashes, corruption, case mismatch, unknown checkpoints, missing completion summary, and the non-promotion of synthetic/unverified traces.
+Release build passed with 0 warnings and 0 errors; the focused helper suite passed 30/30. The actual certified package passed `verify-case`, and the final runtime preflight passed as `QA_RUNTIME_COMPLETE`. The updated launcher was smoke-tested against that preflight and remains preflight-only. No FogReconstruction or production suite was needed because production code was not changed.
 
-The one next owner action is to provide or identify a **complete isolated non-Steam QA DSR runtime** (with its original data archive pair and collision/runtime assets), separate from the read-only extracted source and live Steam. Do not run the current game test against the incomplete root. After a complete runtime is available, additional implementation and review are still required: pin its full inventory, derive and independently validate exact-build markers, and add a live read-only telemetry path. This helper cannot currently open/read a process or produce a trusted gameplay trace; only then can the single Ceaseless gameplay case be run with trustworthy telemetry.
+The runtime-preparation blocker is resolved. Remaining work before telemetry-backed gameplay is to derive and independently validate markers against this exact executable, then implement/review a read-only process reader and ordered live-trace path. No marker offset or gameplay result has been fabricated. Do not treat `QA_RUNTIME_COMPLETE` as a gameplay pass or use the telemetry helper to claim a verified route.

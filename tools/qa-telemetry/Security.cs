@@ -286,46 +286,89 @@ public static class PackageVerifier
 
 public static class RuntimePreflight
 {
-    public static RuntimePreflightResult Run(CaseDescriptor descriptor)
+    public static RuntimePreflightResult Run(CaseDescriptor descriptor, RuntimePolicy? policy = null)
     {
+        RuntimePolicy selected = policy ?? QaRuntimePolicy.Default;
         var blockers = new List<string>();
         RuntimeLock runtime = descriptor.Runtime!;
         string exeHash = "";
-        bool archivePair = false;
+        string? cleanManifestSha = null;
+        string? modifiedManifestSha = null;
+        bool requiredRuntimeAssets = false;
         try
         {
-            string root = SafePaths.NormalizeFullPath(runtime.RootPath!);
-            string expectedExe = Path.Combine(root, "DarkSoulsRemastered.exe");
-            string suppliedExe = SafePaths.NormalizeFullPath(runtime.ExecutablePath!);
-            SafePaths.RejectSteamPath(root);
-            SafePaths.RejectSteamPath(suppliedExe);
-            SafePaths.EnsureNoReparseAncestors(root, leafMustExist: true);
-            if (!Directory.Exists(root)) throw new DirectoryNotFoundException("Locked QA runtime root is missing.");
-            if (!string.Equals(expectedExe, suppliedExe, StringComparison.OrdinalIgnoreCase))
-                blockers.Add("QA_EXECUTABLE_PATH_MISMATCH");
-            else if (!File.Exists(suppliedExe))
-                blockers.Add("QA_EXECUTABLE_MISSING");
-            else
+            if (runtime.CleanManifestPath is null || runtime.CleanManifestSha256 is null ||
+                runtime.ModifiedManifestPath is null || runtime.ModifiedManifestSha256 is null || runtime.CleanRootPath is null)
+                blockers.Add("QA_RUNTIME_MANIFEST_MISSING: the case is not bound to a clean and package-applied runtime attestation.");
+
+            string? root = null;
+            string? suppliedExe = null;
+            try
             {
-                SafePaths.EnsureNoReparseAncestors(suppliedExe, leafMustExist: true);
-                SafePaths.EnsureUniqueFile(suppliedExe);
-                exeHash = SafePaths.HashFile(suppliedExe);
-                if (!string.Equals(exeHash, runtime.ExecutableSha256, StringComparison.OrdinalIgnoreCase)) blockers.Add("QA_EXECUTABLE_HASH_MISMATCH");
+                root = SafePaths.NormalizeFullPath(runtime.RootPath!);
+                suppliedExe = SafePaths.NormalizeFullPath(runtime.ExecutablePath!);
+                RuntimeManifestService.RejectLiveRuntimeSelection(root, selected.SteamSourceRoot);
+                if (!string.Equals(root, SafePaths.NormalizeFullPath(selected.ModifiedRuntimeRoot), StringComparison.OrdinalIgnoreCase))
+                    blockers.Add("QA_RUNTIME_PATH_MISMATCH: runtime root differs from the approved isolated test path.");
+                SafePaths.EnsureNoReparseAncestors(root, leafMustExist: true);
+                if (!Directory.Exists(root)) throw new DirectoryNotFoundException("Locked QA runtime root is missing.");
+            }
+            catch (Exception ex)
+            {
+                blockers.Add(ex.Message.StartsWith("LIVE_RUNTIME_REJECTED", StringComparison.Ordinal) ? ex.Message : "QA_RUNTIME_PATH_INVALID: " + ex.Message);
             }
 
-            string[] bhd = Directory.GetFiles(root, "*.bhd", SearchOption.TopDirectoryOnly);
-            string[] bdt = Directory.GetFiles(root, "*.bdt", SearchOption.TopDirectoryOnly);
-            var bdtNames = new HashSet<string>(bdt.Select(path => Path.GetFileNameWithoutExtension(path) ?? string.Empty), StringComparer.OrdinalIgnoreCase);
-            archivePair = bhd.Any(path => bdtNames.Contains(Path.GetFileNameWithoutExtension(path)));
-            if (!archivePair) blockers.Add("QA_RUNTIME_INCOMPLETE: matching top-level .bhd/.bdt data archives are absent.");
-            if (runtime.RuntimeProfileStatus != "VERIFIED") blockers.Add("QA_RUNTIME_PROFILE_UNVERIFIED: no exact full-runtime inventory/build profile is pinned.");
+            if (root is not null && suppliedExe is not null)
+            {
+                string expectedExe = Path.Combine(root, "DarkSoulsRemastered.exe");
+                if (!string.Equals(expectedExe, suppliedExe, StringComparison.OrdinalIgnoreCase))
+                    blockers.Add("QA_EXECUTABLE_PATH_MISMATCH");
+                else if (!File.Exists(suppliedExe))
+                    blockers.Add("QA_EXECUTABLE_MISSING");
+                else
+                {
+                    SafePaths.EnsureNoReparseAncestors(suppliedExe, leafMustExist: true);
+                    SafePaths.EnsureUniqueFile(suppliedExe);
+                    exeHash = SafePaths.HashFile(suppliedExe);
+                    if (!string.Equals(exeHash, runtime.ExecutableSha256, StringComparison.OrdinalIgnoreCase)) blockers.Add("QA_EXECUTABLE_HASH_MISMATCH");
+                }
+            }
+
+            if (runtime.CleanManifestPath is not null && runtime.CleanManifestSha256 is not null &&
+                runtime.ModifiedManifestPath is not null && runtime.ModifiedManifestSha256 is not null && runtime.CleanRootPath is not null)
+            {
+                try
+                {
+                    RuntimeManifestService.RejectLiveRuntimeSelection(runtime.CleanRootPath, selected.SteamSourceRoot);
+                    if (!string.Equals(SafePaths.NormalizeFullPath(runtime.CleanRootPath), SafePaths.NormalizeFullPath(selected.CleanRuntimeRoot), StringComparison.OrdinalIgnoreCase))
+                        throw new InvalidDataException("QA_CLEAN_RUNTIME_PATH_MISMATCH: clean baseline root differs from the approved QA path.");
+                    RuntimeManifestVerification attestation = RuntimeManifestService.VerifyPackageRuntime(
+                        descriptor,
+                        runtime.CleanManifestPath,
+                        runtime.ModifiedManifestPath,
+                        runtime.CleanManifestSha256,
+                        runtime.ModifiedManifestSha256,
+                        selected);
+                    if (!attestation.Ok) blockers.Add(attestation.Code + ": " + attestation.Message);
+                    else
+                    {
+                        requiredRuntimeAssets = true;
+                        cleanManifestSha = runtime.CleanManifestSha256;
+                        modifiedManifestSha = runtime.ModifiedManifestSha256;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    blockers.Add(ex.Message.StartsWith("LIVE_RUNTIME_REJECTED", StringComparison.Ordinal) ? ex.Message : "QA_RUNTIME_ATTESTATION_ERROR: " + ex.Message);
+                }
+            }
         }
         catch (Exception ex)
         {
-            blockers.Add("QA_RUNTIME_PREFLIGHT_ERROR: " + ex.Message);
+            blockers.Add(ex.Message.StartsWith("LIVE_RUNTIME_REJECTED", StringComparison.Ordinal) ? ex.Message : "QA_RUNTIME_PREFLIGHT_ERROR: " + ex.Message);
         }
 
         bool ok = blockers.Count == 0;
-        return new RuntimePreflightResult(ok, ok ? "QA_RUNTIME_READY" : blockers.Any(b => b.StartsWith("QA_RUNTIME_INCOMPLETE", StringComparison.Ordinal)) ? "QA_RUNTIME_INCOMPLETE" : "QA_RUNTIME_PREFLIGHT_BLOCKED", blockers.ToArray(), exeHash, archivePair);
+        return new RuntimePreflightResult(ok, ok ? "QA_RUNTIME_COMPLETE" : blockers.Any(b => b.StartsWith("LIVE_RUNTIME_REJECTED", StringComparison.Ordinal)) ? "LIVE_RUNTIME_REJECTED" : "QA_RUNTIME_PREFLIGHT_BLOCKED", blockers.ToArray(), exeHash, requiredRuntimeAssets, cleanManifestSha, modifiedManifestSha);
     }
 }
