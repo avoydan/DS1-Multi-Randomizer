@@ -24,6 +24,13 @@ internal static class Program
         Run("process write and operation rights are rejected", RightsRejectWrite);
         Run("only query and read rights are the live reader mask", LiveRightsMask);
         Run("Steam target path is rejected", SteamPathRejected);
+        Run("Steam client absence is an actionable launch blocker", SteamClientAbsent);
+        Run("Steam client must run under the same OS user", SteamClientUserIdentity);
+        Run("QA launch rejects an incorrect working directory", QaLaunchWrongWorkingDirectory);
+        Run("missing QA AppID sidecar is provisioned with exact bytes", QaAppIdSidecarProvisioned);
+        Run("incorrect QA AppID sidecar is rejected without replacement", QaAppIdSidecarWrongContent);
+        Run("live Steam DSR executable cannot be selected for QA launch", QaLiveSteamExecutableRejected);
+        Run("exact isolated QA executable is selected", QaIsolatedExecutableSelected);
         Run("wrong process image path is rejected", ProcessImagePathMismatch);
         Run("wrong process image hash is rejected", ProcessImageHashMismatch);
         Run("Steam process identity is rejected", ProcessSteamPathRejected);
@@ -44,7 +51,7 @@ internal static class Program
         Run("QA runtime without manifest binding fails closed", RuntimeMissingManifestBinding);
         Run("clean runtime cannot be used as the package-applied process target", CleanRuntimeRejectedForLiveTarget);
         Run("clean runtime manifest attests exact copied tree and QA subset", CleanRuntimeManifestRoundTrip);
-        Run("package applies only to a separate runtime copy and preflight verifies it", PackageAppliedRuntimePreflight);
+        Run("QA launch sidecar is separately hashed and excluded from package runtime identity", PackageAppliedRuntimePreflight);
         Run("runtime tree mutation fails its manifest", RuntimeTreeMutationRejected);
         Run("reparse point in runtime inventory fails closed", RuntimeReparsePointRejected);
         Run("Steam runtime path is rejected without reading it", RuntimeSteamPathRejected);
@@ -166,6 +173,82 @@ internal static class Program
         QaTelemetryException error = ThrowsAndReturn<QaTelemetryException>(() => ProcessIdentityPolicy.Verify(42,
             steam, steam, new string('a', 64), new string('a', 64), DateTimeOffset.UtcNow));
         Check(error.Code == "LIVE_STEAM_RUNTIME_REJECTED", "Steam image path was not explicitly rejected.");
+    }
+
+    private static void SteamClientAbsent()
+    {
+        SteamClientStatus result = SteamClientProbe.Evaluate([], QaRuntimePolicy.SteamExecutablePath, "S-1-5-21-qa-user");
+        Check(!result.Ready && result.Code == "STEAM_CLIENT_NOT_RUNNING", "Absent Steam client did not block launch clearly.");
+    }
+
+    private static void SteamClientUserIdentity()
+    {
+        SteamProcessCandidate[] matching = [new(QaRuntimePolicy.SteamExecutablePath, "S-1-5-21-owner")];
+        SteamClientStatus ready = SteamClientProbe.Evaluate(matching, QaRuntimePolicy.SteamExecutablePath, "S-1-5-21-owner");
+        Check(ready.Ready && ready.Code == "STEAM_CLIENT_READY", "Same-user Steam client was not accepted.");
+        SteamClientStatus mismatch = SteamClientProbe.Evaluate(matching, QaRuntimePolicy.SteamExecutablePath, "S-1-5-21-other");
+        Check(!mismatch.Ready && mismatch.Code == "STEAM_CLIENT_USER_MISMATCH", "Different-user Steam client was not rejected.");
+    }
+
+    private static void QaLaunchWrongWorkingDirectory()
+    {
+        string executable = ExactBuildProfile.ExpectedExecutablePath;
+        string runtimeRoot = Path.GetDirectoryName(executable)!;
+        QaTelemetryException error = ThrowsAndReturn<QaTelemetryException>(() => QaLaunchPolicy.ValidateLaunchPaths(
+            executable, Path.GetTempPath(), executable, runtimeRoot));
+        Check(error.Code == "QA_LAUNCH_WORKING_DIRECTORY_MISMATCH", "Incorrect working directory did not fail with the typed code.");
+    }
+
+    private static void QaAppIdSidecarProvisioned()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "ds1tr-qa-appid-test-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        string executable = Path.Combine(root, "DarkSoulsRemastered.exe");
+        File.WriteAllBytes(executable, [0x4d, 0x5a]);
+        try
+        {
+            QaSteamAppIdStatus created = QaSteamAppIdSidecar.ProvisionOrVerify(root, executable, root);
+            Check(created.Created && created.Contents == "570940", "Missing sidecar was not created as the DSR AppID.");
+            Check(File.ReadAllBytes(created.Path).SequenceEqual(Encoding.ASCII.GetBytes("570940")), "Sidecar bytes include unexpected encoding or newline data.");
+            Check(created.Sha256 == QaSteamAppIdSidecar.ExpectedSha256, "Sidecar SHA-256 does not match the pinned exact AppID bytes.");
+            QaSteamAppIdStatus verified = QaSteamAppIdSidecar.ProvisionOrVerify(root, executable, root);
+            Check(!verified.Created && verified.Sha256 == created.Sha256, "Existing correct sidecar was not independently verified.");
+        }
+        finally { try { Directory.Delete(root, recursive: true); } catch { } }
+    }
+
+    private static void QaAppIdSidecarWrongContent()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "ds1tr-qa-appid-wrong-test-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        string executable = Path.Combine(root, "DarkSoulsRemastered.exe");
+        string sidecar = Path.Combine(root, QaSteamAppIdSidecar.FileName);
+        File.WriteAllBytes(executable, [0x4d, 0x5a]);
+        byte[] wrongBytes = Encoding.ASCII.GetBytes("570940\r\n");
+        File.WriteAllBytes(sidecar, wrongBytes);
+        try
+        {
+            QaTelemetryException error = ThrowsAndReturn<QaTelemetryException>(() => QaSteamAppIdSidecar.ProvisionOrVerify(root, executable, root));
+            Check(error.Code == "QA_STEAM_APPID_INVALID", "Wrong sidecar did not use an actionable typed failure.");
+            Check(File.ReadAllBytes(sidecar).SequenceEqual(wrongBytes), "Incorrect existing sidecar was overwritten instead of preserved.");
+        }
+        finally { try { Directory.Delete(root, recursive: true); } catch { } }
+    }
+
+    private static void QaLiveSteamExecutableRejected()
+    {
+        string live = @"C:\Program Files (x86)\Steam\steamapps\common\DARK SOULS REMASTERED\DarkSoulsRemastered.exe";
+        QaTelemetryException error = ThrowsAndReturn<QaTelemetryException>(() => QaLaunchPolicy.VerifyObservedProcessPath(live, ExactBuildProfile.ExpectedExecutablePath));
+        Check(error.Code == "LIVE_STEAM_EXECUTABLE_REJECTED", "Live Steam DSR process path was not explicitly rejected.");
+    }
+
+    private static void QaIsolatedExecutableSelected()
+    {
+        string accepted = QaLaunchPolicy.VerifyObservedProcessPath(ExactBuildProfile.ExpectedExecutablePath, ExactBuildProfile.ExpectedExecutablePath);
+        Check(accepted == ExactBuildProfile.ExpectedExecutablePath, "The exact QA executable path was not selected.");
+        QaLaunchPolicy.ValidateLaunchPaths(ExactBuildProfile.ExpectedExecutablePath,
+            Path.GetDirectoryName(ExactBuildProfile.ExpectedExecutablePath)!, ExactBuildProfile.ExpectedExecutablePath,
+            Path.GetDirectoryName(ExactBuildProfile.ExpectedExecutablePath)!);
     }
 
     private static void MissingProcessIdentityRejected()
@@ -368,6 +451,23 @@ internal static class Program
         Check(preflight.HasRequiredRuntimeAssets, "Complete runtime assets were not reported.");
         Check(preflight.CleanManifestSha256 == clean.ManifestSha256 && preflight.ModifiedManifestSha256 == applied.ManifestSha256, "Preflight did not return both locked manifest hashes.");
         Check(package.Descriptor.TelemetryProfile!.Status == "UNVERIFIED", "Runtime preflight promoted the telemetry marker profile.");
+
+        string sidecarPath = Path.Combine(runtime.Policy.ModifiedRuntimeRoot, QaSteamAppIdSidecar.FileName);
+        QaSteamAppIdStatus sidecar = QaSteamAppIdSidecar.ProvisionOrVerify(runtime.Policy.ModifiedRuntimeRoot, exe, runtime.Policy.ModifiedRuntimeRoot);
+        Check(sidecar.Created && sidecar.Sha256 == QaSteamAppIdSidecar.ExpectedSha256, "QA launch sidecar was not created and separately hashed.");
+        RuntimeManifestVerification withSidecar = RuntimeManifestService.VerifyPackageRuntime(
+            package.Descriptor, runtime.Policy.CleanManifestPath, runtime.Policy.ModifiedManifestPath,
+            clean.ManifestSha256, applied.ManifestSha256, runtime.Policy);
+        Check(withSidecar.Ok, withSidecar.Message);
+        Check(withSidecar.Manifest!.CanonicalDigest == applied.RuntimeDigest, "QA launch sidecar changed the immutable runtime digest.");
+        Check(!withSidecar.Manifest.Files.Any(file => file.Path == QaSteamAppIdSidecar.FileName), "QA launch sidecar leaked into the immutable runtime inventory.");
+
+        File.WriteAllBytes(sidecarPath, Encoding.ASCII.GetBytes("570940\n"));
+        RuntimeManifestVerification badSidecar = RuntimeManifestService.VerifyManifest(
+            runtime.Policy.ModifiedManifestPath, runtime.Policy.ModifiedRuntimeRoot, "QA_RUNTIME_MODDED_DIGEST",
+            applied.ManifestSha256, runtime.Policy);
+        Check(!badSidecar.Ok && badSidecar.Code == "QA_RUNTIME_MANIFEST_INVALID" && badSidecar.Message.Contains("AppID", StringComparison.OrdinalIgnoreCase),
+            "Changed launch sidecar was not rejected independently of the package runtime identity.");
     }
 
     private static void RuntimeTreeMutationRejected()

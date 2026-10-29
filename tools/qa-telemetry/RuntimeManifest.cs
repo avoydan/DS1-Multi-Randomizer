@@ -52,6 +52,7 @@ public sealed record RuntimePolicy(
 public static class QaRuntimePolicy
 {
     public const string SteamSourceRoot = @"C:\Program Files (x86)\Steam\steamapps\common\DARK SOULS REMASTERED";
+    public const string SteamExecutablePath = @"C:\Program Files (x86)\Steam\steam.exe";
     public const string SteamAppManifestPath = @"C:\Program Files (x86)\Steam\steamapps\appmanifest_570940.acf";
     public const string QaDataSnapshotRoot = @"C:\Users\Adam\ds1tr-qa\game-inst\DARK SOULS REMASTERED";
     public const string CleanRuntimeRoot = @"C:\Users\Adam\ds1tr-qa\runtime\DARK SOULS REMASTERED";
@@ -177,7 +178,7 @@ public static class RuntimeManifestService
                 throw new InvalidDataException("Runtime manifest inventory is malformed.");
             if (!FixedEquals(SafePaths.InventoryDigest(recorded), manifest.CanonicalDigest))
                 throw new InvalidDataException("Runtime manifest canonical digest is invalid.");
-            FileDigest[] actual = SafePaths.Inventory(runtimeRoot, rejectHardLinks: true).OrderBy(x => x.Path, StringComparer.Ordinal).ToArray();
+            FileDigest[] actual = InventoryForAttestedIdentity(runtimeRoot, expectedKind, selectedPolicy);
             RequireSameInventory(recorded, actual, "Runtime tree differs from its local attestation.");
             ValidateRuntimeShape(runtimeRoot, actual);
             if (!FixedEquals(HashInventoryEntry(actual, "DarkSoulsRemastered.exe"), manifest.ExecutableSha256))
@@ -333,6 +334,19 @@ public static class RuntimeManifestService
         catch (InvalidDataException ex) { throw new InvalidDataException("LIVE_RUNTIME_REJECTED: " + ex.Message, ex); }
         if (PathEquals(full, steam) || IsUnder(full, steam))
             throw new InvalidDataException("LIVE_RUNTIME_REJECTED: runtime selection points into the live Steam installation.");
+    }
+
+    private static FileDigest[] InventoryForAttestedIdentity(string runtimeRoot, string expectedKind, RuntimePolicy policy)
+    {
+        FileDigest[] actual = SafePaths.Inventory(runtimeRoot, rejectHardLinks: true).OrderBy(x => x.Path, StringComparer.Ordinal).ToArray();
+        if (expectedKind != "QA_RUNTIME_MODDED_DIGEST" || !PathEquals(runtimeRoot, policy.ModifiedRuntimeRoot)) return actual;
+
+        FileDigest? sidecarEntry = actual.SingleOrDefault(file => string.Equals(file.Path, QaSteamAppIdSidecar.FileName, StringComparison.OrdinalIgnoreCase));
+        _ = QaSteamAppIdSidecar.VerifyIfPresent(runtimeRoot, policy.ModifiedRuntimeRoot);
+        if (sidecarEntry is null) return actual;
+        if (!string.Equals(sidecarEntry.Path, QaSteamAppIdSidecar.FileName, StringComparison.Ordinal))
+            throw new InvalidDataException("The QA Steam AppID sidecar must use the exact root-level filename steam_appid.txt.");
+        return actual.Where(file => !string.Equals(file.Path, QaSteamAppIdSidecar.FileName, StringComparison.Ordinal)).ToArray();
     }
 
     public static FileDigest[] ReadPackageFiles(string packageRoot)

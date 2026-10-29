@@ -1,19 +1,18 @@
 @echo off
 setlocal
 set "TOOL_DIR=%~dp0"
-set "TOOL_DLL=%TOOL_DIR%bin\Release\net8.0\QaTelemetry.dll"
+set "TOOL_DLL=%TOOL_DIR%bin\QA-0.4.0\QaTelemetry.dll"
 set "CASE=%TEMP%\ds1tr-ceaseless-certified-v2-lord-souls-off-05634a7e78b443e6910b317721e86b50\sweep-1-certified-lord-souls-off-1\qa-telemetry\case-runtime.json"
-set "QA_EXE=C:\Users\Adam\ds1tr-qa\runtime\DARK SOULS REMASTERED - CEASELESS QA\DarkSoulsRemastered.exe"
 set "DOTNET=C:\Users\Adam\dn8sdk\dotnet.exe"
 
 title DS1 Triple Randomizer - isolated Ceaseless QA
 echo Ceaseless exact-build telemetry
-echo This launcher never starts Steam or launches the game.
+echo This launcher never starts Steam and launches only the locked isolated QA executable.
 echo.
 
 if not exist "%TOOL_DLL%" (
   echo BLOCKED: telemetry helper has not been built.
-  echo Build: dotnet build tools/qa-telemetry/QaTelemetry.csproj --configuration Release
+  echo Build: dotnet build tools/qa-telemetry/QaTelemetry.csproj --configuration Release --output tools/qa-telemetry/bin/QA-0.4.0
   goto :failed
 )
 if not exist "%CASE%" (
@@ -40,20 +39,25 @@ echo [2/4] Verify isolated runtime identity
 if errorlevel 1 goto :failed
 
 echo.
-echo [3/4] Audit the locked executable and unique signature anchors
+echo [3/5] Audit the locked executable and unique signature anchors
 "%DOTNET%" "%TOOL_DLL%" audit-build
 if errorlevel 1 goto :failed
 
 echo.
-echo [4/4] Select telemetry operation
+echo [4/5] Verify same-user Steam, verify runtime DLLs, provision or verify the QA-only AppID sidecar, and launch the isolated executable
+"%DOTNET%" "%TOOL_DLL%" launch-qa --case "%CASE%"
+if errorlevel 1 goto :failed
+
+echo.
+echo [5/5] Select telemetry operation after the launch path has been verified
 if "%~1"=="" (
   echo No marker profile argument supplied; starting guided owner marker validation.
-  echo When asked, launch ONLY:
-  echo %QA_EXE%
+  echo Load the selected QA world in the already verified isolated game when prompted.
   "%DOTNET%" "%TOOL_DLL%" marker-guide --case "%CASE%"
 ) else (
   echo Using supplied marker profile for exact-build trace recording.
-  echo Ensure the isolated QA game is already running with the selected package.
+  echo Load the selected QA world in the already verified isolated game, then press a key here.
+  pause >nul
   "%DOTNET%" "%TOOL_DLL%" record --case "%CASE%" --profile "%~1"
 )
 if errorlevel 1 goto :failed
@@ -65,7 +69,7 @@ exit /b 0
 
 :failed
 echo.
-echo BLOCKED or incomplete. No game was launched by this script.
-echo The tool may attach only to the exact locked isolated QA executable, and only with query/read rights.
+echo BLOCKED or incomplete. Marker validation cannot continue unless launch-qa reported the exact isolated process path.
+echo The live telemetry reader uses query/read-only rights; the launch check uses query-limited identity reads only.
 pause
 exit /b 1

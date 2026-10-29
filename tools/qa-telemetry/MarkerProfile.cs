@@ -173,8 +173,8 @@ public static class MarkerGuide
             throw new QaTelemetryException("QA_SIGNATURE_UNVERIFIED", "Exact-build signature anchors were not uniquely resolved; no process was opened.");
 
         Console.WriteLine("Marker validation is read-only. This command will not launch the game or send game input.");
-        Console.WriteLine("Launch only the isolated QA executable, load the selected QA world, then press Enter here.");
-        Console.WriteLine(ExactBuildProfile.ExpectedExecutablePath);
+        Console.WriteLine("The launcher verified that the isolated QA executable is already running.");
+        Console.WriteLine("In that game, load the selected QA world, then press Enter here.");
         _ = Console.ReadLine();
         using ReadOnlyGameProcess process = ReadOnlyGameProcess.Attach(descriptor);
         Console.WriteLine($"Attached read-only to PID {process.Identity.ProcessId}; granted rights 0x{process.GrantedRights:X4}.");

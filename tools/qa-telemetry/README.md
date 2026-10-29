@@ -1,6 +1,6 @@
 # Ceaseless QA telemetry helper
 
-QaTelemetry is a standalone .NET 8 owner-QA tool, version 0.3.0. It has no reference to the application, backend, FogHost, or randomizer projects and is not included in product packaging.
+QaTelemetry is a standalone .NET 8 owner-QA tool, version 0.4.0. It has no reference to the application, backend, FogHost, or randomizer projects and is not included in product packaging.
 
 ## Trust boundary
 
@@ -12,7 +12,9 @@ The helper is pinned to this package-applied QA executable and runtime:
 - Selected package tree SHA-256: 32f0c2afeff25c9341405989b80ba7dc6a72da1f3e90ecdf90cf37ca2b5f79a9
 - Selected run-manifest.json SHA-256: e81a504da9c251d9e784eb6708133aa3e98a34cd4df9757d4eee3e259cf7324d
 
-Preflight and static executable audit do not open a game process. Live marker validation and recording attach only after checking the exact executable path, executable hash, process creation identity, package identity, and package-applied runtime manifests. The live reader requests PROCESS_QUERY_LIMITED_INFORMATION and PROCESS_VM_READ (0x1010) only. Static preflight requests no process rights (0x0000). No process-writing or injection API is present. The helper never launches a game or sends game input; the owner launches the isolated QA executable manually.
+Preflight and static executable audit do not open a game process. `launch-qa` first checks that Steam is running from the locked client path under the same Windows user SID, verifies the exact package/runtime and required DLLs, provisions or verifies the QA-only AppID sidecar, and starts only the exact isolated executable with its runtime directory as the working directory. It then queries the launched PID image path and executable hash before marker validation proceeds. It does not use a Steam URI. Live marker validation and recording attach only after checking the exact executable path, executable hash, process creation identity, package identity, and package-applied runtime manifests. Launch path checks request PROCESS_QUERY_LIMITED_INFORMATION only; the live reader requests PROCESS_QUERY_LIMITED_INFORMATION and PROCESS_VM_READ (0x1010) only. Static preflight requests no game process rights (0x0000). No process-writing, memory-writing, injection, or game-input API is present.
+
+The exact ASCII bytes `570940` at `<isolated QA runtime>\steam_appid.txt` are a launch-only sidecar. The sidecar is excluded only from the root file inventory of the locked package-applied QA runtime, so it does not alter the package tree or canonical runtime digest. The helper separately checks its exact path, bytes, SHA-256, non-reparse status, and single-link identity; a malformed existing file is not overwritten. No such file is written to the Steam installation.
 
 The three exact-build signatures are unique in the locked executable's .text sections and resolve to .data targets. This proves exact-build byte-anchor uniqueness, not pointer-chain meaning. The player position and event-flag chains remain candidates until owner marker validation. The map reader observes a candidate OnlineAreaID and must be confirmed by visiting Firelink Shrine, Northern Undead Asylum, and Demon Ruins; it does not infer location from coordinates.
 
@@ -27,15 +29,17 @@ These community files are evidence for candidate definitions only. They are not 
 
 Use the installed .NET 8 SDK. Both projects are BCL-only.
 
-    dotnet build tools/qa-telemetry/QaTelemetry.csproj --configuration Release
-    dotnet build tools/qa-telemetry/tests/QaTelemetry.SelfTest.csproj --configuration Release
-    dotnet run --project tools/qa-telemetry/tests/QaTelemetry.SelfTest.csproj --configuration Release --no-build
+    dotnet build tools/qa-telemetry/QaTelemetry.csproj --configuration Release --output tools/qa-telemetry/bin/QA-0.4.0
+    $out = Join-Path (Get-Location) 'tools\qa-telemetry\bin\QA-0.4.0-tests\'
+    dotnet build tools/qa-telemetry/tests/QaTelemetry.SelfTest.csproj --configuration Release --no-incremental "-p:BaseOutputPath=$out"
+    dotnet tools/qa-telemetry/bin/QA-0.4.0-tests/Release/net8.0/QaTelemetry.SelfTest.dll
 
 The self-test console checks package/runtime fail-closed behavior, process path/hash and rights policy, signature uniqueness rules, pointer/coordinate/map/flag bounds, marker-profile binding and revocation, JSONL hash/import checks, synthetic-data isolation, and a source scan for process-writing/injection APIs. It does not launch DSR or access live process memory.
 
 ## Commands
 
     QaTelemetry audit-build
+    QaTelemetry launch-qa --case <case-runtime.json>
     QaTelemetry marker-guide --case <case-runtime.json>
     QaTelemetry record --case <case-runtime.json> --profile <verified-profile.json> [--trace <temp-path.jsonl>]
     QaTelemetry verify-case --case <case-runtime.json>
@@ -46,7 +50,9 @@ audit-build hashes and scans only the locked executable. Each signature must mat
 
 verify-case verifies the exact package tree, run manifest, package file hashes, and pinned local V2 attestation. preflight verifies the separate clean and package-applied runtime attestations and requires the package-applied runtime path. It rejects Steam, clean-runtime-as-target, reparse points, hard links, and identity mismatches.
 
-marker-guide never starts the game. It first verifies the package, runtime, and exact-build signature scan, then asks the owner to launch the isolated executable and load the selected world. It guides these checks:
+The launcher invokes `launch-qa` after the static checks. That command refuses to continue if Steam is absent, belongs to a different OS user, or cannot be identified; if any DSR process is already running; if package/runtime/DLL/sidecar verification fails; or if the resulting process image is not the locked isolated executable. The command starts the exact executable directly with `WorkingDirectory` set to the QA runtime. It never starts the installed Steam-library DSR and never invokes `steam://run/570940`.
+
+After launch-path verification, `marker-guide` asks the owner to load the selected QA world in the already running isolated game. It guides these checks:
 
 1. visit Firelink Shrine, Northern Undead Asylum, and Demon Ruins and confirm each displayed candidate area ID;
 2. stand still for stable XYZ readings, then walk at least 1.5 m and confirm coherent movement;
@@ -65,7 +71,7 @@ trace-import accepts only the pinned external case and exact package identity. S
 
 ## Launcher and owner next step
 
-Run START-CEASELESS-QA.cmd. It verifies the exact package, package-applied runtime, and executable signature audit before entering guided marker validation. It never launches Steam or DSR. To record later, pass the verified marker-profile path as the launcher's first argument; the owner must already have the exact isolated DSR process open.
+Run START-CEASELESS-QA.cmd. It verifies the exact package, package-applied runtime, and executable signature audit, checks same-user Steam, provisions/verifies the AppID sidecar, launches the isolated DSR executable and verifies its process path, then enters guided marker validation. To record later, pass the verified marker-profile path as the launcher's first argument; the launcher still performs the isolated launch and path verification before starting trace recording.
 
 Do not start the Ceaseless gameplay case until the marker guide creates a profile and preflight/audit-build remain clean. The current implementation has not attached to a game process, observed runtime values, or produced a gameplay trace.
 

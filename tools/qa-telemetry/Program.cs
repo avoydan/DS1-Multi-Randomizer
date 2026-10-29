@@ -28,6 +28,16 @@ internal static class Program
                 return MarkerGuide.Run(markerDescriptor);
             }
 
+            if (command == "launch-qa")
+            {
+                if (!options.TryGetValue("case", out string? launchCase) || options.Keys.Any(key => key != "case"))
+                    throw new ArgumentException("launch-qa requires --case <descriptor.json> and accepts no other options.");
+                CaseDescriptor launchDescriptor = CaseDescriptor.Load(launchCase);
+                QaGameLaunchResult launch = QaGameLauncher.Launch(launchDescriptor);
+                Console.WriteLine(JsonSerializer.Serialize(launch, CaseDescriptor.JsonOptions));
+                return launch.ProcessPathVerified ? 0 : 6;
+            }
+
             if (command == "attest-runtime")
             {
                 if (options.Count != 0) throw new ArgumentException("attest-runtime uses repository-locked QA paths and takes no options.");
@@ -135,6 +145,7 @@ internal static class Program
         Console.WriteLine("QaTelemetry " + ExactBuildProfile.ToolVersion + " (standalone development tool)");
         Console.WriteLine("  audit-build");
         Console.WriteLine("  marker-guide --case <descriptor.json>");
+        Console.WriteLine("  launch-qa --case <descriptor.json>");
         Console.WriteLine("  record --case <descriptor.json> --profile <verified-profile.json> [--trace <temp-path.jsonl>]");
         Console.WriteLine("  verify-case --case <descriptor.json>");
         Console.WriteLine("  attest-runtime");
@@ -143,6 +154,7 @@ internal static class Program
         Console.WriteLine("  trace-import --case <descriptor.json> --trace <trace.jsonl> --summary <summary.json> --summary-sha <summary.sha256>");
         Console.WriteLine("audit-build reads the locked executable statically. No game process is opened by that command.");
         Console.WriteLine("marker-guide opens only the exact QA process with query/read-only rights after package/runtime preflight.");
+        Console.WriteLine("launch-qa starts only the exact isolated executable after same-user Steam and runtime verification, then verifies its process image path.");
         return 0;
     }
 

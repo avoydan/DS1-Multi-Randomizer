@@ -2,9 +2,9 @@
 
 ## State
 
-**PARTIAL.** The selected package is installed in a complete, isolated QA runtime, and the final preflight returns `QA_RUNTIME_COMPLETE`. Telemetry remains `UNVERIFIED`: no exact-build marker profile or live read-only reader exists, so this is runtime/package readiness rather than gameplay or telemetry readiness. The launcher performs preflight only and never starts or attaches to the game.
+**ISOLATED_QA_GAME_LAUNCH_READY.** The selected package is installed in a complete isolated QA runtime. The revised launcher verified same-user Steam, provisioned the QA-only AppID sidecar, directly started the exact isolated executable with the correct working directory, verified its process image path/hash, and a post-launch preflight returned `QA_RUNTIME_COMPLETE`. The game is open at its title window. Telemetry remains `UNVERIFIED` until the owner confirms the marker fields; no marker values or gameplay result were collected.
 
-Production validator, V1–V5 semantics, generation profile, retry limit, public version, and safe baseline tag were not changed. The Steam installation was read-only; no live Steam file was modified, no game was launched, and no process was opened. Runtime copies and local manifests are outside Git.
+Production validator, V1–V5 semantics, generation profile, retry limit, public version, and safe baseline tag were not changed. The Steam installation was read-only; no Steam-library DSR executable was launched and no Steam DSR file was modified. Only the separately copied isolated QA executable was launched. Runtime copies and local manifests are outside Git.
 
 ## Repository and baseline checks
 
@@ -114,10 +114,34 @@ Release build passed with 0 warnings and 0 errors; the focused helper suite pass
 
 The runtime-preparation blocker is resolved. Remaining work before telemetry-backed gameplay is to derive and independently validate markers against this exact executable, then implement/review a read-only process reader and ordered live-trace path. No marker offset or gameplay result has been fabricated. Do not treat `QA_RUNTIME_COMPLETE` as a gameplay pass or use the telemetry helper to claim a verified route.
 
-## Current 0.3.0 implementation result
+## Prior 0.3.0 implementation result (historical)
 
-The standalone tool is now version 0.3.0. Release build succeeded with 0 warnings/errors. The offline self-test console passed 48/48 after the exact-build process/profile/trace changes; it includes source-level absence checks for every requested process-write and injection API. No DSR process was launched or attached during verification.
+At this checkpoint the standalone tool was version 0.3.0. Release build succeeded with 0 warnings/errors. The offline self-test console passed 48/48 after the exact-build process/profile/trace changes; it includes source-level absence checks for every requested process-write and injection API. No DSR process was launched or attached during that checkpoint.
 
 The exact executable audit scans both `.text` sections and requires one match per candidate signature plus a `.data`/`.bss` target. The flag reader reports candidate event flag 11410410 at candidate byte offset `0x3c30`, mask `0x20`. Player XYZ and current map use candidate pointer chains; the map candidate is an OnlineAreaID, not yet a canonical map identity. These signals become usable only after the owner guide independently confirms map locations, movement, a known transition, and known false/true flag states.
 
-The launcher now checks package identity, package-applied runtime, and the exact-build audit before entering marker validation. It does not launch Steam or DSR. Passing a verified profile path as its first argument selects trace mode. Marker validation and trace recording are read-only and remain a future owner action. Production validator, generation behavior, retry limits, V1-V5 semantics, baseline tag, and game files were not changed.
+At that checkpoint the launcher did not launch Steam or DSR. That behavior was superseded by the isolated launch implementation below. Production validator, generation behavior, retry limits, V1-V5 semantics, baseline tag, and game files were not changed.
+
+## Isolated QA Steam initialization and launch (2026-10-29; QaTelemetry 0.4.0)
+
+### Finding and correction
+
+The selected isolated runtime initially had `steam_api64.dll` but no root-level `steam_appid.txt`. The earlier launcher also left executable selection and working directory to a manual owner action. Before the corrected run, the existing isolated DSR process showed a `Fatal error` window; its image path was verified as the isolated QA path and it was closed normally. No process under the normal Steam DSR path was launched or closed.
+
+The corrected launch gate requires the Steam client at `C:\Program Files (x86)\Steam\steam.exe` and verifies its process token SID matches the launcher user. It verifies package/runtime attestations and required DLLs, starts `DarkSoulsRemastered.exe` directly with `WorkingDirectory` set to the package-applied QA runtime, then checks the new PID's image path and executable hash using `PROCESS_QUERY_LIMITED_INFORMATION` only. A live Steam-library DSR image, another unknown DSR image, or any already-running DSR process blocks launch. No `steam://run/570940`, game input, process memory write, or process injection is used.
+
+### Launch sidecar and immutable identities
+
+The launch sidecar was created only at:
+
+`C:\Users\Adam\ds1tr-qa\runtime\DARK SOULS REMASTERED - CEASELESS QA\steam_appid.txt`
+
+It contains exactly six ASCII bytes `570940`, no BOM or line ending. SHA-256: `31e26c0b0251cf381c0afbceba381c68f9a5aebb9637ef93a4cb41ee9f17ea91` (bytes `35 37 30 39 34 30`). The file is excluded only from the root inventory for the locked package-applied runtime; its exact path, content, hash, regular-file status, and single-link identity are verified separately. A wrong pre-existing sidecar is preserved and rejected. The existing runtime canonical digest remains `5f182859f78f285a89a31a608ea28dc5b1cb069b082aa906637da11aea2873ef` (6,013 files; 7,371,056,989 bytes), and the selected package tree remains `32f0c2afeff25c9341405989b80ba7dc6a72da1f3e90ecdf90cf37ca2b5f79a9`.
+
+### Verification result
+
+- Steam client was running from the locked Steam client path. The launch command verified the Steam process token SID matched the current owner SID before the game was started.
+- Launch result: `ISOLATED_QA_GAME_LAUNCH_READY`, PID `62764`, working directory `C:\Users\Adam\ds1tr-qa\runtime\DARK SOULS REMASTERED - CEASELESS QA`, process image path equal to the isolated executable, and executable SHA-256 `a45aaa36dd2f6cc151670a639ea5547043cf38ea79ff4178b963c6ed71f98d7b`. The visible title was `DARK SOULS™: REMASTERED` and the process was responding.
+- Post-sidecar post-launch preflight returned `QA_RUNTIME_COMPLETE`, zero blockers, required runtime assets present, and no process rights requested. Independent `verify-case` returned `PACKAGE_IDENTITY_VERIFIED` with the expected package tree digest and run-manifest hash.
+- QaTelemetry 0.4.0 Release build: 0 warnings, 0 errors. Focused self-tests: 55 passed, 0 failed. Tests cover absent Steam, same-user enforcement, wrong working directory, missing/wrong/correct AppID sidecar, live Steam DSR rejection, isolated executable selection, sidecar hash, and invariant runtime/package identity. Source audit continues to reject process-writing/injection APIs.
+- No world was loaded and no gameplay or marker values were collected. Marker profile remains `UNVERIFIED`; the owner may resume marker validation in the already running isolated QA game.
