@@ -23,6 +23,8 @@ tools/smoke-verify/obj/
 # Game cursor helper build output.
 tools/game-cursor-helper/bin/
 tools/game-cursor-helper/obj/
+tools/qa-telemetry/**/bin/
+tools/qa-telemetry/**/obj/
 # Repository-authored combined-engine tests.
 engines/combined/tests/**/bin/
 engines/combined/tests/**/obj/

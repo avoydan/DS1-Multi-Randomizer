@@ -57,6 +57,16 @@ Normal CI should run a small deterministic differential set (for example 50 seed
 At that Night Shift checkpoint, FogHost implementation/project version was 0.7.4, source Program.HostVersion was 0.7.3, and the JSON wire schema was schemaVersion=3. Backend was then 0.46.3. No version bump, Portable, publish, tag, or release was made at that checkpoint. The follow-on profile reconciliation and terminal failure-code correction are recorded below; backend is now 0.46.4. V1-V4 code paths and fixtures remain unchanged.
 # Implementation status
 
+## Ceaseless single-case QA telemetry preparation (2026-10-29)
+
+Prepared a standalone .NET 8 development-only `tools/qa-telemetry` helper and one fail-closed launcher for the previously selected Lord-Souls-off Ceaseless candidate. The current package was independently rehashed: 74 files / 78,082,827 bytes; package tree SHA-256 `32f0c2afeff25c9341405989b80ba7dc6a72da1f3e90ecdf90cf37ca2b5f79a9`; run-manifest SHA-256 `e81a504da9c251d9e784eb6708133aa3e98a34cd4df9757d4eee3e259cf7324d`; V2 attestation SHA-256 `6d4a2fb7eb0445b92c5b729b16b84ae23b6316bb56b53107a3d282a5870ae4a4`. All 74 per-file hashes match and no reparse points were found. This resolves the previous truncated hash display.
+
+The helper verifies package and exact executable locks, rejects Steam paths and linked/reparse inputs, provides a compact JSONL writer with create-new sessions and hashed summaries, and imports traces while keeping untrusted/synthetic observations `UNKNOWN`. The build requests no process rights and contains no live process reader; its future rights allowlist is query/read only. No offsets or marker fields were guessed; all ten telemetry fields remain `UNVERIFIED`, and this build has no gameplay-promotion path.
+
+The established QA DSR root is an extracted data-only snapshot with 199 files, not a complete runtime: no matching `.bhd`/`.bdt` archives or complete collision/runtime assets were found. The launcher therefore returns `QA_RUNTIME_INCOMPLETE` / `QA_RUNTIME_PROFILE_UNVERIFIED`, pauses, and does not launch or attach to the game. No gameplay telemetry was fabricated; this task is **PARTIAL**, not gameplay-ready. The current helper cannot generate a trusted gameplay trace; after a complete isolated runtime is available, exact-build marker validation and a reviewed live read-only reader still need separate implementation. Detailed case identity, fail gates, checkpoints, pass/fail taxonomy, upstream comparison settings, and the exact next owner action are in `docs/CEASELESS_QA_TELEMETRY.md`. No production behavior or application version changed.
+
+Verification: standalone .NET 8 Release build passed with 0 warnings/errors; focused synthetic QA helper tests passed 24/24. The actual selected package passes `verify-case`; preflight returns the expected `QA_RUNTIME_INCOMPLETE` with no process rights requested and no game launched. V5 backend, generation, retry, FogHost, and release behavior were not changed or rerun.
+
 ## Experimental physical-witness shadow tool (2026-10-28; dev tool 0.2.0)
 
 Added a development-only evidence graph and a read-only audit over the existing certified 331 STRICT cases. Production validation/generation remains unchanged; no cases were regenerated and the production validator was not rerun. Safe dispositions are inherited from the canonical dataset selection.
