@@ -22,7 +22,7 @@ public static class TraceRecorder
         if (!runtime.Ok || !string.Equals(runtime.ModifiedManifestSha256, descriptor.Runtime!.ModifiedManifestSha256, StringComparison.OrdinalIgnoreCase))
             throw new QaTelemetryException("QA_RUNTIME_PREFLIGHT_BLOCKED", string.Join("; ", runtime.Blockers));
         MarkerProfileCheck profileCheck = MarkerProfileStore.LoadVerified(profilePath, descriptor.Runtime.ExecutableSha256!,
-            ExactBuildProfile.ExpectedRuntimeDigest, ExactBuildProfile.ToolVersion, ExactBuildProfile.DefinitionSha256);
+            ExactBuildProfile.ToolVersion, ExactBuildProfile.DefinitionSha256);
         if (!profileCheck.Ok || profileCheck.Profile is null || profileCheck.ProfileSha256 is null)
             throw new QaTelemetryException(profileCheck.Code, profileCheck.Message);
         ExactBuildAuditResult audit = ExactBuildProfile.Audit(ExactBuildProfile.ExpectedExecutablePath);
@@ -115,6 +115,7 @@ public static class TraceRecorder
             packageTreeSha256 = descriptor.Package!.TreeSha256,
             runManifestSha256 = descriptor.Package.RunManifestSha256,
             profileSha256 = profileCheck.ProfileSha256,
+            executableProfileId = profileCheck.Profile.ExecutableProfileId,
             profileStatus = "VERIFIED",
             writeCapableProcessRights = false
         }, CaseDescriptor.JsonOptions));

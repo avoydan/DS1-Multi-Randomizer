@@ -1,8 +1,31 @@
-# Ceaseless single-case QA preparation (2026-10-29)
+# Ceaseless single-case QA preparation and telemetry identity split (2026-10-29)
+
+## Current state: calibration and gameplay are separate
+
+The former marker-validation flow on the certified package is stopped. DSR PIDs 62764 and 14288 are no longer running, and no DSR process was present at the start of this task. No world was loaded and no calibration values or gameplay trace were collected.
+
+The owner found that the certified package randomizes enemies and Fog, so the starting kit appears in Tomb of the Giants. That package cannot be used to calibrate basic memory fields before the intended Asylum route. The clean QA runtime is now the only calibration target:
+
+- Clean runtime: `C:\Users\Adam\ds1tr-qa\runtime\DARK SOULS REMASTERED`
+- Clean runtime manifest SHA-256: `89a9dc2a0fa7dbf990521e7adb9f27586c140334676639a88edeb1bd4b2d3729`
+- Clean runtime canonical tree digest: `44abebc1a8363015871fc2fc20c06165c0a7d18f1684d02ff5ef79fc2c16905f`
+- Executable SHA-256: `a45aaa36dd2f6cc151670a639ea5547043cf38ea79ff4178b963c6ed71f98d7b`
+- The clean tree currently has no `steam_appid.txt`; `VALIDATE-TELEMETRY-MARKERS.cmd` will provision the exact `570940` sidecar only there when the owner runs calibration.
+
+QaTelemetry 0.5.0 implements two different identities:
+
+1. **Executable telemetry profile.** Bound to the exact EXE SHA, a stable executable-profile ID, tool version, and a telemetry-definition SHA covering signatures, pointer chains, candidate structures, and flag layout. Owner evidence comes from vanilla Asylum/Firelink map confirmations, stable and moving XYZ, the Asylum-to-Firelink transition, and independently known false/true vanilla flags. It does not bind the Ceaseless runtime digest, package tree, package manifest, or Seed Code. Its calibration provenance records the exact clean manifest hash.
+2. **Ceaseless gameplay session.** Each trace remains bound to the exact case ID and Seed Code, package tree and `run-manifest.json` hashes, package-applied runtime digest and runtime-manifest hash, process image path/hash/PID/start time, and executable-profile ID plus profile SHA. The importer rejects a mismatch in any of these values.
+
+`VALIDATE-TELEMETRY-MARKERS.cmd` is the only launcher for profile creation. It verifies the clean manifest and executable, audits the clean executable, checks same-user Steam, provisions the clean-only AppID sidecar, launches the exact clean executable with its directory as working directory, verifies the process path, then begins a vanilla marker guide. No package or case descriptor is passed to this launcher. `START-CEASELESS-QA.cmd <profile-path>` now refuses to launch without a compatible verified profile and remains pinned to the certified package-applied runtime.
+
+The AppID sidecar is handled as a launch-only sidecar on either explicitly approved isolated runtime. Its exact bytes, hash, path, and file-link identity are checked separately; it is excluded from that runtime's immutable manifest inventory. The package tree remains `32f0c2afeff25c9341405989b80ba7dc6a72da1f3e90ecdf90cf37ca2b5f79a9`. No runtime sidecar was created in this task, and neither the clean runtime nor the package runtime was modified.
+
+Owner's next action: run `tools\qa-telemetry\VALIDATE-TELEMETRY-MARKERS.cmd`, load a vanilla world in the launched clean QA DSR, follow the Asylum-to-Firelink prompts, and retain the emitted executable-profile path. Do not begin the Ceaseless gameplay trace until calibration emits `TELEMETRY_EXECUTABLE_PROFILE_VERIFIED`.
 
 ## State
 
-**ISOLATED_QA_GAME_LAUNCH_READY.** The selected package is installed in a complete isolated QA runtime. The revised launcher verified same-user Steam, provisioned the QA-only AppID sidecar, directly started the exact isolated executable with the correct working directory, verified its process image path/hash, and a post-launch preflight returned `QA_RUNTIME_COMPLETE`. The game is open at its title window. Telemetry remains `UNVERIFIED` until the owner confirms the marker fields; no marker values or gameplay result were collected.
+**Calibration prepared; owner input pending.** The earlier isolated package launch completed successfully, but the game process has since been stopped. No current DSR process is running. Telemetry remains `UNVERIFIED`; no marker values or gameplay result were collected.
 
 Production validator, V1–V5 semantics, generation profile, retry limit, public version, and safe baseline tag were not changed. The Steam installation was read-only; no Steam-library DSR executable was launched and no Steam DSR file was modified. Only the separately copied isolated QA executable was launched. Runtime copies and local manifests are outside Git.
 
@@ -53,7 +76,7 @@ The helper fails closed for an unbound or non-approved runtime path, the known S
 
 ## Telemetry implementation and boundaries
 
-**Current implementation status (2026-10-29, QaTelemetry 0.3.0):** The bullets immediately below describe the earlier 0.2.0 preparation checkpoint and are retained as historical context. They are superseded by the 0.3.0 implementation record at the end of this document.
+**Historical implementation status (before QaTelemetry 0.5.0):** The bullets immediately below describe the earlier package-bound marker-guide design and are retained for history. They are superseded by the clean-runtime calibration and separate session identity described at the top of this document.
 
 - Exact-build static audit, query/read-only process attachment, candidate map/XYZ/event-flag readers, guided owner marker validation, profile binding/revocation, append-only live JSONL recording, and exact-case shadow import are now implemented in `tools/qa-telemetry/`.
 - The locked executable SHA-256 remains `a45aaa36dd2f6cc151670a639ea5547043cf38ea79ff4178b963c6ed71f98d7b`; package-applied runtime digest remains `5f182859f78f285a89a31a608ea28dc5b1cb069b082aa906637da11aea2873ef`. Exact-build signature anchors have unique static matches, but pointer-chain meaning and all live values remain candidate until the owner completes the marker guide.
@@ -80,9 +103,9 @@ The clean runtime contains `map/MapStudio/m14_01_00_00.msb`, `map/m14_01_00_00.m
 
 The pinned `JuicerMV.SoulsFormats` dependency decodes these containers and the MSB/MCP/MCG structures, but the available dependency does not decode the HKX collision mesh triangles. No continuous player traversability proof can be made from approximate coordinates or navmesh connectivity alone. The Ceaseless arena-to-`o4961_0000`-to-main-Demon-Ruins-to-lower-lava physical route therefore remains `UNKNOWN` pending trustworthy geometry/engine evidence or owner gameplay.
 
-## Marker validation required before telemetry can be trusted
+## Earlier marker validation requirements (superseded)
 
-The locked executable needs an independently derived profile and a complete isolated runtime first. Then validate, in this order, before gameplay evidence is trusted:
+The older design expected a single package-bound profile and a complete isolated runtime. This was replaced because the certified package changes Fog and enemies before the intended Asylum route. Current validation uses the clean runtime and requires only vanilla Asylum/Firelink evidence.
 
 1. a deterministic known map such as Firelink;
 2. player coordinates change consistently during ordinary movement;
@@ -144,4 +167,4 @@ It contains exactly six ASCII bytes `570940`, no BOM or line ending. SHA-256: `3
 - Launch result: `ISOLATED_QA_GAME_LAUNCH_READY`, PID `62764`, working directory `C:\Users\Adam\ds1tr-qa\runtime\DARK SOULS REMASTERED - CEASELESS QA`, process image path equal to the isolated executable, and executable SHA-256 `a45aaa36dd2f6cc151670a639ea5547043cf38ea79ff4178b963c6ed71f98d7b`. The visible title was `DARK SOULS™: REMASTERED` and the process was responding.
 - Post-sidecar post-launch preflight returned `QA_RUNTIME_COMPLETE`, zero blockers, required runtime assets present, and no process rights requested. Independent `verify-case` returned `PACKAGE_IDENTITY_VERIFIED` with the expected package tree digest and run-manifest hash.
 - QaTelemetry 0.4.0 Release build: 0 warnings, 0 errors. Focused self-tests: 55 passed, 0 failed. Tests cover absent Steam, same-user enforcement, wrong working directory, missing/wrong/correct AppID sidecar, live Steam DSR rejection, isolated executable selection, sidecar hash, and invariant runtime/package identity. Source audit continues to reject process-writing/injection APIs.
-- No world was loaded and no gameplay or marker values were collected. Marker profile remains `UNVERIFIED`; the owner may resume marker validation in the already running isolated QA game.
+- No world was loaded and no gameplay or marker values were collected. Marker profile remains `UNVERIFIED`. The previous package process is no longer running; owner calibration must start through the new clean-runtime launcher.

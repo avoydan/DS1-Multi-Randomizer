@@ -1,10 +1,14 @@
 # Ceaseless QA telemetry helper
 
-QaTelemetry is a standalone .NET 8 owner-QA tool, version 0.4.0. It has no reference to the application, backend, FogHost, or randomizer projects and is not included in product packaging.
+QaTelemetry is a standalone .NET 8 owner-QA tool, version 0.5.0. It has no reference to the application, backend, FogHost, or randomizer projects and is not included in product packaging.
 
 ## Trust boundary
 
-The helper is pinned to this package-applied QA executable and runtime:
+The helper uses two deliberately separate identities:
+
+**Executable telemetry profile:** calibration is performed only against the manifest-verified clean runtime at `C:\Users\Adam\ds1tr-qa\runtime\DARK SOULS REMASTERED`. The EXE SHA-256 is `a45aaa36dd2f6cc151670a639ea5547043cf38ea79ff4178b963c6ed71f98d7b`; the clean manifest SHA-256 is `89a9dc2a0fa7dbf990521e7adb9f27586c140334676639a88edeb1bd4b2d3729`. The profile binds that exact executable, a stable executable-profile ID, the tool version, and a canonical hash covering signature patterns, candidate pointer/field structures, and flag layout. Its evidence records vanilla Asylum/Firelink confirmations, movement/position checks, the Asylum-to-Firelink transition, and independently known true/false flags. It contains no Ceaseless package, run-manifest, runtime digest, or Seed Code identity.
+
+**Ceaseless gameplay session:** recording and import remain bound to the exact package-applied QA runtime, package, selected case, Seed Code, process path, and executable profile identity:
 
 - Executable: C:\Users\Adam\ds1tr-qa\runtime\DARK SOULS REMASTERED - CEASELESS QA\DarkSoulsRemastered.exe
 - Executable SHA-256: a45aaa36dd2f6cc151670a639ea5547043cf38ea79ff4178b963c6ed71f98d7b
@@ -12,11 +16,11 @@ The helper is pinned to this package-applied QA executable and runtime:
 - Selected package tree SHA-256: 32f0c2afeff25c9341405989b80ba7dc6a72da1f3e90ecdf90cf37ca2b5f79a9
 - Selected run-manifest.json SHA-256: e81a504da9c251d9e784eb6708133aa3e98a34cd4df9757d4eee3e259cf7324d
 
-Preflight and static executable audit do not open a game process. `launch-qa` first checks that Steam is running from the locked client path under the same Windows user SID, verifies the exact package/runtime and required DLLs, provisions or verifies the QA-only AppID sidecar, and starts only the exact isolated executable with its runtime directory as the working directory. It then queries the launched PID image path and executable hash before marker validation proceeds. It does not use a Steam URI. Live marker validation and recording attach only after checking the exact executable path, executable hash, process creation identity, package identity, and package-applied runtime manifests. Launch path checks request PROCESS_QUERY_LIMITED_INFORMATION only; the live reader requests PROCESS_QUERY_LIMITED_INFORMATION and PROCESS_VM_READ (0x1010) only. Static preflight requests no game process rights (0x0000). No process-writing, memory-writing, injection, or game-input API is present.
+Preflight and static executable audit do not open a game process. `launch-calibration` verifies the pinned clean-runtime manifest and same-user Steam, provisions or verifies the clean-root AppID sidecar, and starts only the clean QA executable with its runtime as the working directory. `launch-qa` independently verifies the certified package and package-applied runtime before it starts the Ceaseless executable. Each command checks the resulting PID image path and executable hash. Neither uses a Steam URI. Calibration and recording attach only to their mode's exact executable path and hash. Launch path checks request PROCESS_QUERY_LIMITED_INFORMATION only; the live reader requests PROCESS_QUERY_LIMITED_INFORMATION and PROCESS_VM_READ (0x1010) only. Static preflight requests no game process rights (0x0000). No process-writing, memory-writing, injection, or game-input API is present.
 
-The exact ASCII bytes `570940` at `<isolated QA runtime>\steam_appid.txt` are a launch-only sidecar. The sidecar is excluded only from the root file inventory of the locked package-applied QA runtime, so it does not alter the package tree or canonical runtime digest. The helper separately checks its exact path, bytes, SHA-256, non-reparse status, and single-link identity; a malformed existing file is not overwritten. No such file is written to the Steam installation.
+The exact ASCII bytes `570940` at either approved isolated QA runtime's root `steam_appid.txt` are launch-only sidecars. Each is excluded from that runtime's immutable manifest inventory only after its exact root path, bytes, SHA-256, non-reparse status, and single-link identity are checked separately. The clean manifest SHA and package tree/runtime identities stay stable. A malformed existing file is not overwritten, and no sidecar is written to the Steam installation. The clean-root sidecar is provisioned only when the owner runs the calibration launcher; it is currently absent.
 
-The three exact-build signatures are unique in the locked executable's .text sections and resolve to .data targets. This proves exact-build byte-anchor uniqueness, not pointer-chain meaning. The player position and event-flag chains remain candidates until owner marker validation. The map reader observes a candidate OnlineAreaID and must be confirmed by visiting Firelink Shrine, Northern Undead Asylum, and Demon Ruins; it does not infer location from coordinates.
+The three exact-build signatures are unique in the locked executable's .text sections and resolve to .data targets. This proves exact-build byte-anchor uniqueness, not pointer-chain meaning. Candidate pointer and flag layouts are included in the telemetry-definition hash. The player position and event-flag chains remain candidates until owner calibration. The map reader observes a candidate OnlineAreaID and must be confirmed in the clean vanilla world at Northern Undead Asylum and Firelink Shrine; it does not infer location from coordinates.
 
 Candidate signature and flag-layout evidence is recorded in ExactBuild.cs:
 
@@ -29,18 +33,22 @@ These community files are evidence for candidate definitions only. They are not 
 
 Use the installed .NET 8 SDK. Both projects are BCL-only.
 
-    dotnet build tools/qa-telemetry/QaTelemetry.csproj --configuration Release --output tools/qa-telemetry/bin/QA-0.4.0
-    $out = Join-Path (Get-Location) 'tools\qa-telemetry\bin\QA-0.4.0-tests\'
+    dotnet build tools/qa-telemetry/QaTelemetry.csproj --configuration Release --output tools/qa-telemetry/bin/QA-0.5.0
+    $out = Join-Path (Get-Location) 'tools\qa-telemetry\bin\QA-0.5.0-tests\'
     dotnet build tools/qa-telemetry/tests/QaTelemetry.SelfTest.csproj --configuration Release --no-incremental "-p:BaseOutputPath=$out"
-    dotnet tools/qa-telemetry/bin/QA-0.4.0-tests/Release/net8.0/QaTelemetry.SelfTest.dll
+    dotnet tools/qa-telemetry/bin/QA-0.5.0-tests/Release/net8.0/QaTelemetry.SelfTest.dll
 
 The self-test console checks package/runtime fail-closed behavior, process path/hash and rights policy, signature uniqueness rules, pointer/coordinate/map/flag bounds, marker-profile binding and revocation, JSONL hash/import checks, synthetic-data isolation, and a source scan for process-writing/injection APIs. It does not launch DSR or access live process memory.
 
 ## Commands
 
-    QaTelemetry audit-build
+    QaTelemetry verify-calibration-runtime
+    QaTelemetry audit-build --target clean
+    QaTelemetry launch-calibration
+    QaTelemetry calibrate-markers
+    QaTelemetry verify-profile --profile <executable-profile.json>
     QaTelemetry launch-qa --case <case-runtime.json>
-    QaTelemetry marker-guide --case <case-runtime.json>
+    QaTelemetry audit-build --target ceaseless
     QaTelemetry record --case <case-runtime.json> --profile <verified-profile.json> [--trace <temp-path.jsonl>]
     QaTelemetry verify-case --case <case-runtime.json>
     QaTelemetry preflight --case <case-runtime.json>
@@ -52,14 +60,14 @@ verify-case verifies the exact package tree, run manifest, package file hashes, 
 
 The launcher invokes `launch-qa` after the static checks. That command refuses to continue if Steam is absent, belongs to a different OS user, or cannot be identified; if any DSR process is already running; if package/runtime/DLL/sidecar verification fails; or if the resulting process image is not the locked isolated executable. The command starts the exact executable directly with `WorkingDirectory` set to the QA runtime. It never starts the installed Steam-library DSR and never invokes `steam://run/570940`.
 
-After launch-path verification, `marker-guide` asks the owner to load the selected QA world in the already running isolated game. It guides these checks:
+After launch-path verification, `calibrate-markers` attaches only to the already-running clean QA executable. It asks the owner to load a vanilla world and guides these checks:
 
-1. visit Firelink Shrine, Northern Undead Asylum, and Demon Ruins and confirm each displayed candidate area ID;
+1. confirm Northern Undead Asylum from the vanilla in-game location;
 2. stand still for stable XYZ readings, then walk at least 1.5 m and confirm coherent movement;
-3. cross an ordinary known transition and confirm the candidate map value changes;
-4. provide one independently known false and one independently known true event flag, with the in-game reason for each.
+3. use vanilla progression from the Asylum to Firelink Shrine and confirm the candidate map value changes and matches the Firelink location;
+4. provide one independently known false and one independently known true vanilla event flag, with the in-game reason for each.
 
-Only a successful complete session writes a VERIFIED marker profile and SHA-256 sidecar under %TEMP%\ds1tr-qa-telemetry\marker-profiles. The profile binds executable hash, package-applied runtime digest, tool version, signature-definition hash, owner-confirmed map IDs, flag checks, transition, process identity, and validation timestamps. If a later trace encounters an invalid pointer/field value, it creates a separate .invalid marker and refuses further use of that profile. Any hash, runtime, tool, or signature-definition mismatch also prevents profile loading.
+Only a successful complete calibration writes a VERIFIED executable telemetry profile and SHA-256 sidecar under `%TEMP%\ds1tr-qa-telemetry\marker-profiles`. The profile is independent of gameplay package/runtime/Seed Code identity. It records clean-runtime calibration provenance and evidence but can be reused only when the exact EXE hash, executable-profile ID, tool version, and telemetry-definition hash match. A later live pointer/field read failure creates a separate `.invalid` marker and blocks further use.
 
 record rechecks package/runtime/profile/executable identity, then reads the process on a background sampler while the console accepts owner checkpoint annotations. Sampling continues while explicit y/n outcome prompts are answered. Checkpoint keypresses mark only the owner's report that the checkpoint was reached; they never imply that an exit was actionable, a transition succeeded, a landing was safe, or a route milestone was reached. W opens an explicit interruption annotation for death, warp/teleport, loading, or a sampling gap. No keypress is sent to DSR.
 
@@ -71,9 +79,9 @@ trace-import accepts only the pinned external case and exact package identity. S
 
 ## Launcher and owner next step
 
-Run START-CEASELESS-QA.cmd. It verifies the exact package, package-applied runtime, and executable signature audit, checks same-user Steam, provisions/verifies the AppID sidecar, launches the isolated DSR executable and verifies its process path, then enters guided marker validation. To record later, pass the verified marker-profile path as the launcher's first argument; the launcher still performs the isolated launch and path verification before starting trace recording.
+Run `VALIDATE-TELEMETRY-MARKERS.cmd` first. It verifies the clean runtime, audits the clean executable, checks same-user Steam, provisions/verifies the clean-QA AppID sidecar, launches only that executable, verifies its process path, and starts vanilla calibration. It does not read or launch the certified package.
 
-Do not start the Ceaseless gameplay case until the marker guide creates a profile and preflight/audit-build remain clean. The current implementation has not attached to a game process, observed runtime values, or produced a gameplay trace.
+After calibration emits a verified profile, run `START-CEASELESS-QA.cmd <profile-path>`. The launcher requires and verifies that profile before package checks and launch. The live trace binds case ID, exact Seed Code, runtime digest and runtime-manifest SHA, package tree and run-manifest SHA, process image path/PID/start time, and executable-profile ID plus profile SHA. Import refuses any mismatch. At this checkpoint no owner calibration has run and no gameplay trace exists.
 
 ## Ceaseless route annotations
 

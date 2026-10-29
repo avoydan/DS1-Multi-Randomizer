@@ -27,6 +27,7 @@ internal static class Program
         Run("Steam client absence is an actionable launch blocker", SteamClientAbsent);
         Run("Steam client must run under the same OS user", SteamClientUserIdentity);
         Run("QA launch rejects an incorrect working directory", QaLaunchWrongWorkingDirectory);
+        Run("clean calibration launch selects only the clean QA executable", CleanCalibrationExecutableSelected);
         Run("missing QA AppID sidecar is provisioned with exact bytes", QaAppIdSidecarProvisioned);
         Run("incorrect QA AppID sidecar is rejected without replacement", QaAppIdSidecarWrongContent);
         Run("live Steam DSR executable cannot be selected for QA launch", QaLiveSteamExecutableRejected);
@@ -43,14 +44,15 @@ internal static class Program
         Run("invalid event flag bank is rejected", InvalidEventFlagIndexRejected);
         Run("corrupt marker profile fails closed", CorruptMarkerProfileRejected);
         Run("marker profile for another executable is rejected", MarkerProfileExecutableMismatch);
-        Run("marker profile for another runtime is rejected", MarkerProfileRuntimeMismatch);
-        Run("marker profile for changed signatures is rejected", MarkerProfileSignatureMismatch);
+        Run("executable marker profile is independent of gameplay runtime identity", MarkerProfileIndependentOfGameplayRuntime);
+        Run("marker profile for changed telemetry definitions is rejected", MarkerProfileSignatureMismatch);
         Run("pointer failure invalidates the marker profile", MarkerProfileInvalidation);
         Run("production telemetry source contains no process-write or injection API", ProcessWriteApiAudit);
         Run("trace output outside Temp is rejected", TraceOutsideTempRejected);
         Run("QA runtime without manifest binding fails closed", RuntimeMissingManifestBinding);
         Run("clean runtime cannot be used as the package-applied process target", CleanRuntimeRejectedForLiveTarget);
         Run("clean runtime manifest attests exact copied tree and QA subset", CleanRuntimeManifestRoundTrip);
+        Run("clean-runtime AppID sidecar is separately verified and excluded from immutable identity", CleanRuntimeSidecarIdentity);
         Run("QA launch sidecar is separately hashed and excluded from package runtime identity", PackageAppliedRuntimePreflight);
         Run("runtime tree mutation fails its manifest", RuntimeTreeMutationRejected);
         Run("reparse point in runtime inventory fails closed", RuntimeReparsePointRejected);
@@ -64,6 +66,8 @@ internal static class Program
         Run("trace mutation fails summary hash", TraceCorruptionRejected);
         Run("summary mutation fails summary hash file", SummaryCorruptionRejected);
         Run("case identity mismatch is rejected after valid reseal", TracePackageMismatchRejected);
+        Run("Seed Code mismatch is rejected after valid reseal", TraceSeedCodeMismatchRejected);
+        Run("Ceaseless session remains bound to exact runtime manifest and process path", TraceRuntimeAndProcessIdentityMismatchRejected);
         Run("unverified telemetry cannot promote gameplay certainty", TelemetryUnverifiedStaysUnknown);
         Run("synthetic data never promotes gameplay certainty", SyntheticNeverGameplayConfirmed);
         Run("live telemetry writer is disabled without verified profile", LiveWriterDisabled);
@@ -251,6 +255,18 @@ internal static class Program
             Path.GetDirectoryName(ExactBuildProfile.ExpectedExecutablePath)!);
     }
 
+    private static void CleanCalibrationExecutableSelected()
+    {
+        string expected = ExactBuildProfile.CalibrationExecutablePath;
+        string accepted = QaLaunchPolicy.VerifyObservedProcessPath(expected, expected);
+        Check(accepted == expected, "The exact clean calibration executable path was not selected.");
+        QaLaunchPolicy.ValidateLaunchPaths(expected, Path.GetDirectoryName(expected)!, expected, Path.GetDirectoryName(expected)!);
+        ExactBuildProfile.RequireApprovedExecutable(expected, ExactBuildProfile.ExpectedExecutableSha256);
+        QaTelemetryException error = ThrowsAndReturn<QaTelemetryException>(() => ExactBuildProfile.RequireApprovedExecutable(
+            ExactBuildProfile.ExpectedExecutablePath, new string('0', 64)));
+        Check(error.Code == "QA_EXECUTABLE_HASH_MISMATCH", "Calibration accepted an unexpected executable hash.");
+    }
+
     private static void MissingProcessIdentityRejected()
     {
         QaTelemetryException error = ThrowsAndReturn<QaTelemetryException>(() => ProcessIdentityPolicy.SelectExactlyOne([]));
@@ -302,7 +318,7 @@ internal static class Program
             File.WriteAllText(path, "{}", new UTF8Encoding(false));
             File.WriteAllText(path + ".sha256", SafePaths.HashFile(path) + "\n", Encoding.ASCII);
             MarkerProfileCheck result = MarkerProfileStore.LoadVerified(path, ExactBuildProfile.ExpectedExecutableSha256,
-                ExactBuildProfile.ExpectedRuntimeDigest, ExactBuildProfile.ToolVersion, ExactBuildProfile.DefinitionSha256);
+                ExactBuildProfile.ToolVersion, ExactBuildProfile.DefinitionSha256);
             Check(!result.Ok, "Corrupt marker profile unexpectedly verified.");
         }
         finally { TryDelete(path); TryDelete(path + ".sha256"); }
@@ -312,23 +328,28 @@ internal static class Program
     {
         MarkerProfileDocument profile = ValidMarkerProfile();
         QaTelemetryException error = ThrowsAndReturn<QaTelemetryException>(() => MarkerProfileStore.Validate(profile,
-            new string('0', 64), ExactBuildProfile.ExpectedRuntimeDigest, ExactBuildProfile.ToolVersion, ExactBuildProfile.DefinitionSha256));
+            new string('0', 64), ExactBuildProfile.ToolVersion, ExactBuildProfile.DefinitionSha256));
         Check(error.Code == "MARKER_PROFILE_EXE_MISMATCH", "Wrong executable-bound profile used an unexpected status.");
     }
 
-    private static void MarkerProfileRuntimeMismatch()
+    private static void MarkerProfileIndependentOfGameplayRuntime()
     {
         MarkerProfileDocument profile = ValidMarkerProfile();
-        QaTelemetryException error = ThrowsAndReturn<QaTelemetryException>(() => MarkerProfileStore.Validate(profile,
-            ExactBuildProfile.ExpectedExecutableSha256, new string('0', 64), ExactBuildProfile.ToolVersion, ExactBuildProfile.DefinitionSha256));
-        Check(error.Code == "MARKER_PROFILE_RUNTIME_MISMATCH", "Wrong runtime-bound profile used an unexpected status.");
+        MarkerProfileStore.Validate(profile, ExactBuildProfile.ExpectedExecutableSha256,
+            ExactBuildProfile.ToolVersion, ExactBuildProfile.DefinitionSha256);
+        JsonElement document = JsonSerializer.SerializeToElement(profile, CaseDescriptor.JsonOptions);
+        string[] forbiddenBindings = ["RuntimeDigest", "PackageTreeSha256", "RunManifestSha256", "SeedCode"];
+        Check(forbiddenBindings.All(name => !document.TryGetProperty(name, out _)),
+            "Executable profile serialized a gameplay runtime, package, manifest, or Seed Code binding.");
+        Check(profile.OwnerConfirmedMapAreaIds.Count == 2 && !profile.OwnerConfirmedMapAreaIds.ContainsKey("Demon Ruins"),
+            "Vanilla calibration unexpectedly requires a randomized Demon Ruins route.");
     }
 
     private static void MarkerProfileSignatureMismatch()
     {
         MarkerProfileDocument profile = ValidMarkerProfile();
         QaTelemetryException error = ThrowsAndReturn<QaTelemetryException>(() => MarkerProfileStore.Validate(profile,
-            ExactBuildProfile.ExpectedExecutableSha256, ExactBuildProfile.ExpectedRuntimeDigest, ExactBuildProfile.ToolVersion, new string('0', 64)));
+            ExactBuildProfile.ExpectedExecutableSha256, ExactBuildProfile.ToolVersion, new string('0', 64)));
         Check(error.Code == "MARKER_PROFILE_SIGNATURE_MISMATCH", "Changed signature binding used an unexpected status.");
     }
 
@@ -341,7 +362,7 @@ internal static class Program
             File.WriteAllText(path, "{}", new UTF8Encoding(false));
             MarkerProfileStore.InvalidateAfterReadFailure(path, "synthetic invalid-pointer test");
             MarkerProfileCheck result = MarkerProfileStore.LoadVerified(path, ExactBuildProfile.ExpectedExecutableSha256,
-                ExactBuildProfile.ExpectedRuntimeDigest, ExactBuildProfile.ToolVersion, ExactBuildProfile.DefinitionSha256);
+                ExactBuildProfile.ToolVersion, ExactBuildProfile.DefinitionSha256);
             Check(!result.Ok && result.Message.Contains("invalidated", StringComparison.OrdinalIgnoreCase), "Invalidated profile remained loadable.");
         }
         finally { TryDelete(path); TryDelete(invalid); }
@@ -409,6 +430,30 @@ internal static class Program
         Check(written.Manifest.QaDataSubsetFileCount == 1, "Established QA snapshot subset was not bound.");
         Check(written.Manifest.CanonicalDigest == SafePaths.InventoryDigest(written.Manifest.Files), "Canonical inventory digest is inconsistent.");
         Check(written.Manifest.TopLevelArchivePairs.Length == 0, "Synthetic loose-tree fixture unexpectedly has archive pairs.");
+    }
+
+    private static void CleanRuntimeSidecarIdentity()
+    {
+        using var runtime = new RuntimeFixture();
+        RuntimeManifestWriteResult written = runtime.AttestClean();
+        string executable = Path.Combine(runtime.Policy.CleanRuntimeRoot, "DarkSoulsRemastered.exe");
+        QaSteamAppIdStatus sidecar = QaSteamAppIdSidecar.ProvisionOrVerify(
+            runtime.Policy.CleanRuntimeRoot, executable, runtime.Policy.CleanRuntimeRoot);
+        Check(sidecar.Created && sidecar.Sha256 == QaSteamAppIdSidecar.ExpectedSha256,
+            "Clean QA AppID sidecar was not independently created and hashed.");
+        RuntimeManifestVerification verified = RuntimeManifestService.VerifyManifest(
+            written.ManifestPath, runtime.Policy.CleanRuntimeRoot, "QA_RUNTIME_CLEAN_BASELINE", written.ManifestSha256, runtime.Policy);
+        Check(verified.Ok, verified.Message);
+        Check(verified.Manifest!.CanonicalDigest == written.Manifest.CanonicalDigest,
+            "The clean AppID launch sidecar changed the immutable runtime digest.");
+        Check(!verified.Manifest.Files.Any(file => file.Path == QaSteamAppIdSidecar.FileName),
+            "The clean QA launch sidecar leaked into the attested game inventory.");
+
+        File.WriteAllBytes(sidecar.Path, Encoding.ASCII.GetBytes("570940\n"));
+        RuntimeManifestVerification invalid = RuntimeManifestService.VerifyManifest(
+            written.ManifestPath, runtime.Policy.CleanRuntimeRoot, "QA_RUNTIME_CLEAN_BASELINE", written.ManifestSha256, runtime.Policy);
+        Check(!invalid.Ok && invalid.Message.Contains("AppID", StringComparison.OrdinalIgnoreCase),
+            "An invalid clean-runtime launch sidecar was not rejected separately from runtime identity.");
     }
 
     private static void PackageAppliedRuntimePreflight()
@@ -606,6 +651,46 @@ internal static class Program
         Throws<InvalidDataException>(() => TraceImporter.Import(f.Descriptor, paths.Trace, paths.Summary, paths.SummarySha));
     }
 
+    private static void TraceSeedCodeMismatchRejected()
+    {
+        using var f = new Fixture();
+        var paths = f.WriteSyntheticTrace("mismatch-seed");
+        string[] lines = File.ReadAllLines(paths.Trace);
+        TraceRecord header = JsonSerializer.Deserialize<TraceRecord>(lines[0], CaseDescriptor.JsonOptions)!;
+        header.SeedCode = "different-seed-code";
+        lines[0] = JsonSerializer.Serialize(header, TraceFormat.JsonOptions);
+        File.WriteAllLines(paths.Trace, lines, new UTF8Encoding(false));
+        Reseal(paths.Trace, paths.Summary, paths.SummarySha, "mismatch-seed");
+        Throws<InvalidDataException>(() => TraceImporter.Import(f.Descriptor, paths.Trace, paths.Summary, paths.SummarySha));
+    }
+
+    private static void TraceRuntimeAndProcessIdentityMismatchRejected()
+    {
+        using var f = new Fixture();
+        Action<TraceRecord>[] mutations =
+        [
+            header => header.RuntimeDigest = new string('0', 64),
+            header => header.RuntimeManifestSha256 = new string('1', 64),
+            header => header.RunManifestSha256 = new string('2', 64),
+            header => header.ObservedExecutablePath = Path.Combine(f.Root, "other", "DarkSoulsRemastered.exe")
+        ];
+        for (int i = 0; i < mutations.Length; i++)
+        {
+            string session = "mismatch-session-" + i;
+            var paths = f.WriteHeaderOnlyTrace(session, "READ_ONLY_GAME_TELEMETRY", "UNVERIFIED", new string('b', 64));
+            string[] lines = File.ReadAllLines(paths.Trace);
+            TraceRecord header = JsonSerializer.Deserialize<TraceRecord>(lines[0], CaseDescriptor.JsonOptions)!;
+            mutations[i](header);
+            lines[0] = JsonSerializer.Serialize(header, TraceFormat.JsonOptions);
+            File.WriteAllLines(paths.Trace, lines, new UTF8Encoding(false));
+            Reseal(paths.Trace, paths.Summary, paths.SummarySha, session);
+            Throws<InvalidDataException>(() => TraceImporter.Import(f.Descriptor, paths.Trace, paths.Summary, paths.SummarySha));
+            TryDelete(paths.Trace);
+            TryDelete(paths.Summary);
+            TryDelete(paths.SummarySha);
+        }
+    }
+
     private static void TelemetryUnverifiedStaysUnknown()
     {
         using var f = new Fixture();
@@ -683,29 +768,30 @@ internal static class Program
         string now = DateTimeOffset.UtcNow.ToString("O");
         return new MarkerProfileDocument
         {
-            ProfileId = "fixture-profile",
+            ProfileId = ExactBuildProfile.MarkerProfileId + "-fixture",
+            ExecutableProfileId = ExactBuildProfile.ExecutableProfileId,
             Status = "VERIFIED",
             ExecutableSha256 = ExactBuildProfile.ExpectedExecutableSha256,
-            RuntimeDigest = ExactBuildProfile.ExpectedRuntimeDigest,
             ToolVersion = ExactBuildProfile.ToolVersion,
-            SignatureDefinitionSha256 = ExactBuildProfile.DefinitionSha256,
+            TelemetryDefinitionSha256 = ExactBuildProfile.DefinitionSha256,
             CreatedAtUtc = now,
             OwnerConfirmedMapAreaIds = new Dictionary<string, int>(StringComparer.Ordinal)
             {
                 ["Firelink Shrine"] = 101,
-                ["Northern Undead Asylum"] = 102,
-                ["Demon Ruins"] = 150
+                ["Northern Undead Asylum"] = 102
             },
             Validation = new MarkerValidationEvidence
             {
+                CalibrationExecutablePath = ExactBuildProfile.CalibrationExecutablePath,
+                CalibrationRuntimeManifestSha256 = ExactBuildProfile.ExpectedCleanManifestSha256,
                 OwnerConfirmedKnownMap = true,
                 StationaryPositionStable = true,
                 StationarySpread = 0.01,
                 PlayerMovementObserved = true,
                 PlayerMovementDistance = 2,
                 KnownTransitionObserved = true,
-                TransitionFromAreaId = 101,
-                TransitionToAreaId = 102,
+                TransitionFromAreaId = 102,
+                TransitionToAreaId = 101,
                 KnownFalseFlagConfirmed = true,
                 KnownFalseFlagId = 11410410,
                 KnownFalseEvidence = "fixture known false",
@@ -729,7 +815,29 @@ internal static class Program
     private static void Reseal(string tracePath, string summaryPath, string summaryShaPath, string session)
     {
         string hash = SafePaths.HashFile(tracePath);
-        File.WriteAllText(summaryPath, JsonSerializer.Serialize(new TraceSummary { SessionId = session, RecordCount = File.ReadAllLines(tracePath).Length, TraceSha256 = hash, Completed = true }, CaseDescriptor.JsonOptions), new UTF8Encoding(false));
+        TraceRecord header = JsonSerializer.Deserialize<TraceRecord>(File.ReadLines(tracePath).First(), CaseDescriptor.JsonOptions)!;
+        var summary = new TraceSummary
+        {
+            SessionId = session,
+            RecordCount = File.ReadAllLines(tracePath).Length,
+            TraceSha256 = hash,
+            CaseId = header.CaseId,
+            SeedCode = header.SeedCode,
+            ExecutableSha256 = header.ExecutableSha256,
+            ExecutableProfileId = header.ExecutableProfileId,
+            RuntimeManifestSha256 = header.RuntimeManifestSha256,
+            RuntimeDigest = header.RuntimeDigest,
+            PackageTreeSha256 = header.PackageTreeSha256,
+            RunManifestSha256 = header.RunManifestSha256,
+            ProfileSha256 = header.ProfileSha256,
+            ObservedExecutablePath = header.ObservedExecutablePath,
+            ProcessId = header.ProcessId,
+            ProcessCreatedUtc = header.ProcessCreatedUtc,
+            StartUtc = header.TimestampUtc,
+            EndUtc = DateTimeOffset.UtcNow.ToString("O"),
+            Completed = true
+        };
+        File.WriteAllText(summaryPath, JsonSerializer.Serialize(summary, CaseDescriptor.JsonOptions), new UTF8Encoding(false));
         File.WriteAllText(summaryShaPath, SafePaths.HashFile(summaryPath) + "\n", Encoding.ASCII);
     }
 
@@ -944,9 +1052,12 @@ internal static class Program
             string trace = Path.Combine(Root, session + ".jsonl");
             var header = new TraceRecord
             {
-                Type = "header", SchemaVersion = 1, SessionId = session, Sequence = 0,
+                Type = "header", SchemaVersion = 2, SessionId = session, Sequence = 0,
                 TimestampUtc = DateTimeOffset.UtcNow.ToString("O"),
+                CaseId = Descriptor.CaseId!,
+                SeedCode = Descriptor.SeedCode!,
                 ExecutableSha256 = Descriptor.Runtime!.ExecutableSha256!,
+                RuntimeManifestSha256 = Descriptor.Runtime.ModifiedManifestSha256 ?? "",
                 PackageTreeSha256 = Descriptor.Package!.TreeSha256!,
                 RunManifestSha256 = Descriptor.Package.RunManifestSha256!,
                 Provenance = provenance, TelemetryStatus = status,
@@ -962,7 +1073,27 @@ internal static class Program
             string traceHash = SafePaths.HashFile(trace);
             string summaryPath = trace + ".summary.json";
             string summaryShaPath = trace + ".summary.sha256";
-            File.WriteAllText(summaryPath, JsonSerializer.Serialize(new TraceSummary { SessionId = session, RecordCount = 1, TraceSha256 = traceHash, Completed = true }, CaseDescriptor.JsonOptions), new UTF8Encoding(false));
+            var summary = new TraceSummary
+            {
+                SessionId = session,
+                RecordCount = 1,
+                TraceSha256 = traceHash,
+                CaseId = header.CaseId,
+                SeedCode = header.SeedCode,
+                ExecutableSha256 = header.ExecutableSha256,
+                RuntimeManifestSha256 = header.RuntimeManifestSha256,
+                RuntimeDigest = header.RuntimeDigest,
+                PackageTreeSha256 = header.PackageTreeSha256,
+                RunManifestSha256 = header.RunManifestSha256,
+                ProfileSha256 = header.ProfileSha256,
+                ObservedExecutablePath = header.ObservedExecutablePath,
+                ProcessId = header.ProcessId,
+                ProcessCreatedUtc = header.ProcessCreatedUtc,
+                StartUtc = header.TimestampUtc,
+                EndUtc = DateTimeOffset.UtcNow.ToString("O"),
+                Completed = true
+            };
+            File.WriteAllText(summaryPath, JsonSerializer.Serialize(summary, CaseDescriptor.JsonOptions), new UTF8Encoding(false));
             File.WriteAllText(summaryShaPath, SafePaths.HashFile(summaryPath) + "\n", Encoding.ASCII);
             return (trace, summaryPath, summaryShaPath);
         }

@@ -86,6 +86,25 @@ public static class RuntimeManifestService
         "fmod_event_net64.dll", "steam_api64.dll", "xinput1_3.dll"
     ];
 
+    public static RuntimeManifestVerification VerifyCleanCalibrationRuntime(RuntimePolicy? policy = null)
+    {
+        RuntimePolicy selected = policy ?? QaRuntimePolicy.Default;
+        if (!PathEquals(selected.CleanRuntimeRoot, QaRuntimePolicy.CleanRuntimeRoot) ||
+            !PathEquals(selected.CleanManifestPath, QaRuntimePolicy.CleanManifestPath))
+            return new(false, "QA_CALIBRATION_RUNTIME_PATH_MISMATCH", "Vanilla telemetry calibration accepts only the repository-locked clean QA runtime and its attestation.");
+
+        RuntimeManifestVerification verification = VerifyManifest(selected.CleanManifestPath, selected.CleanRuntimeRoot,
+            "QA_RUNTIME_CLEAN_BASELINE", ExactBuildProfile.ExpectedCleanManifestSha256, selected);
+        if (!verification.Ok || verification.Manifest is null) return verification;
+        if (!FixedEquals(verification.Manifest.ExecutableSha256, ExactBuildProfile.ExpectedExecutableSha256))
+            return new(false, "QA_CALIBRATION_EXECUTABLE_HASH_MISMATCH", "The clean QA runtime attests a different DSR executable build.");
+        return verification with
+        {
+            Code = "QA_CALIBRATION_RUNTIME_VERIFIED",
+            Message = "The immutable clean QA runtime, pinned attestation, and exact DSR executable were verified."
+        };
+    }
+
     public static RuntimeManifestWriteResult AttestCleanBaseline(RuntimePolicy policy, string? outputPath = null)
     {
         string sourceRoot = SafePaths.NormalizeFullPath(policy.SteamSourceRoot);
@@ -99,7 +118,7 @@ public static class RuntimeManifestService
         EnsureManifestPath(policy, manifestPath, policy.CleanRuntimeRoot, policy.ModifiedRuntimeRoot);
 
         var sourceInventory = SafePaths.Inventory(sourceRoot, rejectHardLinks: true).OrderBy(x => x.Path, StringComparer.Ordinal).ToArray();
-        var runtimeInventory = SafePaths.Inventory(runtimeRoot, rejectHardLinks: true).OrderBy(x => x.Path, StringComparer.Ordinal).ToArray();
+        var runtimeInventory = InventoryForAttestedIdentity(runtimeRoot, "QA_RUNTIME_CLEAN_BASELINE", policy);
         RequireSameInventory(sourceInventory, runtimeInventory, "The isolated runtime differs from the read-only installed source.");
         ValidateRuntimeShape(runtimeRoot, runtimeInventory);
 
@@ -339,10 +358,12 @@ public static class RuntimeManifestService
     private static FileDigest[] InventoryForAttestedIdentity(string runtimeRoot, string expectedKind, RuntimePolicy policy)
     {
         FileDigest[] actual = SafePaths.Inventory(runtimeRoot, rejectHardLinks: true).OrderBy(x => x.Path, StringComparer.Ordinal).ToArray();
-        if (expectedKind != "QA_RUNTIME_MODDED_DIGEST" || !PathEquals(runtimeRoot, policy.ModifiedRuntimeRoot)) return actual;
+        bool cleanRuntime = expectedKind == "QA_RUNTIME_CLEAN_BASELINE" && PathEquals(runtimeRoot, policy.CleanRuntimeRoot);
+        bool packageRuntime = expectedKind == "QA_RUNTIME_MODDED_DIGEST" && PathEquals(runtimeRoot, policy.ModifiedRuntimeRoot);
+        if (!cleanRuntime && !packageRuntime) return actual;
 
         FileDigest? sidecarEntry = actual.SingleOrDefault(file => string.Equals(file.Path, QaSteamAppIdSidecar.FileName, StringComparison.OrdinalIgnoreCase));
-        _ = QaSteamAppIdSidecar.VerifyIfPresent(runtimeRoot, policy.ModifiedRuntimeRoot);
+        _ = QaSteamAppIdSidecar.VerifyIfPresent(runtimeRoot, cleanRuntime ? policy.CleanRuntimeRoot : policy.ModifiedRuntimeRoot);
         if (sidecarEntry is null) return actual;
         if (!string.Equals(sidecarEntry.Path, QaSteamAppIdSidecar.FileName, StringComparison.Ordinal))
             throw new InvalidDataException("The QA Steam AppID sidecar must use the exact root-level filename steam_appid.txt.");

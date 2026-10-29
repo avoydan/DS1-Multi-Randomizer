@@ -43,6 +43,9 @@ public static class ProcessIdentityPolicy
 public sealed class ReadOnlyGameProcess : IDisposable, IReadOnlyMemory
 {
     public const uint ExactReadRights = ProcessAccessPolicy.LiveReaderRightsRequested;
+    public const ulong MinimumUserPointer = 0x10000;
+    public const ulong MaximumUserPointer = 0x00007fffffffffff;
+    public const int PointerAlignmentBytes = 8;
     private const uint SnapshotModules = 0x00000008;
     private const uint SnapshotModules32 = 0x00000010;
     private const uint InvalidSnapshot = 0xffffffff;
@@ -70,12 +73,19 @@ public sealed class ReadOnlyGameProcess : IDisposable, IReadOnlyMemory
 
     public static ReadOnlyGameProcess Attach(CaseDescriptor descriptor)
     {
+        descriptor.Validate();
+        string expectedPath = SafePaths.NormalizeFullPath(descriptor.Runtime!.ExecutablePath!);
+        if (!string.Equals(expectedPath, ExactBuildProfile.ExpectedExecutablePath, StringComparison.OrdinalIgnoreCase))
+            throw new QaTelemetryException("QA_PROCESS_PATH_MISMATCH", "Ceaseless telemetry accepts only the package-applied QA executable path.");
+        return Attach(expectedPath, descriptor.Runtime.ExecutableSha256!);
+    }
+
+    public static ReadOnlyGameProcess Attach(string lockedExecutablePath, string lockedExecutableSha256)
+    {
         if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("Read-only DSR process telemetry is Windows-only.");
         ProcessAccessPolicy.RequireExactLiveRights(ExactReadRights);
-        string expectedPath = SafePaths.NormalizeFullPath(descriptor.Runtime!.ExecutablePath!);
-        SafePaths.RejectSteamPath(expectedPath);
-        if (!string.Equals(expectedPath, ExactBuildProfile.ExpectedExecutablePath, StringComparison.OrdinalIgnoreCase))
-            throw new QaTelemetryException("QA_PROCESS_PATH_MISMATCH", "Case descriptor does not name the exact isolated QA executable.");
+        string expectedPath = SafePaths.NormalizeFullPath(lockedExecutablePath);
+        ExactBuildProfile.RequireApprovedExecutable(expectedPath, lockedExecutableSha256);
 
         Process[] candidates = Process.GetProcessesByName(Path.GetFileNameWithoutExtension(expectedPath));
         if (candidates.Length == 0) throw new QaTelemetryException("QA_PROCESS_NOT_FOUND", "The isolated QA game is not running. Launch only the locked QA executable, then retry.");
@@ -105,7 +115,7 @@ public sealed class ReadOnlyGameProcess : IDisposable, IReadOnlyMemory
                 string imageHash = SafePaths.HashFile(observedPath);
                 try
                 {
-                    VerifiedProcessIdentity identity = ProcessIdentityPolicy.Verify(process.Id, observedPath, expectedPath, imageHash, descriptor.Runtime.ExecutableSha256!, createdUtc);
+                    VerifiedProcessIdentity identity = ProcessIdentityPolicy.Verify(process.Id, observedPath, expectedPath, imageHash, lockedExecutableSha256, createdUtc);
                     eligible.Add(identity);
                 }
                 catch (QaTelemetryException ex) { rejection = ex; }
@@ -124,7 +134,7 @@ public sealed class ReadOnlyGameProcess : IDisposable, IReadOnlyMemory
             if (!string.Equals(SafePaths.NormalizeFullPath(recheckedPath), verified.ImagePath, StringComparison.OrdinalIgnoreCase) || recheckedCreated != verified.CreatedUtc)
                 throw new QaTelemetryException("QA_PROCESS_IDENTITY_CHANGED", "The PID was reused or its process identity changed during attachment.");
             string recheckedHash = SafePaths.HashFile(recheckedPath);
-            _ = ProcessIdentityPolicy.Verify(verified.ProcessId, recheckedPath, expectedPath, recheckedHash, descriptor.Runtime.ExecutableSha256!, recheckedCreated);
+            _ = ProcessIdentityPolicy.Verify(verified.ProcessId, recheckedPath, expectedPath, recheckedHash, lockedExecutableSha256, recheckedCreated);
             ulong moduleBase = FindModuleBase(verified.ProcessId, Path.GetFileName(expectedPath));
             return new(readHandle, verified, moduleBase);
         }
@@ -148,7 +158,7 @@ public sealed class ReadOnlyGameProcess : IDisposable, IReadOnlyMemory
         _handle = null;
     }
 
-    public static bool IsUserPointer(ulong pointer) => pointer >= 0x10000 && pointer <= 0x00007fffffffffff && (pointer & 7) == 0;
+    public static bool IsUserPointer(ulong pointer) => pointer >= MinimumUserPointer && pointer <= MaximumUserPointer && pointer % PointerAlignmentBytes == 0;
 
     private static ulong FindModuleBase(int pid, string moduleName)
     {
@@ -248,7 +258,30 @@ public sealed class ReadOnlyGameProcess : IDisposable, IReadOnlyMemory
 
 public static class CandidateTelemetryReader
 {
-    public static CandidateTelemetrySample Sample(IReadOnlyMemory memory, ulong moduleBase, ExactBuildAuditResult audit, uint bossFlagId = 11410410)
+    public const uint MapRootPointerOffset = 0x00;
+    public const uint MapPlayerPointerOffset = 0x68;
+    public const int MapAreaFieldOffset = 0x354;
+    public const uint PlayerRootPointerOffset = 0x00;
+    public const uint PlayerManagerPointerOffset = 0x68;
+    public const uint CharacterPointerOffset = 0x68;
+    public const uint PositionPointerOffset = 0x28;
+    public const int PositionVectorOffset = 0x10;
+    public const int PositionVectorLength = 12;
+    public const int MinimumCandidateAreaId = 1;
+    public const int MaximumCandidateAreaId = 65535;
+    public const float MaximumAbsoluteCoordinate = 100000f;
+    public const uint TrackedBossFlagId = 11410410;
+    public const uint EventFlagRootPointerOffset = 0x00;
+    public const uint EventFlagManagerPointerOffset = 0x00;
+
+    public static string DefinitionDescriptor =>
+        $"candidate-structures-v2|map-chain=[0x{MapRootPointerOffset:X},0x{MapPlayerPointerOffset:X}]|map-field=int32+0x{MapAreaFieldOffset:X}|" +
+        $"xyz-chain=[0x{PlayerRootPointerOffset:X},0x{PlayerManagerPointerOffset:X},0x{CharacterPointerOffset:X},0x{PositionPointerOffset:X}]|xyz-f32x3+0x{PositionVectorOffset:X}/len{PositionVectorLength}|" +
+        $"event-flags-chain=[0x{EventFlagRootPointerOffset:X},0x{EventFlagManagerPointerOffset:X}]|" +
+        $"user-pointer=[0x{ReadOnlyGameProcess.MinimumUserPointer:X},0x{ReadOnlyGameProcess.MaximumUserPointer:X}]/align{ReadOnlyGameProcess.PointerAlignmentBytes}|" +
+        $"area-int32={MinimumCandidateAreaId}..{MaximumCandidateAreaId}|xyz-finite-abs<={MaximumAbsoluteCoordinate.ToString(System.Globalization.CultureInfo.InvariantCulture)}|tracked-boss-flag={TrackedBossFlagId}";
+
+    public static CandidateTelemetrySample Sample(IReadOnlyMemory memory, ulong moduleBase, ExactBuildAuditResult audit, uint bossFlagId = TrackedBossFlagId)
     {
         DateTimeOffset now = DateTimeOffset.UtcNow;
         SignatureMatch world = NeedCandidate(audit, "worldChrMan");
@@ -261,8 +294,8 @@ public static class CandidateTelemetryReader
 
         try
         {
-            ulong player = ResolvePointerChain(memory, Add(moduleBase, map.TargetRva!.Value), 0, 0x68);
-            int candidate = BitConverter.ToInt32(memory.Read(Add(player, 0x354), 4));
+            ulong player = ResolvePointerChain(memory, Add(moduleBase, map.TargetRva!.Value), MapRootPointerOffset, MapPlayerPointerOffset);
+            int candidate = BitConverter.ToInt32(memory.Read(Add(player, MapAreaFieldOffset), sizeof(int)));
             if (IsPlausibleCandidateAreaId(candidate)) area = candidate;
             else mapError = "Candidate map/area field contains a sentinel or implausible value.";
         }
@@ -270,8 +303,8 @@ public static class CandidateTelemetryReader
 
         try
         {
-            ulong position = ResolvePointerChain(memory, Add(moduleBase, world.TargetRva!.Value), 0, 0x68, 0x68, 0x28);
-            byte[] bytes = memory.Read(Add(position, 0x10), 12);
+            ulong position = ResolvePointerChain(memory, Add(moduleBase, world.TargetRva!.Value), PlayerRootPointerOffset, PlayerManagerPointerOffset, CharacterPointerOffset, PositionPointerOffset);
+            byte[] bytes = memory.Read(Add(position, PositionVectorOffset), PositionVectorLength);
             float fx = BitConverter.ToSingle(bytes, 0), fy = BitConverter.ToSingle(bytes, 4), fz = BitConverter.ToSingle(bytes, 8);
             if (IsPlausiblePosition(fx, fy, fz))
                 (x, y, z) = (fx, fy, fz);
@@ -282,7 +315,7 @@ public static class CandidateTelemetryReader
         try
         {
             (int offset, uint mask) = EventFlagAddressing.Resolve(bossFlagId);
-            ulong flagManager = ResolvePointerChain(memory, Add(moduleBase, flags.TargetRva!.Value), 0, 0);
+            ulong flagManager = ResolvePointerChain(memory, Add(moduleBase, flags.TargetRva!.Value), EventFlagRootPointerOffset, EventFlagManagerPointerOffset);
             uint word = BitConverter.ToUInt32(memory.Read(Add(flagManager, checked((uint)offset)), 4));
             bossFlag = (word & mask) != 0;
         }
@@ -308,17 +341,17 @@ public static class CandidateTelemetryReader
         return address;
     }
 
-    public static bool IsPlausibleCandidateAreaId(int areaId) => areaId is > 0 and <= 65535;
+    public static bool IsPlausibleCandidateAreaId(int areaId) => areaId >= MinimumCandidateAreaId && areaId <= MaximumCandidateAreaId;
 
     public static bool IsPlausiblePosition(float x, float y, float z) =>
         float.IsFinite(x) && float.IsFinite(y) && float.IsFinite(z) &&
-        Math.Abs(x) <= 100000 && Math.Abs(y) <= 100000 && Math.Abs(z) <= 100000;
+        Math.Abs(x) <= MaximumAbsoluteCoordinate && Math.Abs(y) <= MaximumAbsoluteCoordinate && Math.Abs(z) <= MaximumAbsoluteCoordinate;
 
     public static bool ReadFlag(IReadOnlyMemory memory, ulong moduleBase, ExactBuildAuditResult audit, uint eventFlagId)
     {
         SignatureMatch flags = NeedCandidate(audit, "eventFlags");
         (int offset, uint mask) = EventFlagAddressing.Resolve(eventFlagId);
-        ulong flagManager = ResolvePointerChain(memory, Add(moduleBase, flags.TargetRva!.Value), 0, 0);
+        ulong flagManager = ResolvePointerChain(memory, Add(moduleBase, flags.TargetRva!.Value), EventFlagRootPointerOffset, EventFlagManagerPointerOffset);
         uint word = BitConverter.ToUInt32(memory.Read(Add(flagManager, checked((uint)offset)), 4));
         return (word & mask) != 0;
     }
@@ -345,6 +378,11 @@ public static class EventFlagAddressing
         [131] = 8, [132] = 9, [140] = 10, [141] = 11, [150] = 12, [151] = 13, [160] = 14, [170] = 15,
         [180] = 16, [181] = 17
     };
+
+    public static string DefinitionDescriptor =>
+        "event-flag-address-v1|groups=" + string.Join(",", Groups.OrderBy(x => x.Key).Select(x => $"{x.Key}:{x.Value:X}")) +
+        "|areas=" + string.Join(",", Areas.OrderBy(x => x.Key).Select(x => $"{x.Key}:{x.Value}")) +
+        "|formula=groupBase+areaIndex*0x500+section*128+floor(number/32)*4|mask=0x80000000>>(number%32)";
 
     public static (int ByteOffset, uint Mask) Resolve(uint eventFlagId)
     {

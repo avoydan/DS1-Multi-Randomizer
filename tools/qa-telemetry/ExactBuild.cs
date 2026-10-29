@@ -6,14 +6,16 @@ namespace QaTelemetry;
 
 public sealed record SignatureDefinition(string Name, string Pattern, int DisplacementOffset, int InstructionLength, string Purpose, string EvidenceUrl);
 public sealed record SignatureMatch(string Name, int MatchCount, string Status, int? MatchRva, int? TargetRva, string? TargetSection, string Purpose, string EvidenceUrl);
-public sealed record ExactBuildAuditResult(string Status, string ExecutablePath, string ExecutableSha256, string ExpectedSha256, string ToolVersion, string SignatureDefinitionSha256, SignatureMatch[] Signatures);
+public sealed record ExactBuildAuditResult(string Status, string ExecutablePath, string ExecutableSha256, string ExpectedSha256, string ToolVersion, string TelemetryDefinitionSha256, SignatureMatch[] Signatures);
 
 public static class ExactBuildProfile
 {
+    public const string CalibrationExecutablePath = @"C:\Users\Adam\ds1tr-qa\runtime\DARK SOULS REMASTERED\DarkSoulsRemastered.exe";
     public const string ExpectedExecutablePath = @"C:\Users\Adam\ds1tr-qa\runtime\DARK SOULS REMASTERED - CEASELESS QA\DarkSoulsRemastered.exe";
     public const string ExpectedExecutableSha256 = "a45aaa36dd2f6cc151670a639ea5547043cf38ea79ff4178b963c6ed71f98d7b";
     public const string ExpectedRuntimeDigest = "5f182859f78f285a89a31a608ea28dc5b1cb069b082aa906637da11aea2873ef";
-    public const string MarkerProfileId = "dsr-1.03.1-ceaseless-qa-candidate-v1";
+    public const string ExpectedCleanManifestSha256 = "89a9dc2a0fa7dbf990521e7adb9f27586c140334676639a88edeb1bd4b2d3729";
+    public const string MarkerProfileId = "dsr-1.03.1-executable-telemetry-v2";
 
     // These signatures and offsets are candidate definitions from community tooling.
     // Exact-build uniqueness checks below verify the byte anchors, not the runtime
@@ -31,14 +33,34 @@ public static class ExactBuildProfile
     public static string ToolVersion => typeof(ExactBuildProfile).Assembly.GetName().Version?.ToString(3) ?? "unknown";
 
     public static string DefinitionSha256 => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
-        string.Join("\n", Definitions.Select(d => $"{d.Name}|{d.Pattern}|{d.DisplacementOffset}|{d.InstructionLength}|{d.Purpose}|{d.EvidenceUrl}"))))).ToLowerInvariant();
+        string.Join("\n", Definitions.Select(d => $"signature|{d.Name}|{d.Pattern}|{d.DisplacementOffset}|{d.InstructionLength}|{d.Purpose}|{d.EvidenceUrl}")
+            .Concat([CandidateTelemetryReader.DefinitionDescriptor, EventFlagAddressing.DefinitionDescriptor]))))).ToLowerInvariant();
+
+    public static string ExecutableProfileId => "dsr-executable-profile-v2-" + Convert.ToHexString(SHA256.HashData(
+        Encoding.ASCII.GetBytes(ExpectedExecutableSha256 + "|" + DefinitionSha256 + "|" + ToolVersion))).ToLowerInvariant()[..16];
+
+    public static bool IsApprovedExecutablePath(string executablePath)
+    {
+        string full = SafePaths.NormalizeFullPath(executablePath);
+        return string.Equals(full, CalibrationExecutablePath, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(full, ExpectedExecutablePath, StringComparison.OrdinalIgnoreCase);
+    }
+
+    public static void RequireApprovedExecutable(string executablePath, string executableSha256)
+    {
+        SafePaths.RejectSteamPath(executablePath);
+        if (!IsApprovedExecutablePath(executablePath))
+            throw new QaTelemetryException("QA_PROCESS_PATH_MISMATCH", "Telemetry accepts only the exact clean-calibration or package-applied QA executable path.");
+        if (!FixedEquals(executableSha256, ExpectedExecutableSha256))
+            throw new QaTelemetryException("QA_EXECUTABLE_HASH_MISMATCH", "Telemetry accepts only the locked exact-build executable hash.");
+    }
 
     public static ExactBuildAuditResult Audit(string executablePath)
     {
         string full = SafePaths.NormalizeFullPath(executablePath);
         SafePaths.RejectSteamPath(full);
-        if (!string.Equals(full, ExpectedExecutablePath, StringComparison.OrdinalIgnoreCase))
-            throw new QaTelemetryException("QA_PROCESS_PATH_MISMATCH", "Static build audit accepts only the locked isolated QA executable path.");
+        if (!IsApprovedExecutablePath(full))
+            throw new QaTelemetryException("QA_PROCESS_PATH_MISMATCH", "Static build audit accepts only the exact clean-calibration or package-applied QA executable path.");
         SafePaths.EnsureNoReparseAncestors(full, leafMustExist: true);
         SafePaths.EnsureUniqueFile(full);
         string hash = SafePaths.HashFile(full);

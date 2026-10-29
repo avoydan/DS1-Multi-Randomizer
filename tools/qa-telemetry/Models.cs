@@ -193,11 +193,15 @@ public sealed record RuntimePreflightResult(bool Ok, string Code, string[] Block
 public sealed class TraceRecord
 {
     public string Type { get; set; } = "";
-    public int SchemaVersion { get; set; }
+    public int SchemaVersion { get; set; } = 2;
     public string SessionId { get; set; } = "";
     public long Sequence { get; set; }
     public string TimestampUtc { get; set; } = "";
+    public string CaseId { get; set; } = "";
+    public string SeedCode { get; set; } = "";
     public string ExecutableSha256 { get; set; } = "";
+    public string? ExecutableProfileId { get; set; }
+    public string RuntimeManifestSha256 { get; set; } = "";
     public string PackageTreeSha256 { get; set; } = "";
     public string RunManifestSha256 { get; set; } = "";
     public string RuntimeDigest { get; set; } = "";
@@ -239,15 +243,22 @@ public sealed class TraceRecord
 
 public sealed class TraceSummary
 {
-    public int SchemaVersion { get; set; } = 1;
+    public int SchemaVersion { get; set; } = 2;
     public string SessionId { get; set; } = "";
     public int RecordCount { get; set; }
     public string TraceSha256 { get; set; } = "";
+    public string CaseId { get; set; } = "";
+    public string SeedCode { get; set; } = "";
     public string ExecutableSha256 { get; set; } = "";
+    public string? ExecutableProfileId { get; set; }
+    public string RuntimeManifestSha256 { get; set; } = "";
     public string RuntimeDigest { get; set; } = "";
     public string PackageTreeSha256 { get; set; } = "";
     public string RunManifestSha256 { get; set; } = "";
     public string? ProfileSha256 { get; set; }
+    public string? ObservedExecutablePath { get; set; }
+    public int? ProcessId { get; set; }
+    public string? ProcessCreatedUtc { get; set; }
     public string StartUtc { get; set; } = "";
     public string EndUtc { get; set; } = "";
     public bool Completed { get; set; }

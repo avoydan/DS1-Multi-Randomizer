@@ -14,18 +14,67 @@ internal static class Program
 
             if (command == "audit-build")
             {
-                if (options.Count != 0) throw new ArgumentException("audit-build accepts no options; it reads only the locked QA executable.");
-                ExactBuildAuditResult audit = ExactBuildProfile.Audit(ExactBuildProfile.ExpectedExecutablePath);
+                string target = options.Count == 0 ? "ceaseless" : Need(options, "target");
+                if (options.Keys.Any(key => key != "target") || target is not ("clean" or "ceaseless"))
+                    throw new ArgumentException("audit-build accepts only optional --target clean|ceaseless.");
+                string executable = target == "clean" ? ExactBuildProfile.CalibrationExecutablePath : ExactBuildProfile.ExpectedExecutablePath;
+                ExactBuildAuditResult audit = ExactBuildProfile.Audit(executable);
                 Console.WriteLine(JsonSerializer.Serialize(audit, CaseDescriptor.JsonOptions));
                 return audit.Status == "EXACT_BUILD_SIGNATURES_UNVERIFIED" ? 3 : 0;
             }
 
-            if (command == "marker-guide")
+            if (command == "verify-calibration-runtime")
             {
-                if (!options.TryGetValue("case", out string? markerCase) || options.Keys.Any(key => key != "case"))
-                    throw new ArgumentException("marker-guide requires --case <descriptor.json> and accepts no other options.");
-                CaseDescriptor markerDescriptor = CaseDescriptor.Load(markerCase);
-                return MarkerGuide.Run(markerDescriptor);
+                if (options.Count != 0) throw new ArgumentException("verify-calibration-runtime accepts no options and checks only the locked clean runtime.");
+                RuntimeManifestVerification runtime = RuntimeManifestService.VerifyCleanCalibrationRuntime();
+                Console.WriteLine(JsonSerializer.Serialize(new
+                {
+                    status = runtime.Code,
+                    runtime.Message,
+                    runtime.ManifestSha256,
+                    runtime.Manifest?.CanonicalDigest,
+                    runtime.Manifest?.ExecutableSha256,
+                    runtime.Manifest?.FileCount,
+                    runtime.Manifest?.TotalBytes,
+                    runtimeRoot = QaRuntimePolicy.CleanRuntimeRoot,
+                    packageApplied = false,
+                    gameLaunched = false
+                }, CaseDescriptor.JsonOptions));
+                return runtime.Ok ? 0 : 3;
+            }
+
+            if (command == "launch-calibration")
+            {
+                if (options.Count != 0) throw new ArgumentException("launch-calibration accepts no options and launches only the locked clean QA runtime.");
+                QaGameLaunchResult launch = QaGameLauncher.LaunchCalibration();
+                Console.WriteLine(JsonSerializer.Serialize(launch, CaseDescriptor.JsonOptions));
+                return launch.ProcessPathVerified ? 0 : 6;
+            }
+
+            if (command == "calibrate-markers")
+            {
+                if (options.Count != 0) throw new ArgumentException("calibrate-markers accepts no options; it is locked to the clean vanilla QA runtime.");
+                return MarkerGuide.Run();
+            }
+
+            if (command == "verify-profile")
+            {
+                if (!options.TryGetValue("profile", out string? profilePath) || options.Keys.Any(key => key != "profile"))
+                    throw new ArgumentException("verify-profile requires only --profile <executable-profile.json>.");
+                MarkerProfileCheck profile = MarkerProfileStore.LoadVerified(profilePath, ExactBuildProfile.ExpectedExecutableSha256,
+                    ExactBuildProfile.ToolVersion, ExactBuildProfile.DefinitionSha256);
+                Console.WriteLine(JsonSerializer.Serialize(new
+                {
+                    status = profile.Code,
+                    profile.Message,
+                    profile.ProfileSha256,
+                    profileId = profile.Profile?.ProfileId,
+                    executableProfileId = profile.Profile?.ExecutableProfileId,
+                    executableSha256 = profile.Profile?.ExecutableSha256,
+                    toolVersion = profile.Profile?.ToolVersion,
+                    telemetryDefinitionSha256 = profile.Profile?.TelemetryDefinitionSha256
+                }, CaseDescriptor.JsonOptions));
+                return profile.Ok ? 0 : 4;
             }
 
             if (command == "launch-qa")
@@ -144,7 +193,11 @@ internal static class Program
     {
         Console.WriteLine("QaTelemetry " + ExactBuildProfile.ToolVersion + " (standalone development tool)");
         Console.WriteLine("  audit-build");
-        Console.WriteLine("  marker-guide --case <descriptor.json>");
+        Console.WriteLine("  verify-calibration-runtime");
+        Console.WriteLine("  launch-calibration");
+        Console.WriteLine("  calibrate-markers");
+        Console.WriteLine("  verify-profile --profile <executable-profile.json>");
+        Console.WriteLine("  audit-build [--target clean|ceaseless]");
         Console.WriteLine("  launch-qa --case <descriptor.json>");
         Console.WriteLine("  record --case <descriptor.json> --profile <verified-profile.json> [--trace <temp-path.jsonl>]");
         Console.WriteLine("  verify-case --case <descriptor.json>");
@@ -153,7 +206,7 @@ internal static class Program
         Console.WriteLine("  preflight --case <descriptor.json>");
         Console.WriteLine("  trace-import --case <descriptor.json> --trace <trace.jsonl> --summary <summary.json> --summary-sha <summary.sha256>");
         Console.WriteLine("audit-build reads the locked executable statically. No game process is opened by that command.");
-        Console.WriteLine("marker-guide opens only the exact QA process with query/read-only rights after package/runtime preflight.");
+        Console.WriteLine("calibrate-markers reads only the clean vanilla QA process after its pinned manifest verification; it never opens the package-applied runtime.");
         Console.WriteLine("launch-qa starts only the exact isolated executable after same-user Steam and runtime verification, then verifies its process image path.");
         return 0;
     }

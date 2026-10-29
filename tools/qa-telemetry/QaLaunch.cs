@@ -246,18 +246,36 @@ public static class QaGameLauncher
         if (!preflight.Ok || !string.Equals(preflight.ModifiedManifestSha256, descriptor.Runtime!.ModifiedManifestSha256, StringComparison.OrdinalIgnoreCase))
             throw new QaTelemetryException("QA_RUNTIME_PREFLIGHT_BLOCKED", string.Join("; ", preflight.Blockers));
 
-        ExactBuildAuditResult audit = ExactBuildProfile.Audit(ExactBuildProfile.ExpectedExecutablePath);
+        return LaunchLockedRuntime(selected.ModifiedRuntimeRoot, ExactBuildProfile.ExpectedExecutablePath, "ISOLATED_QA_GAME_LAUNCH_READY");
+    }
+
+    public static QaGameLaunchResult LaunchCalibration(RuntimePolicy? policy = null)
+    {
+        if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("Isolated DSR launch is Windows-only.");
+        RuntimePolicy selected = policy ?? QaRuntimePolicy.Default;
+        RuntimeManifestVerification runtime = RuntimeManifestService.VerifyCleanCalibrationRuntime(selected);
+        if (!runtime.Ok) throw new QaTelemetryException(runtime.Code, runtime.Message);
+        SteamClientStatus steam = SteamClientProbe.Check(QaRuntimePolicy.SteamExecutablePath);
+        if (!steam.Ready) throw new QaTelemetryException(steam.Code, steam.Message);
+
+        return LaunchLockedRuntime(selected.CleanRuntimeRoot, ExactBuildProfile.CalibrationExecutablePath, "VANILLA_CALIBRATION_LAUNCH_READY");
+    }
+
+    private static QaGameLaunchResult LaunchLockedRuntime(string runtimeRoot, string expectedExecutablePath, string successStatus)
+    {
+        string root = SafePaths.NormalizeFullPath(runtimeRoot);
+        string executable = SafePaths.NormalizeFullPath(expectedExecutablePath);
+        QaLaunchPolicy.ValidateLaunchPaths(executable, root, expectedExecutablePath, runtimeRoot);
+        RuntimeManifestService.RejectLiveRuntimeSelection(root, QaRuntimePolicy.SteamSourceRoot);
+
+        ExactBuildAuditResult audit = ExactBuildProfile.Audit(expectedExecutablePath);
         if (audit.Status != "EXACT_BUILD_SIGNATURES_UNIQUE_CANDIDATE")
             throw new QaTelemetryException("QA_SIGNATURE_UNVERIFIED", "Exact-build executable anchors are not verified; refusing to launch QA DSR.");
 
-        string root = SafePaths.NormalizeFullPath(selected.ModifiedRuntimeRoot);
-        string executable = SafePaths.NormalizeFullPath(descriptor.Runtime!.ExecutablePath!);
-        QaLaunchPolicy.ValidateLaunchPaths(executable, root, ExactBuildProfile.ExpectedExecutablePath, selected.ModifiedRuntimeRoot);
         SafePaths.EnsureNoReparseAncestors(executable, leafMustExist: true);
         SafePaths.EnsureUniqueFile(executable);
         string exeHash = SafePaths.HashFile(executable);
-        if (!FixedEquals(exeHash, ExactBuildProfile.ExpectedExecutableSha256))
-            throw new QaTelemetryException("QA_EXECUTABLE_HASH_MISMATCH", "The isolated QA executable hash differs from the locked exact build.");
+        ExactBuildProfile.RequireApprovedExecutable(executable, exeHash);
 
         var libraryHashes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (string library in RequiredRuntimeLibraries)
@@ -275,7 +293,7 @@ public static class QaGameLauncher
                 throw new QaTelemetryException("QA_PROCESS_ALREADY_RUNNING", "An isolated QA DSR process is already running. Close that process normally, then run the launcher again; this launcher will not treat an existing process as a fresh successful startup.");
         }
 
-        QaSteamAppIdStatus sidecar = QaSteamAppIdSidecar.ProvisionOrVerify(root, executable, selected.ModifiedRuntimeRoot);
+        QaSteamAppIdStatus sidecar = QaSteamAppIdSidecar.ProvisionOrVerify(root, executable, runtimeRoot);
 
         var startInfo = new ProcessStartInfo
         {
@@ -300,7 +318,7 @@ public static class QaGameLauncher
             string processPath = QaLaunchPolicy.VerifyObservedProcessPath(observedPath, executable);
             string processHash = SafePaths.HashFile(processPath);
             if (!FixedEquals(processHash, exeHash)) throw new QaTelemetryException("QA_EXECUTABLE_HASH_MISMATCH", "The launched process image hash differs from the isolated QA executable.");
-            return new("ISOLATED_QA_GAME_LAUNCH_READY", "QA_GAME_PROCESS_VERIFIED", "The exact isolated QA executable is running with the locked working directory; no Steam-library DSR process was launched.", processPath, root, started.Id, processHash, sidecar.Path, sidecar.Sha256, libraryHashes["steam_api64.dll"], true, ProcessAccessPolicy.QueryLimitedInformation);
+            return new(successStatus, "QA_GAME_PROCESS_VERIFIED", "The exact isolated QA executable is running with the locked working directory; no Steam-library DSR process was launched.", processPath, root, started.Id, processHash, sidecar.Path, sidecar.Sha256, libraryHashes["steam_api64.dll"], true, ProcessAccessPolicy.QueryLimitedInformation);
         }
     }
 

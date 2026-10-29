@@ -35,10 +35,11 @@ public sealed class TraceSessionWriter : IDisposable
             throw new QaTelemetryException("QA_PROCESS_PATH_MISMATCH", "Live trace requires the exact locked isolated QA executable path.");
         if (!string.Equals(runtimeDigest, ExactBuildProfile.ExpectedRuntimeDigest, StringComparison.OrdinalIgnoreCase))
             throw new QaTelemetryException("QA_RUNTIME_IDENTITY_MISMATCH", "Live trace requires the exact locked package-applied runtime digest.");
+        SafePaths.RequireSha256(descriptor.Runtime.ModifiedManifestSha256, "package-applied runtime manifest hash");
         VerifiedProcessIdentity verifiedIdentity = ProcessIdentityPolicy.Verify(identity.ProcessId, identity.ImagePath,
             descriptor.Runtime!.ExecutablePath!, identity.ImageSha256, descriptor.Runtime.ExecutableSha256!, identity.CreatedUtc);
         MarkerProfileCheck profile = MarkerProfileStore.LoadVerified(markerProfilePath,
-            descriptor.Runtime!.ExecutableSha256!, runtimeDigest, ExactBuildProfile.ToolVersion, ExactBuildProfile.DefinitionSha256);
+            descriptor.Runtime!.ExecutableSha256!, ExactBuildProfile.ToolVersion, ExactBuildProfile.DefinitionSha256);
         if (!profile.Ok || profile.Profile is null || profile.ProfileSha256 is null)
             throw new QaTelemetryException(profile.Code, profile.Message);
         return new TraceSessionWriter(descriptor, tracePath, sessionId,
@@ -69,11 +70,15 @@ public sealed class TraceSessionWriter : IDisposable
         _header = new TraceRecord
         {
             Type = "header",
-            SchemaVersion = 1,
+            SchemaVersion = 2,
             SessionId = sessionId,
             Sequence = 0,
             TimestampUtc = DateTimeOffset.UtcNow.ToString("O"),
+            CaseId = descriptor.CaseId!,
+            SeedCode = descriptor.SeedCode!,
             ExecutableSha256 = descriptor.Runtime!.ExecutableSha256!,
+            ExecutableProfileId = live?.Profile.ExecutableProfileId,
+            RuntimeManifestSha256 = descriptor.Runtime.ModifiedManifestSha256 ?? "",
             PackageTreeSha256 = descriptor.Package!.TreeSha256!,
             RunManifestSha256 = descriptor.Package.RunManifestSha256!,
             Provenance = live is null ? "SYNTHETIC" : "READ_ONLY_GAME_TELEMETRY",
@@ -107,11 +112,15 @@ public sealed class TraceSessionWriter : IDisposable
             throw new InvalidDataException("Synthetic writer cannot accept live or verified observations.");
         if (_liveIdentity is not null && (observation.Provenance is not ("" or "READ_ONLY_GAME_TELEMETRY") || observation.TelemetryStatus is not ("" or "VERIFIED")))
             throw new InvalidDataException("Live writer accepts only verified observations from its bound profile.");
-        observation.SchemaVersion = 1;
+        observation.SchemaVersion = 2;
         observation.SessionId = _sessionId;
         observation.Sequence = ++_sequence;
         observation.TimestampUtc = DateTimeOffset.UtcNow.ToString("O");
+        observation.CaseId = _descriptor.CaseId!;
+        observation.SeedCode = _descriptor.SeedCode!;
         observation.ExecutableSha256 = _descriptor.Runtime!.ExecutableSha256!;
+        observation.ExecutableProfileId = _profile?.ExecutableProfileId;
+        observation.RuntimeManifestSha256 = _descriptor.Runtime.ModifiedManifestSha256 ?? "";
         observation.PackageTreeSha256 = _descriptor.Package!.TreeSha256!;
         observation.RunManifestSha256 = _descriptor.Package.RunManifestSha256!;
         observation.Provenance = _liveIdentity is null ? "SYNTHETIC" : "READ_ONLY_GAME_TELEMETRY";
@@ -160,14 +169,22 @@ public sealed class TraceSessionWriter : IDisposable
         string traceHash = SafePaths.HashFile(_tracePath);
         var summary = new TraceSummary
         {
+            SchemaVersion = 2,
             SessionId = _sessionId,
             RecordCount = checked((int)_sequence + 1),
             TraceSha256 = traceHash,
+            CaseId = _header.CaseId,
+            SeedCode = _header.SeedCode,
             ExecutableSha256 = _header.ExecutableSha256,
+            ExecutableProfileId = _header.ExecutableProfileId,
+            RuntimeManifestSha256 = _header.RuntimeManifestSha256,
             RuntimeDigest = _runtimeDigest,
             PackageTreeSha256 = _header.PackageTreeSha256,
             RunManifestSha256 = _header.RunManifestSha256,
             ProfileSha256 = _profileSha256,
+            ObservedExecutablePath = _header.ObservedExecutablePath,
+            ProcessId = _header.ProcessId,
+            ProcessCreatedUtc = _header.ProcessCreatedUtc,
             StartUtc = _header.TimestampUtc,
             EndUtc = DateTimeOffset.UtcNow.ToString("O"),
             Completed = true
@@ -243,7 +260,7 @@ public static class TraceImporter
 
         TraceSummary summary = JsonSerializer.Deserialize<TraceSummary>(File.ReadAllText(summaryPath), CaseDescriptor.JsonOptions)
             ?? throw new InvalidDataException("Trace summary is malformed.");
-        if (summary.SchemaVersion != 1 || !summary.Completed || !FixedEquals(summary.TraceSha256, traceHash))
+        if (summary.SchemaVersion != 2 || !summary.Completed || !FixedEquals(summary.TraceSha256, traceHash))
             throw new InvalidDataException("Trace is truncated, incomplete, or differs from its session summary.");
 
         string[] lines = File.ReadAllLines(tracePath, Encoding.UTF8);
@@ -256,10 +273,21 @@ public static class TraceImporter
             records.Add(JsonSerializer.Deserialize<TraceRecord>(line, TraceFormat.JsonOptions) ?? throw new InvalidDataException("Trace contains malformed JSON."));
         }
         TraceRecord header = records[0];
-        if (header.Type != "header" || header.SchemaVersion != 1 || header.Sequence != 0 || string.IsNullOrWhiteSpace(header.SessionId))
+        if (header.Type != "header" || header.SchemaVersion != 2 || summary.SchemaVersion != 2 || header.Sequence != 0 || string.IsNullOrWhiteSpace(header.SessionId))
             throw new InvalidDataException("Trace header is missing or unsupported.");
         if (summary.SessionId != header.SessionId || summary.RecordCount != records.Count)
             throw new InvalidDataException("Trace summary session identity or record count mismatch.");
+        if (summary.CaseId != header.CaseId || summary.SeedCode != header.SeedCode ||
+            !FixedEquals(summary.ExecutableSha256, header.ExecutableSha256) ||
+            summary.ExecutableProfileId != header.ExecutableProfileId ||
+            !FixedEquals(summary.RuntimeManifestSha256, header.RuntimeManifestSha256) ||
+            !FixedEquals(summary.RuntimeDigest, header.RuntimeDigest) ||
+            !FixedEquals(summary.PackageTreeSha256, header.PackageTreeSha256) ||
+            !FixedEquals(summary.RunManifestSha256, header.RunManifestSha256) ||
+            !string.Equals(summary.ObservedExecutablePath, header.ObservedExecutablePath, StringComparison.OrdinalIgnoreCase) ||
+            summary.ProcessId != header.ProcessId || summary.ProcessCreatedUtc != header.ProcessCreatedUtc ||
+            !string.Equals(summary.ProfileSha256, header.ProfileSha256, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidDataException("Trace summary identity does not match its session header.");
         if (header.Provenance is not ("SYNTHETIC" or "READ_ONLY_GAME_TELEMETRY"))
             throw new InvalidDataException("Unsupported trace provenance.");
         if (header.TelemetryStatus is not ("UNVERIFIED" or "VERIFIED")) throw new InvalidDataException("Unknown telemetry verification status.");
@@ -272,6 +300,9 @@ public static class TraceImporter
             throw new InvalidDataException("Unverified live telemetry cannot claim a marker profile.");
         if (header.Provenance == "READ_ONLY_GAME_TELEMETRY")
         {
+            if (header.RuntimeDigest != ExactBuildProfile.ExpectedRuntimeDigest ||
+                !string.Equals(header.RuntimeManifestSha256, descriptor.Runtime!.ModifiedManifestSha256 ?? "", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException("Live telemetry header does not match the locked package-applied runtime identity.");
             if (header.ProcessRightsRequested != ReadOnlyGameProcess.ExactReadRights)
                 throw new InvalidDataException("Live telemetry header does not declare the exact query/read-only rights mask.");
             ProcessAccessPolicy.Validate(header.ProcessRightsRequested);
@@ -281,15 +312,22 @@ public static class TraceImporter
             SafePaths.RequireSha256(header.ProfileSha256, "verified telemetry profile");
             if (header.Provenance != "READ_ONLY_GAME_TELEMETRY" || string.IsNullOrWhiteSpace(header.ProfilePath) ||
                 header.RuntimeDigest != ExactBuildProfile.ExpectedRuntimeDigest || header.ToolVersion != ExactBuildProfile.ToolVersion ||
-                header.ProcessRightsRequested != ReadOnlyGameProcess.ExactReadRights)
-                throw new InvalidDataException("Verified telemetry header lacks the exact runtime, tool, or profile binding.");
+                header.ProcessRightsRequested != ReadOnlyGameProcess.ExactReadRights ||
+                string.IsNullOrWhiteSpace(header.ExecutableProfileId))
+                throw new InvalidDataException("Verified telemetry header lacks the exact case, runtime, tool, executable-profile, or process-rights binding.");
             MarkerProfileCheck profile = MarkerProfileStore.LoadVerified(header.ProfilePath,
-                descriptor.Runtime!.ExecutableSha256!, header.RuntimeDigest, header.ToolVersion, ExactBuildProfile.DefinitionSha256);
-            if (!profile.Ok || profile.Profile is null || !FixedEquals(profile.ProfileSha256!, header.ProfileSha256!))
+                descriptor.Runtime!.ExecutableSha256!, header.ToolVersion, ExactBuildProfile.DefinitionSha256);
+            if (!profile.Ok || profile.Profile is null || !FixedEquals(profile.ProfileSha256!, header.ProfileSha256!) ||
+                !string.Equals(profile.Profile.ExecutableProfileId, header.ExecutableProfileId, StringComparison.Ordinal))
                 throw new InvalidDataException("Trace marker profile is missing, corrupt, or does not match its recorded hash: " + profile.Message);
             if (!FixedEquals(summary.ExecutableSha256, header.ExecutableSha256) || !FixedEquals(summary.RuntimeDigest, header.RuntimeDigest) ||
+                !FixedEquals(summary.RuntimeManifestSha256, header.RuntimeManifestSha256) ||
                 !FixedEquals(summary.PackageTreeSha256, header.PackageTreeSha256) || !FixedEquals(summary.RunManifestSha256, header.RunManifestSha256) ||
-                !FixedEquals(summary.ProfileSha256!, header.ProfileSha256!) || summary.StartUtc != header.TimestampUtc)
+                !FixedEquals(summary.ProfileSha256!, header.ProfileSha256!) || summary.StartUtc != header.TimestampUtc ||
+                summary.CaseId != header.CaseId || summary.SeedCode != header.SeedCode ||
+                summary.ExecutableProfileId != header.ExecutableProfileId ||
+                !string.Equals(summary.ObservedExecutablePath, header.ObservedExecutablePath, StringComparison.OrdinalIgnoreCase) ||
+                summary.ProcessId != header.ProcessId || summary.ProcessCreatedUtc != header.ProcessCreatedUtc)
                 throw new InvalidDataException("Trace summary linkage does not match its session header.");
         }
         DateTimeOffset previousTimestamp = ParseUtc(header.TimestampUtc);
@@ -300,11 +338,13 @@ public static class TraceImporter
         for (int i = 1; i < records.Count; i++)
         {
             TraceRecord record = records[i];
-            if (record.Type != "observation" || record.SchemaVersion != 1 || record.Sequence != i || record.SessionId != header.SessionId)
+            if (record.Type != "observation" || record.SchemaVersion != 2 || record.Sequence != i || record.SessionId != header.SessionId)
                 throw new InvalidDataException("Trace sequence or session continuity check failed.");
             if (record.Provenance != header.Provenance || record.TelemetryStatus != header.TelemetryStatus || !MatchesCase(descriptor, record))
                 throw new InvalidDataException("Trace contains mixed provenance, status, or case identities.");
             if (record.RuntimeDigest != header.RuntimeDigest || record.ToolVersion != header.ToolVersion ||
+                record.ExecutableProfileId != header.ExecutableProfileId ||
+                record.RuntimeManifestSha256 != header.RuntimeManifestSha256 ||
                 !string.Equals(record.ProfilePath, header.ProfilePath, StringComparison.OrdinalIgnoreCase) ||
                 record.ProcessRightsRequested != header.ProcessRightsRequested)
                 throw new InvalidDataException("Trace runtime, tool, or marker-profile linkage changed within the session.");
@@ -367,7 +407,10 @@ public static class TraceImporter
     }
 
     private static bool MatchesCase(CaseDescriptor descriptor, TraceRecord record) =>
+        string.Equals(record.CaseId, descriptor.CaseId, StringComparison.Ordinal) &&
+        string.Equals(record.SeedCode, descriptor.SeedCode, StringComparison.Ordinal) &&
         FixedEquals(record.ExecutableSha256, descriptor.Runtime!.ExecutableSha256!) &&
+        string.Equals(record.RuntimeManifestSha256, descriptor.Runtime.ModifiedManifestSha256 ?? "", StringComparison.OrdinalIgnoreCase) &&
         FixedEquals(record.PackageTreeSha256, descriptor.Package!.TreeSha256!) &&
         FixedEquals(record.RunManifestSha256, descriptor.Package.RunManifestSha256!);
 
@@ -388,9 +431,9 @@ public static class TraceImporter
         string observed = SafePaths.NormalizeFullPath(record.ObservedExecutablePath);
         string expected = SafePaths.NormalizeFullPath(descriptor.Runtime!.ExecutablePath!);
         SafePaths.RejectSteamPath(observed);
-        SafePaths.EnsureNoReparseAncestors(observed, leafMustExist: true);
         if (!string.Equals(observed, expected, StringComparison.OrdinalIgnoreCase))
             throw new InvalidDataException("Telemetry executable path does not match the locked QA executable.");
+        SafePaths.EnsureNoReparseAncestors(observed, leafMustExist: true);
         if (!FixedEquals(SafePaths.HashFile(observed), descriptor.Runtime.ExecutableSha256!))
             throw new InvalidDataException("Telemetry executable file hash no longer matches the locked exact build.");
         _ = ParseUtc(record.ProcessCreatedUtc);
