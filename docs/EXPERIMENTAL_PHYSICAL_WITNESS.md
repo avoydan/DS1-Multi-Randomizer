@@ -133,7 +133,7 @@ Observed pristine QA EMEVD `event/m14_01_00_00.emevd.dcx` SHA-256: `dc0e348fc530
 - Event 11410400, the elevator controller, is initialized and instruction-equivalent to vanilla in **331/331** staging packages. It checks completion flag 11410410 and the four elevator regions. Event 11410402 is also identical in 331/331 and displays the English message “Contraption does not move” when that flag is off. Its direct body is a dialog/condition check, not a movement or warp event.
 - Event 11410090 has two `IssueShortWarpRequest` instructions and two action-line-segment checks, but an exhaustive scan found no `InitializeEvent` call targeting it in either pristine QA EMEVD (32 archives, 1,401 events, 3,153 initializer sites) or the 331 staging corpus (18 archives, 1,281 events, 3,051 sites). It is instruction-identical to vanilla in 331/331 staging packages. This supports `NOT_ROUTE_RELEVANT_PROVEN IN THIS PINNED CORPUS`, not a universal dead-code claim.
 
-The 331-package preservation scan returned no mismatches: 11415371, 11410400, 11410402, and 11410090 are all instruction-equivalent; the elevator/completion/controller initializers remain; both barriers remain in the MSB; and all three defeated-state barrier cleanup blocks are missing in all 331. The source/staging comparison therefore identifies a generated-package Ceaseless exit-state regression: the vanilla boss-death progression that releases the two light walls is not preserved. This is strong evidence for the lifecycle defect, but it does **not** certify the full physical path from the arena through the released barrier to the elevator/main route; collision connectivity and walkable geometry remain unproven.
+The 331-package preservation scan returned no mismatches: 11415371, 11410400, 11410402, and 11410090 are all instruction-equivalent; the elevator/completion/controller initializers remain; both barriers remain in the MSB; and all three defeated-state barrier cleanup blocks are missing in all 331. At that checkpoint the omission appeared to be an unintended generated-package regression. The fresh differential documented below shows that the staging corpus contained Fog-transformed outputs: combined-only workspaces retain the cleanup, while successful Fog outputs remove it in the same way as pinned FogMod. The earlier count remains a correct observation, but the omission alone does not establish a generator defect. Physical connectivity and post-defeat actionability remain unproven.
 
 EMEDF instruction names used in interpreting the event bodies: `IfActionButtonLineSegment` 3[18], `IfEventFlag` 3[0], `IfMultiplayerState` 3[6], `IfCharacterDeadalive` 4[0], `InitializeEvent` 2000[0], `SetNetworkSyncState` 2000[2], `HandleBossDefeat` 2003[12], `RotateCharacter` 2004[14], `DeactivateObject` 2005[3], `DeleteMapSFX` 2006[1], and `IssueShortWarpRequest` 2004[41]. These IDs are documented in the DS1 EMEDF reference.
 
@@ -148,6 +148,75 @@ Even if the post-boss barrier-release issue were hypothetically fixed, all 331 c
 At generation time, preserve a canonical per-case attestation outside the mutable staging tree: Seed Code and profile; attempt and derived seeds; exact app/backend/engine and input-data identities; sorted relative-path inventory with size and SHA-256 for every package file; and a digest over a canonical serialization. Anchor that attestation in an immutable, access-controlled CI artifact or sign it with a key unavailable to the staging writer. The auditor should verify the attestation before parsing or classifying staging bytes. Keep the canonical dataset, attestation, tool build identity, and audit report together. A hash computed during a later audit is useful for repeatability only; without a contemporaneous trusted expected digest it cannot authenticate historical package content.
 
 No production code, validator, retry limit, generation profile, package version, or DECISIONS entry changed. No game process or live Steam installation was accessed.
+
+## Fresh Ceaseless lifecycle differential (2026-10-29; current V5 code)
+
+This follow-up resolves the cleanup-block ambiguity with fresh outputs and contemporaneous local attestations. It does not change production generation, validation, retries, profile semantics, or the physical-witness certainty rules.
+
+### Source and attestation identity
+
+- Worktree: `C:\Users\Adam\VisualStudioProjects\ds1-triple-randomizer-v5-isolation`
+- Branch and source HEAD: `fix/compact-fog-v5-progression`, `c7440e685221ec04b7856a317aa8037c7142ce8d`
+- Safe tag: `v5-safe-ceaseless-baseline` -> `abc6a5286353618a1087b8363bf9438236b8fb10` (unchanged)
+- Profile: `ds1tr-gen-v5`; catalog fingerprint `73f3c842d51490d45a836a489105b37f57d702eaa2ffda084f42781e5aaef00f`; semantic fingerprint `6c73ee8777629c43759403d0c156cd928107cfcc8d21439ca5f1eff09686e5f0`; worldDataId `ef625777d6aa5abf`
+- FogHost project 0.7.4 / HostVersion 0.7.3 / protocol 3; backend 0.46.4; FogReconstruction 0.3.2
+- Read-only QA DSR: `C:\Users\Adam\ds1tr-qa\game-inst\DARK SOULS REMASTERED`
+- QA input tree: 199 files, inventory SHA-256 `2d056b2adfda65372f3115c98afd6f9366961f73d2392694969ab025151931a0`
+- Compact Fog input: 59 files, inventory SHA-256 `d6fd8aeca8c07c1f1ddb3cd77d8a5543a0b8ffd2c31bb081aa371331313627ba`
+
+Each attestation is classified `CONTEMPORANEOUS_HASH_ATTESTATION`; it is not an externally trusted signature. The six audit files are outside the repository under `C:\Users\Adam\AppData\Local\Temp\ds1tr-ceaseless-certified-v2-*`. Their SHA-256 values are:
+
+| Sweep | Cases | Packages | Exhausted | `audit.json` SHA-256 |
+|---|---:|---:|---:|---|
+| baseline | 5 | 0 | 5 | `b61e9ea150a66adcd1a1afc00de7b05e8380830fff0c0a734aaeb4ff8c81a3b0` |
+| both PvP | 5 | 2 | 3 | `f58b6f32499ebe9a5db4e7476a359348eac9da914ec3de4a7dc0e7eecd974a35` |
+| disconnected | 5 | 1 | 4 | `a51187591c4b33ec84c760c7448084fb7aa04fa89df78a8ce972328e63ed34fa` |
+| Lord Souls off | 5 | 2 | 3 | `3f778e138118e53b62dd689f77ec9866df118c74d48c13631a16ac111e98d35e` |
+| Major PvP | 5 | 0 | 5 | `c9187bb0b51a088b92ee4f5d291b17756a36e8bc200e211ab4dc129249397658` |
+| Minor PvP | 5 | 2 | 3 | `6ca4969119ad36cf12063c710e87ea47842e6765955e8e9f9daae0b0ed8a9dc6` |
+| **Total** | **30** | **7** | **23** | |
+
+The 23 exhausted cases each had five rejected Fog attempts. There were 17 further rejected attempts before the seven accepted attempts, for 139 attempts total: 132 rejected and 7 accepted. An independent log classification found that all 132 rejected attempts failed specifically at `solve-graph` with the event-11410410 post-boss fixed-route error; zero rejected attempts had a different error. All 139 attempt logs contain the V5 post-boss route summary. No Fog writer ran on the 23 exhausted cases; each successful package has one write log.
+
+All seven packages have two instruction merges (`m15_00_00_00.emevd.dcx:11500001` and `m16_00_00_00.emevd.dcx:11600400`) and no merge conflicts. Fog/combined event mismatch arrays are empty. Combined SKIP verification, Fog SKIP verification, and Fog post-write invariants pass. An independent rehash verified 518 retained package files, seven package tree digests, and seven `run-manifest.json` hashes; all matched the contemporaneous attestations. No package `.bak` or unexpected output was reported.
+
+### Lifecycle differential and pinned upstream comparison
+
+The fresh output separates two states that the historical 331 staging did not distinguish:
+
+1. The 23 final rejected cases retain the combined-only workspace. The three vanilla Ceaseless defeated-state cleanup blocks remain in event 0, event 11410410, and event 11415342, matching the pristine QA source's logical cleanup operations.
+2. In each of the seven accepted Fog outputs, the cleanup blocks are removed by the known M14 DLC reconstruction. The corresponding cleanup removal agrees with pinned FogMod's transformed event records. The barrier objects remain in the MSB, while Fog's randomized gate dispatch is added. This is an observed engine transformation, not evidence that the final gate is physically reachable or usable after boss defeat.
+
+The pinned FogMod checkout used as read-only oracle is `C:\Users\Adam\AppData\Local\Temp\FogMod-pvp-audit-6e6dc7886d0f8bcc53c1800d95c9e859d1f2f87f`. With a command-scoped `safe.directory` exception, `git rev-parse HEAD` returned exactly `6e6dc7886d0f8bcc53c1800d95c9e859d1f2f87f`; `git status --short` was empty. The evidence files were `dist/DS1R/event/m14_01_00_00.emevd.dcx` (SHA-256 `26fa087386ae61522cd5262bcd5e44a2cbc4c914e7ac5b915d84b70b1f7848f7`) and `dist/fog.txt` (SHA-256 `15c665bb6c577219a2b36ffd9e1a7eb2fa2b789c9862fce5340b6a3116d24ec2`). The corresponding FogHost reconstruction code is in `FogModifiedEventBuilder.cs` (`ReconstructKnownM14DlcEvents`, `ReconstructM14DlcBossEvent11415342`, and `ReconstructM14DlcEvent0`); event 11410410 uses `RemoveInstructionSequence(11410410, 12, ...)`. These records support that accepted Fog outputs perform the same cleanup-block removal as pinned FogMod. No upstream `dist` or annotation data was copied into the repository, and upstream remains an oracle rather than project policy.
+
+Event 11415371, 11410400, and 11410402 remain source-equivalent in the fresh staging scan; the `event0` initializer to 11410410 remains. The successful-run route log says `exit 'o4961_0000' from 'demonruins_ceaseless'`, with logical fixed-route destination `demonruins_lava`. This log records project route policy, not a traversable collision path. No defect correction is supported by the lifecycle evidence alone.
+
+### Current physical-witness result
+
+The shadow evaluator ran against all seven fresh accepted packages; the 23 no-package rejects were not treated as generated worlds. The result is **0 PROVEN_ACTIONABLE, 0 PROVEN_NON_ACTIONABLE, 28 UNKNOWN edges, 0 solvable, 0 unsolvable, and 7 UNRESOLVED_MODEL_GAP**. Each package has four unresolved stages: (1) physical approach to `o4961_0000`, (2) Mode-0 actionability after completion flag 11410410, (3) generated landing to the main Demon Ruins side, and (4) physical route from that side to lower lava. No witness class was promoted; the prior 331-case result remains 483 actionable, 0 non-actionable, 4,639 unknown, and 331 unresolved.
+
+The minimum evidence gap for a positive Ceaseless witness is either authenticated collision geometry sufficient to establish a continuous, state-correct route and gate approach/landing for one exact generated package, or validated read-only runtime observation of those same states. The verified QA DSR contains no collision/NVM/HKX source assets; no telemetry code or process-memory access was used. The old 331 staging inventory has no historical expected package hashes, so its bytes still cannot be authenticated to the original generation moment.
+
+### Manual QA candidate
+
+The accepted Lord-Souls-off case is suitable for an owner gameplay check, but not yet certified as physically traversable:
+
+- Seed Code: `DS1TR1-06NWCQQ3-K2HDEE69-N52JB6B9-K6MJKEN0-EJM0PAGA-HDTZ7MYJ-EG6METX0-J590788Q-2PHNBM38-2MTF0N8G-5K6N1A8E-08042ASS-WW`
+- Master seed: `certified-lord-souls-off-1`
+- Combined seed: `8a3d20e4760831c1eccf67c75a417193`
+- Fog attempt: 4; raw Fog seed: `3695053466`
+- Package tree SHA-256: `32f0c2afeff25c9341405989b80ba7dc6a72da1f3e90ecdf90cf37ca2b5f79a9`
+- Seed Code decode/round-trip: passed; recomputed combined/Fog seeds match the attestation.
+
+Suggested evidence checkpoints: start the fresh world; reach the Ceaseless arena and trigger; defeat Ceaseless; verify the post-defeat fog prompt and crossing; record destination map/player position; then verify a physically traversable route to the lower Demon Ruins/lava route, quit/reload, and repeat the relevant post-defeat checks. A manual PASS would be gameplay evidence for this exact package, not a generalized geometry rule.
+
+### Verification and non-changes
+
+- FogHost tests: 124 passed, 0 failed, 0 skipped.
+- Backend tests: 621 total, 618 passed, 0 failed, 3 skipped.
+- Contracts, backend, and desktop no-emit typechecks passed. The aggregate root typecheck did not complete because the root script's contracts build tries to write `packages/contracts/dist` outside the writable worktree.
+- FogReconstruction existing .NET 8 Release binary self-test passed. `dotnet run` could not read the protected user NuGet.Config, so no rebuild was performed for this documentation/harness-only continuation.
+- No production behavior, retry limit, profile semantics, version, safe baseline tag, V1-V4 behavior, live Steam DSR, game process, or game memory changed. No `DECISIONS.md` entry was warranted.
 
 ## Overnight physical-witness audit (2026-10-28; shadow-only)
 

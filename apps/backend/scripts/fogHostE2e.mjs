@@ -25,15 +25,38 @@
 
 import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
-import { cp, mkdtemp, readFile, readdir, rename, rm } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { GameStateAuthority, executableName, managedRoots } from '../dist/core/gameState.js';
 import { generateRun } from '../dist/core/generationPipeline.js';
-import { defaultWorldDataCacheRoot } from '../dist/adapters/fogPrerequisites.js';
+import { currentGenerationProfile } from '../dist/core/generationProfiles.js';
+import { defaultFogHostExecutable, defaultWorldDataCacheRoot } from '../dist/adapters/fogPrerequisites.js';
+import { COMPACT_FOG_CATALOG_V2_FINGERPRINT } from '../dist/adapters/compactFogProjection.js';
 import { worldDataId } from '../dist/adapters/worldData.js';
+
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
+const backendPackage = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
+const generationProfile = currentGenerationProfile();
+const attestationDirectory = process.env.DS1TR_E2E_ATTEST_DIR ? path.resolve(process.env.DS1TR_E2E_ATTEST_DIR) : null;
+const compactFogDoc = await readFile(path.join(repoRoot, 'docs', 'COMPACT_FULL_FOG_V2.md'), 'utf8');
+const semanticFingerprintMatch = compactFogDoc.match(/old\/current semantic fingerprints are `([0-9a-f]{64})` and `([0-9a-f]{64})`/u);
+if (!semanticFingerprintMatch) throw new Error('Could not resolve the current Compact Fog V2 semantic fingerprint from docs/COMPACT_FULL_FOG_V2.md.');
+const compactFogSemanticFingerprint = semanticFingerprintMatch[2];
+function projectVersion(text, label) {
+  const match = text.match(/<Version>([^<]+)<\/Version>/u);
+  if (!match) throw new Error(`Could not resolve ${label} project version.`);
+  return match[1];
+}
+const fogHostProjectVersion = projectVersion(await readFile(path.join(repoRoot, 'tools', 'fog-host', 'FogHost.csproj'), 'utf8'), 'FogHost');
+const fogReconstructionProjectVersion = projectVersion(await readFile(path.join(repoRoot, 'tools', 'fog-reconstruction', 'FogReconstruction.csproj'), 'utf8'), 'FogReconstruction');
+const hostVersionSource = await readFile(path.join(repoRoot, 'tools', 'fog-host', 'src', 'Program.cs'), 'utf8');
+const hostVersionMatch = hostVersionSource.match(/public const string HostVersion = "([^"]+)";/u);
+if (!hostVersionMatch) throw new Error('Could not resolve FogHost protocol compatibility version from Program.cs.');
+const fogHostHostVersion = hostVersionMatch[1];
 
 const livePath = process.argv[2] ?? process.env.DS1TR_E2E_GAME_PATH;
 if (!livePath) {
@@ -63,6 +86,104 @@ async function listTree(root, relative) {
     else files.push(child);
   }
   return files;
+}
+
+async function treeInventory(root, relative = '') {
+  const files = [];
+  for (const entry of await readdir(path.join(root, relative), { withFileTypes: true })) {
+    const child = relative ? `${relative}/${entry.name}` : entry.name;
+    const target = path.join(root, child);
+    if (entry.isDirectory()) files.push(...await treeInventory(root, child));
+    else {
+      const info = await stat(target);
+      files.push({ path: child.replaceAll('\\', '/'), size: info.size, sha256: await hashFile(target) });
+    }
+  }
+  return files.sort((a, b) => a.path.localeCompare(b.path, 'en'));
+}
+
+function inventoryDigest(files) {
+  return createHash('sha256').update(files.map((file) => `${file.path}\0${file.size}\0${file.sha256}\n`).join('')).digest('hex');
+}
+
+function gitOutput(args) {
+  const result = spawnSync('git', args, { cwd: repoRoot, encoding: 'utf8' });
+  if (result.status !== 0) throw new Error(`git ${args.join(' ')} failed: ${result.stderr || result.error}`);
+  return result.stdout.trim();
+}
+
+let attestationBase = null;
+
+async function attestRun(name, result, workspace, runConfig, diagnostics = null) {
+  if (!attestationDirectory || !attestationBase) return;
+  const slug = name.replace(/[^A-Za-z0-9._-]/gu, '_');
+  const caseDirectory = path.join(attestationDirectory, slug);
+  await mkdir(caseDirectory, { recursive: false });
+  const workspaceFiles = await treeInventory(workspace);
+  const packageFiles = result.ok ? await treeInventory(result.packagePath) : [];
+  const runManifest = result.ok ? JSON.parse(await readFile(path.join(result.packagePath, 'run-manifest.json'), 'utf8')) : null;
+  const fogAttemptLogs = [];
+  for (const directory of await readdir(workspace).catch(() => [])) {
+    if (!/^fog-\d+-\d+$/u.test(directory)) continue;
+    const logPath = path.join(workspace, directory, 'foghost.log');
+    const content = await readFile(logPath, 'utf8').catch(() => null);
+    if (content !== null) fogAttemptLogs.push({
+      attemptDirectory: directory,
+      sha256: createHash('sha256').update(content, 'utf8').digest('hex'),
+      content,
+    });
+  }
+  const retainedPath = path.join(caseDirectory, result.ok ? 'package' : 'attempt-workspace');
+  await cp(result.ok ? result.packagePath : workspace, retainedPath, { recursive: true, errorOnExist: true, force: false });
+  const attestation = {
+    ...attestationBase,
+    attestationClass: 'CONTEMPORANEOUS_HASH_ATTESTATION',
+    caseName: name,
+    generation: {
+      masterSeed: runConfig.masterSeed,
+      options: {
+        items: runConfig.items,
+        enemies: runConfig.enemies,
+        fog: runConfig.fog,
+        output: runConfig.output,
+      },
+      seedCode: result.manifest.seedCode ?? null,
+    },
+    result: {
+      ok: result.ok,
+      code: result.ok ? 'success' : result.code,
+      stage: result.ok ? null : result.stage,
+      message: result.ok ? null : result.message,
+      packagePath: result.ok ? result.packagePath : null,
+      attempts: result.manifest.attempts,
+      engineVersions: result.manifest.engines,
+      validation: runManifest?.validation ?? null,
+      packageManifestSha256: result.ok ? await hashFile(path.join(result.packagePath, 'run-manifest.json')) : null,
+      packageTreeSha256: result.ok ? inventoryDigest(packageFiles) : null,
+      packageFiles,
+    },
+    diagnostics: diagnostics ? {
+      validatorResult: result.ok ? 'accepted' : result.code,
+      validatorStage: result.ok ? null : result.stage,
+      validatorMessage: result.ok ? null : result.message,
+      skipChecks: diagnostics.skipChecks ?? [],
+      fogCombinedEventMismatches: diagnostics.fogCombinedEventMismatches ?? [],
+      fogModOnlyEventMismatches: diagnostics.fogModOnlyEventMismatches ?? [],
+      mergeConflicts: diagnostics.conflicts ?? [],
+      instructionMerges: diagnostics.merges ?? [],
+      bossOverlays: diagnostics.overlays ?? [],
+    } : null,
+    fogAttemptLogs,
+    workspace: {
+      sourcePath: workspace,
+      retainedPath,
+      treeSha256: inventoryDigest(workspaceFiles),
+      fileCount: workspaceFiles.length,
+      files: workspaceFiles,
+    },
+  };
+  await writeFile(path.join(caseDirectory, 'attestation.json'), `${JSON.stringify(attestation, null, 2)}\n`, { flag: 'wx' });
+  console.log(`attested ${name}: result=${attestation.result.code}; packageFiles=${packageFiles.length}; workspaceFiles=${workspaceFiles.length}; workspaceSha256=${attestation.workspace.treeSha256}`);
 }
 
 async function hashRoots(root) {
@@ -109,6 +230,7 @@ const config = (gamePath, masterSeed = process.env.DS1TR_E2E_SEED ?? 'foghost-e2
     minorPvpFogs: false, lordvesselGates: false, randomStart: false, disconnectedFogs: false,
     noFallBedOfChaos: false, scaling: true, glitchedLogic: false, requireLordSouls: true,
     pacifistMode: false, language: 'ENGLISH',
+    ...(process.env.DS1TR_E2E_FOG_OPTIONS ? JSON.parse(process.env.DS1TR_E2E_FOG_OPTIONS) : {}),
   },
   output: { includeDlc: true, generateSpoilerLog: false },
 });
@@ -122,7 +244,8 @@ async function sweep(count, prefix) {
     const seed = `${prefix}-${i}`;
     const workspace = path.join(temp, `sweep-${i}`);
     // DS1TR_E2E_LOGS=1 prints every log event (diagnosing a failing seed).
-    const result = await generateRun({ config: config(game, seed), workspacePath: workspace },
+    const runConfig = config(game, seed);
+    const result = await generateRun({ config: runConfig, workspacePath: workspace, profile: generationProfile },
       (event) => { if (process.env.DS1TR_E2E_LOGS && event.type === 'log') console.log(`  [${event.stage}] ${event.level}: ${event.message}`); }, deps);
     const merges = [];
     const overlays = [];
@@ -207,6 +330,7 @@ async function sweep(count, prefix) {
     }
     results.push(entry);
     console.log(JSON.stringify(entry));
+    await attestRun(`sweep-${i}-${seed}`, result, workspace, runConfig, entry);
     await rm(workspace, { recursive: true, force: true });
   }
   const attempts = results.flatMap((r) => r.attempts);
@@ -243,6 +367,7 @@ const game = path.join(temp, 'game');
 const authority = new GameStateAuthority({ stateRoot: path.join(temp, 'state'), isGameRunning: async () => false });
 const deps = {
   getPristineSource: (gamePath) => authority.getPristineSource(gamePath),
+  appVersion: backendPackage.version,
 };
 
 try {
@@ -252,6 +377,52 @@ try {
   // DS1TR_E2E_GAME_SOURCE: a clean copy of the game (for example the application's pristine snapshot) to use instead of the
   // live installation, which is not clean once the app (or another tool) has applied a randomization to it. Read only.
   const source = process.env.DS1TR_E2E_GAME_SOURCE ?? livePath;
+  const sourceBefore = source === livePath ? liveBefore : await hashRoots(source);
+  if (attestationDirectory) {
+    const relative = path.relative(repoRoot, attestationDirectory);
+    if (relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative)))
+      throw new Error('DS1TR_E2E_ATTEST_DIR must be outside the repository.');
+    await mkdir(attestationDirectory, { recursive: true });
+    const qaInputFiles = await Promise.all([...sourceBefore].map(async ([relativePath, sha256]) => ({
+      path: relativePath,
+      size: (await stat(path.join(source, relativePath))).size,
+      sha256,
+    })));
+    const fogDataRoot = process.env.DS1TR_FOG_DATA_ROOT
+      ? path.resolve(process.env.DS1TR_FOG_DATA_ROOT)
+      : path.join(defaultWorldDataCacheRoot(), generationProfile.fogEngine.worldDataId);
+    const fogDataFiles = await treeInventory(fogDataRoot);
+    attestationBase = {
+      schema: 'ds1tr-ceaseless-e2e-attestation-v2',
+      attestedAt: new Date().toISOString(),
+      externalSignature: 'NONE; this is a local contemporaneous hash attestation, not an externally trusted signature.',
+      repository: repoRoot,
+      gitHead: gitOutput(['rev-parse', 'HEAD']),
+      gitStatusPorcelain: gitOutput(['status', '--porcelain=v1']),
+      harnessPath: path.relative(repoRoot, fileURLToPath(import.meta.url)).replaceAll('\\', '/'),
+      harnessSha256: await hashFile(fileURLToPath(import.meta.url)),
+      backendVersion: backendPackage.version,
+      generationProfile: generationProfile.id,
+      fogModCommit: generationProfile.fogEngine.fogModCommit,
+      fogHostVersions: generationProfile.fogEngine.hostVersions,
+      worldDataId: generationProfile.fogEngine.worldDataId,
+      catalogFingerprint: COMPACT_FOG_CATALOG_V2_FINGERPRINT,
+      semanticFingerprint: compactFogSemanticFingerprint,
+      fogHostProjectVersion,
+      fogHostHostVersion,
+      fogHostCompatibleVersions: generationProfile.fogEngine.hostVersions,
+      fogReconstructionProjectVersion,
+      hostExecutable: defaultFogHostExecutable,
+      hostExecutableSha256: await hashFile(defaultFogHostExecutable),
+      qaSourceRoot: source,
+      qaSourceTreeSha256: inventoryDigest(qaInputFiles),
+      qaInputFiles,
+      compactFogDataRoot: fogDataRoot,
+      compactFogDataTreeSha256: inventoryDigest(fogDataFiles),
+      compactFogDataFiles: fogDataFiles,
+    };
+    await writeFile(path.join(attestationDirectory, 'audit.json'), `${JSON.stringify(attestationBase, null, 2)}\n`, { flag: 'wx' });
+  }
   await cp(path.join(source, executableName), path.join(game, executableName));
   for (const managed of managedRoots) {
     await cp(path.join(source, ...managed.split('/')), path.join(game, ...managed.split('/')), { recursive: true });
@@ -275,8 +446,10 @@ try {
 
   const logs = [];
   const started = Date.now();
-  const first = await generateRun({ config: config(game), workspacePath: path.join(temp, 'run-a') },
+  const firstConfig = config(game);
+  const first = await generateRun({ config: firstConfig, workspacePath: path.join(temp, 'run-a'), profile: generationProfile },
     (event) => { if (event.type === 'log' && event.stage === 'fog' && event.level !== 'info') logs.push(event.message); }, deps);
+  await attestRun('full-run-a', first, path.join(temp, 'run-a'), firstConfig);
   check('combined + Fog generation succeeds', first.ok,
     first.ok ? `${first.packagePath} in ${Math.round((Date.now() - started) / 1000)} s` : `${first.code}: ${first.message}`);
   console.log(`attempts: ${JSON.stringify(first.manifest.attempts.map((a) => `${a.combinedAttempt}/${a.fogAttempt}:${a.result}`))}`);
@@ -287,7 +460,9 @@ try {
   check('package has no .bak files', !m.files.some((file) => /\.bak$/i.test(file.path)));
   check('package includes Fog talk ESDs', m.files.some((file) => file.path.startsWith('script/talk/')));
 
-  const second = await generateRun({ config: config(game), workspacePath: path.join(temp, 'run-b') }, () => {}, deps);
+  const secondConfig = config(game);
+  const second = await generateRun({ config: secondConfig, workspacePath: path.join(temp, 'run-b'), profile: generationProfile }, () => {}, deps);
+  await attestRun('full-run-b-determinism-repeat', second, path.join(temp, 'run-b'), secondConfig);
   check('rerun with same seed is byte-identical', second.ok && JSON.stringify(second.manifest.files) === JSON.stringify(m.files));
   check('no generation write into the game', sameMap(await hashRoots(game), reconstructed));
 
