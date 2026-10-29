@@ -200,19 +200,31 @@ public sealed class TraceRecord
     public string ExecutableSha256 { get; set; } = "";
     public string PackageTreeSha256 { get; set; } = "";
     public string RunManifestSha256 { get; set; } = "";
+    public string RuntimeDigest { get; set; } = "";
+    public string ToolVersion { get; set; } = "";
     public string Provenance { get; set; } = "";
     public string TelemetryStatus { get; set; } = "UNVERIFIED";
     public string? ProfileSha256 { get; set; }
+    public string? ProfilePath { get; set; }
     public string? ObservedExecutablePath { get; set; }
     public int? ProcessId { get; set; }
     public string? ProcessCreatedUtc { get; set; }
+    public uint ProcessRightsRequested { get; set; }
     public string? Checkpoint { get; set; }
     public string ObservationStatus { get; set; } = "UNVERIFIED";
     public string? ObservedMapId { get; set; }
+    public int? CandidateMapAreaId { get; set; }
+    public string MapTrust { get; set; } = "UNAVAILABLE";
     public double? PlayerX { get; set; }
     public double? PlayerY { get; set; }
     public double? PlayerZ { get; set; }
+    public string PositionTrust { get; set; } = "UNAVAILABLE";
     public bool? EventFlag11410410 { get; set; }
+    public string EventFlagTrust { get; set; } = "UNAVAILABLE";
+    public int? TransitionFromAreaId { get; set; }
+    public int? TransitionToAreaId { get; set; }
+    public string TransitionTrust { get; set; } = "UNAVAILABLE";
+    public bool? OwnerConfirmedCheckpoint { get; set; }
     public bool? ExitPromptPresent { get; set; }
     public bool? ExitActionable { get; set; }
     public bool? TransitionSucceeded { get; set; }
@@ -220,6 +232,8 @@ public sealed class TraceRecord
     public bool? LandingIsolated { get; set; }
     public bool? RouteMilestoneReached { get; set; }
     public string? TransitionType { get; set; }
+    public string? OwnerAnnotationTimestampUtc { get; set; }
+    public string? SampleTimestampUtc { get; set; }
     public string? Confidence { get; set; }
 }
 
@@ -229,6 +243,13 @@ public sealed class TraceSummary
     public string SessionId { get; set; } = "";
     public int RecordCount { get; set; }
     public string TraceSha256 { get; set; } = "";
+    public string ExecutableSha256 { get; set; } = "";
+    public string RuntimeDigest { get; set; } = "";
+    public string PackageTreeSha256 { get; set; } = "";
+    public string RunManifestSha256 { get; set; } = "";
+    public string? ProfileSha256 { get; set; }
+    public string StartUtc { get; set; } = "";
+    public string EndUtc { get; set; } = "";
     public bool Completed { get; set; }
 }
 
@@ -236,7 +257,9 @@ public sealed record ShadowEdgeResult(string EdgeId, string Certainty);
 
 public sealed record TraceImportResult(string Status, bool GameplayConfirmed, string Explanation, ShadowEdgeResult[] ShadowEdges, int ObservationCount, string TraceSha256);
 
-public sealed class QaTelemetryException(string code, string message) : Exception(message)
+public sealed class QaTelemetryException : Exception
 {
-    public string Code { get; } = code;
+    public string Code { get; }
+    public QaTelemetryException(string code, string message) : base(message) => Code = code;
+    public QaTelemetryException(string code, string message, Exception innerException) : base(message, innerException) => Code = code;
 }

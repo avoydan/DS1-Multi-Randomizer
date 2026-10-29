@@ -12,6 +12,22 @@ internal static class Program
             string command = args[0];
             Dictionary<string, string> options = ParseOptions(args.Skip(1).ToArray());
 
+            if (command == "audit-build")
+            {
+                if (options.Count != 0) throw new ArgumentException("audit-build accepts no options; it reads only the locked QA executable.");
+                ExactBuildAuditResult audit = ExactBuildProfile.Audit(ExactBuildProfile.ExpectedExecutablePath);
+                Console.WriteLine(JsonSerializer.Serialize(audit, CaseDescriptor.JsonOptions));
+                return audit.Status == "EXACT_BUILD_SIGNATURES_UNVERIFIED" ? 3 : 0;
+            }
+
+            if (command == "marker-guide")
+            {
+                if (!options.TryGetValue("case", out string? markerCase) || options.Keys.Any(key => key != "case"))
+                    throw new ArgumentException("marker-guide requires --case <descriptor.json> and accepts no other options.");
+                CaseDescriptor markerDescriptor = CaseDescriptor.Load(markerCase);
+                return MarkerGuide.Run(markerDescriptor);
+            }
+
             if (command == "attest-runtime")
             {
                 if (options.Count != 0) throw new ArgumentException("attest-runtime uses repository-locked QA paths and takes no options.");
@@ -47,11 +63,11 @@ internal static class Program
                 PackageVerification package = PackageVerifier.Verify(descriptor);
                 if (!package.Ok)
                 {
-                    Console.WriteLine(JsonSerializer.Serialize(new { status = package.Code, package.Message, processRightsRequested = ProcessAccessPolicy.RightsRequestedByThisBuild }, CaseDescriptor.JsonOptions));
+                    Console.WriteLine(JsonSerializer.Serialize(new { status = package.Code, package.Message, processRightsRequested = ProcessAccessPolicy.PreflightRightsRequested }, CaseDescriptor.JsonOptions));
                     return 2;
                 }
                 RuntimePreflightResult runtime = RuntimePreflight.Run(descriptor);
-                ProcessAccessPolicy.Validate(ProcessAccessPolicy.RightsRequestedByThisBuild);
+                ProcessAccessPolicy.Validate(ProcessAccessPolicy.PreflightRightsRequested);
                 Console.WriteLine(JsonSerializer.Serialize(new
                 {
                     status = runtime.Code,
@@ -61,7 +77,7 @@ internal static class Program
                     runtime.HasRequiredRuntimeAssets,
                     runtime.CleanManifestSha256,
                     runtime.ModifiedManifestSha256,
-                    processRightsRequested = ProcessAccessPolicy.RightsRequestedByThisBuild,
+                    processRightsRequested = ProcessAccessPolicy.PreflightRightsRequested,
                     gameLaunched = false,
                     telemetryStatus = "UNVERIFIED"
                 }, CaseDescriptor.JsonOptions));
@@ -79,6 +95,15 @@ internal static class Program
                     policy);
                 Console.WriteLine(JsonSerializer.Serialize(result, CaseDescriptor.JsonOptions));
                 return result.Ok ? 0 : 5;
+            }
+
+            if (command == "record")
+            {
+                if (!options.TryGetValue("case", out string? recordCase) || !options.TryGetValue("profile", out string? profilePath) ||
+                    options.Keys.Any(key => key is not ("case" or "profile" or "trace")))
+                    throw new ArgumentException("record requires --case <descriptor.json> --profile <verified-profile.json> and optionally --trace <temp-path.jsonl>.");
+                CaseDescriptor recordDescriptor = CaseDescriptor.Load(recordCase);
+                return TraceRecorder.Run(recordDescriptor, profilePath, options.GetValueOrDefault("trace"));
             }
 
             if (command == "trace-import")
@@ -107,13 +132,17 @@ internal static class Program
 
     private static int Help()
     {
-        Console.WriteLine("QaTelemetry 0.2.0 (standalone development tool)");
+        Console.WriteLine("QaTelemetry " + ExactBuildProfile.ToolVersion + " (standalone development tool)");
+        Console.WriteLine("  audit-build");
+        Console.WriteLine("  marker-guide --case <descriptor.json>");
+        Console.WriteLine("  record --case <descriptor.json> --profile <verified-profile.json> [--trace <temp-path.jsonl>]");
         Console.WriteLine("  verify-case --case <descriptor.json>");
         Console.WriteLine("  attest-runtime");
         Console.WriteLine("  apply-package --case <descriptor.json>");
         Console.WriteLine("  preflight --case <descriptor.json>");
         Console.WriteLine("  trace-import --case <descriptor.json> --trace <trace.jsonl> --summary <summary.json> --summary-sha <summary.sha256>");
-        Console.WriteLine("This build never launches or attaches to a game process. Live telemetry is disabled until runtime and offsets are independently verified.");
+        Console.WriteLine("audit-build reads the locked executable statically. No game process is opened by that command.");
+        Console.WriteLine("marker-guide opens only the exact QA process with query/read-only rights after package/runtime preflight.");
         return 0;
     }
 

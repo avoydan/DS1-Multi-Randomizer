@@ -12,12 +12,20 @@ public static class ProcessAccessPolicy
     public const uint QueryLimitedInformation = 0x1000;
     public const uint VirtualMemoryRead = 0x0010;
     public const uint AllowlistedReadOnlyRights = QueryLimitedInformation | VirtualMemoryRead;
-    public const uint RightsRequestedByThisBuild = 0;
+    public const uint PreflightRightsRequested = 0;
+    public const uint LiveReaderRightsRequested = AllowlistedReadOnlyRights;
 
     public static void Validate(uint requested)
     {
         if ((requested & ~AllowlistedReadOnlyRights) != 0)
             throw new UnauthorizedAccessException("Process access mask exceeds the query/read-only allowlist.");
+    }
+
+    public static void RequireExactLiveRights(uint requested)
+    {
+        Validate(requested);
+        if (requested != LiveReaderRightsRequested)
+            throw new UnauthorizedAccessException("Live telemetry requires exactly query-limited plus read-only memory rights.");
     }
 }
 

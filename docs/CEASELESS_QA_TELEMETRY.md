@@ -53,6 +53,15 @@ The helper fails closed for an unbound or non-approved runtime path, the known S
 
 ## Telemetry implementation and boundaries
 
+**Current implementation status (2026-10-29, QaTelemetry 0.3.0):** The bullets immediately below describe the earlier 0.2.0 preparation checkpoint and are retained as historical context. They are superseded by the 0.3.0 implementation record at the end of this document.
+
+- Exact-build static audit, query/read-only process attachment, candidate map/XYZ/event-flag readers, guided owner marker validation, profile binding/revocation, append-only live JSONL recording, and exact-case shadow import are now implemented in `tools/qa-telemetry/`.
+- The locked executable SHA-256 remains `a45aaa36dd2f6cc151670a639ea5547043cf38ea79ff4178b963c6ed71f98d7b`; package-applied runtime digest remains `5f182859f78f285a89a31a608ea28dc5b1cb069b082aa906637da11aea2873ef`. Exact-build signature anchors have unique static matches, but pointer-chain meaning and all live values remain candidate until the owner completes the marker guide.
+- Static preflight requests no process rights. Live attach requests only query-limited information plus read-only memory (`0x1010`). No process-write/injection API, automatic launch, game input automation, or live process access occurred while building/testing this helper.
+- The marker guide asks for three owner-confirmed maps, stationary/moving coordinates, one known map transition, and independently known false/true flags. It stores a profile under Temp only after all checks pass. A pointer/field validation failure invalidates that profile.
+- The trace sampler continues during owner prompts. Checkpoint keys annotate only owner-reported arrival; outcome values require explicit yes/no answers. Death, warp, loading, and sampling gaps can be marked. The importer keeps synthetic and unverified data at UNKNOWN certainty and can only classify the exact pinned package after all route requirements pass.
+- No runtime observations, marker profile, or gameplay trace have been produced. Owner marker validation is the next gate; Ceaseless gameplay must wait for that gate.
+
 Standalone tool: `tools/qa-telemetry`, version `0.2.0`, .NET 8, BCL-only, no reference to production projects. It is not wired into the desktop app, backend, activation, or release packaging.
 
 - Process rights requested by this build: **none (`0x0000`)**.
@@ -99,8 +108,16 @@ Keep these failures distinct: `NO_EXIT_PROMPT`, `EXIT_NOT_ACTIONABLE`, `TRANSITI
 
 The case descriptor preserves raw Fog seed `3695053466` and the accepted attempt `4`. The corresponding selected V5 settings are: traversable fogs, boss fogs, area warps, scaling, and DLC enabled; Major/Minor PvP, Lordvessel gates, random start, disconnected fogs, glitched logic, and Lord Souls requirement disabled; pacifist mode disabled. These are ready to map to the pinned FogMod settings for a later single-seed comparison. No upstream FogMod run was performed, and no topology parity is claimed.
 
-## Tests and remaining action
+## Tests and remaining action (historical 0.2.0 checkpoint)
 
 Release build passed with 0 warnings and 0 errors; the focused helper suite passed 30/30. The actual certified package passed `verify-case`, and the final runtime preflight passed as `QA_RUNTIME_COMPLETE`. The updated launcher was smoke-tested against that preflight and remains preflight-only. No FogReconstruction or production suite was needed because production code was not changed.
 
 The runtime-preparation blocker is resolved. Remaining work before telemetry-backed gameplay is to derive and independently validate markers against this exact executable, then implement/review a read-only process reader and ordered live-trace path. No marker offset or gameplay result has been fabricated. Do not treat `QA_RUNTIME_COMPLETE` as a gameplay pass or use the telemetry helper to claim a verified route.
+
+## Current 0.3.0 implementation result
+
+The standalone tool is now version 0.3.0. Release build succeeded with 0 warnings/errors. The offline self-test console passed 48/48 after the exact-build process/profile/trace changes; it includes source-level absence checks for every requested process-write and injection API. No DSR process was launched or attached during verification.
+
+The exact executable audit scans both `.text` sections and requires one match per candidate signature plus a `.data`/`.bss` target. The flag reader reports candidate event flag 11410410 at candidate byte offset `0x3c30`, mask `0x20`. Player XYZ and current map use candidate pointer chains; the map candidate is an OnlineAreaID, not yet a canonical map identity. These signals become usable only after the owner guide independently confirms map locations, movement, a known transition, and known false/true flag states.
+
+The launcher now checks package identity, package-applied runtime, and the exact-build audit before entering marker validation. It does not launch Steam or DSR. Passing a verified profile path as its first argument selects trace mode. Marker validation and trace recording are read-only and remain a future owner action. Production validator, generation behavior, retry limits, V1-V5 semantics, baseline tag, and game files were not changed.

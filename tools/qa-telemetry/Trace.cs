@@ -17,12 +17,37 @@ public sealed class TraceSessionWriter : IDisposable
     private readonly string _sessionId;
     private long _sequence;
     private bool _completed;
+    private readonly TraceRecord _header;
+    private readonly VerifiedProcessIdentity? _liveIdentity;
+    private readonly string? _profilePath;
+    private readonly string? _profileSha256;
+    private readonly MarkerProfileDocument? _profile;
+    private readonly string _runtimeDigest;
 
     public TraceSessionWriter(CaseDescriptor descriptor, string tracePath, string sessionId, string provenance = "SYNTHETIC")
+        : this(descriptor, tracePath, sessionId, RequireSynthetic(provenance)) { }
+
+    internal static TraceSessionWriter CreateLive(CaseDescriptor descriptor, string tracePath, string sessionId,
+        string markerProfilePath, VerifiedProcessIdentity identity, string runtimeDigest)
     {
         descriptor.Validate();
-        if (provenance != "SYNTHETIC")
-            throw new NotSupportedException("No verified read-only memory reader or offset profile is available; this build can write synthetic tests only.");
+        if (!string.Equals(SafePaths.NormalizeFullPath(descriptor.Runtime!.ExecutablePath!), ExactBuildProfile.ExpectedExecutablePath, StringComparison.OrdinalIgnoreCase))
+            throw new QaTelemetryException("QA_PROCESS_PATH_MISMATCH", "Live trace requires the exact locked isolated QA executable path.");
+        if (!string.Equals(runtimeDigest, ExactBuildProfile.ExpectedRuntimeDigest, StringComparison.OrdinalIgnoreCase))
+            throw new QaTelemetryException("QA_RUNTIME_IDENTITY_MISMATCH", "Live trace requires the exact locked package-applied runtime digest.");
+        VerifiedProcessIdentity verifiedIdentity = ProcessIdentityPolicy.Verify(identity.ProcessId, identity.ImagePath,
+            descriptor.Runtime!.ExecutablePath!, identity.ImageSha256, descriptor.Runtime.ExecutableSha256!, identity.CreatedUtc);
+        MarkerProfileCheck profile = MarkerProfileStore.LoadVerified(markerProfilePath,
+            descriptor.Runtime!.ExecutableSha256!, runtimeDigest, ExactBuildProfile.ToolVersion, ExactBuildProfile.DefinitionSha256);
+        if (!profile.Ok || profile.Profile is null || profile.ProfileSha256 is null)
+            throw new QaTelemetryException(profile.Code, profile.Message);
+        return new TraceSessionWriter(descriptor, tracePath, sessionId,
+            new LiveTraceBinding(markerProfilePath, profile.ProfileSha256, profile.Profile, verifiedIdentity, runtimeDigest));
+    }
+
+    private TraceSessionWriter(CaseDescriptor descriptor, string tracePath, string sessionId, LiveTraceBinding? live)
+    {
+        descriptor.Validate();
         if (string.IsNullOrWhiteSpace(sessionId) || sessionId.Length > 80 || sessionId.Any(c => !(char.IsAsciiLetterOrDigit(c) || c is '-' or '_')))
             throw new ArgumentException("Session id must be a short ASCII identifier.", nameof(sessionId));
         SafePaths.RejectSteamPath(tracePath);
@@ -35,8 +60,13 @@ public sealed class TraceSessionWriter : IDisposable
         _descriptor = descriptor;
         _tracePath = full;
         _sessionId = sessionId;
+        _liveIdentity = live?.Identity;
+        _profilePath = live?.ProfilePath;
+        _profileSha256 = live?.ProfileSha256;
+        _profile = live?.Profile;
+        _runtimeDigest = live?.RuntimeDigest ?? "";
         _stream = new FileStream(full, FileMode.CreateNew, FileAccess.Write, FileShare.Read, 16 * 1024, FileOptions.WriteThrough);
-        WriteLine(new TraceRecord
+        _header = new TraceRecord
         {
             Type = "header",
             SchemaVersion = 1,
@@ -46,22 +76,37 @@ public sealed class TraceSessionWriter : IDisposable
             ExecutableSha256 = descriptor.Runtime!.ExecutableSha256!,
             PackageTreeSha256 = descriptor.Package!.TreeSha256!,
             RunManifestSha256 = descriptor.Package.RunManifestSha256!,
-            Provenance = "SYNTHETIC",
-            TelemetryStatus = "UNVERIFIED",
-            ProfileSha256 = null,
+            Provenance = live is null ? "SYNTHETIC" : "READ_ONLY_GAME_TELEMETRY",
+            TelemetryStatus = live is null ? "UNVERIFIED" : "VERIFIED",
+            ProfileSha256 = live?.ProfileSha256,
+            ProfilePath = live?.ProfilePath,
+            RuntimeDigest = live?.RuntimeDigest ?? "",
+            ToolVersion = ExactBuildProfile.ToolVersion,
+            ObservedExecutablePath = live?.Identity.ImagePath,
+            ProcessId = live?.Identity.ProcessId,
+            ProcessCreatedUtc = live?.Identity.CreatedUtc.ToString("O"),
+            ProcessRightsRequested = live is null ? ProcessAccessPolicy.PreflightRightsRequested : ReadOnlyGameProcess.ExactReadRights,
             ObservationStatus = "UNVERIFIED",
             Confidence = "TEST_FIXTURE_ONLY"
-        });
+        };
+        if (live is not null)
+        {
+            _header.Confidence = "OWNER_MARKER_PROFILE_VERIFIED";
+            _header.ObservationStatus = "VERIFIED";
+        }
+        WriteLine(_header);
     }
 
     public void Append(TraceRecord observation)
     {
         ObjectDisposedException.ThrowIf(_completed, this);
         if (observation.Type != "observation") throw new InvalidDataException("Only observation records may follow the trace header.");
-        if (!_descriptor.ExpectedRoute!.Checkpoints.Contains(observation.Checkpoint, StringComparer.Ordinal))
+        if (observation.Checkpoint is not null && !_descriptor.ExpectedRoute!.Checkpoints.Contains(observation.Checkpoint, StringComparer.Ordinal))
             throw new InvalidDataException("Unknown Ceaseless checkpoint: " + observation.Checkpoint);
-        if (observation.Provenance is not ("" or "SYNTHETIC") || observation.TelemetryStatus != "UNVERIFIED")
-            throw new InvalidDataException("This build only accepts synthetic, unverified observations.");
+        if (_liveIdentity is null && (observation.Provenance is not ("" or "SYNTHETIC") || observation.TelemetryStatus != "UNVERIFIED"))
+            throw new InvalidDataException("Synthetic writer cannot accept live or verified observations.");
+        if (_liveIdentity is not null && (observation.Provenance is not ("" or "READ_ONLY_GAME_TELEMETRY") || observation.TelemetryStatus is not ("" or "VERIFIED")))
+            throw new InvalidDataException("Live writer accepts only verified observations from its bound profile.");
         observation.SchemaVersion = 1;
         observation.SessionId = _sessionId;
         observation.Sequence = ++_sequence;
@@ -69,10 +114,41 @@ public sealed class TraceSessionWriter : IDisposable
         observation.ExecutableSha256 = _descriptor.Runtime!.ExecutableSha256!;
         observation.PackageTreeSha256 = _descriptor.Package!.TreeSha256!;
         observation.RunManifestSha256 = _descriptor.Package.RunManifestSha256!;
-        observation.Provenance = "SYNTHETIC";
-        observation.TelemetryStatus = "UNVERIFIED";
-        observation.ObservationStatus = "UNVERIFIED";
-        observation.ProfileSha256 = null;
+        observation.Provenance = _liveIdentity is null ? "SYNTHETIC" : "READ_ONLY_GAME_TELEMETRY";
+        observation.TelemetryStatus = _liveIdentity is null ? "UNVERIFIED" : "VERIFIED";
+        observation.ObservationStatus = _liveIdentity is null ? "UNVERIFIED" : "VERIFIED";
+        observation.ProfileSha256 = _profileSha256;
+        observation.ProfilePath = _profilePath;
+        observation.RuntimeDigest = _runtimeDigest;
+        observation.ToolVersion = ExactBuildProfile.ToolVersion;
+        observation.ObservedExecutablePath = _liveIdentity?.ImagePath;
+        observation.ProcessId = _liveIdentity?.ProcessId;
+        observation.ProcessCreatedUtc = _liveIdentity?.CreatedUtc.ToString("O");
+        observation.ProcessRightsRequested = _liveIdentity is null ? ProcessAccessPolicy.PreflightRightsRequested : ReadOnlyGameProcess.ExactReadRights;
+        if (_liveIdentity is null)
+        {
+            observation.MapTrust = "UNAVAILABLE";
+            observation.PositionTrust = "UNAVAILABLE";
+            observation.EventFlagTrust = "UNAVAILABLE";
+            observation.TransitionTrust = "UNAVAILABLE";
+        }
+        else
+        {
+            if (observation.CandidateMapAreaId is int areaId && _profile!.OwnerConfirmedMapAreaIds.FirstOrDefault(entry => entry.Value == areaId) is { Key.Length: > 0 } mapAlias)
+            {
+                observation.MapTrust = "SESSION_VERIFIED";
+                observation.ObservedMapId = mapAlias.Key;
+            }
+            else observation.MapTrust = observation.CandidateMapAreaId.HasValue ? "CANDIDATE_UNVERIFIED" : "UNAVAILABLE";
+            observation.PositionTrust = observation.PlayerX.HasValue && observation.PlayerY.HasValue && observation.PlayerZ.HasValue ? "SESSION_VERIFIED" : "UNAVAILABLE";
+            observation.EventFlagTrust = observation.EventFlag11410410.HasValue ? "SESSION_VERIFIED" : "UNAVAILABLE";
+            int[] verifiedAreas = _profile!.OwnerConfirmedMapAreaIds.Values
+                .Concat([_profile.Validation!.TransitionFromAreaId!.Value, _profile.Validation.TransitionToAreaId!.Value])
+                .Distinct().ToArray();
+            bool transitionKnown = observation.TransitionFromAreaId.HasValue && observation.TransitionToAreaId.HasValue &&
+                verifiedAreas.Contains(observation.TransitionFromAreaId.Value) && verifiedAreas.Contains(observation.TransitionToAreaId.Value);
+            observation.TransitionTrust = transitionKnown ? "SESSION_VERIFIED" : observation.TransitionFromAreaId.HasValue ? "CANDIDATE_UNVERIFIED" : "UNAVAILABLE";
+        }
         WriteLine(observation);
     }
 
@@ -82,7 +158,20 @@ public sealed class TraceSessionWriter : IDisposable
         _stream.Flush(flushToDisk: true);
         _stream.Dispose();
         string traceHash = SafePaths.HashFile(_tracePath);
-        var summary = new TraceSummary { SessionId = _sessionId, RecordCount = checked((int)_sequence + 1), TraceSha256 = traceHash, Completed = true };
+        var summary = new TraceSummary
+        {
+            SessionId = _sessionId,
+            RecordCount = checked((int)_sequence + 1),
+            TraceSha256 = traceHash,
+            ExecutableSha256 = _header.ExecutableSha256,
+            RuntimeDigest = _runtimeDigest,
+            PackageTreeSha256 = _header.PackageTreeSha256,
+            RunManifestSha256 = _header.RunManifestSha256,
+            ProfileSha256 = _profileSha256,
+            StartUtc = _header.TimestampUtc,
+            EndUtc = DateTimeOffset.UtcNow.ToString("O"),
+            Completed = true
+        };
         string summaryPath = _tracePath + ".summary.json";
         string summaryShaPath = _tracePath + ".summary.sha256";
         WriteNew(summaryPath, JsonSerializer.SerializeToUtf8Bytes(summary, CaseDescriptor.JsonOptions));
@@ -112,6 +201,15 @@ public sealed class TraceSessionWriter : IDisposable
         using var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.Read, 4096, FileOptions.WriteThrough);
         stream.Write(data);
         stream.Flush(flushToDisk: true);
+    }
+
+    private sealed record LiveTraceBinding(string ProfilePath, string ProfileSha256, MarkerProfileDocument Profile, VerifiedProcessIdentity Identity, string RuntimeDigest);
+
+    private static LiveTraceBinding? RequireSynthetic(string provenance)
+    {
+        if (provenance != "SYNTHETIC")
+            throw new NotSupportedException("Live recording requires a verified owner marker profile and verified process identity.");
+        return null;
     }
 }
 
@@ -169,11 +267,33 @@ public static class TraceImporter
             throw new InvalidDataException("Synthetic records cannot claim verified telemetry.");
         if (header.Provenance == "SYNTHETIC" && header.ProfileSha256 is not null)
             throw new InvalidDataException("Synthetic traces cannot name a telemetry profile.");
+        if (header.Provenance == "READ_ONLY_GAME_TELEMETRY" && header.TelemetryStatus == "UNVERIFIED" &&
+            (header.ProfileSha256 is not null || header.ProfilePath is not null))
+            throw new InvalidDataException("Unverified live telemetry cannot claim a marker profile.");
+        if (header.Provenance == "READ_ONLY_GAME_TELEMETRY")
+        {
+            if (header.ProcessRightsRequested != ReadOnlyGameProcess.ExactReadRights)
+                throw new InvalidDataException("Live telemetry header does not declare the exact query/read-only rights mask.");
+            ProcessAccessPolicy.Validate(header.ProcessRightsRequested);
+        }
         if (header.TelemetryStatus == "VERIFIED")
         {
             SafePaths.RequireSha256(header.ProfileSha256, "verified telemetry profile");
+            if (header.Provenance != "READ_ONLY_GAME_TELEMETRY" || string.IsNullOrWhiteSpace(header.ProfilePath) ||
+                header.RuntimeDigest != ExactBuildProfile.ExpectedRuntimeDigest || header.ToolVersion != ExactBuildProfile.ToolVersion ||
+                header.ProcessRightsRequested != ReadOnlyGameProcess.ExactReadRights)
+                throw new InvalidDataException("Verified telemetry header lacks the exact runtime, tool, or profile binding.");
+            MarkerProfileCheck profile = MarkerProfileStore.LoadVerified(header.ProfilePath,
+                descriptor.Runtime!.ExecutableSha256!, header.RuntimeDigest, header.ToolVersion, ExactBuildProfile.DefinitionSha256);
+            if (!profile.Ok || profile.Profile is null || !FixedEquals(profile.ProfileSha256!, header.ProfileSha256!))
+                throw new InvalidDataException("Trace marker profile is missing, corrupt, or does not match its recorded hash: " + profile.Message);
+            if (!FixedEquals(summary.ExecutableSha256, header.ExecutableSha256) || !FixedEquals(summary.RuntimeDigest, header.RuntimeDigest) ||
+                !FixedEquals(summary.PackageTreeSha256, header.PackageTreeSha256) || !FixedEquals(summary.RunManifestSha256, header.RunManifestSha256) ||
+                !FixedEquals(summary.ProfileSha256!, header.ProfileSha256!) || summary.StartUtc != header.TimestampUtc)
+                throw new InvalidDataException("Trace summary linkage does not match its session header.");
         }
         DateTimeOffset previousTimestamp = ParseUtc(header.TimestampUtc);
+        DateTimeOffset? previousSampleTimestamp = null;
         if (header.Provenance == "READ_ONLY_GAME_TELEMETRY") ValidateProcessIdentity(descriptor, header);
         if (!MatchesCase(descriptor, header)) throw new InvalidDataException("Trace identity does not match the selected QA case.");
 
@@ -184,12 +304,35 @@ public static class TraceImporter
                 throw new InvalidDataException("Trace sequence or session continuity check failed.");
             if (record.Provenance != header.Provenance || record.TelemetryStatus != header.TelemetryStatus || !MatchesCase(descriptor, record))
                 throw new InvalidDataException("Trace contains mixed provenance, status, or case identities.");
+            if (record.RuntimeDigest != header.RuntimeDigest || record.ToolVersion != header.ToolVersion ||
+                !string.Equals(record.ProfilePath, header.ProfilePath, StringComparison.OrdinalIgnoreCase) ||
+                record.ProcessRightsRequested != header.ProcessRightsRequested)
+                throw new InvalidDataException("Trace runtime, tool, or marker-profile linkage changed within the session.");
             if (!string.Equals(record.ProfileSha256, header.ProfileSha256, StringComparison.OrdinalIgnoreCase))
                 throw new InvalidDataException("Telemetry profile identity changed within the session.");
             DateTimeOffset timestamp = ParseUtc(record.TimestampUtc);
             if (timestamp < previousTimestamp) throw new InvalidDataException("Trace timestamps are not monotonic.");
             previousTimestamp = timestamp;
-            if (record.Checkpoint is null || !descriptor.ExpectedRoute!.Checkpoints.Contains(record.Checkpoint, StringComparer.Ordinal))
+            bool anyPosition = record.PlayerX.HasValue || record.PlayerY.HasValue || record.PlayerZ.HasValue;
+            bool fullPosition = record.PlayerX.HasValue && record.PlayerY.HasValue && record.PlayerZ.HasValue;
+            if (record.SampleTimestampUtc is not null)
+            {
+                DateTimeOffset sampleTimestamp = ParseUtc(record.SampleTimestampUtc);
+                if (sampleTimestamp > timestamp)
+                    throw new InvalidDataException("Captured sample timestamp is later than its trace record.");
+                if (previousSampleTimestamp.HasValue && sampleTimestamp < previousSampleTimestamp.Value)
+                    throw new InvalidDataException("Captured sample timestamps are not monotonic.");
+                previousSampleTimestamp = sampleTimestamp;
+            }
+            if (record.OwnerAnnotationTimestampUtc is not null)
+            {
+                DateTimeOffset ownerTimestamp = ParseUtc(record.OwnerAnnotationTimestampUtc);
+                if (ownerTimestamp < ParseUtc(header.TimestampUtc) || ownerTimestamp > timestamp || ownerTimestamp > ParseUtc(summary.EndUtc))
+                    throw new InvalidDataException("Owner annotation timestamp falls outside the trace session.");
+            }
+            if (record.OwnerConfirmedCheckpoint == true && record.OwnerAnnotationTimestampUtc is null)
+                throw new InvalidDataException("Owner-confirmed checkpoint lacks its explicit annotation timestamp.");
+            if (record.Checkpoint is not null && !descriptor.ExpectedRoute!.Checkpoints.Contains(record.Checkpoint, StringComparer.Ordinal))
                 throw new InvalidDataException("Trace contains an unknown checkpoint.");
             if (record.ObservationStatus is not ("UNVERIFIED" or "VERIFIED")) throw new InvalidDataException("Unknown observation verification status.");
             if ((header.Provenance == "SYNTHETIC" || header.TelemetryStatus != "VERIFIED") && record.ObservationStatus != "UNVERIFIED")
@@ -200,9 +343,16 @@ public static class TraceImporter
                 if (record.ProcessId != header.ProcessId || record.ProcessCreatedUtc != header.ProcessCreatedUtc ||
                     !string.Equals(record.ObservedExecutablePath, header.ObservedExecutablePath, StringComparison.OrdinalIgnoreCase))
                     throw new InvalidDataException("Process identity changed within a telemetry session.");
+                if (record.MapTrust is not ("UNAVAILABLE" or "CANDIDATE_UNVERIFIED" or "MARKER_VERIFIED" or "SESSION_VERIFIED") ||
+                    record.PositionTrust is not ("UNAVAILABLE" or "CANDIDATE_UNVERIFIED" or "MARKER_VERIFIED" or "SESSION_VERIFIED") ||
+                    record.EventFlagTrust is not ("UNAVAILABLE" or "CANDIDATE_UNVERIFIED" or "MARKER_VERIFIED" or "SESSION_VERIFIED") ||
+                    record.TransitionTrust is not ("UNAVAILABLE" or "CANDIDATE_UNVERIFIED" or "MARKER_VERIFIED" or "SESSION_VERIFIED"))
+                    throw new InvalidDataException("Trace contains an unknown field trust state.");
+                if ((record.CandidateMapAreaId.HasValue && record.MapTrust == "UNAVAILABLE") ||
+                    (fullPosition && record.PositionTrust == "UNAVAILABLE") ||
+                    (record.EventFlag11410410.HasValue && record.EventFlagTrust == "UNAVAILABLE"))
+                    throw new InvalidDataException("Trace has a value whose field trust state is unavailable.");
             }
-            bool anyPosition = record.PlayerX.HasValue || record.PlayerY.HasValue || record.PlayerZ.HasValue;
-            bool fullPosition = record.PlayerX.HasValue && record.PlayerY.HasValue && record.PlayerZ.HasValue;
             if (anyPosition != fullPosition || (fullPosition && (!double.IsFinite(record.PlayerX!.Value) || !double.IsFinite(record.PlayerY!.Value) || !double.IsFinite(record.PlayerZ!.Value))))
                 throw new InvalidDataException("Player position must contain three finite coordinates or be absent.");
         }
@@ -210,9 +360,10 @@ public static class TraceImporter
         if (header.Provenance == "SYNTHETIC")
             return new TraceImportResult("SYNTHETIC_TEST_PASS", false, "Trace structure and hashes are valid; synthetic data can never certify gameplay.", UnknownEdges(descriptor), records.Count - 1, traceHash);
 
-        return new TraceImportResult("TELEMETRY_UNVERIFIED", false,
-            "This build verifies trace structure and identity but has no live reader or independent marker-validation rules; gameplay promotion is disabled.",
-            UnknownEdges(descriptor), records.Count - 1, traceHash);
+        if (header.TelemetryStatus != "VERIFIED")
+            return new TraceImportResult("TELEMETRY_UNVERIFIED", false, "Live observations without an exact-build verified marker profile remain untrusted.", UnknownEdges(descriptor), records.Count - 1, traceHash);
+
+        return ShadowRouteClassifier.Classify(descriptor, records, traceHash);
     }
 
     private static bool MatchesCase(CaseDescriptor descriptor, TraceRecord record) =>
@@ -240,6 +391,8 @@ public static class TraceImporter
         SafePaths.EnsureNoReparseAncestors(observed, leafMustExist: true);
         if (!string.Equals(observed, expected, StringComparison.OrdinalIgnoreCase))
             throw new InvalidDataException("Telemetry executable path does not match the locked QA executable.");
+        if (!FixedEquals(SafePaths.HashFile(observed), descriptor.Runtime.ExecutableSha256!))
+            throw new InvalidDataException("Telemetry executable file hash no longer matches the locked exact build.");
         _ = ParseUtc(record.ProcessCreatedUtc);
     }
 

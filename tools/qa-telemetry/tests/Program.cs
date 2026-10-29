@@ -22,9 +22,27 @@ internal static class Program
         Run("unsafe relative manifest path fails", UnsafeManifestPathFails);
         Run("process-rights allowlist contains query/read only", RightsAllowlist);
         Run("process write and operation rights are rejected", RightsRejectWrite);
+        Run("only query and read rights are the live reader mask", LiveRightsMask);
         Run("Steam target path is rejected", SteamPathRejected);
+        Run("wrong process image path is rejected", ProcessImagePathMismatch);
+        Run("wrong process image hash is rejected", ProcessImageHashMismatch);
+        Run("Steam process identity is rejected", ProcessSteamPathRejected);
+        Run("missing exact process fails with actionable code", MissingProcessIdentityRejected);
+        Run("signature scanner rejects zero and multiple matches", SignatureMatchCountsFailClosed);
+        Run("flag 11410410 resolves to the documented candidate bit", CeaselessFlagCandidateBit);
+        Run("invalid pointer chain fails closed", InvalidPointerRejected);
+        Run("NaN and implausible coordinates fail sanity checks", CoordinateSanityRejected);
+        Run("invalid candidate map identity fails closed", CandidateMapIdentityRejected);
+        Run("invalid event flag bank is rejected", InvalidEventFlagIndexRejected);
+        Run("corrupt marker profile fails closed", CorruptMarkerProfileRejected);
+        Run("marker profile for another executable is rejected", MarkerProfileExecutableMismatch);
+        Run("marker profile for another runtime is rejected", MarkerProfileRuntimeMismatch);
+        Run("marker profile for changed signatures is rejected", MarkerProfileSignatureMismatch);
+        Run("pointer failure invalidates the marker profile", MarkerProfileInvalidation);
+        Run("production telemetry source contains no process-write or injection API", ProcessWriteApiAudit);
         Run("trace output outside Temp is rejected", TraceOutsideTempRejected);
         Run("QA runtime without manifest binding fails closed", RuntimeMissingManifestBinding);
+        Run("clean runtime cannot be used as the package-applied process target", CleanRuntimeRejectedForLiveTarget);
         Run("clean runtime manifest attests exact copied tree and QA subset", CleanRuntimeManifestRoundTrip);
         Run("package applies only to a separate runtime copy and preflight verifies it", PackageAppliedRuntimePreflight);
         Run("runtime tree mutation fails its manifest", RuntimeTreeMutationRejected);
@@ -102,7 +120,7 @@ internal static class Program
     private static void RightsAllowlist()
     {
         ProcessAccessPolicy.Validate(ProcessAccessPolicy.AllowlistedReadOnlyRights);
-        Check(ProcessAccessPolicy.RightsRequestedByThisBuild == 0, "This build must not open a process.");
+        Check(ProcessAccessPolicy.PreflightRightsRequested == 0, "Static preflight unexpectedly requests process rights.");
         Check(ProcessAccessPolicy.AllowlistedReadOnlyRights == 0x1010, "Unexpected read-only rights mask.");
     }
 
@@ -112,9 +130,161 @@ internal static class Program
         Throws<UnauthorizedAccessException>(() => ProcessAccessPolicy.Validate(0x1018));
     }
 
+    private static void LiveRightsMask()
+    {
+        ProcessAccessPolicy.Validate(ProcessAccessPolicy.LiveReaderRightsRequested);
+        Check(ProcessAccessPolicy.PreflightRightsRequested == 0, "Static preflight unexpectedly requests process rights.");
+        Check(ProcessAccessPolicy.LiveReaderRightsRequested == 0x1010, "Live telemetry rights must be query-limited plus read-only memory.");
+        Throws<UnauthorizedAccessException>(() => ProcessAccessPolicy.RequireExactLiveRights(ProcessAccessPolicy.QueryLimitedInformation));
+        Throws<UnauthorizedAccessException>(() => ProcessAccessPolicy.RequireExactLiveRights(ProcessAccessPolicy.VirtualMemoryRead));
+    }
+
     private static void SteamPathRejected()
     {
         Throws<InvalidDataException>(() => SafePaths.RejectSteamPath("C:\\Program Files (x86)\\Steam\\steamapps\\common\\DARK SOULS REMASTERED"));
+    }
+
+    private static void ProcessImagePathMismatch()
+    {
+        string expected = Path.Combine(Path.GetTempPath(), "isolated-qa", "DarkSoulsRemastered.exe");
+        QaTelemetryException error = ThrowsAndReturn<QaTelemetryException>(() => ProcessIdentityPolicy.Verify(42,
+            Path.Combine(Path.GetTempPath(), "other", "DarkSoulsRemastered.exe"), expected, new string('a', 64), new string('a', 64), DateTimeOffset.UtcNow));
+        Check(error.Code == "QA_PROCESS_PATH_MISMATCH", "Wrong image path did not use the typed mismatch code.");
+    }
+
+    private static void ProcessImageHashMismatch()
+    {
+        string expected = Path.Combine(Path.GetTempPath(), "isolated-qa", "DarkSoulsRemastered.exe");
+        QaTelemetryException error = ThrowsAndReturn<QaTelemetryException>(() => ProcessIdentityPolicy.Verify(42,
+            expected, expected, new string('a', 64), new string('b', 64), DateTimeOffset.UtcNow));
+        Check(error.Code == "QA_EXECUTABLE_HASH_MISMATCH", "Wrong image hash did not use the typed mismatch code.");
+    }
+
+    private static void ProcessSteamPathRejected()
+    {
+        string steam = @"C:\Program Files (x86)\Steam\steamapps\common\DARK SOULS REMASTERED\DarkSoulsRemastered.exe";
+        QaTelemetryException error = ThrowsAndReturn<QaTelemetryException>(() => ProcessIdentityPolicy.Verify(42,
+            steam, steam, new string('a', 64), new string('a', 64), DateTimeOffset.UtcNow));
+        Check(error.Code == "LIVE_STEAM_RUNTIME_REJECTED", "Steam image path was not explicitly rejected.");
+    }
+
+    private static void MissingProcessIdentityRejected()
+    {
+        QaTelemetryException error = ThrowsAndReturn<QaTelemetryException>(() => ProcessIdentityPolicy.SelectExactlyOne([]));
+        Check(error.Code == "QA_PROCESS_NOT_FOUND", "Missing process did not use an actionable status.");
+        Throws<UnauthorizedAccessException>(() => ProcessAccessPolicy.Validate(0x1020));
+    }
+
+    private static void SignatureMatchCountsFailClosed()
+    {
+        Check(ExactBuildProfile.FindMatches([1, 2, 3], [8]).Length == 0, "Zero-match test fixture was incorrect.");
+        Check(ExactBuildProfile.FindMatches([1, 2, 1, 2], [1, 2]).Length == 2, "Multi-match test fixture was incorrect.");
+    }
+
+    private static void CeaselessFlagCandidateBit()
+    {
+        (int offset, uint mask) = EventFlagAddressing.Resolve(11410410);
+        Check(offset == 0x3c30 && mask == 0x20, $"Candidate flag address changed: offset=0x{offset:X}, mask=0x{mask:X}.");
+    }
+
+    private static void InvalidPointerRejected()
+    {
+        Throws<InvalidDataException>(() => CandidateTelemetryReader.ResolvePointerChain(new ZeroMemory(), 0x100000, 0));
+    }
+
+    private static void CoordinateSanityRejected()
+    {
+        Check(!CandidateTelemetryReader.IsPlausiblePosition(float.NaN, 1, 1), "NaN coordinate was accepted.");
+        Check(!CandidateTelemetryReader.IsPlausiblePosition(100001, 1, 1), "Implausible coordinate was accepted.");
+        Check(CandidateTelemetryReader.IsPlausiblePosition(1, -2, 3), "Plausible finite coordinates were rejected.");
+    }
+
+    private static void CandidateMapIdentityRejected()
+    {
+        Check(!CandidateTelemetryReader.IsPlausibleCandidateAreaId(0), "Unknown/sentinel map identity zero was accepted.");
+        Check(!CandidateTelemetryReader.IsPlausibleCandidateAreaId(-1), "Negative map identity was accepted.");
+        Check(CandidateTelemetryReader.IsPlausibleCandidateAreaId(101), "A plausible candidate area ID was rejected.");
+    }
+
+    private static void InvalidEventFlagIndexRejected()
+    {
+        Throws<InvalidDataException>(() => EventFlagAddressing.Resolve(91410410));
+    }
+
+    private static void CorruptMarkerProfileRejected()
+    {
+        string path = Path.Combine(Path.GetTempPath(), "ds1tr-corrupt-profile-" + Guid.NewGuid().ToString("N") + ".json");
+        try
+        {
+            File.WriteAllText(path, "{}", new UTF8Encoding(false));
+            File.WriteAllText(path + ".sha256", SafePaths.HashFile(path) + "\n", Encoding.ASCII);
+            MarkerProfileCheck result = MarkerProfileStore.LoadVerified(path, ExactBuildProfile.ExpectedExecutableSha256,
+                ExactBuildProfile.ExpectedRuntimeDigest, ExactBuildProfile.ToolVersion, ExactBuildProfile.DefinitionSha256);
+            Check(!result.Ok, "Corrupt marker profile unexpectedly verified.");
+        }
+        finally { TryDelete(path); TryDelete(path + ".sha256"); }
+    }
+
+    private static void MarkerProfileExecutableMismatch()
+    {
+        MarkerProfileDocument profile = ValidMarkerProfile();
+        QaTelemetryException error = ThrowsAndReturn<QaTelemetryException>(() => MarkerProfileStore.Validate(profile,
+            new string('0', 64), ExactBuildProfile.ExpectedRuntimeDigest, ExactBuildProfile.ToolVersion, ExactBuildProfile.DefinitionSha256));
+        Check(error.Code == "MARKER_PROFILE_EXE_MISMATCH", "Wrong executable-bound profile used an unexpected status.");
+    }
+
+    private static void MarkerProfileRuntimeMismatch()
+    {
+        MarkerProfileDocument profile = ValidMarkerProfile();
+        QaTelemetryException error = ThrowsAndReturn<QaTelemetryException>(() => MarkerProfileStore.Validate(profile,
+            ExactBuildProfile.ExpectedExecutableSha256, new string('0', 64), ExactBuildProfile.ToolVersion, ExactBuildProfile.DefinitionSha256));
+        Check(error.Code == "MARKER_PROFILE_RUNTIME_MISMATCH", "Wrong runtime-bound profile used an unexpected status.");
+    }
+
+    private static void MarkerProfileSignatureMismatch()
+    {
+        MarkerProfileDocument profile = ValidMarkerProfile();
+        QaTelemetryException error = ThrowsAndReturn<QaTelemetryException>(() => MarkerProfileStore.Validate(profile,
+            ExactBuildProfile.ExpectedExecutableSha256, ExactBuildProfile.ExpectedRuntimeDigest, ExactBuildProfile.ToolVersion, new string('0', 64)));
+        Check(error.Code == "MARKER_PROFILE_SIGNATURE_MISMATCH", "Changed signature binding used an unexpected status.");
+    }
+
+    private static void MarkerProfileInvalidation()
+    {
+        string path = Path.Combine(Path.GetTempPath(), "ds1tr-invalidated-profile-" + Guid.NewGuid().ToString("N") + ".json");
+        string invalid = path + ".invalid";
+        try
+        {
+            File.WriteAllText(path, "{}", new UTF8Encoding(false));
+            MarkerProfileStore.InvalidateAfterReadFailure(path, "synthetic invalid-pointer test");
+            MarkerProfileCheck result = MarkerProfileStore.LoadVerified(path, ExactBuildProfile.ExpectedExecutableSha256,
+                ExactBuildProfile.ExpectedRuntimeDigest, ExactBuildProfile.ToolVersion, ExactBuildProfile.DefinitionSha256);
+            Check(!result.Ok && result.Message.Contains("invalidated", StringComparison.OrdinalIgnoreCase), "Invalidated profile remained loadable.");
+        }
+        finally { TryDelete(path); TryDelete(invalid); }
+    }
+
+    private static void ProcessWriteApiAudit()
+    {
+        string projectRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../"));
+        string[] forbidden =
+        [
+            string.Concat("WriteProcess", "Memory"), string.Concat("VirtualAlloc", "Ex"),
+            string.Concat("VirtualProtect", "Ex"), string.Concat("CreateRemote", "Thread"),
+            string.Concat("PROCESS_VM_", "WRITE"), string.Concat("PROCESS_VM_", "OPERATION"),
+            string.Concat("DebugActive", "Process"), string.Concat("SetThread", "Context"),
+            string.Concat("NtWriteVirtual", "Memory")
+        ];
+        IEnumerable<string> sources = Directory.EnumerateFiles(projectRoot, "*.cs", SearchOption.AllDirectories)
+            .Where(path => !path.Contains(Path.DirectorySeparatorChar + "tests" + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) &&
+                           !path.Contains(Path.DirectorySeparatorChar + "obj" + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) &&
+                           !path.Contains(Path.DirectorySeparatorChar + "bin" + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase));
+        foreach (string source in sources)
+        {
+            string text = File.ReadAllText(source);
+            foreach (string api in forbidden)
+                Check(!text.Contains(api, StringComparison.OrdinalIgnoreCase), "Forbidden process-write API text found in " + Path.GetFileName(source) + ".");
+        }
     }
 
     private static void TraceOutsideTempRejected()
@@ -130,6 +300,19 @@ internal static class Program
         Check(!result.Ok && result.Code == "QA_RUNTIME_PREFLIGHT_BLOCKED", "Missing runtime attestations did not fail closed.");
         Check(result.Blockers.Any(b => b.StartsWith("QA_RUNTIME_MANIFEST_MISSING", StringComparison.Ordinal)), "Missing runtime attestation was not reported.");
         Check(!result.HasRequiredRuntimeAssets, "Unattested runtime was accepted.");
+    }
+
+    private static void CleanRuntimeRejectedForLiveTarget()
+    {
+        using var f = new Fixture();
+        using var runtime = new RuntimeFixture();
+        _ = runtime.AttestClean();
+        f.Descriptor.Runtime!.RootPath = runtime.Policy.CleanRuntimeRoot;
+        f.Descriptor.Runtime.ExecutablePath = Path.Combine(runtime.Policy.CleanRuntimeRoot, "DarkSoulsRemastered.exe");
+        f.Descriptor.Runtime.ExecutableSha256 = SafePaths.HashFile(f.Descriptor.Runtime.ExecutablePath);
+        RuntimePreflightResult result = RuntimePreflight.Run(f.Descriptor, runtime.Policy);
+        Check(!result.Ok && result.Blockers.Any(blocker => blocker.StartsWith("QA_RUNTIME_PATH_MISMATCH", StringComparison.Ordinal)),
+            "The clean baseline was accepted as the package-applied process target.");
     }
 
     private static void CleanRuntimeManifestRoundTrip()
@@ -326,7 +509,7 @@ internal static class Program
     private static void TelemetryUnverifiedStaysUnknown()
     {
         using var f = new Fixture();
-        var paths = f.WriteHeaderOnlyTrace("unverified-live", "READ_ONLY_GAME_TELEMETRY", "VERIFIED", new string('b', 64));
+        var paths = f.WriteHeaderOnlyTrace("unverified-live", "READ_ONLY_GAME_TELEMETRY", "UNVERIFIED", new string('b', 64));
         TraceImportResult result = TraceImporter.Import(f.Descriptor, paths.Trace, paths.Summary, paths.SummarySha);
         Check(result.Status == "TELEMETRY_UNVERIFIED" && !result.GameplayConfirmed, "Unpinned profile became trusted.");
         Check(result.ShadowEdges.All(e => e.Certainty == "UNKNOWN"), "Unverified trace promoted a shadow edge.");
@@ -381,6 +564,66 @@ internal static class Program
         try { action(); }
         catch (T) { return; }
         throw new InvalidOperationException("Expected exception " + typeof(T).Name + ".");
+    }
+
+    private static T ThrowsAndReturn<T>(Action action) where T : Exception
+    {
+        try { action(); }
+        catch (T error) { return error; }
+        throw new InvalidOperationException("Expected exception " + typeof(T).Name + ".");
+    }
+
+    private static void TryDelete(string path)
+    {
+        try { if (File.Exists(path)) File.Delete(path); } catch { }
+    }
+
+    private static MarkerProfileDocument ValidMarkerProfile()
+    {
+        string now = DateTimeOffset.UtcNow.ToString("O");
+        return new MarkerProfileDocument
+        {
+            ProfileId = "fixture-profile",
+            Status = "VERIFIED",
+            ExecutableSha256 = ExactBuildProfile.ExpectedExecutableSha256,
+            RuntimeDigest = ExactBuildProfile.ExpectedRuntimeDigest,
+            ToolVersion = ExactBuildProfile.ToolVersion,
+            SignatureDefinitionSha256 = ExactBuildProfile.DefinitionSha256,
+            CreatedAtUtc = now,
+            OwnerConfirmedMapAreaIds = new Dictionary<string, int>(StringComparer.Ordinal)
+            {
+                ["Firelink Shrine"] = 101,
+                ["Northern Undead Asylum"] = 102,
+                ["Demon Ruins"] = 150
+            },
+            Validation = new MarkerValidationEvidence
+            {
+                OwnerConfirmedKnownMap = true,
+                StationaryPositionStable = true,
+                StationarySpread = 0.01,
+                PlayerMovementObserved = true,
+                PlayerMovementDistance = 2,
+                KnownTransitionObserved = true,
+                TransitionFromAreaId = 101,
+                TransitionToAreaId = 102,
+                KnownFalseFlagConfirmed = true,
+                KnownFalseFlagId = 11410410,
+                KnownFalseEvidence = "fixture known false",
+                KnownFalseFlagRead = false,
+                KnownTrueFlagConfirmed = true,
+                KnownTrueFlagId = 11000100,
+                KnownTrueEvidence = "fixture known true",
+                KnownTrueFlagRead = true,
+                ProcessId = 1,
+                ProcessCreatedUtc = now,
+                ValidatedAtUtc = now
+            }
+        };
+    }
+
+    private sealed class ZeroMemory : IReadOnlyMemory
+    {
+        public byte[] Read(ulong address, int length) => new byte[length];
     }
 
     private static void Reseal(string tracePath, string summaryPath, string summaryShaPath, string session)
@@ -606,10 +849,14 @@ internal static class Program
                 ExecutableSha256 = Descriptor.Runtime!.ExecutableSha256!,
                 PackageTreeSha256 = Descriptor.Package!.TreeSha256!,
                 RunManifestSha256 = Descriptor.Package.RunManifestSha256!,
-                Provenance = provenance, TelemetryStatus = status, ProfileSha256 = profileSha,
+                Provenance = provenance, TelemetryStatus = status,
+                ProfileSha256 = status == "VERIFIED" ? profileSha : null,
                 ObservedExecutablePath = Descriptor.Runtime.ExecutablePath,
                 ProcessId = provenance == "READ_ONLY_GAME_TELEMETRY" ? 42 : null,
-                ProcessCreatedUtc = provenance == "READ_ONLY_GAME_TELEMETRY" ? DateTimeOffset.UtcNow.ToString("O") : null
+                ProcessCreatedUtc = provenance == "READ_ONLY_GAME_TELEMETRY" ? DateTimeOffset.UtcNow.ToString("O") : null,
+                ProcessRightsRequested = provenance == "READ_ONLY_GAME_TELEMETRY" ? ReadOnlyGameProcess.ExactReadRights : ProcessAccessPolicy.PreflightRightsRequested,
+                RuntimeDigest = provenance == "READ_ONLY_GAME_TELEMETRY" ? ExactBuildProfile.ExpectedRuntimeDigest : "",
+                ToolVersion = ExactBuildProfile.ToolVersion
             };
             File.WriteAllText(trace, JsonSerializer.Serialize(header, TraceFormat.JsonOptions) + "\n", new UTF8Encoding(false));
             string traceHash = SafePaths.HashFile(trace);
