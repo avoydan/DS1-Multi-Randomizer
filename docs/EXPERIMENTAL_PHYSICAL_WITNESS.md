@@ -206,9 +206,11 @@ The accepted Lord-Souls-off case is suitable for an owner gameplay check, but no
 - Combined seed: `8a3d20e4760831c1eccf67c75a417193`
 - Fog attempt: 4; raw Fog seed: `3695053466`
 - Package tree SHA-256: `32f0c2afeff25c9341405989b80ba7dc6a72da1f3e90ecdf90cf37ca2b5f79a9`
+- Run-manifest SHA-256: `e81a504da9c251d9e784eb6708133aa3e98a34cd4df9757d4eee3e259cf7324d`
+- Retained manifest path: `C:\Users\Adam\AppData\Local\Temp\ds1tr-ceaseless-certified-v2-lord-souls-off-05634a7e78b443e6910b317721e86b50\sweep-1-certified-lord-souls-off-1\package\run-manifest.json`
 - Seed Code decode/round-trip: passed; recomputed combined/Fog seeds match the attestation.
 
-Suggested evidence checkpoints: start the fresh world; reach the Ceaseless arena and trigger; defeat Ceaseless; verify the post-defeat fog prompt and crossing; record destination map/player position; then verify a physically traversable route to the lower Demon Ruins/lava route, quit/reload, and repeat the relevant post-defeat checks. A manual PASS would be gameplay evidence for this exact package, not a generalized geometry rule.
+Expected graph transition: after defeating Ceaseless and setting flag 11410410, exit `o4961_0000` is assigned to Demon Ruins Lava; the actual landing position remains unverified. Suggested evidence checkpoints: use a fresh Asylum start (`randomStart=false`); reach the Ceaseless arena and trigger; defeat Ceaseless; verify the post-defeat fog prompt and crossing; record destination map/player position; then verify a physically traversable route to the main Demon Ruins side and lower lava route, quit/reload, and repeat the relevant post-defeat checks. A manual PASS would be gameplay evidence for this exact package, not a generalized geometry rule.
 
 ### Verification and non-changes
 
