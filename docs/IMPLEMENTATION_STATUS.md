@@ -1,3 +1,67 @@
+## Local V5 QA Portable and conservative rerolls (2026-10-31)
+
+This was a local gameplay-QA preparation task, not a release. No further
+ExperimentalPhysicalWitness or QA telemetry work was performed. Production
+V5 generation, the Ceaseless validator, retry limits, and V1-V4 behavior were
+not changed.
+
+- A fresh unsigned internal Portable was built from clean source HEAD
+  `bf9b3afc40d6b823b207e09b94c6d46a2de561ce`, app version `0.39.2`, backend
+  `0.46.4`, FogHost project `0.7.4` / protocol `0.7.3`. Artifact:
+  `apps/desktop/release/DS1-Multi-Randomizer-0.39.2-Portable-x64.exe`,
+  204,934,498 bytes, SHA-256
+  `e245db0baff87bd1781fc9be3afcc32a7b09576e0fe6d18724fb7e83ffc2f994`.
+  The development-mode release verifier passed. No tag or public release was
+  created.
+- Packaging inspection found no QA telemetry, physical-witness, or
+  Fog-reconstruction paths in 347 `app.asar` entries or 98 packaged runtime
+  files. The shipped runtime contains only the allowlisted application and
+  engine tools.
+- The existing accepted owner world was regenerated through the exact
+  packaged FogHost and DsrDataTool against the read-only QA source
+  `C:\Users\Adam\ds1tr-qa\game-inst\DARK SOULS REMASTERED`:
+  `DS1TR1-06NWCQQ3-K1HD8E66-2S3AD5N6-CTHZBKB8-FMSNNQWC-TRVW78NY-040F30XX-F0`.
+  It is `ds1tr-gen-v5`, master seed `13825956`, combined seed
+  `4350ff75872e7612c0096293f9441d17`, Fog attempt 2 / Fog seed `6843`.
+  Fog attempts 0 and 1 were rejected as `FOG_SEED_UNSOLVABLE`; attempt 2
+  succeeded. The generated package contains 73 manifest-listed files; both
+  combined and Fog output hashes verified. Package tree SHA-256:
+  `677e9180d25045da7c826ea11647b5a86c474d0d8563972a5cf0fad83ac5f4e0`;
+  run-manifest SHA-256:
+  `c79a7c0d2c6f3e0a6379e4efd523fc9701a6de9aa78967e8c44a8497fd9c8241`.
+  A deterministic rerun was byte-identical. Activation and restore were
+  exercised only on the temporary reconstruction. The source read set
+  (199 files) was unchanged. No game executable was launched.
+  FogHost and DsrDataTool were invoked from the Portable runtime (SHA-256
+  `1f031f6595181c058dab5f87660d7ef37bc2f8aea4e8855e95909e30cf09cef6` and
+  `a08799c63ebdacb1ff2994db90aeaa8055d387f471d09b0642c19291c7268a8d`).
+  The existing pinned-hash data preparation used a Temp-only cache: 58 files,
+  tree SHA-256
+  `3e660284e7ee941f535597b0e35ba26e9ff5951f96f297bbd3dedda76a37cce2`;
+  neither that cache nor game-derived inputs were bundled into the Portable.
+- **Accepted limitation:** the fixed, conservative V5 post-boss route policy
+  rejects some otherwise generated Fog layouts. A seed can exhaust the
+  existing five Fog attempts with `FOG_RETRIES_EXHAUSTED`; users may need to
+  reroll a master seed or adjust Fog options. This is an intentional
+  false-negative tradeoff, not evidence that the rejected world is safe.
+  The existing `1..1000` study remains 248 accepted / 752 rejected under its
+  specific Triple settings; retry limits and validator were left unchanged.
+- Verification after synchronizing the generated settings inventory:
+  root typecheck passed; desktop tests 137 total (136 passed, 1 skipped); backend
+  tests 615 total (613 passed, 2 skipped); settings-inventory check and the
+  local release verifier passed. QA-tool path scans were empty.
+- Golden compatibility against the exact packaged helper binaries passed 58
+  cases and failed 3. The V3 compact full-triple fixture returns
+  `GENERATION_PROFILE_MISMATCH`; V5 support reproduction still generates but
+  its package digest is `427e847ec48aa665a88e4ae635b33cd309bfeeca62f181ed76ffc1db1663e5ec`
+  instead of the frozen
+  `f43eb1df06649f2ba9df12f720a53767fc06a1f54a49a0fe4b0caad41d2f6a3c`, with
+  differences in `event/common.emevd.dcx`, 17 MapStudio files, and
+  `param/GameParam/GameParam.parambnd.dcx`; the V5 route-search full-triple
+  fixture exhausts Fog retries. Fixtures were not re-recorded. These
+  compatibility failures remain release blockers; the Portable is for local
+  owner QA only.
+
 ## Separate vanilla telemetry calibration and Ceaseless session identity (2026-10-29; QaTelemetry 0.5.0)
 
 - `tools/qa-telemetry` remains standalone .NET 8 and outside product packaging. Its version is **0.5.0**. Production validator, V1-V5 semantics, retries, generation, public version, baseline tag, and certified package are unchanged.

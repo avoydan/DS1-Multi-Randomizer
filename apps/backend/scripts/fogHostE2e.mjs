@@ -53,6 +53,7 @@ function projectVersion(text, label) {
 }
 const fogHostProjectVersion = projectVersion(await readFile(path.join(repoRoot, 'tools', 'fog-host', 'FogHost.csproj'), 'utf8'), 'FogHost');
 const fogReconstructionProjectVersion = projectVersion(await readFile(path.join(repoRoot, 'tools', 'fog-reconstruction', 'FogReconstruction.csproj'), 'utf8'), 'FogReconstruction');
+const selectedFogHostExecutable = path.resolve(process.env.DS1TR_FOG_HOST || defaultFogHostExecutable);
 const hostVersionSource = await readFile(path.join(repoRoot, 'tools', 'fog-host', 'src', 'Program.cs'), 'utf8');
 const hostVersionMatch = hostVersionSource.match(/public const string HostVersion = "([^"]+)";/u);
 if (!hostVersionMatch) throw new Error('Could not resolve FogHost protocol compatibility version from Program.cs.');
@@ -90,7 +91,13 @@ async function listTree(root, relative) {
 
 async function treeInventory(root, relative = '') {
   const files = [];
-  for (const entry of await readdir(path.join(root, relative), { withFileTypes: true })) {
+  let entries;
+  try { entries = await readdir(path.join(root, relative), { withFileTypes: true }); }
+  catch (error) {
+    if (error?.code === 'ENOENT') return files;
+    throw error;
+  }
+  for (const entry of entries) {
     const child = relative ? `${relative}/${entry.name}` : entry.name;
     const target = path.join(root, child);
     if (entry.isDirectory()) files.push(...await treeInventory(root, child));
@@ -119,8 +126,20 @@ async function attestRun(name, result, workspace, runConfig, diagnostics = null)
   const slug = name.replace(/[^A-Za-z0-9._-]/gu, '_');
   const caseDirectory = path.join(attestationDirectory, slug);
   await mkdir(caseDirectory, { recursive: false });
+  await mkdir(workspace, { recursive: true });
   const workspaceFiles = await treeInventory(workspace);
   const packageFiles = result.ok ? await treeInventory(result.packagePath) : [];
+  const fogDataRoot = process.env.DS1TR_FOG_DATA_ROOT
+    ? path.resolve(process.env.DS1TR_FOG_DATA_ROOT)
+    : path.join(defaultWorldDataCacheRoot(), generationProfile.fogEngine.worldDataId);
+  const fogDataFiles = await treeInventory(fogDataRoot);
+  attestationBase = {
+    ...attestationBase,
+    compactFogDataRoot: fogDataRoot,
+    compactFogDataTreeSha256: inventoryDigest(fogDataFiles),
+    compactFogDataFiles: fogDataFiles,
+  };
+  await writeFile(path.join(attestationDirectory, 'audit.json'), `${JSON.stringify(attestationBase, null, 2)}\n`);
   const runManifest = result.ok ? JSON.parse(await readFile(path.join(result.packagePath, 'run-manifest.json'), 'utf8')) : null;
   const fogAttemptLogs = [];
   for (const directory of await readdir(workspace).catch(() => [])) {
@@ -412,8 +431,8 @@ try {
       fogHostHostVersion,
       fogHostCompatibleVersions: generationProfile.fogEngine.hostVersions,
       fogReconstructionProjectVersion,
-      hostExecutable: defaultFogHostExecutable,
-      hostExecutableSha256: await hashFile(defaultFogHostExecutable),
+      hostExecutable: selectedFogHostExecutable,
+      hostExecutableSha256: await hashFile(selectedFogHostExecutable),
       qaSourceRoot: source,
       qaSourceTreeSha256: inventoryDigest(qaInputFiles),
       qaInputFiles,

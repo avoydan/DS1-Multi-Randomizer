@@ -370,7 +370,7 @@ The view (Basic or Advanced), the language and the help are interface state: the
 * **Seed Code and presets:** part of the world (Seed Code, preset, history); exported and imported.
 * **Neutral value (an old record without the key means this):** `"anywhere"`.
 * **Evidence:** read from the code that does it.
-* **Implemented in (found by search, validated in apps/backend/src/core/configValidation.ts):** `apps/backend/src/core/enemyPlacement.ts`, `engines/combined/vendor/src/core/generator.js`, `engines/combined/vendor/src/core/placement.js`.
+* **Implemented in (found by search, validated in apps/backend/src/core/configValidation.ts):** `apps/backend/src/core/enemyPlacement.ts`, `apps/backend/src/core/generationProfiles.ts`, `engines/combined/vendor/src/core/config.js`.
 
 ### Difficulty matching (`enemies.difficultyMode`)
 
@@ -715,7 +715,7 @@ The view (Basic or Advanced), the language and the help are interface state: the
   * `fogOff`: Turn on Transition and fog randomization to change this option.
 * **Seed Code and presets:** part of the world (Seed Code, preset, history); exported and imported.
 * **Evidence:** read from the code; the exact effect in the game was not observed.
-* **Implemented in (found by search, validated in apps/backend/src/core/configValidation.ts):** `apps/backend/src/adapters/fogHostProcess.ts`, `apps/backend/src/core/configValidation.ts`, `apps/backend/src/core/seedCode.ts`.
+* **Implemented in (found by search, validated in apps/backend/src/core/configValidation.ts):** `tools/fog-host/src/FogCompactV2PvpPolicy.cs`.
 
 ### Minor PvP fog gates (`fog.minorPvp`)
 
@@ -726,7 +726,7 @@ The view (Basic or Advanced), the language and the help are interface state: the
   * `fogOff`: Turn on Transition and fog randomization to change this option.
 * **Seed Code and presets:** part of the world (Seed Code, preset, history); exported and imported.
 * **Evidence:** read from the code; the exact effect in the game was not observed.
-* **Implemented in (found by search, validated in apps/backend/src/core/configValidation.ts):** `apps/backend/src/adapters/fogHostProcess.ts`, `apps/backend/src/core/configValidation.ts`, `apps/backend/src/core/seedCode.ts`.
+* **Implemented in (found by search, validated in apps/backend/src/core/configValidation.ts):** `tools/fog-host/src/FogCompactV2PvpPolicy.cs`.
 
 ### Golden Lordvessel fog gates (`fog.lordvesselGates`)
 
