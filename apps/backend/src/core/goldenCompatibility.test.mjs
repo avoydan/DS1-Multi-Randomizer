@@ -77,11 +77,14 @@ test('the v5 golden fixtures pin the Compact Fog hard-lock reproduction and full
   assert.equal(reproduction.profile, 'ds1tr-gen-v5');
   assert.equal(reproduction.masterSeed, '332055808');
   assert.equal(deriveSeeds(reproduction.masterSeed).fog, 4009337993);
-  assert.deepEqual(reproduction.expected.fogSeeds, [4009337993, 1035824285, 3787474680, 899537058, 31341427]);
-  assert.deepEqual(reproduction.expected.attempts, ['FOG_SEED_UNSOLVABLE', 'FOG_SEED_UNSOLVABLE', 'FOG_SEED_UNSOLVABLE', 'FOG_SEED_UNSOLVABLE', 'success']);
+  // Recorded after the 0.7.3/0.7.4 Compact V2 changes: the same Fog seed now yields a different, validator-accepted layout.
+  assert.deepEqual(reproduction.expected.fogSeeds, [4009337993]);
+  assert.deepEqual(reproduction.expected.attempts, ['success']);
   const fullTriple = v5.cases[1];
-  assert.equal(fullTriple.masterSeed, 'golden-v5-route-search-2');
-  assert.deepEqual(fullTriple.expected.fogSeeds, [2098234880]);
+  assert.equal(fullTriple.masterSeed, 'golden-v5-route-search-7');
+  // Accepted on the fifth (last) Fog attempt after four deterministic FOG_SEED_UNSOLVABLE rejections.
+  assert.deepEqual(fullTriple.expected.fogSeeds, [3755285091, 3373530305, 7572447, 2839939825, 2331940042]);
+  assert.deepEqual(fullTriple.expected.attempts, ['FOG_SEED_UNSOLVABLE', 'FOG_SEED_UNSOLVABLE', 'FOG_SEED_UNSOLVABLE', 'FOG_SEED_UNSOLVABLE', 'success']);
   assert.equal(reproduction.settings.fog.language, 'POLISH');
   assert.equal(reproduction.settings.items.enabled, false);
   assert.equal(reproduction.settings.enemies.enabled, false);

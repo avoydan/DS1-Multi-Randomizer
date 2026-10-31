@@ -1,3 +1,17 @@
+## Release gate: V3/V4 Fog host allow-list and V5 golden refresh (2026-10-31; backend 0.46.5)
+
+Scope: the three golden failures left by the previous local QA handoff. The Ceaseless validator, the five-attempt Fog budget, V1-V4 fixtures and desktop 0.39.2 were not changed. Details and proof: `docs/GENERATION_COMPATIBILITY.md` ("V3/V4 Fog host allow-list", "Pre-release V5 golden refresh").
+
+| Failure | Classification | Resolution |
+|---|---|---|
+| V3 `v3-compact-full-triple`: `GENERATION_PROFILE_MISMATCH` | REAL_PRODUCTION_REGRESSION (compatibility refusal; output unchanged) | `7766d69` replaced the only Compact host (0.6.0) with 0.7.x; v3/v4 allowed only 0.6.0. Added `0.7.3` to the v3 list (v4 shares it) after the frozen v3 golden and an 11-world 0.6.0-vs-0.7.x differential (9 v3, 2 v4) were byte-identical. |
+| V5 `v5-support-reproduction`: digest mismatch | STALE_GOLDEN | Recorded at `daed190`; `15e58e9`, `0992b8e`, `abc6a52` changed the graph afterwards. Same Fog seed `4009337993` now gives a different layout accepted on attempt 0 (Asylum no longer leads into Ceaseless; 11410410 fixed-route check passed). Re-recorded: `f43eb1df…` -> `427e847ec48aa665a88e4ae635b33cd309bfeeca62f181ed76ffc1db1663e5ec`. |
+| V5 `v5-compact-full-triple`: `FOG_RETRIES_EXHAUSTED` | EXPECTED_POLICY_CHANGE | All five attempts rejected by the 11410410 rule on the changed graph. Replaced by accepted master `golden-v5-route-search-7` (four rejections, success on the last attempt, digest `d701bfd3…`). |
+
+The previous Portable's `release-manifest.json` says `workingTreeClean: false` although its provenance commit is `bf9b3af`; it was not treated as current.
+
+Verification (packaged helpers from `apps/desktop/release/runtime` for the golden run, QA DSR source read-only): `goldenCompatibility.mjs verify` 61/61 PASS; root typecheck passes; backend 615 total (613 passed, 2 skipped, 0 failed); desktop 137 total (136 passed, 1 skipped, 0 failed); FogHost Release build 0 warnings/errors and 155/155 tests with data; settings inventory regenerated (source-reference lines only).
+
 ## Local V5 QA Portable and conservative rerolls (2026-10-31)
 
 This was a local gameplay-QA preparation task, not a release. No further

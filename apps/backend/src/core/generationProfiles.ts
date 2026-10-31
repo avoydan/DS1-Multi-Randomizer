@@ -100,7 +100,10 @@ const v3: GenerationProfile = Object.freeze({
   roamingBossFitPolicy: 'legacy-v1',
   fogAnnotationSource: 'compact-v1',
   fogEngine: Object.freeze({
-    hostVersions: Object.freeze(['0.6.0']),
+    // 0.7.3 is the only Compact-capable host the application ships since the V5 host replaced 0.6.0. Its compact-v1 output
+    // was proven byte-identical to 0.6.0 (docs/GENERATION_COMPATIBILITY.md, "V3/V4 Fog host allow-list"); without it every
+    // v3/v4 Seed Code with Fog enabled is refused with GENERATION_PROFILE_MISMATCH.
+    hostVersions: Object.freeze(['0.6.0', '0.7.3']),
     fogModCommit: '6e6dc7886d0f8bcc53c1800d95c9e859d1f2f87f',
     worldDataId: 'compact-runtime-offline-v1',
     compactCatalogVersion: 'ds1tr-compact-full-fog-v1',

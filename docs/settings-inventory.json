@@ -60,8 +60,8 @@
         "validatedIn": "apps/backend/src/core/configValidation.ts",
         "effect": [
           "apps/backend/src/adapters/combinedRandomizerBridge.ts",
-          "apps/backend/src/server.ts",
-          "engines/combined/vendor/src/core/generator.js"
+          "apps/backend/src/core/generationProfiles.ts",
+          "apps/backend/src/server.ts"
         ]
       }
     },
@@ -1055,8 +1055,8 @@
         "validatedIn": "apps/backend/src/core/configValidation.ts",
         "effect": [
           "apps/backend/src/adapters/combinedRandomizerBridge.ts",
-          "apps/backend/src/server.ts",
-          "engines/combined/vendor/src/core/generator.js"
+          "apps/backend/src/core/generationProfiles.ts",
+          "apps/backend/src/server.ts"
         ]
       }
     },
@@ -2575,8 +2575,8 @@
         "validatedIn": "apps/backend/src/core/configValidation.ts",
         "effect": [
           "apps/backend/src/adapters/combinedRandomizerBridge.ts",
-          "apps/backend/src/server.ts",
-          "engines/combined/vendor/src/core/generator.js"
+          "apps/backend/src/core/generationProfiles.ts",
+          "apps/backend/src/server.ts"
         ]
       }
     },

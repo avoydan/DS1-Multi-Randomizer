@@ -38,12 +38,12 @@ test('v1 through v4 keep their frozen behavior while Compact v5 is current for n
   assert.deepEqual(compactLegacy.combinedEngine.randomizerVersions, ['0.5.66']);
   assert.equal(compactLegacy.roamingBossDestinationPolicy, 'safe-handlers-v2');
   assert.equal(compactLegacy.roamingBossFitPolicy, 'legacy-v1');
-  assert.deepEqual(compactLegacy.fogEngine.hostVersions, ['0.6.0']);
+  assert.deepEqual(compactLegacy.fogEngine.hostVersions, ['0.6.0', '0.7.3']);
   assert.equal(compactLegacy.fogAnnotationSource, 'compact-v1');
   assert.deepEqual(current.combinedEngine.randomizerVersions, ['0.5.66']);
   assert.equal(current.roamingBossDestinationPolicy, 'safe-handlers-v2');
   assert.equal(current.roamingBossFitPolicy, 'owner-approved-v1');
-  assert.deepEqual(historicalCurrent.fogEngine.hostVersions, ['0.6.0']);
+  assert.deepEqual(historicalCurrent.fogEngine.hostVersions, ['0.6.0', '0.7.3']);
   assert.equal(historicalCurrent.fogAnnotationSource, 'compact-v1');
   assert.deepEqual(current.fogEngine.hostVersions, ['0.7.3']);
   assert.equal(current.fogAnnotationSource, 'compact-v2');
@@ -93,6 +93,14 @@ test('components outside the profile lists are refused, those inside are accepte
   assert.equal(checkProfileComponents(current, { fogHostVersion: '0.7.3' }), null);
   assert.match(checkProfileComponents(current, { fogHostVersion: '0.7.2' }), /FogHost 0\.7\.2/u);
   assert.match(checkProfileComponents(current, { fogHostVersion: '0.7.0' }), /FogHost 0\.7\.0/u);
+  // v3/v4 Compact Fog runs on the shipped 0.7.3 host (byte-identical to 0.6.0, proven by differential and the v3 golden).
+  for (const id of ['ds1tr-gen-v3', 'ds1tr-gen-v4']) {
+    const compact = resolveGenerationProfile(id);
+    assert.equal(checkProfileComponents(compact, { fogHostVersion: '0.6.0' }), null);
+    assert.equal(checkProfileComponents(compact, { fogHostVersion: '0.7.3' }), null);
+    assert.match(checkProfileComponents(compact, { fogHostVersion: '0.7.2' }), /FogHost 0\.7\.2/u);
+    assert.match(checkProfileComponents(compact, { fogHostVersion: '0.5.0' }), /FogHost 0\.5\.0/u);
+  }
   assert.match(checkProfileComponents(profile, { fogModCommit: 'abc' }), /FogMod abc/u);
   assert.match(checkProfileComponents(profile, { worldDataId: 'other' }), /world data other/u);
 });

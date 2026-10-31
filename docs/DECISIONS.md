@@ -1,5 +1,11 @@
 # Decisions
 
+## V3/V4 Compact Fog runs on the shipped FogHost; V5 goldens refreshed (2026-10-31)
+
+`ds1tr-gen-v3` and `ds1tr-gen-v4` now list FogHost `0.7.3` next to `0.6.0`. The 0.6.0 build no longer ships, so v3/v4 Seed Codes with Fog were refused with `GENERATION_PROFILE_MISMATCH`. Admission is justified only by proof of byte-identical output: the frozen v3 golden and an 11-world differential against a 0.6.0 host built from `eaa8b68` (see `docs/GENERATION_COMPATIBILITY.md`). No profile, catalog or fixture of v1-v4 changed.
+
+The two pre-release V5 goldens were re-recorded because later accepted V5 fixes (`15e58e9`, `0992b8e`, `abc6a52`) legitimately changed the graph a Fog seed produces. The Ceaseless validator and the five-attempt Fog budget are unchanged; a world the conservative validator rejects remains an accepted limitation, and the full-triple golden now uses a deterministic accepted master seed (`golden-v5-route-search-7`) instead of a rejected one.
+
 ## Keep the Ceaseless fixed-route safety gate pending itinerary proof (2026-10-26)
 
 The V5 catalog fingerprint was updated only after a semantic comparison showed that all changes were previously approved boss-fog actionability and Ceaseless route work, with zero unexplained changes, and independent exports reproduced the new value. This reconciles the unpublished profile pin; it does not loosen Fog validation. V1-V4 remain frozen.
