@@ -1,5 +1,11 @@
 # Decisions
 
+## Free cursor helper runs only during a Dark Souls Remastered session; releases come only from the workflow (2026-10-31)
+
+The saved `freeCursorInMenus` preference used to start `GameCursorHelper.exe` at every application start, and the helper installed a global `WH_KEYBOARD_LL` hook before it checked for the game. Electron now only arms a light check (one `tasklist` call every 10 s while the setting is on); it spawns at most one helper per game session when `DarkSoulsRemastered.exe` exists, whether the game was started from the app's Steam button or directly from Steam, and stops it when the game is gone or the setting is off. The helper additionally exits without a hook when the game is not running and runs as one instance per Windows session. This reduces an unnecessary startup hook; it does not make the helper trusted and is not an antivirus remedy.
+
+Public releases are produced only by the `Release (draft)` workflow (hosted build, verification, draft, owner publishes; prerelease by default). v0.39.2 was uploaded by hand from another account and is the one release outside that flow; it is not a precedent. Releases are never replaced: a fix ships as a higher version.
+
 ## V3/V4 Compact Fog runs on the shipped FogHost; V5 goldens refreshed (2026-10-31)
 
 `ds1tr-gen-v3` and `ds1tr-gen-v4` now list FogHost `0.7.3` next to `0.6.0`. The 0.6.0 build no longer ships, so v3/v4 Seed Codes with Fog were refused with `GENERATION_PROFILE_MISMATCH`. Admission is justified only by proof of byte-identical output: the frozen v3 golden and an 11-world differential against a 0.6.0 host built from `eaa8b68` (see `docs/GENERATION_COMPATIBILITY.md`). No profile, catalog or fixture of v1-v4 changed.

@@ -6,6 +6,8 @@ using System.Text;
 internal static class Program
 {
     internal const string TargetProcessName = "DarkSoulsRemastered";
+    /// <summary>One helper per Windows session: a second launch (for example from a newly opened application window) exits at once.</summary>
+    private const string SingleInstanceName = "Local\\DS1MultiRandomizer.GameCursorHelper";
     internal const int WM_KEYDOWN = 0x0100;
     internal const int WM_KEYUP = 0x0101;
     private const int WM_SYSKEYDOWN = 0x0104;
@@ -22,6 +24,11 @@ internal static class Program
         var shortcutText = args.Length > 0 ? args[0] : "F10";
         var ownerPid = args.Length > 1 && int.TryParse(args[1], out var parsedPid) ? parsedPid : 0;
         if (!CursorShortcut.TryParse(shortcutText, out var initialShortcut)) return 2;
+        // The application starts this helper only while the game runs, but the helper does not trust that: the keyboard hook is
+        // installed only for a running game, so a stray launch never leaves a global hook behind.
+        using var instance = new Mutex(true, SingleInstanceName, out var firstInstance);
+        if (!firstInstance) return 0;
+        if (!GameProcessIsRunning()) return 0;
         using var shortcut = new CursorShortcutHook(ownerPid);
         shortcut.SetShortcut(initialShortcut);
         try
