@@ -10,6 +10,17 @@ The workflow stops at a draft. Publish as a **public prerelease** by default; pu
 - [ ] Separate release repository only: secret `RELEASE_REPO_TOKEN` (fine-grained, that repository only, Contents read/write) and variable `RELEASE_REPOSITORY`.
 - [ ] Record the N to N+1 QA from [AUTO_UPDATE.md](AUTO_UPDATE.md), section 11 before calling the updater end-to-end verified.
 
+## Repeatable flow (verified with v0.40.0)
+
+1. Work on the V5 branch and bump the desktop version (SemVer; never reuse a published version or tag). Add `docs/release-notes/vX.Y.Z.md`. One commit with the change.
+2. Local gates: `npm run typecheck`, `npm test -w @ds1tr/backend`, `npm test -w @ds1tr/desktop`, and `goldenCompatibility.mjs verify` on a clean game copy (all PASS). Optional rehearsal: `npm run package:win:github -w @ds1tr/desktop -- --channel=public --unsigned-release`, then `node tools/release/release-verify.mjs --publication --tag vX.Y.Z --manifest apps/desktop/release/release-manifest.json`.
+3. `git push origin <branch>`, then `gh workflow run release.yml --ref <branch> -f version=X.Y.Z -f golden_attestation=<first 7 chars of HEAD> -f create_draft=true`. The workflow runs the tests, packages (public channel, unsigned), verifies and creates a **draft** that targets that commit.
+4. Verify the draft (`gh release download vX.Y.Z`): six assets uploaded by `github-actions[bot]`; `sha256sum -c SHA256SUMS.txt`; `release-manifest-X.Y.Z.json` shows the built commit, `workingTreeClean: true`, `signatureState`; `latest.yml` sha512 equals the Setup's; `Get-AuthenticodeSignature` on both executables.
+5. Publish: `gh release edit vX.Y.Z --draft=false --prerelease` (stable only when explicitly requested; then omit `--prerelease`). The tag is created on the built commit at that moment. Check the page lists the six assets and is marked Pre-release.
+6. Record the release (README download link and hash, `docs/IMPLEMENTATION_STATUS.md`) in a later commit; never edit or replace a published release. A bad release is fixed by a higher version.
+
+Never upload files by hand: v0.39.2 was uploaded manually and is the one release outside this flow. An unsigned build is never described as signed; the signing steps in `docs/CODE_SIGNING.md` are still open.
+
 ## Every release
 
 1. [ ] Bump the versions (desktop, and backend/contracts when they changed), update the notes in `docs/IMPLEMENTATION_STATUS.md`; notes file `docs/release-notes/vX.Y.Z.md` (copy the previous one: it opens with the Recommended = Setup / Portable names and one line on each). Commit.
