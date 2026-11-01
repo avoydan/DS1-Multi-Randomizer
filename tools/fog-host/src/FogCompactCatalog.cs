@@ -595,8 +595,9 @@ namespace FogHost
         }
 
         /// <summary>
-        /// The v3 catalog: <see cref="BuildV2"/> with the Asylum start made physically sound. Only the starting hallway's two fixed exits change
-        /// (see <see cref="FogCompactCatalogV3"/>); v2 itself is untouched and keeps its frozen fingerprint.
+        /// The v3 catalog: <see cref="BuildV2"/> with three physically unsound fixed routes corrected: the Asylum starting hallway's two unconditional exits,
+        /// the Lost Izalith lava crossing (Orange Charred Ring) and the Sen's Fortress cage (Cage Key, no bypass to the roof). See
+        /// <see cref="FogCompactCatalogV3"/> and docs/COMPACT_FULL_FOG_V3.md; v2 itself is untouched and keeps its frozen fingerprint.
         /// </summary>
         public static FogCompactCatalogV3 BuildV3(FogDsrFacts facts)
         {
@@ -625,11 +626,84 @@ namespace FogHost
                 || !hallway.To.Any(link => link.Destination.Value == "asylum_outside"))
                 throw new InvalidDataException("Compact Fog v3 must not give the Asylum starting hallway an unconditional exit and must keep its conditioned exterior route.");
 
+            // ---- Lost Izalith lava crossing: the Orange Charred Ring ----------------------------------------------------------------------------
+            // Both entries into the lava segment need the ring (upstream FogMod models exactly this; leaving the segment is free). v1 and v2 chained the
+            // segment into the Demon Ruins list with unconditional routes, although the v2 catalog already declares the ring as "the lava-gate condition".
+            // Where the ring comes from: item lot 2670 is awarded by m14_01 event 11415386 once the whole Centipede Demon encounter (c5200 and its ten
+            // spawn, all on collision h0062B1, the demonruins_centipede Area) is dead; lot 4030 is a dormant relief treasure (no part, start disabled) that
+            // is not an acquisition. The ring is therefore found in demonruins_centipede, which is also fixed-adjacent to demonruins_izalithprelava.
+            const int ringLot = 2670;
+            const long ringAwardEvent = 11415386;
+            if (!facts.ItemLotAwards.Any(award => award.ItemLotId == ringLot && award.EventId == ringAwardEvent
+                && string.Equals(award.EventArchiveName, "m14_01_00_00.emevd.dcx", StringComparison.Ordinal)))
+                throw new InvalidDataException("Compact Fog v3 requires the pristine Demon Ruins event 11415386 to award the Orange Charred Ring lot 2670.");
+            FogCondition ringGate = new FogCondition(FogConditionKind.Atom,
+                Array.AsReadOnly(new[] { FogConditionReference.KeyItem(new FogItemName("orange_charred_ring")) }));
+            FogAreaLink GateLava(FogArea area, FogAreaLink link) =>
+                link.Destination.Value == "demonruins_izalithlava" && link.Condition == null ? link with { Condition = ringGate } : link;
+            areas = areas.Select(area => area.Id.Value == "demonruins_izalith" || area.Id.Value == "demonruins_izalithprelava"
+                ? area with { To = Array.AsReadOnly(area.To.Select(link => GateLava(area, link)).ToArray()) } : area).ToArray();
+
+            // ---- Sen's Fortress cage: the Cage Key, and the cage is a closed room ---------------------------------------------------------------
+            // Upstream FogMod: sens_mid -> sens_cage is a key door (Cage Key), sens_cage has no way out except back, and the key lies in sens_upper
+            // (item lot 1500150 is a treasure on collision h0032B0_0000, an upper-Sen's collision). v1 and v2 chained mid, cage and upper by list order
+            // (AddLocalSequence only skipped a gate pair for CONSECUTIVE names, so the cage let mid and upper bypass their randomizable wall o5153_0000)
+            // and left the door unlocked. v3 locks the door, keeps the way back out, and removes the two links between the cage and the roof.
+            const int cageKeyLot = 1500150;
+            if (!facts.TreasureLots.Any(treasure => treasure.ItemLotId == cageKeyLot && treasure.PartCollisionName == "h0032B0_0000"))
+                throw new InvalidDataException("Compact Fog v3 requires the pristine Sen's Cage Key lot 1500150 to be a treasure on collision h0032B0_0000.");
+            FogCondition cageGate = new FogCondition(FogConditionKind.Atom,
+                Array.AsReadOnly(new[] { FogConditionReference.KeyItem(new FogItemName("cage_key_goods_2003")) }));
+            areas = areas.Select(area =>
+            {
+                if (area.Id.Value == "sens_mid")
+                    return area with { To = Array.AsReadOnly(area.To.Select(link =>
+                        link.Destination.Value == "sens_cage" && link.Condition == null ? link with { Condition = cageGate } : link).ToArray()) };
+                if (area.Id.Value == "sens_cage")
+                    return area with { To = Array.AsReadOnly(area.To.Where(link => link.Destination.Value != "sens_upper").ToArray()) };
+                if (area.Id.Value == "sens_upper")
+                    return area with { To = Array.AsReadOnly(area.To.Where(link => link.Destination.Value != "sens_cage").ToArray()) };
+                return area;
+            }).ToArray();
+
+            FogArea mid = areas.Single(area => area.Id.Value == "sens_mid");
+            FogArea cage = areas.Single(area => area.Id.Value == "sens_cage");
+            FogArea roof = areas.Single(area => area.Id.Value == "sens_upper");
+            FogArea izalith = areas.Single(area => area.Id.Value == "demonruins_izalith");
+            FogArea prelava = areas.Single(area => area.Id.Value == "demonruins_izalithprelava");
+            FogArea lava = areas.Single(area => area.Id.Value == "demonruins_izalithlava");
+            if (!mid.To.Any(link => link.Destination.Value == "sens_cage" && link.Condition == cageGate)
+                || mid.To.Any(link => link.Destination.Value == "sens_cage" && link.Condition == null)
+                || cage.To.Any(link => link.Destination.Value == "sens_upper") || roof.To.Any(link => link.Destination.Value == "sens_cage")
+                || !cage.To.Any(link => link.Destination.Value == "sens_mid"))
+                throw new InvalidDataException("Compact Fog v3 must lock the Sen's cage door, keep the way back to sens_mid and remove every cage link to sens_upper.");
+            if (izalith.To.Any(link => link.Destination.Value == "demonruins_izalithlava" && link.Condition != ringGate)
+                || prelava.To.Any(link => link.Destination.Value == "demonruins_izalithlava" && link.Condition != ringGate)
+                || !izalith.To.Any(link => link.Destination.Value == "demonruins_izalithlava")
+                || !prelava.To.Any(link => link.Destination.Value == "demonruins_izalithlava")
+                || !lava.To.Any(link => link.Destination.Value == "demonruins_izalith") || !lava.To.Any(link => link.Destination.Value == "demonruins_izalithprelava"))
+                throw new InvalidDataException("Compact Fog v3 must gate both lava entries with the Orange Charred Ring and keep both exits from the lava segment free.");
+
+            // ---- where the two keys are found (graph location of an item = the Area of its source lot) --------------------------------------------
+            var keyLotAreas = new Dictionary<int, FogAreaId>
+            {
+                [ringLot] = new FogAreaId("demonruins_centipede"),
+                [cageKeyLot] = new FogAreaId("sens_upper"),
+            };
+            FogLotRowLocation[] lotRows = source.LotRows.Select(row => keyLotAreas.TryGetValue(row.Lot.Value, out FogAreaId area) ? row with { Area = area } : row).ToArray();
+            FogLotLocation[] lotLocations = source.LotLocations.Select(lot => keyLotAreas.TryGetValue(lot.FirstLot.Value, out FogAreaId area) ? lot with { Area = area } : lot).ToArray();
+            if (keyLotAreas.Keys.Any(lot => lotRows.Count(row => row.Lot.Value == lot) != 1))
+                throw new InvalidDataException("Compact Fog v3 requires the Orange Charred Ring and Cage Key source lots in the project lot index.");
+            // The default Area of a RandomOnly key is only used when no lot holds it; keep it where the key is found.
+            FogKeyItem[] keyItems = source.KeyItems.Select(item =>
+                item.Name.Value == "orange_charred_ring" ? item with { DefaultArea = keyLotAreas[ringLot] }
+                : item.Name.Value == "cage_key_goods_2003" ? item with { DefaultArea = keyLotAreas[cageKeyLot] } : item).ToArray();
+
             FogBossCompletionTransition[] bossCompletions = source.BossCompletions
                 .Select(transition => transition with { RequireFixedPostBossRoute = false }).ToArray();
-            var catalog = new FogAnnotationCatalog(areas, source.KeyItems, source.Warps, source.Entrances,
-                source.CustomStarts, source.DefaultCosts, source.Enemies, source.LotLocations,
-                source.DefaultFlagCols, source.WriterSupportEntrances, source.LotRows, bossCompletions);
+            var catalog = new FogAnnotationCatalog(areas, keyItems, source.Warps, source.Entrances,
+                source.CustomStarts, source.DefaultCosts, source.Enemies, lotLocations,
+                source.DefaultFlagCols, source.WriterSupportEntrances, lotRows, bossCompletions);
             return new FogCompactCatalogV3(catalog, v2.Coverage, v2.BossGatedRoutes);
         }
 

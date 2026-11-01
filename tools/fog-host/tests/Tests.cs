@@ -134,6 +134,8 @@ namespace FogHost.Tests
                 if (Environment.GetEnvironmentVariable("DS1TR_COMPACT_DATA_ROOT") != null && Environment.GetEnvironmentVariable("DS1TR_PRISTINE_DSR_ROOT") != null)
                 {
                     Test("v3 catalog seals the Asylum start and retires the Ceaseless post-boss proof; v2 stays frozen", StartReachabilityTest.VerifyV3CatalogSealsTheAsylumStart);
+                    Test("v3 gates the lava crossing with the Orange Charred Ring and closes the Sen's cage; v2 stays frozen; the keys are found where the game puts them", StartReachabilityTest.VerifyV3LavaAndCageCatalog);
+                    Test("on real v3 layouts the lava needs the ring and the cage needs its key and never bypasses to the roof", StartReachabilityTest.VerifyLavaAndCageOnRealLayouts);
                     Test("regression A: the original confirmed hard-lock seed traps the sealed hallway on v1 and reaches the world on v3", StartReachabilityTest.VerifyOriginalHardLockSeed);
                     Test("regression B: the V5 owner smoke Fog seed traps the sealed hallway on v2 and reaches the world on v3", StartReachabilityTest.VerifySmokeSeedStartTrap);
                     Test("regression C: a valid world rejected by the Ceaseless rule is accepted by v6", StartReachabilityTest.VerifyWorldRejectedByCeaselessRuleIsAcceptedByV6);

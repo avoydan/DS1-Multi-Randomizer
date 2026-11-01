@@ -75,8 +75,8 @@ test('v1 through v5 keep their frozen behavior while Compact v6 is current for n
   assert.equal(startReachability.fogAnnotationSource, 'compact-v3');
   assert.deepEqual(startReachability.fogEngine.hostVersions, ['0.7.3'], 'the shipped host keeps its compatibility identifier; v6 is selected by annotation source and catalog');
   assert.equal(startReachability.fogEngine.compactCatalogVersion, 'ds1tr-compact-full-fog-v3');
-  assert.equal(startReachability.fogEngine.compactCatalogFingerprint, 'df7aa8f9db20ac309a57dce26ecdc5691e1e6c45c9fa56920d61cbac002802a8');
-  assert.equal(startReachability.fogEngine.worldDataId, '93da37b479bec09a');
+  assert.equal(startReachability.fogEngine.compactCatalogFingerprint, '6849fb6984144641732fb8a9807c105bb54e06336686ac720734b70d0952df56');
+  assert.equal(startReachability.fogEngine.worldDataId, 'c0474c41b941ed30');
   assert.notEqual(startReachability.fogEngine.compactCatalogFingerprint, current.fogEngine.compactCatalogFingerprint);
   assert.notEqual(startReachability.fogEngine.worldDataId, current.fogEngine.worldDataId);
   assert.equal(startReachability.fogEngine.fogModCommit, current.fogEngine.fogModCommit);

@@ -70,11 +70,12 @@ namespace FogHost.Tests
                 || !v3Hallway.To.Any(link => link.Destination.Value == "asylum_outside" && link.Condition != null))
                 throw new InvalidOperationException("The v3 hallway must have no unconditional exit, no hallway-owned route to Firelink, and a conditioned exterior route.");
 
-            // Every other Area of the v3 catalog is exactly v2's: only the hallway changed.
-            foreach (FogArea area in v3.Catalog.Areas.Where(area => area.Id.Value != Hallway))
+            // Every other Area of the v3 catalog is exactly v2's: only the hallway, the two lava entries and the Sen's cage rooms changed.
+            var changed = new HashSet<string>(StringComparer.Ordinal) { Hallway, "demonruins_izalith", "demonruins_izalithprelava", "sens_mid", "sens_cage", "sens_upper" };
+            foreach (FogArea area in v3.Catalog.Areas.Where(area => !changed.Contains(area.Id.Value)))
             {
                 FogArea before = v2.Catalog.Areas.Single(candidate => candidate.Id == area.Id);
-                if (before.To.Count != area.To.Count) throw new InvalidOperationException($"v3 changed the links of {area.Id.Value}; only the Asylum hallway may change.");
+                if (before.To.Count != area.To.Count) throw new InvalidOperationException($"v3 changed the links of {area.Id.Value}; only the Asylum hallway, the lava entries and the Sen's cage may change.");
             }
 
             // The Ceaseless post-boss route proof is retired for v3: no completion rule asks for it, and the lower route stays an ordinary boss-gated edge.
@@ -85,6 +86,103 @@ namespace FogHost.Tests
                 throw new InvalidOperationException("v3 must keep the Ceaseless completion as an ordinary boss-completion condition.");
             if (!annotations.Areas.Single(area => area.Name == "demonruins").To.Any(link => link.Area == "demonruins_lava" && link.Cond != null && link.Cond.Contains("boss_defeated_11410410", StringComparison.Ordinal)))
                 throw new InvalidOperationException("v3 must keep the main Demon Ruins to lava route gated by Ceaseless completion.");
+        }
+
+        /// <summary>
+        /// The lava crossing and the Sen's cage are physically gated in v3: ring on both lava entries (leaving the lava is free), cage key on the cage door, the
+        /// cage a closed room. v2 keeps its frozen unconditional routes and the cage bypass; the two keys are found where the game puts them.
+        /// </summary>
+        public static void VerifyV3LavaAndCageCatalog()
+        {
+            string dataRoot = RequiredDirectory("DS1TR_COMPACT_DATA_ROOT");
+            string pristineRoot = RequiredDirectory("DS1TR_PRISTINE_DSR_ROOT");
+            FogDsrFacts facts = FogDsrFacts.Read(dataRoot, pristineRoot, includeLegacyAnnotations: false);
+            FogCompactCatalogV2 v2 = FogCompactCatalogBuilder.BuildV2(facts);
+            FogCompactCatalogV3 v3 = FogCompactCatalogBuilder.BuildV3(facts);
+            FogAreaLink Link(FogCompactCatalogV2 catalog, string from, string to) => catalog.Catalog.Areas.Single(area => area.Id.Value == from).To.SingleOrDefault(link => link.Destination.Value == to);
+            FogAreaLink LinkV3(string from, string to) => v3.Catalog.Areas.Single(area => area.Id.Value == from).To.SingleOrDefault(link => link.Destination.Value == to);
+
+            // v2 (profile ds1tr-gen-v5) is frozen: free lava crossing, unlocked cage and the cage bypass between the middle and the roof.
+            foreach ((string from, string to) in new[] { ("demonruins_izalith", "demonruins_izalithlava"), ("demonruins_izalithprelava", "demonruins_izalithlava"), ("sens_mid", "sens_cage"), ("sens_cage", "sens_upper"), ("sens_upper", "sens_cage") })
+                if (Link(v2, from, to)?.Condition != null || Link(v2, from, to) == null)
+                    throw new InvalidOperationException($"The frozen v2 route {from} > {to} must still exist and be unconditional.");
+
+            // v3: both lava entries need the ring, both exits stay free.
+            foreach (string entry in new[] { "demonruins_izalith", "demonruins_izalithprelava" })
+            {
+                FogAreaLink gate = LinkV3(entry, "demonruins_izalithlava");
+                if (gate?.Condition is not { Kind: FogConditionKind.Atom, Terms.Count: 1 } || gate.Condition.Terms[0] != FogConditionReference.KeyItem(new FogItemName("orange_charred_ring")))
+                    throw new InvalidOperationException($"v3 must gate {entry} > demonruins_izalithlava on the Orange Charred Ring.");
+            }
+            if (LinkV3("demonruins_izalithlava", "demonruins_izalith")?.Condition != null || LinkV3("demonruins_izalithlava", "demonruins_izalithprelava")?.Condition != null
+                || LinkV3("demonruins_izalithlava", "demonruins_izalith") == null || LinkV3("demonruins_izalithlava", "demonruins_izalithprelava") == null)
+                throw new InvalidOperationException("Leaving the lava segment must stay free in v3.");
+
+            // v3: the cage door needs the Cage Key, the cage keeps its way back, and no link joins the cage to the roof.
+            FogAreaLink door = LinkV3("sens_mid", "sens_cage");
+            if (door?.Condition is not { Kind: FogConditionKind.Atom, Terms.Count: 1 } || door.Condition.Terms[0] != FogConditionReference.KeyItem(new FogItemName("cage_key_goods_2003")))
+                throw new InvalidOperationException("v3 must lock sens_mid > sens_cage with the Cage Key.");
+            if (LinkV3("sens_cage", "sens_mid") == null || LinkV3("sens_cage", "sens_upper") != null || LinkV3("sens_upper", "sens_cage") != null)
+                throw new InvalidOperationException("v3's cage is a closed room: a way back to sens_mid and no link to sens_upper.");
+
+            // The keys are found where the game puts them: the ring when the Centipede Demon encounter dies (event 11415386, collision h0062B1), the cage key on a roof collision.
+            if (v3.Catalog.LotRows.Single(row => row.Lot.Value == 2670).Area.Value != "demonruins_centipede" || v3.Catalog.LotLocations.Single(lot => lot.FirstLot.Value == 2670).Area.Value != "demonruins_centipede"
+                || v3.Catalog.LotRows.Single(row => row.Lot.Value == 1500150).Area.Value != "sens_upper" || v3.Catalog.LotLocations.Single(lot => lot.FirstLot.Value == 1500150).Area.Value != "sens_upper")
+                throw new InvalidOperationException("v3 must find the Orange Charred Ring in demonruins_centipede and the Cage Key in sens_upper.");
+            if (v2.Catalog.LotRows.Single(row => row.Lot.Value == 2670).Area.Value != "demonruins" || v2.Catalog.LotRows.Single(row => row.Lot.Value == 1500150).Area.Value != "sens")
+                throw new InvalidOperationException("The frozen v2 lot areas must be unchanged.");
+        }
+
+        /// <summary>
+        /// On real v3 layouts: without the ring the lava segment is unreachable, with the ring where the game puts it it is reachable; without the cage key the cage is
+        /// unreachable and the cage never carries the player to the roof (v2 does: the bypass).
+        /// </summary>
+        public static void VerifyLavaAndCageOnRealLayouts()
+        {
+            int ringChecked = 0, cageChecked = 0, v2Bypass = 0;
+            for (uint seed = 1; seed <= 12; seed++)
+            {
+                Connected v3 = Connect("v3", seed, OriginalOptions);
+                string start = v3.Graph.start.Area;
+                string ringArea = v3.Graph.itemAreas["orange_charred_ring"];
+                string cageArea = v3.Graph.itemAreas["cage_key_goods_2003"];
+                if (ringArea != "demonruins_centipede" || cageArea != "sens_upper")
+                    throw new InvalidOperationException($"seed {seed}: the ring must sit in demonruins_centipede and the cage key in sens_upper (found {ringArea} and {cageArea}).");
+
+                // 1 + 2: the ring.
+                if (new GraphChecker().Check(v3.Options, v3.Graph, start).Unvisited.Count != 0)
+                    throw new InvalidOperationException($"seed {seed}: the accepted v3 layout must be completely reachable with the ring.");
+                var withoutRing = WithoutItem(v3, "orange_charred_ring", () => new GraphChecker().Check(v3.Options, v3.Graph, start).Unvisited.ToArray());
+                if (!withoutRing.Contains("demonruins_izalithlava"))
+                    throw new InvalidOperationException($"seed {seed}: the lava segment must not be reachable before the ring.");
+                ringChecked++;
+
+                // 3 + 4: the cage.
+                var withoutKey = WithoutItem(v3, "cage_key_goods_2003", () => new GraphChecker().Check(v3.Options, v3.Graph, start).Unvisited.ToArray());
+                if (!withoutKey.Contains("sens_cage"))
+                    throw new InvalidOperationException($"seed {seed}: the cage must not be reachable without the Cage Key.");
+                // The roof must not be reachable through the cage: forbid every randomized way into it and nothing else.
+                Func<Graph.Edge, bool> noRandomizedWayIntoRoof = edge => edge.IsFixed || edge.To != "sens_upper";
+                var viaCage = new GraphChecker().Check(v3.Options, v3.Graph, start, null, noRandomizedWayIntoRoof);
+                if (viaCage.Records.ContainsKey("sens_upper"))
+                    throw new InvalidOperationException($"seed {seed}: sens_upper must not be reachable through the cage.");
+                cageChecked++;
+
+                Connected v2 = Connect("v2", seed, OriginalOptions);
+                var v2ViaCage = new GraphChecker().Check(v2.Options, v2.Graph, v2.Graph.start.Area, null, noRandomizedWayIntoRoof);
+                if (v2ViaCage.Records.ContainsKey("sens_upper")) v2Bypass++;
+            }
+            if (ringChecked != 12 || cageChecked != 12) throw new InvalidOperationException("The lava and cage checks must run on every sampled layout.");
+            if (v2Bypass == 0) throw new InvalidOperationException("The frozen v2 graph is expected to show the cage bypass to the roof in at least one sampled layout (that is the defect).");
+        }
+
+        private static T WithoutItem<T>(Connected connected, string item, Func<T> check)
+        {
+            var removed = new List<string>();
+            foreach (var node in connected.Graph.graph.Values)
+                if (node.Items.Remove(item)) removed.Add(node.Area);
+            try { return check(); }
+            finally { foreach (string area in removed) connected.Graph.graph[area].Items.Add(item); }
         }
 
         /// <summary>
