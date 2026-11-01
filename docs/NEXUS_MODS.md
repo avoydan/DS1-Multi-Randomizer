@@ -1,147 +1,98 @@
-# Nexus Mods publication draft
+# Nexus Mods release readiness
 
-This is copy-ready page text and a launch checklist. **Do not upload or publish the current executable yet.** Nexus Mods' current [File Submission Guidelines](https://help.nexusmods.com/article/28-file-submission-guidelines) say internet-connected executables that download or send information/files are not allowed unless that network behavior is crucial to the utility, and explicitly say auto-update functionality does not qualify as crucial. The Nexus distribution described here removes application update checks and downloads entirely. It still downloads 40 pinned Fog data files when needed for world randomization; this is a separate data transfer and may still require written staff guidance before hosting a binary. The [Terms of Service](https://help.nexusmods.com/article/18-terms-of-service) also grant Nexus Mods and its partners a broad, transferable license to uploaded content; the owner must review that grant against GPL and upstream component rights before accepting it. The source-code page can be prepared locally; no Nexus account action or Terms acceptance was performed.
+Status as of 2026-11-01 (version 0.40.0). This is a preparation dossier for the owner, not an upload record. **Nothing has been uploaded, published or submitted to Nexus Mods, and no Terms of Service were accepted.** The copy-ready mod page is in [NEXUS_RELEASE_DRAFT.md](NEXUS_RELEASE_DRAFT.md); the gates are in [PUBLICATION_CHECKLIST.md](PUBLICATION_CHECKLIST.md).
 
-The draft description was prepared with AI assistance. Nexus's current categorization identifies AI-assisted/generated mod-page descriptions as **AI Media**; include that tag if this wording or an edited version is posted. Review whether the AI assistance in this task's code change also falls under **AI Assisted** and use that tag if required by Nexus staff. The project has substantial human-led source history and can provide it for review; do not claim the page or code was created without AI assistance.
+Verdict: the **Nexus distribution build** (`npm run package:win:nexus -w @ds1tr/desktop`) is designed to meet Nexus's internet-communication rule: it has no application-update network code path and downloads nothing. Two things still need the owner before upload: written confirmation from Nexus staff is recommended (the rule is discretionary), and the Nexus package has **no CI-built provenance or attestation yet** (see "Open gaps").
 
-## Mod title
+## Sources used (read 2026-11-01)
 
-**DS1 Multi Randomizer**
+Official Nexus help pages: [File Submission Guidelines](https://help.nexusmods.com/article/28-file-submission-guidelines) (page footer: last updated 2026-10-27), [Why has my mod been quarantined?](https://help.nexusmods.com/article/117-why-has-my-mod-been-quarantined) (2026-10-19), [Moderation Policy](https://help.nexusmods.com/article/27-moderation-policy) (2025-07-16), [Terms of Service](https://help.nexusmods.com/article/18-terms-of-service) (2026-05-12), [Best Practices for Mod Authors](https://help.nexusmods.com/article/136-best-practices-for-mod-authors) (2024-08-05; may be outdated). The Nexus Dark Souls Remastered game page and `/about` returned HTTP 403 to the research tool, so **any DSR-specific Nexus rules were not checked**. Policies change: re-read the File Submission Guidelines on the day of upload.
 
-## Short summary
+## Compliance matrix
 
-Create a reproducible Dark Souls Remastered world with randomized items, enemies, bosses, and world transitions using one Windows desktop app and one shareable Seed Code.
+| # | Requirement (Nexus, quoted or paraphrased) | Current project status | Risk | Action |
+|---|---|---|---|---|
+| 1 | Executables: the guidelines do not say whether executables are allowed outright; "Submitted files will be subject to virus scanning"; self-extracting files "will be marked for review"; "Public mod pages should contain only functional mod files, modding tools or modding guides." | A Windows Electron tool (a modding tool). Setup and Portable are NSIS executables; the Portable one self-extracts at each start. | Medium: unsigned executables, self-extracting wrapper, large (about 205 MB) | Upload the Setup as Main; Portable only as Optional (see Files layout). Expect moderation review; do not repack to dodge the scanner. |
+| 2 | Internet: "Files (especially executables) that connect to the internet to download or send information and/or files are prohibited unless where it is crucial for the functioning of the mod/utility. Please note that "auto update" functionality does not qualify as crucial." Authors with a need are told to email support@nexusmods.com with reasoning and source code. | **Nexus build: no outbound traffic by design** (see Network audit). The GitHub build checks GitHub for updates and is **not** the file to upload. | Low for the Nexus build; High if the GitHub build were uploaded by mistake | Upload only a `-Nexus-` named file. Verify `build-info.json` says `"distribution": "nexus"` (checklist). Optionally email staff with the source link (suggested text below). |
+| 3 | Auto-update does not qualify as crucial. | Nexus build: updater not loaded, no `app-update.yml`, no `latest.yml`, timers gated; Updates screen only shows the installed version and (if configured) opens the Nexus page in the browser on a click. | Low | None; keep `DS1TR_NEXUS_PAGE_URL` unset unless the real mod page URL is known. |
+| 4 | Telemetry/analytics/crash reporting: not named; falls under "send information". | None in the code (no analytics/crash-reporter/Sentry calls found). | Low | State it on the page only as far as proven (see below). |
+| 5 | Runtime downloads / external fetching: "connect to the internet to download". | Nexus build: none. GitHub build: legacy-only (see Network audit). Nexus build refuses legacy v1/v2 Fog Seed Codes that need a downloaded cache (`WORLD_DATA_LEGACY_UNAVAILABLE`). | Low | Document the limitation on the page. |
+| 6 | Copyrighted game assets: "User submissions which include copyrighted content, be it game files or images, are prohibited unless proper permission has been granted." ToS: the uploader warrants no infringement of the game owner's copyright and compliance with the game's EULA. | No Dark Souls files, saves or QA data are packaged (Content audit). The tool reads the player's own installed game and writes modified files only on the player's machine. The Fog helper reconstructs its input data locally from the player's own files. | Low-Medium: the tool modifies a copyrighted game; DSR's EULA position on modding is not something this repo can prove | Keep "unofficial, not affiliated" wording. Do not ship screenshots/art that are not your own or properly permitted (game screenshots of gameplay are normally what mod pages show; the owner judges that). Owner reads the ToS upload licence. |
+| 7 | Archive/format: "strongly recommended to use ZIP or 7z"; RAR may cause false positives; no password-protected archives; "we reject any upload that features additional archives inside the mod structure." | Release files are raw `.exe`. | Medium | Upload ZIP files (see Files layout). |
+| 8 | Virus scanning: every file is scanned; a VirusTotal icon is shown on each file; failures are quarantined for moderator review; authors may contact vendors about flags. | Unsigned binaries bundling .NET single-file helpers and Electron: false-positive prone (see ANTIVIRUS_FALSE_POSITIVES.md). | Medium | Expect a possible quarantine; do not disable protection or hide anything; keep SHA-256 and source links ready; follow Nexus's review path (support@nexusmods.com, do not delete the blocked file). |
+| 9 | Required disclosures / description accuracy: descriptions must "accurately reflect the file's nature and functionality"; claims "must be truthful and supported by reasonable evidence". "Files must be presented in good faith and in a functional state with respect to any caveats or requirements that you must detail." | Draft page states the proven limits (Fog/Ceaseless rerolls, no PTDE, unsigned, offline play). | Low | Owner reviews the draft against the final build. Do not claim "safe" or "virus-free". |
+| 10 | AI-generated content: tags **AI-Generated Content** (includes AI-generated code and user interface), **AI Media** (AI mod-page descriptions, thumbnails, promo art) and **AI Assisted** (developer-led code with limited AI involvement, requiring evidence such as version-control history and genuine expertise). "Failure to correctly tag mods, including undisclosed generative AI usage, may be subject to moderation action." | **Applies.** AGENTS.md records that ChatGPT, Codex and Claude work on this repository, and this page copy was drafted with AI. | Medium: wrong or missing tag is a moderation risk | Owner decides the honest tag for the code from how it was actually written (do not choose AI Assisted unless you can meet its evidence requirements; the git history is the evidence). Tag **AI Media** if the AI-drafted description is posted. |
+| 11 | Licensing/credits: "Proper credit to the original author(s) must be given"; credit is no substitute for permission; "Submissions must adhere to the licences and agreements associated with the modified or featured title(s)." | GPL-3.0-only project; vendored `kellernz1/ds-randomizer` (GPL-3.0), FogMod and SoulsIds (Apache-2.0), SoulsFormats (GPL-3.0), YamlDotNet/Newtonsoft.Json/ZstdSharp (MIT). Legacy Python randomizers are behaviour references only, not copied. Notices ship in the package. | Low-Medium: Nexus ToS grants Nexus a broad licence over uploads; combine with GPL obligations | Owner reads ToS upload licence before accepting. Credits are in the draft. Keep a source tag for the exact uploaded version. |
+| 12 | Requirements/dependencies: recommended, not mandatory, to state requirements. | Requires 64-bit Windows and the player's own Dark Souls Remastered (PC). No .NET/Node install needed. | Low | Fill Nexus "Requirements" with Dark Souls Remastered only. |
+| 13 | Multiplayer: "Files that may be disruptive to any persistent multiplayer environment are prohibited." | The tool recommends offline play with modified data; it does not touch network play. | Low-Medium | Keep the offline-play warning prominent. |
+| 14 | Placeholders: "Public placeholders are prohibited." | Not applicable until there is a working file. | Low | Create the page only when uploading a working file. |
 
-## Full description (draft)
+## Network audit (production code, not documentation)
 
-DS1 Multi Randomizer combines item, enemy/boss, and world-transition randomization for Dark Souls Remastered on PC. Choose your options, generate a world from one master seed, and share its Seed Code so another player can reproduce the same settings and world.
+Method: grep of every `fetch`/HTTP/socket/`autoUpdater`/`openExternal`/crash-reporter/analytics use in `apps/desktop`, `apps/backend`, `packages`, the C# helpers and the vendored engine; reading the build metadata gate; a locally built Nexus package; and a 42-second live observation of that package's process tree (TCP and UDP endpoints sampled every 3 s with `autoCheck` setting on).
 
-The app generates files in a separate workspace. It does not change the game until you choose **Apply to game**. It keeps a pristine snapshot for **Restore original game**. Back up important saves before modding and play offline while randomized game data is active.
+**NETWORK BEHAVIOR (Nexus distribution):** none. Only loopback traffic between the window and the local backend (`127.0.0.1`, random port, per-session token) was observed. No update checker, GitHub API client, `electron-updater` or downloader is loaded: `main.ts` creates them only when the immutable build metadata says `distribution: "github"`; a Nexus or unreadable-metadata build gets inert update operations. The package contains no `app-update.yml` and no `latest.yml`. `release-verify.mjs --distribution nexus` checks these facts. The updater code files exist inside `app.asar` but are never loaded. The only deliberate external action is the user clicking a link: the GPL license page (`gnu.org`) and, only if the build was made with `DS1TR_NEXUS_PAGE_URL`, the Nexus page; both open in the default browser, not through the app.
 
-### Features
+**NETWORK BEHAVIOR (GitHub distribution, for comparison):**
 
-- Item and equipment randomization.
-- Ordinary enemy and boss randomization, including configurable placement behavior.
-- Fog/world-transition randomization.
-- One master seed and shareable Seed Codes.
-- Run history, presets, spoiler hint sheet, English and Polish interface.
-- Local generation workspace and a restore path for managed game files.
+| Destination | Purpose | When | Data sent |
+|---|---|---|---|
+| `api.github.com` (repository metadata, `releases/latest`) and the GitHub release asset hosts | Update check; the download only after the user clicks Download | Automatic check unless disabled in Updates; stable releases only for public builds | Ordinary HTTPS metadata: IP address, request time, `User-Agent`; no settings, seeds, saves or game data |
+| `raw.githubusercontent.com/thefifthmatt/FogMod/<pinned commit>/` (40 files, SHA-256 verified) | Legacy Fog data for generation profiles v1/v2 **only** | Only when such a Seed Code is used and the local cache is incomplete | Ordinary HTTPS metadata |
 
-### Requirements
+New worlds use profile v5 (and v3/v4 Seed Codes): their Fog data is reconstructed locally from the player's own game files and nothing is downloaded (`worldData.ts`, covered by `fogPrerequisites.test.mjs`). Earlier project documents said Fog randomization "downloads 40 files when needed"; that is true only for legacy v1/v2 GitHub builds and has been corrected in README and `SECURITY_AND_PRIVACY.md`.
 
-- 64-bit Windows.
-- Your own installed PC copy of Dark Souls Remastered.
-- No separate Node.js or .NET installation is needed for the packaged app.
-- PTDE is not supported by this release.
+**AUTO UPDATE:** GitHub build enabled (on by default, can be turned off, download and install need a click); Nexus build **disabled** (no network path at all).
 
-### Installation
+**USER DATA SENT:** none by the application in either build. Not sent: settings, seeds, run history, saves, game files, support bundles (a support bundle is a local ZIP that the user exports and shares by hand). Not present: telemetry, analytics, accounts, crash reporting.
 
-1. Download the installer from the **Files** section after the Nexus-hosted build is approved for upload.
-2. Run the installer as your normal Windows user. It installs per-user and does not require administrator access.
-3. Start DS1 Multi Randomizer from the Start menu or desktop shortcut.
+Limits of this evidence: the live observation was a 42-second idle sample of connection tables (short-lived connections between samples could be missed) and did not exercise generation; the claim rests mainly on the code review above. Chromium/Electron's own behaviour was not audited beyond the observation. The C# helpers contain no network API usage (searched sources; the only matches were generated implicit-using files).
 
-The installer is the recommended package. The portable build extracts to a temporary directory on each start and may receive more heuristic security warnings. Do not repackage or disable security software to address a warning.
+## Content audit of the packaged Nexus build
 
-### First run
+Inspected `apps/desktop/release/nexus/win-unpacked` (171 files outside `app.asar`, 347 entries inside it; the Setup and Portable are built from this same tree by electron-builder).
 
-1. Confirm the detected Dark Souls Remastered installation path.
-2. Review the default settings or create a preset.
-3. Choose **Randomize** and wait for validation to finish.
-4. Back up important saves, then choose **Apply to game** when you are ready.
-5. Launch the game and play offline while randomized data is active.
+- **Game content: none found.** No file with a Dark Souls container extension (`.dcx .bnd .bhd .bdt .msb .emevd .esd .tpf .flver .param .msgbnd ...`) outside Chromium's `icudtl.dat` (an ICU text-data file), none in `app.asar`. No DSR executable, save, QA runtime or telemetry-tool file. `runtime/engines/combined/vendor` contains JavaScript only (generation logic and a 4 KB `prototype-data.js`). The five project executables are `DS1 Multi Randomizer.exe` (Electron), `DsrDataTool.exe`, two `FogHost.exe` builds and `GameCursorHelper.exe`; `DsrDataTool` and `FogHost` read the player's own game files at run time. FogMod's own `dist/` data (partly FromSoftware-derived, edited by its author) is **not** bundled; see [FOG_DATA_PROVENANCE.md](FOG_DATA_PROVENANCE.md). The package carries SHA-256 manifests and provenance notes, not game bytes.
+- **Project code and data vs FromSoftware content:** everything in the package is project code, third-party software (Electron/Chromium, .NET single-file runtime, npm/NuGet components) or notices. The only FromSoftware-derived artefacts are what the tool *writes into the player's own game folder* at Apply time; they are never in the installer.
+- **Secrets:** pattern scan for GitHub/AWS/Slack tokens and private-key headers found only false positives (random base64 inside the 246 MB Electron binary). No credentials or tokens; no `.env`, key or certificate files.
+- **Developer/local data:** no local paths found. Public GitHub account names appear in updater code (`remohomer`, `adamwojdan` as accepted former repository owners, in `githubReleaseApi.js`; present but never loaded in the Nexus build); "Adam" appears only inside Chromium's license text and binary strings. Nothing is a secret; these are public identifiers.
+- **Signatures:** all five authored executables are unsigned (`UNSIGNED`); Electron/Chromium DLLs keep their upstream state.
 
-### Updating
+Nexus package built for this audit (local, unsigned, not for upload as is): `DS1-Multi-Randomizer-0.40.0-Nexus-Setup-x64.exe` 205,576,844 bytes SHA-256 `8e42ad6aa8a61f418f5608dc29b285489f75ff91e7348499544f85d85875e997`; `...-Nexus-Portable-x64.exe` 204,939,985 bytes `13e93f1a75383b5f0b505c9a6d72bd342ff95930a48b940dd1ce7815f0100a3d`; verifier result OK for development mode. **These hashes are for a local build; the file you upload must be rebuilt (or CI-built) from the release commit and hashed again.**
 
-The Nexus distribution does not automatically check for application updates, query GitHub for newer application versions, or download application updates. Its Updates section shows the installed version and says that new versions are obtained through the DS1 Multi Randomizer page on Nexus Mods. If a canonical Nexus page URL is configured in a future build, the section may offer a button that opens that page in the system browser. The user's existing automatic-check preference is retained but ignored by the Nexus build.
+## Open gaps (owner-visible)
 
-**Application update network and Fog data network are separate.** The Nexus build disables the first. Fog/world randomization may still retrieve pinned Fog data over HTTPS the first time it needs files that are not already cached. The app cannot perform that randomization without those files. This remaining transfer is not described as offline behavior and should be included in any staff policy request.
+1. **No provenance for the Nexus package.** The GitHub workflow builds only the GitHub distribution; `package:win:nexus` is a local build ("local unsigned staging artifacts") and cannot use the GitHub publication modes. So the new GitHub attestations do **not** cover the file a Nexus user downloads, and the Nexus file's SHA-256 differs from the GitHub Setup's. Recommended follow-up (not done, because it changes the release workflow and cannot be tested before a real run): build the Nexus distribution in the same workflow, upload it as a workflow artifact, and add its files to the attested subjects. Until then, state on the page that the Nexus file is built from the tagged source and publish its SHA-256, and do not imply it is attested.
+2. **Unsigned.** See [CODE_SIGNING.md](CODE_SIGNING.md) for the decision brief.
+3. **Staff confirmation.** The internet rule is discretionary and enforcement is by report and moderation; written confirmation reduces risk of later removal but is not required to upload.
+4. **DSR-specific Nexus rules** were not readable (HTTP 403); check the Dark Souls Remastered game page's rules yourself.
 
-### Uninstall
+## Nexus Files tab layout (recommended)
 
-Use Windows **Installed apps** to uninstall. Uninstalling does not automatically restore the game's files. If you want to return the game to its original state, use **Restore original game** before uninstalling and keep the app's user data until the restore is complete.
+| Slot | File | Why |
+|---|---|---|
+| **Main file** | `DS1-Multi-Randomizer-X.Y.Z-Nexus-Setup-x64.zip` containing `DS1-Multi-Randomizer-X.Y.Z-Nexus-Setup-x64.exe`, `SHA256.txt` (the exe's hash) and `LICENSE` | Per-user, no-admin installer; recommended path; ZIP is Nexus's recommended container |
+| **Optional file** | `DS1-Multi-Randomizer-X.Y.Z-Nexus-Portable-x64.zip` containing the Portable exe and `SHA256.txt` | For people who do not want to install. It self-extracts to a temp folder on each start and is more likely to draw heuristic warnings, so keep it optional and say so in its description |
 
-### Restore original game
+ZIP versus raw `.exe`: the Nexus pages say "strongly recommended to use ZIP or 7z", warn that RAR causes false positives, ban password-protected archives, reject archives nested in the mod structure, and send self-extracting files to review; they do not state a preference for raw executables. A plain ZIP (Deflate, no password, one executable plus text files, no inner archive) follows that guidance. The ZIP does not hide anything: the scanner scans the contents, and the executable inside must be byte-identical to the one whose hash you publish. This is the format Nexus recommends, not a repack to influence detection; if staff say they prefer a raw EXE, follow staff. Do not use RAR or password protection. Give each file its own description, and mark nothing as "Old". Do not upload the GitHub `-Setup-x64` file to Nexus.
 
-Open the app and choose **Restore original game**. The app restores managed files from its pristine snapshot. Do this before uninstalling if you want to remove the randomizer while returning the game to vanilla data.
+Build the ZIPs from the final, approved Nexus build with a standard tool (for example `Compress-Archive`) and record the SHA-256 of the ZIP too, because users download the ZIP.
 
-### Compatibility and limitations
+## Suggested support request (optional, send before uploading)
 
-- Dark Souls Remastered for PC is the target. PTDE is outside the supported scope.
-- Do not use the app while the game is running or while another tool is changing the same game files.
-- Only the game files managed by the randomizer are restored; unrelated files are not changed.
-- Some settings are limited by the game's data structure and are explained in the app's tooltips.
-- An internet connection is needed for the pinned Fog data download when the cache is empty. The Nexus distribution does not make application update requests. Generated game files are otherwise local.
+> We maintain DS1 Multi Randomizer, a GPL-3.0-only Windows tool for Dark Souls Remastered. Source: https://github.com/avoydan/DS1-Multi-Randomizer. Our Nexus distribution does not load any updater, makes no network requests, and downloads nothing: new Fog worlds reconstruct their data locally from the player's own game files, and legacy Fog Seed Codes that would need a download are refused in this build. We observed only loopback traffic between the app window and its local backend. We have not uploaded anything. Could you confirm that this exact utility may be hosted under the internet-communication rule, and tell us if any change is needed? We will tag the page with the applicable AI categories.
 
-### Online-play warning and save backups
+Send from the owner's own account to support@nexusmods.com; attach nothing secret.
 
-Do not connect to online play with modified game data. Back up important saves before using mods. The randomizer changes game data after an explicit Apply action; it does not change the user's save files.
+## Page media (screenshot plan, 6 to 8 images)
 
-### FAQ
+Use real screenshots from the final Nexus build. Do not fabricate screenshots; crop out usernames, folder paths, Steam names and save data.
 
-**Does the app include Dark Souls Remastered files?** No. It uses the user's own installed game. No game executables, maps, events, parameter files, or generated game packages are included.
-
-**Can I share a world?** Yes. Share its Seed Code. It contains the master seed and settings needed to reproduce the world; it does not contain personal data.
-
-**Does uninstalling restore the game?** No. Choose **Restore original game** first if you want to return managed game files to their pristine state.
-
-**Why does Windows show a publisher or antivirus warning?** Public releases are currently unsigned. Check the published SHA-256 and use the vendor's official false-positive process if a specific file appears incorrectly detected. Do not disable protection or add an exclusion.
-
-**Does the app send my settings, saves, or game files to the developer?** No. The app has no telemetry, analytics, account, crash reporting, or automatic support upload. A GitHub distribution contacts GitHub Releases for application updates; the Nexus distribution does not. Both distributions may contact the pinned Fog data source when that cache is empty.
-
-### Source code and issue tracker
-
-- Source and matching release tags: https://github.com/avoydan/DS1-Multi-Randomizer
-- Issues: https://github.com/avoydan/DS1-Multi-Randomizer/issues
-- License and third-party notices: `LICENSE`, `THIRD_PARTY_NOTICES.md`, and `docs/LICENSING.md` in the source repository.
-
-### Credits and licenses
-
-DS1 Multi Randomizer is GPL-3.0-only. The combined Items/Enemies integration selectively vendors `kellernz1/ds-randomizer` under GPL-3.0-only. Fog randomization uses a headless host around pinned `thefifthmatt/FogMod` and `thefifthmatt/SoulsIds` sources under Apache-2.0. The application also includes/notices JuicerMV.SoulsFormats (GPL-3.0-only), YamlDotNet, Newtonsoft.Json and ZstdSharp.Port (MIT), Electron, Chromium, Node.js, and the .NET runtime under their respective licenses. The release contains the complete notices and license files. Credits do not replace any license or permission requirement.
-
-This is an unofficial community tool and is not affiliated with or endorsed by FromSoftware or Bandai Namco Entertainment.
-
-### Permissions
-
-The project source is available under GPL-3.0-only. Reuse and redistribution of project code must follow that license and preserve applicable notices. Third-party components retain their own licenses and notices. This page does not grant permission to redistribute Dark Souls Remastered content or another mod author's files; none is included in the release.
-
-### Version and checksums
-
-When approved for Nexus hosting, identify the exact version and link the matching public source tag. The GitHub distribution includes `SHA256SUMS.txt` and `latest.yml`; the locally staged Nexus build has separate Nexus-named Setup and Portable files and a distribution-aware release manifest, with no GitHub update metadata. If Nexus publication is later approved, provide checksums for the exact files actually uploaded. On Windows, calculate a file hash with `Get-FileHash <filename> -Algorithm SHA256`.
-
-### Changelog template
-
-**vX.Y.Z — YYYY-MM-DD**
-
-- Added or changed:
-- Fixed:
-- Compatibility notes:
-- Source tag:
-- SHA-256 list:
-
-### SmartScreen and antivirus note
-
-Current public builds are unsigned, so Windows or antivirus software may show warnings. A matching SHA-256 verifies file integrity against the release checksum, not publisher identity or safety. See the project's false-positive reporting guide. Never disable antivirus, add exclusions, or bypass SmartScreen to install this tool.
-
-## Recommended file layout
-
-No official guideline reviewed here prefers an installer EXE or portable EXE format. If Nexus staff approves the current application behavior, use the **Setup x64 installer as the main file** because it installs per-user and is the recommended user path; add Portable as an optional file only if it serves a clear audience. Do not wrap or repack executables merely to influence scanning. Wait for Nexus scanning/review and resolve any request through staff; do not attempt to bypass the scanner. Do not upload until there is a working, approved file—Nexus does not permit public placeholder pages.
-
-## Materials checklist for the owner
-
-1. Header/banner using project-owned artwork and no copyrighted game art unless rights are confirmed.
-2. Square project icon using the current project icon or original project artwork.
-3. Screenshots in this order: (1) main randomizer screen with options visible, (2) example generated-world summary or hint sheet with spoiler level disclosed, (3) Apply/Restore safety explanation or app About/version screen. Use screenshots from the actual public build; crop out usernames, paths, and save data.
-4. Exact release version, matching source tag, `SHA256SUMS.txt`, credits, license links, and a verified functional download.
-
-## Manual steps on Nexus Mods
-
-1. Contact `support@nexusmods.com` with the source code and a precise explanation of the update-check and Fog-data requests. Ask whether Nexus permits hosting this exact utility/build under the current rule and what, if any, product change would make it eligible.
-2. Wait for written staff guidance. Do not create a public file page or upload the executable before receiving it.
-3. Review the [Terms of Service, especially its upload license](https://help.nexusmods.com/article/18-terms-of-service), with the project's GPL and third-party license obligations. Do not accept if the owner cannot grant the required rights in every uploaded component.
-4. If both the policy review and license review are acceptable, sign in, select Dark Souls Remastered, create the mod page, choose category/tags, paste the reviewed text, add project-owned images, upload the exact approved release files, and complete Nexus's required file/permissions fields.
-5. Apply the applicable Nexus AI tags (AI Media for AI-assisted page copy; assess AI Assisted for code), review the page and scanner result, and make sure all claims and credits are accurate.
-6. Accept Nexus terms and publish only when the owner personally reviews and confirms the final page and file.
-
-### Suggested support request
-
-> We maintain DS1 Multi Randomizer, a GPL-3.0-only Windows tool for Dark Souls Remastered. Its source is https://github.com/avoydan/DS1-Multi-Randomizer. We are preparing a Nexus distribution that does not initialize its application updater, query GitHub for application versions, or download application updates. Separately, when a user selects Fog/world randomization and the local cache is absent, the app downloads 40 pinned, SHA-256-verified FogMod data files from the FogMod source; Fog randomization cannot run without those files. The app does not upload game files, settings, saves, or support bundles. Could Nexus review this remaining data-download behavior and advise whether this exact Nexus build may be hosted, and whether any changes are required? We have not uploaded a binary or published a page pending your guidance.
+1. **Main screen** with the navigation visible: shows what the app is.
+2. **Items configuration**: the item randomization options, to show how choices are made.
+3. **Enemies and bosses configuration**: the placement and pool options.
+4. **Fog configuration**: gate types (ordinary, boss, optional PvP gates), noting safe defaults.
+5. **Result screen with the Seed Code** (blur or crop spoiler content): shows reproducibility and the Apply to game / Restore original game safety buttons.
+6. **In-game, randomized enemy or boss** in an unexpected place (real gameplay capture).
+7. **In-game, a fog gate leading to an interesting destination** (caption which area it connects).
+8. **Optional: Skill Issue Mode** on the Your game screen, captioned as optional and off by default.

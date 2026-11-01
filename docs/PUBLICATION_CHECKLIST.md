@@ -1,0 +1,45 @@
+# Final publication checklist (GitHub and Nexus Mods)
+
+Use together with [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) (the workflow mechanics). A box is ticked only when evidence exists; the note after a box says what the evidence is, or what is still open. Evidence from earlier commits does not carry over: re-run the gates on the release commit. Status written 2026-11-01 at version 0.40.0; **nothing has been published to Nexus, and no new GitHub release has been created since v0.40.0.**
+
+## AUTOMATED (run by scripts or CI)
+
+- [ ] Release commit is the intended one and the working tree is clean (`release-manifest` shows `workingTreeClean: true` and the commit). *Open: choose the final commit.*
+- [ ] Version is new and correct in `apps/desktop/package.json` (never reuse a published version or tag). *Open.*
+- [ ] `npm run typecheck`, backend tests, desktop tests, release-tools tests pass on that commit. *Last green: 48bc9fe (typecheck; backend 614/615 with 1 skipped; desktop 145/146 with 1 skipped; release tools 20/21 with 1 skipped). Re-run on the final commit.*
+- [ ] Golden compatibility 61/61 and FogHost 155/155 on that commit with a clean game copy (FogHost needs `DS1TR_FOG_DATA_ROOT`, `DS1TR_PRISTINE_DSR_ROOT`, `DS1TR_TEST_GAME_ROOT`, `FOGHOST_EXE`). *Last green: 48bc9fe.*
+- [ ] GitHub edition: official CI-built artifacts from the Release (draft) workflow, draft created. *Open: run for the new version.*
+- [ ] **Artifact attestations created successfully** (the "Attest the release files" step is green and `gh attestation verify` passes on Setup and Portable with `--source-digest <commit>`). *Open: the step has never run on a real release.*
+- [ ] Package verification and QA-tool leakage scan pass on the final build. *Evidence: `release-verify.mjs` OK and no QA telemetry/physical-witness markers in a 0.40.0 package at 48bc9fe; Nexus package scan of 2026-11-01 in NEXUS_MODS.md. Repeat on the final build.*
+- [ ] Nexus edition built from the release commit (`npm run package:win:nexus -w @ds1tr/desktop`), its verifier is OK, and `resources/runtime/build-info.json` says `"distribution": "nexus"`, with no `app-update.yml`/`latest.yml`. *Evidence so far: a local 0.40.0 build at 48bc9fe; rebuild for the release.*
+- [ ] Follow-up (recommended, not implemented): build and attest the Nexus edition in CI so Nexus users get provenance too. *Open.*
+
+## OWNER MANUAL
+
+- [ ] **Owner gameplay QA passed** (generate, launch, play through the first Fog gates; Seed Code `DS1TR1-06NWCQQ3-K1HD8E66-2S3AD5N6-CTHZBKB8-FMSNNQWC-TRVW78NY-040F30XX-F0` is a known generated case). *Open: nobody has played V5 Fog in the real game.*
+- [ ] **F10 watcher tested** in a real DSR session (helper starts only after the game starts, F10 frees the cursor, helper stops when the game exits). *Open.*
+- [ ] Setup smoke-tested from the exact file to be uploaded: install per-user without an administrator prompt, start, generate, About shows the version. *Open.*
+- [ ] Portable smoke-tested the same way (Windows may block a freshly downloaded unsigned file; do not bypass protection, report it). *Open.*
+- [ ] Apply and Restore verified on a copy or backed-up game, and Steam "Verify integrity" fallback understood. *Open.*
+- [ ] Decide the signing question for this release ([CODE_SIGNING.md](CODE_SIGNING.md) brief): unsigned release with the warnings stated, or wait. *Open: owner decision.*
+- [ ] Decide the honest Nexus AI tags for code and page text. *Open.*
+
+## GITHUB
+
+- [x] `SECURITY.md` exists and states the private reporting route. *Evidence: file added 2026-11-01.*
+- [ ] **Enable GitHub private vulnerability reporting** (repository Settings > Code security > Private vulnerability reporting). *Open: currently disabled (API reports `enabled: false`); SECURITY.md works without it via the issue fallback but the button is preferable.*
+- [ ] Release notes `docs/release-notes/vX.Y.Z.md` exist, open with Setup recommended, and include one sentence that the release carries build provenance attestations. *Open.*
+- [ ] Draft verified: six assets by `github-actions[bot]`, `sha256sum -c SHA256SUMS.txt`, manifest commit and `workingTreeClean: true`, `latest.yml` sha512 equals the Setup, `Get-AuthenticodeSignature` shows `NotSigned` (unsigned is stated), attestations verify. *Open.*
+- [ ] Published as a pre-release first (`gh release edit vX.Y.Z --draft=false --prerelease`); stable only when explicitly authorized (stable is what enables auto-update for installed copies). *Open.*
+- [ ] README download link, hash and version updated in a later commit; no published release or tag edited or moved. *Open.*
+
+## NEXUS
+
+- [ ] **Network/update compliance confirmed:** only a `-Nexus-` file is uploaded; no updater and no network (NEXUS_MODS.md, Network audit). Optional: send the suggested support request and keep the reply. *Evidence for the build behaviour exists; staff confirmation is optional and not yet requested.*
+- [ ] Files prepared as ZIPs (Setup = Main, Portable = Optional), each containing the exe, `SHA256.txt` and licence, no password, no nested archive; SHA-256 of each ZIP and each inner exe recorded. *Open.*
+- [ ] Page text taken from [NEXUS_RELEASE_DRAFT.md](NEXUS_RELEASE_DRAFT.md), every **[OWNER]** marker resolved and each claim checked against the final build. *Open.*
+- [ ] Screenshots captured from the final build (6 to 8, see the plan in NEXUS_MODS.md); no personal paths or names. *Open.*
+- [ ] Nexus Terms of Service upload licence read against GPL and upstream licences; accepted personally by the owner. *Open.*
+- [ ] Nexus virus scan completed and its result reviewed; if quarantined, follow Nexus's review path and do not delete the blocked file. *Open.*
+- [ ] Nexus changelog and version match the GitHub release; source tag linked. *Open.*
+- [ ] Dark Souls Remastered game-page rules read manually (they could not be fetched during research). *Open.*
