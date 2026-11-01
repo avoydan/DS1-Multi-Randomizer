@@ -595,8 +595,9 @@ namespace FogHost
         }
 
         /// <summary>
-        /// The v3 catalog: <see cref="BuildV2"/> with three physically unsound fixed routes corrected: the Asylum starting hallway's two unconditional exits,
-        /// the Lost Izalith lava crossing (Orange Charred Ring) and the Sen's Fortress cage (Cage Key, no bypass to the roof). See
+        /// The v3 catalog: <see cref="BuildV2"/> with four groups of physically unsound fixed routes corrected: the Asylum starting hallway's two unconditional exits,
+        /// the Lost Izalith lava crossing (Orange Charred Ring), the Sen's Fortress cage (Cage Key, no bypass to the roof) and the twelve links from a post-encounter
+        /// neighbour back into a boss arena (the arena must have been reached first). See
         /// <see cref="FogCompactCatalogV3"/> and docs/COMPACT_FULL_FOG_V3.md; v2 itself is untouched and keeps its frozen fingerprint.
         /// </summary>
         public static FogCompactCatalogV3 BuildV3(FogDsrFacts facts)
@@ -683,6 +684,30 @@ namespace FogHost
                 || !prelava.To.Any(link => link.Destination.Value == "demonruins_izalithlava")
                 || !lava.To.Any(link => link.Destination.Value == "demonruins_izalith") || !lava.To.Any(link => link.Destination.Value == "demonruins_izalithprelava"))
                 throw new InvalidDataException("Compact Fog v3 must gate both lava entries with the Orange Charred Ring and keep both exits from the lava segment free.");
+
+            // ---- boss arenas: no free way back into a living boss's arena ----------------------------------------------------------------------
+            // AddLocalSequence never links INTO a boss Area ("an ordinary Area.To edge cannot bypass its entrance") but AddLocalRoute is two-way, so every
+            // boss Area that owns a post-encounter route also got the reverse link from that neighbour back into the arena, unconditionally. When the
+            // neighbour is reachable some other way (Quelaag's bell room from Demon Ruins, confirmed in the owner's world), the checker walked into the
+            // arena and left through its randomized boss-side fog, which the game does not open while the boss lives. v3 asks for the arena to have been
+            // reached already: the only other way in is the boss's own fog, so the reverse link only works after an arrival through the gate. The link
+            // out of the arena stays free, and forward-only encounter routes (Gwyndolin, the hard Gaping Dragon drop) have no reverse link and are untouched.
+            FogArea[] beforeBossEntries = areas;
+            HashSet<string> bossAreaIds = FogProjectAnnotationPolicy.BossAreaTagPolicies.Select(policy => policy.Area.Value).ToHashSet(StringComparer.Ordinal);
+            areas = beforeBossEntries.Select(area => area with
+            {
+                To = Array.AsReadOnly((area.To ?? Array.Empty<FogAreaLink>()).Select(link =>
+                {
+                    if (!bossAreaIds.Contains(link.Destination.Value) || link.Condition != null || link.Tags.HasFlag(FogAreaLinkTags.Hard)) return link;
+                    FogArea boss = beforeBossEntries.Single(candidate => candidate.Id == link.Destination);
+                    if (!(boss.To ?? Array.Empty<FogAreaLink>()).Any(back => back.Destination == area.Id)) return link;
+                    return link with { Condition = new FogCondition(FogConditionKind.Atom, Array.AsReadOnly(new[] { FogConditionReference.Area(link.Destination) })) };
+                }).ToArray()),
+            }).ToArray();
+            FogAreaLink quelaagBack = areas.Single(area => area.Id.Value == "blighttown_bell").To.SingleOrDefault(link => link.Destination.Value == "blighttown_quelaag");
+            if (quelaagBack?.Condition is not { Kind: FogConditionKind.Atom, Terms.Count: 1 } || quelaagBack.Condition.Terms[0] != FogConditionReference.Area(new FogAreaId("blighttown_quelaag"))
+                || !areas.Single(area => area.Id.Value == "blighttown_quelaag").To.Any(link => link.Destination.Value == "blighttown_bell" && link.Condition == null))
+                throw new InvalidDataException("Compact Fog v3 must require Quelaag's arena to be reached before the bell room can walk back into it, and keep the way out free.");
 
             // ---- where the two keys are found (graph location of an item = the Area of its source lot) --------------------------------------------
             var keyLotAreas = new Dictionary<int, FogAreaId>

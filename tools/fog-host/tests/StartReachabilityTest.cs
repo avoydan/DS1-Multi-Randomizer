@@ -249,7 +249,7 @@ namespace FogHost.Tests
 
         // ---- helpers -------------------------------------------------------------------------------------------------------------------------------------
 
-        private sealed class Connected
+        internal sealed class Connected
         {
             public Graph Graph;
             public RandomizerOptions Options;
@@ -258,7 +258,8 @@ namespace FogHost.Tests
 
         private static Annotations ConnectedAnnotations(Connected connected) => connected.Annotations;
 
-        private static Connected Connect(string catalog, uint seed, string[] enabledOptions)
+        /// <param name="replayLayoutFrom">When set, the graph is not randomized: the connections of that already connected graph are copied onto this catalog's graph.</param>
+        internal static Connected Connect(string catalog, uint seed, string[] enabledOptions, bool withoutBossArenaEntryRule = false, Connected replayLayoutFrom = null)
         {
             string dataRoot = RequiredDirectory("DS1TR_COMPACT_DATA_ROOT");
             string pristineRoot = RequiredDirectory("DS1TR_PRISTINE_DSR_ROOT");
@@ -277,13 +278,15 @@ namespace FogHost.Tests
                 foreach ((string key, string flag) in HostRequest.OptionFlags) options[flag] = enabled.Contains(key);
                 options.Language = "ENGLISH";
                 if (catalog != "v1") FogCompactV2PvpPolicy.ApplyGraphOptions(annotations, options["major"], options["minor"]);
+                if (withoutBossArenaEntryRule) BossArenaEntryTest.StripBossArenaEntryRule(annotations);
                 var graph = new Graph();
                 graph.Construct(options, annotations);
                 string staging = Path.Combine(scratch, "staging");
                 CompactRealGenerationTest.CopyGameDataForAudit(Path.Combine(dataRoot, "dist", "DS1R"), staging, pristineRoot, "ENGLISH");
                 Console.SetOut(TextWriter.Null);
                 new ItemReader().FindItems(options, annotations, graph, staging, FromGame.DS1R);
-                new GraphConnector().Connect(options, graph, annotations);
+                if (replayLayoutFrom != null) BossArenaEntryTest.ReplayLayout(replayLayoutFrom.Graph, graph);
+                else new GraphConnector().Connect(options, graph, annotations);
                 return new Connected { Graph = graph, Options = options, Annotations = annotations };
             }
             finally

@@ -161,9 +161,9 @@ const v6: GenerationProfile = Object.freeze({
     // allow-list changes (a v6 request is refused by any older host as an unknown annotation source).
     hostVersions: Object.freeze(['0.7.3']),
     fogModCommit: v5.fogEngine.fogModCommit,
-    worldDataId: 'c0474c41b941ed30',
+    worldDataId: 'ca336bc0c0e2adf7',
     compactCatalogVersion: 'ds1tr-compact-full-fog-v3',
-    compactCatalogFingerprint: '6849fb6984144641732fb8a9807c105bb54e06336686ac720734b70d0952df56',
+    compactCatalogFingerprint: '1e7188b128054e2c87e9e6389634309e5d1c6fbfbeabffbf57cc679f95b191ac',
   }),
   fogItemTracking: 'compact-fog-item-tracking-v1',
   completeSettings: v5.completeSettings,

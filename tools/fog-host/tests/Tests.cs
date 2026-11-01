@@ -131,8 +131,12 @@ namespace FogHost.Tests
                 Test("v5 boss completion is a trigger-bound state, not an Area visit", BossProgressionTest.Verify);
                 Test("v6 start reachability rejects a start region whose only exit pairs with a dead-end pocket", StartReachabilityTest.VerifySyntheticStartTrapIsRejected);
                 Test("an unconditional fixed exit out of the start hides the same trap (the original defect)", StartReachabilityTest.VerifySyntheticFakeUnconditionalExitHidesTheTrap);
+                Test("v6 boss-arena entry: a boss arena reachable only through the link back from its bell room is rejected; entering through its own fog keeps the link usable", BossArenaEntryTest.VerifySyntheticBossArenaEntry);
                 if (Environment.GetEnvironmentVariable("DS1TR_COMPACT_DATA_ROOT") != null && Environment.GetEnvironmentVariable("DS1TR_PRISTINE_DSR_ROOT") != null)
                 {
+                    Test("v3 requires a boss arena to be reached before its post-encounter neighbour can walk back in; v2 stays frozen; forward-only routes untouched", BossArenaEntryTest.VerifyV3BossArenaEntryCatalog);
+                    Test("regression D: the owner's Quelaag layout (Fog seed 4038375671) is accepted without the rule, rejected with it, and the corrected seed is valid", BossArenaEntryTest.VerifyOwnerQuelaagLayoutIsRejected);
+                    Test("on real v3 layouts no Area depends on walking back into a boss arena", BossArenaEntryTest.VerifyNoBackEntryDependenceOnRealLayouts);
                     Test("v3 catalog seals the Asylum start and retires the Ceaseless post-boss proof; v2 stays frozen", StartReachabilityTest.VerifyV3CatalogSealsTheAsylumStart);
                     Test("v3 gates the lava crossing with the Orange Charred Ring and closes the Sen's cage; v2 stays frozen; the keys are found where the game puts them", StartReachabilityTest.VerifyV3LavaAndCageCatalog);
                     Test("on real v3 layouts the lava needs the ring and the cage needs its key and never bypasses to the roof", StartReachabilityTest.VerifyLavaAndCageOnRealLayouts);
