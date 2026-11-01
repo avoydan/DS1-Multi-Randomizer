@@ -137,6 +137,8 @@ namespace FogHost.Tests
                     Test("v3 requires a boss arena to be reached before its post-encounter neighbour can walk back in; v2 stays frozen; forward-only routes untouched", BossArenaEntryTest.VerifyV3BossArenaEntryCatalog);
                     Test("regression D: the owner's Quelaag layout (Fog seed 4038375671) is accepted without the rule, rejected with it, and the corrected seed is valid", BossArenaEntryTest.VerifyOwnerQuelaagLayoutIsRejected);
                     Test("on real v3 layouts no Area depends on walking back into a boss arena", BossArenaEntryTest.VerifyNoBackEntryDependenceOnRealLayouts);
+                    Test("v3 enters the Gaping Dragon arena only through its own fog: the Depths wall follows upstream; v2 stays frozen; the boss fog is unchanged", BossArenaEntryTest.VerifyV3GapingArenaCatalog);
+                    Test("regression E: Fog seed 2654435761 depended on the false arena entry through the Depths wall before the correction and is valid after it", BossArenaEntryTest.VerifyGapingWallRegression);
                     Test("v3 catalog seals the Asylum start and retires the Ceaseless post-boss proof; v2 stays frozen", StartReachabilityTest.VerifyV3CatalogSealsTheAsylumStart);
                     Test("v3 gates the lava crossing with the Orange Charred Ring and closes the Sen's cage; v2 stays frozen; the keys are found where the game puts them", StartReachabilityTest.VerifyV3LavaAndCageCatalog);
                     Test("on real v3 layouts the lava needs the ring and the cage needs its key and never bypasses to the roof", StartReachabilityTest.VerifyLavaAndCageOnRealLayouts);

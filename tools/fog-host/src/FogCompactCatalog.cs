@@ -709,6 +709,20 @@ namespace FogHost
                 || !areas.Single(area => area.Id.Value == "blighttown_quelaag").To.Any(link => link.Destination.Value == "blighttown_bell" && link.Condition == null))
                 throw new InvalidDataException("Compact Fog v3 must require Quelaag's arena to be reached before the bell room can walk back into it, and keep the way out free.");
 
+            // ---- the Gaping Dragon arena is entered through its own fog -------------------------------------------------------------------------
+            // Upstream FogMod puts both sides of the Depths wall o1420_0000 ("near the area with the Channeler") in `depths`; the project's v1 segmentation
+            // labelled its far side `depths_gaping`, the Area of the arena. The wall lies on collision h0035B0, about 25 m from the arena collision h0074B0
+            // that holds the boss fog o1400_0000 and the Gaping Dragon, so arriving through it does not put the player in the arena: it lets the graph
+            // reach the arena's boss-side fog exit (flag 2, set when Gaping dies) and the Depths key inside it without the encounter. In 131 of 300 sampled
+            // layouts progression depended on that. v3 follows upstream: the wall joins `depths` to `depths`, and `depths_gaping` is entered through o1400_0000
+            // (or the hard-logic drop, which is off by default).
+            const string gapingWall = "o1420_0000";
+            FogEntrance wall = source.Entrances.Single(entrance => entrance.Name == gapingWall);
+            if (wall.ASide?.Area.Value != "depths" || wall.BSide?.Area.Value != "depths_gaping")
+                throw new InvalidDataException("Compact Fog v3 expects the v2 Depths wall o1420_0000 to join depths and depths_gaping before it is corrected.");
+            FogEntrance[] correctedEntrances = source.Entrances.Select(entrance => entrance.Name == gapingWall
+                ? entrance with { BSide = entrance.BSide with { Area = new FogAreaId("depths") } } : entrance).ToArray();
+
             // ---- where the two keys are found (graph location of an item = the Area of its source lot) --------------------------------------------
             var keyLotAreas = new Dictionary<int, FogAreaId>
             {
@@ -726,7 +740,7 @@ namespace FogHost
 
             FogBossCompletionTransition[] bossCompletions = source.BossCompletions
                 .Select(transition => transition with { RequireFixedPostBossRoute = false }).ToArray();
-            var catalog = new FogAnnotationCatalog(areas, keyItems, source.Warps, source.Entrances,
+            var catalog = new FogAnnotationCatalog(areas, keyItems, source.Warps, correctedEntrances,
                 source.CustomStarts, source.DefaultCosts, source.Enemies, lotLocations,
                 source.DefaultFlagCols, source.WriterSupportEntrances, lotRows, bossCompletions);
             return new FogCompactCatalogV3(catalog, v2.Coverage, v2.BossGatedRoutes);

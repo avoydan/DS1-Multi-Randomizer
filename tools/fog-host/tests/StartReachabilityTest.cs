@@ -259,7 +259,7 @@ namespace FogHost.Tests
         private static Annotations ConnectedAnnotations(Connected connected) => connected.Annotations;
 
         /// <param name="replayLayoutFrom">When set, the graph is not randomized: the connections of that already connected graph are copied onto this catalog's graph.</param>
-        internal static Connected Connect(string catalog, uint seed, string[] enabledOptions, bool withoutBossArenaEntryRule = false, Connected replayLayoutFrom = null)
+        internal static Connected Connect(string catalog, uint seed, string[] enabledOptions, bool withoutBossArenaEntryRule = false, Connected replayLayoutFrom = null, bool withoutGapingWallCorrection = false)
         {
             string dataRoot = RequiredDirectory("DS1TR_COMPACT_DATA_ROOT");
             string pristineRoot = RequiredDirectory("DS1TR_PRISTINE_DSR_ROOT");
@@ -279,6 +279,7 @@ namespace FogHost.Tests
                 options.Language = "ENGLISH";
                 if (catalog != "v1") FogCompactV2PvpPolicy.ApplyGraphOptions(annotations, options["major"], options["minor"]);
                 if (withoutBossArenaEntryRule) BossArenaEntryTest.StripBossArenaEntryRule(annotations);
+                if (withoutGapingWallCorrection) BossArenaEntryTest.RestoreGapingWall(annotations);
                 var graph = new Graph();
                 graph.Construct(options, annotations);
                 string staging = Path.Combine(scratch, "staging");

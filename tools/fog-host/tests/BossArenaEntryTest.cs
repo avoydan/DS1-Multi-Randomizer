@@ -40,29 +40,38 @@ namespace FogHost.Tests
                     if (bosses.Contains(side.Area) && side.Cond == side.Area) side.Cond = null;
         }
 
-        /// <summary>Copies every randomized connection of a connected graph onto an unconnected graph built from the same Area and Entrance lists.</summary>
+        /// <summary>Restores the v2 labelling of the Depths wall o1420_0000 (far side `depths_gaping`), giving the graph v3 had before the Gaping correction.</summary>
+        public static void RestoreGapingWall(Annotations annotations)
+        {
+            Entrance wall = annotations.Entrances.Single(entrance => entrance.Name == "o1420_0000");
+            wall.BSide.Area = "depths_gaping";
+        }
+
+        /// <summary>
+        /// Copies every randomized connection of a connected graph onto an unconnected graph built from the same Entrance and Warp lists. Edges are matched by
+        /// Entrance (or Warp) name, side and direction, so the two graphs may label a side with a different Area.
+        /// </summary>
         public static void ReplayLayout(Graph source, Graph fresh)
         {
-            foreach (string area in source.graph.Keys)
+            string Key(Graph graph, Graph.Edge edge)
             {
-                Graph.Node from = source.graph[area], to = fresh.graph[area];
-                if (from.To.Count != to.To.Count || from.From.Count != to.From.Count)
-                    throw new InvalidOperationException($"The replayed graph has a different edge count at {area}.");
-                for (int index = 0; index < from.To.Count; index++)
+                Entrance entrance = graph.entranceIds[edge.Name];
+                int side = ReferenceEquals(edge.Side, entrance.ASide) ? 0 : ReferenceEquals(edge.Side, entrance.BSide) ? 1 : throw new InvalidOperationException($"Edge {edge} has an unknown side.");
+                return $"{edge.Name}|{side}|{edge.Type}";
+            }
+            var freshEdges = new Dictionary<string, Graph.Edge>(StringComparer.Ordinal);
+            foreach (Graph.Node node in fresh.graph.Values)
+                foreach (Graph.Edge edge in node.To.Concat(node.From).Where(edge => !edge.IsFixed))
+                    if (!freshEdges.TryAdd(Key(fresh, edge), edge)) throw new InvalidOperationException($"Duplicate randomized edge {Key(fresh, edge)}.");
+            foreach (Graph.Node node in source.graph.Values)
+                foreach (Graph.Edge oldExit in node.To.Where(edge => !edge.IsFixed))
                 {
-                    Graph.Edge oldExit = from.To[index], newExit = to.To[index];
-                    if (oldExit.Name != newExit.Name || oldExit.IsFixed != newExit.IsFixed || oldExit.Side.Area != newExit.Side.Area)
-                        throw new InvalidOperationException($"The replayed graph has a different exit at {area}[{index}].");
-                    if (oldExit.IsFixed || newExit.Link != null) continue;
-                    Graph.Node target = source.graph[oldExit.To];
-                    int entranceIndex = target.From.IndexOf(oldExit.Link);
-                    if (entranceIndex < 0) throw new InvalidOperationException($"The entrance of {area}[{index}] was not found at {oldExit.To}.");
-                    Graph.Edge newEntrance = fresh.graph[oldExit.To].From[entranceIndex];
-                    if (newEntrance.Name != oldExit.Link.Name || newEntrance.Link != null)
-                        throw new InvalidOperationException($"The replayed entrance of {area}[{index}] does not match.");
+                    Graph.Edge newExit = freshEdges[Key(source, oldExit)];
+                    if (newExit.Link != null) continue;
+                    Graph.Edge newEntrance = freshEdges[Key(source, oldExit.Link)];
+                    if (newEntrance.Link != null) throw new InvalidOperationException($"The replayed entrance of {newExit} is already connected.");
                     fresh.connect(newExit, newEntrance);
                 }
-            }
             fresh.start = source.start;
         }
 
@@ -112,8 +121,8 @@ namespace FogHost.Tests
         /// </summary>
         public static void VerifyOwnerQuelaagLayoutIsRejected()
         {
-            // The owner's build: v3 before the rule. Its connector decisions are deterministic, so Fog seed 4038375671 reproduces the world the owner played.
-            StartReachabilityTest.Connected owner = StartReachabilityTest.Connect("v3", OwnerFogSeed, OriginalOptions, withoutBossArenaEntryRule: true);
+            // The owner's build: v3 before the boss-arena rule and the Gaping wall correction. Its connector decisions are deterministic, so Fog seed 4038375671 reproduces the world the owner played.
+            StartReachabilityTest.Connected owner = StartReachabilityTest.Connect("v3", OwnerFogSeed, OriginalOptions, withoutBossArenaEntryRule: true, withoutGapingWallCorrection: true);
             string[] hallwayExits = owner.Graph.graph["asylum"].To.Where(edge => !edge.IsFixed).Select(edge => edge.To).ToArray();
             Graph.Edge quelaagFog = owner.Graph.graph["blighttown_quelaag"].To.Single(edge => !edge.IsFixed);
             if (hallwayExits.Length != 1 || hallwayExits[0] != "demonruins" || quelaagFog.To != "sens_mid" || quelaagFog.Name != "o4950_0000")
@@ -145,7 +154,11 @@ namespace FogHost.Tests
         public static void VerifyNoBackEntryDependenceOnRealLayouts()
         {
             for (uint seed = 1; seed <= 10; seed++)
-                AssertNoBackEntryDependence(StartReachabilityTest.Connect("v3", seed, OriginalOptions), $"Fog seed {seed}");
+            {
+                StartReachabilityTest.Connected layout = StartReachabilityTest.Connect("v3", seed, OriginalOptions);
+                AssertNoBackEntryDependence(layout, $"Fog seed {seed}");
+                AssertArenaOnlyThroughItsFog(layout, $"Fog seed {seed}");
+            }
         }
 
         private static void AssertNoBackEntryDependence(StartReachabilityTest.Connected connected, string what)
@@ -160,6 +173,72 @@ namespace FogHost.Tests
         /// <summary>A fixed link whose condition asks for its own destination Area to be reached: the v3 boss-arena back-entry.</summary>
         private static bool IsNotBackEntry(Graph.Edge edge) =>
             !(edge.IsFixed && edge.LinkedExpr != null && edge.To != null && edge.LinkedExpr.FreeVars().Contains(edge.To));
+
+        // ---- Gaping Dragon -------------------------------------------------------------------------------------------------------------------------
+
+        /// <summary>
+        /// v3 follows upstream FogMod for the Depths wall o1420_0000 (both sides in `depths`) so that the Gaping Dragon arena is entered through its own fog only (or the
+        /// hard-logic drop); v2 keeps the project's frozen labelling. The arena's boss fog o1400_0000 and its completion rule are untouched.
+        /// </summary>
+        public static void VerifyV3GapingArenaCatalog()
+        {
+            string dataRoot = RequiredDirectory("DS1TR_COMPACT_DATA_ROOT");
+            string pristineRoot = RequiredDirectory("DS1TR_PRISTINE_DSR_ROOT");
+            FogDsrFacts facts = FogDsrFacts.Read(dataRoot, pristineRoot, includeLegacyAnnotations: false);
+            FogCompactCatalogV2 v2 = FogCompactCatalogBuilder.BuildV2(facts);
+            FogCompactCatalogV3 v3 = FogCompactCatalogBuilder.BuildV3(facts);
+            FogEntrance Wall(FogAnnotationCatalog catalog) => catalog.Entrances.Single(entrance => entrance.Name == "o1420_0000");
+            if (Wall(v2.Catalog).ASide.Area.Value != "depths" || Wall(v2.Catalog).BSide.Area.Value != "depths_gaping")
+                throw new InvalidOperationException("The frozen v2 wall o1420_0000 must still join depths and depths_gaping (profile ds1tr-gen-v5 stays byte-compatible).");
+            if (Wall(v3.Catalog).ASide.Area.Value != "depths" || Wall(v3.Catalog).BSide.Area.Value != "depths")
+                throw new InvalidOperationException("v3 must keep both sides of the Depths wall o1420_0000 in depths, as upstream FogMod does.");
+
+            // The arena's inbound edges: its own boss fog and the hard-logic drop, nothing else.
+            var inbound = new List<string>();
+            foreach (FogArea area in v3.Catalog.Areas)
+                foreach (FogAreaLink link in area.To ?? Array.Empty<FogAreaLink>())
+                    if (link.Destination.Value == "depths_gaping") inbound.Add($"link {area.Id.Value}{(link.Tags.HasFlag(FogAreaLinkTags.Hard) ? " hard" : "")}");
+            foreach (FogEntrance entrance in v3.Catalog.Entrances)
+                foreach (FogEntranceSide side in new[] { entrance.ASide, entrance.BSide })
+                    if (side != null && side.Area.Value == "depths_gaping") inbound.Add($"entrance {entrance.Name}");
+            if (!inbound.OrderBy(value => value, StringComparer.Ordinal).SequenceEqual(new[] { "entrance o1400_0000", "link depths hard" }))
+                throw new InvalidOperationException($"The v3 Gaping arena must be entered only through o1400_0000 (and the hard drop); found [{string.Join(", ", inbound)}].");
+            FogEntrance boss = v3.Catalog.Entrances.Single(entrance => entrance.Name == "o1400_0000");
+            if (boss.ASide.Area.Value != "depths" || boss.BSide.Area.Value != "depths_gaping" || boss.BSide.Flag != 2 || boss.BSide.BossEncounterStartEventId != 11005391
+                || !v3.Catalog.BossCompletions.Any(rule => rule.EventId == 11000001))
+                throw new InvalidOperationException("The Gaping boss fog and its completion rule must be unchanged.");
+        }
+
+        /// <summary>
+        /// The same false-progression class as Quelaag. Fog seed 2654435761 on the catalog before the correction: the wall's far side was the arena Area, so the graph reached the
+        /// arena (its boss-side fog exit and the Depths key inside it) without the encounter, and progression depended on that. The same Fog seed on the corrected catalog is a
+        /// valid layout that enters the arena only through its own fog.
+        /// </summary>
+        public static void VerifyGapingWallRegression()
+        {
+            const uint seed = 2654435761;
+            StartReachabilityTest.Connected before = StartReachabilityTest.Connect("v3", seed, OriginalOptions, withoutGapingWallCorrection: true);
+            if (new GraphChecker().Check(before.Options, before.Graph, before.Graph.start.Area).Unvisited.Count != 0)
+                throw new InvalidOperationException("The pre-correction graph accepted this layout (that is the defect).");
+            Func<Graph.Edge, bool> noWallIntoArena = edge => !(edge.To == "depths_gaping" && edge.Link?.Name == "o1420_0000");
+            GraphChecker.CheckRecord dependent = new GraphChecker().Check(before.Options, before.Graph, before.Graph.start.Area, null, noWallIntoArena);
+            if (dependent.Unvisited.Count == 0)
+                throw new InvalidOperationException("Without the wall into the arena the pre-correction layout must lose Areas (progression depended on a false arena entry).");
+
+            StartReachabilityTest.Connected corrected = StartReachabilityTest.Connect("v3", seed, OriginalOptions);
+            AssertArenaOnlyThroughItsFog(corrected, "the Gaping regression seed on the corrected catalog");
+            StartReachabilityValidator.Validate(corrected.Options, corrected.Graph);
+        }
+
+        /// <summary>The Gaping arena is entered only through its own boss fog (the hard drop is not in the graph unless glitched logic is on), and the layout is fully reachable.</summary>
+        private static void AssertArenaOnlyThroughItsFog(StartReachabilityTest.Connected connected, string what)
+        {
+            Graph.Node arena = connected.Graph.graph["depths_gaping"];
+            if (arena.From.Any(edge => edge.Name != "o1400_0000"))
+                throw new InvalidOperationException($"{what}: the arena must be entered only through o1400_0000.");
+            if (new GraphChecker().Check(connected.Options, connected.Graph, connected.Graph.start.Area).Unvisited.Count != 0)
+                throw new InvalidOperationException($"{what}: the layout must be fully reachable.");
+        }
 
         // ---- synthetic graph (no game data) --------------------------------------------------------------------------------------------------------------
 
