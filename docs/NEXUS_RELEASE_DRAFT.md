@@ -157,6 +157,7 @@ Full notices: THIRD_PARTY_NOTICES.md in the repository and the licenses folder i
 **X.Y.Z [OWNER: final version]**
 
 - New worlds use the newest generation rules (`ds1tr-gen-v6`). They fix a start trap: the first wall in the Asylum could lead to a dead-end area whose only way out led back, which left the whole run stuck. The Fog safety check is now a general "everything is reachable from the start" rule and the earlier Ceaseless-only check is retired. Earlier Seed Codes keep generating exactly as before.
+- Fog routes the solver used to count wrongly are corrected for new worlds: the Lost Izalith lava crossing needs the Orange Charred Ring, the Sen's Fortress cage needs the Cage Key, and a boss arena is no longer counted as a way onward when it is only reachable from behind while the boss is alive (this stopped a real run at Quelaag's back fog). The same applies to the Gaping Dragon's arena. These are checked by automated tests; the Fog behavior has not been played through completely in every combination.
 - Older (v3 and v4) Seed Codes with Fog work again.
 - The optional free-cursor helper (F10) now starts only while Dark Souls Remastered is running, and only if you turned it on.
 - Optional Skill Issue Mode.
