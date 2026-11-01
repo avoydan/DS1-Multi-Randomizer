@@ -111,20 +111,21 @@ test('tokens and private keys are recognised in anything that is packaged', () =
   assert.equal(findSecrets('-----BEGIN RSA PRIVATE KEY-----').length, 1);
 });
 
-test('the release workflow is manual, creates a DRAFT only, asks for the least privilege and never takes untrusted text into a script', async () => {
+test('the release workflow is manual, creates a DRAFT only, attests the staged files, asks for the least privilege and never takes untrusted text into a script', async () => {
   const yaml = requireFromRoot('js-yaml');
   const text = await read('.github', 'workflows', 'release.yml');
   const workflow = yaml.load(text);
   assert.deepEqual(Object.keys(workflow.on), ['workflow_dispatch'], 'it runs only when started by hand: not on push, pull request, tag or schedule');
   assert.deepEqual(workflow.permissions, { contents: 'read' }, 'read-only by default');
   const job = workflow.jobs.release;
-  assert.deepEqual(job.permissions, { contents: 'write' }, 'the one job raises only contents: write');
+  assert.deepEqual(job.permissions, { contents: 'write', 'id-token': 'write', attestations: 'write' }, 'the one job raises only what the draft and the attestation need (no artifact-metadata, packages or actions)');
   assert.equal(Object.keys(workflow.jobs).length, 1);
   assert.equal(job['runs-on'], 'windows-latest');
   const steps = job.steps;
   const runs = steps.map((step) => step.run ?? '');
   for (const run of runs) assert.doesNotMatch(run, /\$\{\{\s*(inputs|github\.event)/u, 'inputs reach scripts only through env variables');
-  assert.deepEqual(steps.filter((step) => step.uses).map((step) => step.uses.split('@')[0]).sort(), ['actions/checkout', 'actions/setup-dotnet', 'actions/setup-node', 'actions/upload-artifact'], 'only first-party actions');
+  assert.deepEqual(steps.filter((step) => step.uses).map((step) => step.uses.split('@')[0]).sort(), ['actions/attest', 'actions/checkout', 'actions/setup-dotnet', 'actions/setup-node', 'actions/upload-artifact'], 'only first-party actions');
+  for (const step of steps.filter((candidate) => candidate.uses)) assert.match(step.uses, /^[\w.-]+\/[\w.-]+@[0-9a-f]{40}$/u, `${step.uses} is pinned to a full commit SHA`);
   assert.equal(steps.find((step) => step.uses?.startsWith('actions/checkout')).with['persist-credentials'], false, 'the checkout does not leave a token in .git/config');
   const index = (pattern) => steps.findIndex((step) => pattern.test(`${step.name ?? ''} ${step.run ?? ''}`));
   assert.ok(index(/npm ci/u) >= 0 && index(/npm test -w @ds1tr\/backend/u) > index(/npm ci/u), 'locked install, then backend tests');
@@ -133,6 +134,13 @@ test('the release workflow is manual, creates a DRAFT only, asks for the least p
   assert.ok(index(/package:win/u) > index(/npm test -w @ds1tr\/desktop/u), 'the tests come before the build');
   assert.ok(index(/release-assets\.mjs/u) > index(/package:win/u));
   assert.ok(index(/gh release create/u) > index(/release-assets\.mjs/u), 'the draft is created last, after verification');
+  const attest = steps.findIndex((step) => step.uses?.startsWith('actions/attest@'));
+  assert.ok(attest > index(/release-assets\.mjs/u) && attest < index(/gh release create/u), 'the attestation covers the verified, staged files and comes before the draft, so a failed attestation leaves no draft');
+  assert.equal(steps[attest].if, '${{ inputs.create_draft }}', 'a dry run writes no public attestation');
+  assert.equal(steps[attest].with['push-to-registry'], undefined, 'no registry or storage-record use');
+  const subjects = String(steps[attest].with['subject-path']).split(/\r?\n/u).filter(Boolean);
+  for (const kind of ['Setup-x64.exe', 'Portable-x64.exe']) assert.ok(subjects.some((line) => line.endsWith(`-\${{ inputs.version }}-${kind}`) && line.startsWith('apps/desktop/release/assets/')), `${kind} is an attested subject`);
+  assert.ok(subjects.every((line) => line.startsWith('apps/desktop/release/assets/') && !line.includes('*')), 'subjects are explicit staged files, not a glob');
   const create = runs.find((run) => /gh release create/u.test(run));
   assert.match(create, /--draft/u);
   assert.doesNotMatch(text, /--prerelease|--latest|release edit|draft=false|--discussion/u, 'it can neither publish nor mark a release');

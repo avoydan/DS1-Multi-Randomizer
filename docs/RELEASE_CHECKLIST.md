@@ -1,7 +1,7 @@
 # Release checklist
 
 The short version. The reasons are in [AUTO_UPDATE.md](AUTO_UPDATE.md) (updates, workflow) and [RELEASE_TRUST.md](RELEASE_TRUST.md) (signing, trust).
-The workflow stops at a draft. Publish as a **public prerelease** by default; publish stable only when explicitly requested.
+The workflow stops at a draft and, from the release after v0.40.0, attests its files (build provenance; see [RELEASE_TRUST.md](RELEASE_TRUST.md)). v0.40.0 and earlier have no attestation. Publish as a **public prerelease** by default; publish stable only when explicitly requested.
 
 ## Once, before the first release
 
@@ -15,11 +15,11 @@ The workflow stops at a draft. Publish as a **public prerelease** by default; pu
 1. Work on the V5 branch and bump the desktop version (SemVer; never reuse a published version or tag). Add `docs/release-notes/vX.Y.Z.md`. One commit with the change.
 2. Local gates: `npm run typecheck`, `npm test -w @ds1tr/backend`, `npm test -w @ds1tr/desktop`, and `goldenCompatibility.mjs verify` on a clean game copy (all PASS). Optional rehearsal: `npm run package:win:github -w @ds1tr/desktop -- --channel=public --unsigned-release`, then `node tools/release/release-verify.mjs --publication --tag vX.Y.Z --manifest apps/desktop/release/release-manifest.json`.
 3. `git push origin <branch>`, then `gh workflow run release.yml --ref <branch> -f version=X.Y.Z -f golden_attestation=<first 7 chars of HEAD> -f create_draft=true`. The workflow runs the tests, packages (public channel, unsigned), verifies and creates a **draft** that targets that commit.
-4. Verify the draft (`gh release download vX.Y.Z`): six assets uploaded by `github-actions[bot]`; `sha256sum -c SHA256SUMS.txt`; `release-manifest-X.Y.Z.json` shows the built commit, `workingTreeClean: true`, `signatureState`; `latest.yml` sha512 equals the Setup's; `Get-AuthenticodeSignature` on both executables.
-5. Publish: `gh release edit vX.Y.Z --draft=false --prerelease` (stable only when explicitly requested; then omit `--prerelease`). The tag is created on the built commit at that moment. Check the page lists the six assets and is marked Pre-release.
+4. Verify the draft (`gh release download vX.Y.Z`): six assets uploaded by `github-actions[bot]`; `sha256sum -c SHA256SUMS.txt`; `release-manifest-X.Y.Z.json` shows the built commit, `workingTreeClean: true`, `signatureState`; `latest.yml` sha512 equals the Setup's; `Get-AuthenticodeSignature` on both executables. Attestation, for the Setup and again for the Portable: `gh attestation verify <file> --repo avoydan/DS1-Multi-Randomizer --signer-workflow avoydan/DS1-Multi-Randomizer/.github/workflows/release.yml --source-digest <full built commit> --deny-self-hosted-runners` (do not pin `--source-ref` to the tag: the run is on a branch and the tag appears at publish). A missing attestation blocks publishing.
+5. Release notes for the new version end with one sentence that the release carries build provenance attestations and points to the README verify section (do not edit the v0.40.0 notes). Publish: `gh release edit vX.Y.Z --draft=false --prerelease` (stable only when explicitly requested; then omit `--prerelease`). The tag is created on the built commit at that moment. Check the page lists the six assets and is marked Pre-release.
 6. Record the release (README download link and hash, `docs/IMPLEMENTATION_STATUS.md`) in a later commit; never edit or replace a published release. A bad release is fixed by a higher version.
 
-Never upload files by hand: v0.39.2 was uploaded manually and is the one release outside this flow. An unsigned build is never described as signed; the signing steps in `docs/CODE_SIGNING.md` are still open.
+Never upload files by hand: v0.39.2 was uploaded manually and is the one release outside this flow. An attestation is provenance, not an Authenticode signature, an antivirus verdict or SmartScreen reputation; an unsigned build is never described as signed; the signing steps in `docs/CODE_SIGNING.md` are still open.
 
 ## Every release
 
@@ -28,7 +28,7 @@ Never upload files by hand: v0.39.2 was uploaded manually and is the one release
 3. [ ] Golden fixtures on your computer: `node apps/backend/scripts/goldenCompatibility.mjs verify` is all PASS (a clean game copy; never the live Steam folder).
 4. [ ] Push the commit.
 5. [ ] GitHub > Actions > **Release (draft)** > Run workflow: `version` = `X.Y.Z` (must equal `apps/desktop/package.json`), `golden_attestation` = first 7 characters of the commit from step 3.
-6. [ ] The run is green. Download the draft's files: `DS1-Multi-Randomizer-X.Y.Z-Setup-x64.exe`, its `.blockmap`, `DS1-Multi-Randomizer-X.Y.Z-Portable-x64.exe`, `latest.yml`, `release-manifest-X.Y.Z.json`, `SHA256SUMS.txt`; compare the hashes.
+6. [ ] The run is green (including the "Attest the release files" step). Download the draft's files: `DS1-Multi-Randomizer-X.Y.Z-Setup-x64.exe`, its `.blockmap`, `DS1-Multi-Randomizer-X.Y.Z-Portable-x64.exe`, `latest.yml`, `release-manifest-X.Y.Z.json`, `SHA256SUMS.txt`; compare the hashes.
 7. [ ] Install the draft's installer on a test machine or scratch folder; generate, check About shows X.Y.Z; try the portable once.
 8. [ ] Read the release notes on the draft and confirm the Setup / Portable links and changelog are correct.
 9. [ ] Publish the draft with GitHub's **Set as a pre-release** option enabled. Stable users continue to ignore it.

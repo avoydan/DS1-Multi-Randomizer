@@ -34,6 +34,16 @@ Get-FileHash .\DS1-Multi-Randomizer-0.40.0-Setup-x64.exe -Algorithm SHA256
 
 Compare the `Hash` value with the line for that exact filename in `SHA256SUMS.txt`. A matching hash shows that the file matches the published checksum; it is not a code signature or a safety certification.
 
+### Verify where a release came from (releases after 0.40.0)
+
+Releases built after v0.40.0 carry a GitHub **build provenance attestation** for the Setup, the Portable build and the other release files. With the [GitHub CLI](https://cli.github.com/) (`gh`; run `gh auth login` first if it asks you to sign in), run this in the folder with the download:
+
+```powershell
+gh attestation verify .\DS1-Multi-Randomizer-X.Y.Z-Setup-x64.exe --repo avoydan/DS1-Multi-Randomizer --signer-workflow avoydan/DS1-Multi-Randomizer/.github/workflows/release.yml
+```
+
+Replace `X.Y.Z` with the version you downloaded, and repeat the command for `DS1-Multi-Randomizer-X.Y.Z-Portable-x64.exe`. A success means that GitHub's records show this exact file was produced by that workflow in that repository (the attestation names the commit). It is **not** an Authenticode signature, not an antivirus scan and not a safety review, and it does not remove Windows SmartScreen or antivirus warnings. **v0.40.0 and earlier releases have no attestation**, so the command fails for them.
+
 ## Code signing and antivirus
 
 **The latest release is unsigned.** No SignPath application has been approved and no trusted code-signing certificate is active. Windows SmartScreen or antivirus software may warn about the download. We do not recommend disabling protection or adding an exclusion. See [false-positive reporting and verification](docs/ANTIVIRUS_FALSE_POSITIVES.md), [release trust](docs/RELEASE_TRUST.md), and the [code-signing preparation](docs/CODE_SIGNING.md).

@@ -10,6 +10,10 @@
 # Secrets: none are needed when the draft is created in THIS repository (the workflow token is enough). Only when the public releases live in a SEPARATE repository does the
 # workflow use the secret RELEASE_REPO_TOKEN (a fine-grained token limited to that one repository, "Contents: read and write") and the variable RELEASE_REPOSITORY.
 # No token is ever written into the application, the installer, app-update.yml or a log.
+#
+# Artifact attestations (docs/RELEASE_TRUST.md): when a draft is requested, the exact staged release files are attested with GitHub's actions/attest (SLSA build provenance,
+# signed through Sigstore) AFTER they were verified and BEFORE the draft is created, so a failed attestation leaves no draft. It records which repository, workflow and commit
+# built those bytes. It is neither an Authenticode signature nor an antivirus or SmartScreen verdict, and it does not change how installed clients update.
 
 name: Release (draft)
 
@@ -49,7 +53,9 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 120
     permissions:
-      contents: write # creates the DRAFT release and uploads its files; nothing else is requested
+      contents: write # creates the DRAFT release and uploads its files
+      id-token: write # lets actions/attest request the short-lived Sigstore signing certificate (OIDC); nothing is stored
+      attestations: write # lets actions/attest persist the build provenance attestation of this repository
     steps:
       - name: The request is well formed
         shell: bash
@@ -123,6 +129,19 @@ jobs:
           path: apps/desktop/release/assets/*
           if-no-files-found: error
           retention-days: 14
+
+      - name: Attest the release files (build provenance)
+        if: ${{ inputs.create_draft }}
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          # Exactly the staged files that the next step uploads, named one by one: a missing file fails the step instead of being skipped by a glob.
+          subject-path: |
+            apps/desktop/release/assets/DS1-Multi-Randomizer-${{ inputs.version }}-Setup-x64.exe
+            apps/desktop/release/assets/DS1-Multi-Randomizer-${{ inputs.version }}-Setup-x64.exe.blockmap
+            apps/desktop/release/assets/DS1-Multi-Randomizer-${{ inputs.version }}-Portable-x64.exe
+            apps/desktop/release/assets/latest.yml
+            apps/desktop/release/assets/release-manifest-${{ inputs.version }}.json
+            apps/desktop/release/assets/SHA256SUMS.txt
 
       - name: Create the DRAFT release
         if: ${{ inputs.create_draft }}

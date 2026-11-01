@@ -1,3 +1,7 @@
+## Release attestations prepared for the next release (2026-11-01; workflow and docs only, uncommitted, no version bump)
+
+`.github/workflows/release.yml` now attests the six staged release files (Setup, blockmap, Portable, `latest.yml`, `release-manifest-X.Y.Z.json`, `SHA256SUMS.txt`) with `actions/attest` v4.2.2 (SHA `1e69f48acb82d1966a394da916b4c1698aa569d6`) after `release-assets.mjs` and before the draft is created, only when `create_draft` is true. Job permissions are `contents: write`, `id-token: write`, `attestations: write`; workflow-level stays `contents: read`. The workflow was **not run**, no release, tag or draft was created or changed, and nothing was pushed; v0.40.0 and earlier have no attestation and the updater is unchanged. User and maintainer verification commands are in `README.md`, `docs/RELEASE_TRUST.md` ("Build provenance attestations") and `docs/RELEASE_CHECKLIST.md`; the decision and the accepted limitation (attestation shares the build job) are in `docs/DECISIONS.md`. Checks: `tools/release/update-lib.test.mjs` and `release-tools.test.mjs` pass (the workflow test now pins permissions, SHA pinning of every action, attest step order, explicit subjects). Not verified until the first real run: the attestation step itself, and `gh attestation verify` on a real asset. Attestation is not a signature, antivirus verdict or SmartScreen reputation.
+
 ## GitHub prerelease v0.40.0 and free-cursor watcher fix (2026-10-31; desktop 0.40.0)
 
 Fog logic, retry limits, the Ceaseless validator and V1-V4 behavior were not touched.
