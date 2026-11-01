@@ -1,4 +1,4 @@
-import { CURRENT_GENERATION_PROFILE, GENERATION_PROFILE_V1, GENERATION_PROFILE_V2, GENERATION_PROFILE_V3, GENERATION_PROFILE_V4, GENERATION_PROFILE_V5 } from '@ds1tr/contracts';
+import { CURRENT_GENERATION_PROFILE, GENERATION_PROFILE_V1, GENERATION_PROFILE_V2, GENERATION_PROFILE_V3, GENERATION_PROFILE_V4, GENERATION_PROFILE_V5, GENERATION_PROFILE_V6 } from '@ds1tr/contracts';
 import { SEED_DERIVATION_V1, type SeedDerivation } from './seeds.js';
 
 /**
@@ -28,7 +28,7 @@ export interface GenerationProfile {
   /** Frozen roaming-boss candidate and fit-class rules; not a user setting. */
   readonly roamingBossFitPolicy: 'legacy-v1' | 'owner-approved-v1';
   /** Whether this profile selects the legacy pinned FogMod annotation source or the project Compact catalog. */
-  readonly fogAnnotationSource: 'legacy-fogmod' | 'compact-v1' | 'compact-v2';
+  readonly fogAnnotationSource: 'legacy-fogmod' | 'compact-v1' | 'compact-v2' | 'compact-v3';
   /** Fog engine: FogHost versions with identical output, the pinned FogMod commit, and the world data set it reads. */
   readonly fogEngine: {
     readonly hostVersions: readonly string[];
@@ -53,7 +53,7 @@ export interface GenerationProfile {
 export interface FogHostRuntimeContract {
   readonly hostVersion: '0.5.0' | '0.6.0' | '0.7.3';
   readonly schemaVersion: 2 | 3;
-  readonly annotationSource: 'legacy-fogmod' | 'compact-v1' | 'compact-v2';
+  readonly annotationSource: 'legacy-fogmod' | 'compact-v1' | 'compact-v2' | 'compact-v3';
 }
 
 const v1: GenerationProfile = Object.freeze({
@@ -147,7 +147,29 @@ const v5: GenerationProfile = Object.freeze({
   completeSettings: v4.completeSettings,
 });
 
-const registry: ReadonlyMap<string, GenerationProfile> = new Map([[v1.id, v1], [v2.id, v2], [v3.id, v3], [v4.id, v4], [v5.id, v5]]);
+const v6: GenerationProfile = Object.freeze({
+  id: GENERATION_PROFILE_V6,
+  title: 'Start-reachability Fog: physically sound Asylum start, no Ceaseless post-boss check',
+  seedDerivation: SEED_DERIVATION_V1,
+  retryBounds: Object.freeze({ maxCombinedAttempts: 3, maxFogAttempts: 5 }),
+  combinedEngine: Object.freeze({ randomizerVersions: Object.freeze(['0.5.66']) }),
+  roamingBossDestinationPolicy: 'safe-handlers-v2',
+  roamingBossFitPolicy: 'owner-approved-v1',
+  fogAnnotationSource: 'compact-v3',
+  fogEngine: Object.freeze({
+    // The shipped host keeps HostVersion 0.7.3; v6 is selected by its own annotation source and catalog fingerprint, so no earlier profile's
+    // allow-list changes (a v6 request is refused by any older host as an unknown annotation source).
+    hostVersions: Object.freeze(['0.7.3']),
+    fogModCommit: v5.fogEngine.fogModCommit,
+    worldDataId: '93da37b479bec09a',
+    compactCatalogVersion: 'ds1tr-compact-full-fog-v3',
+    compactCatalogFingerprint: 'df7aa8f9db20ac309a57dce26ecdc5691e1e6c45c9fa56920d61cbac002802a8',
+  }),
+  fogItemTracking: 'compact-fog-item-tracking-v1',
+  completeSettings: v5.completeSettings,
+});
+
+const registry: ReadonlyMap<string, GenerationProfile> = new Map([[v1.id, v1], [v2.id, v2], [v3.id, v3], [v4.id, v4], [v5.id, v5], [v6.id, v6]]);
 
 export function resolveGenerationProfile(id: string): GenerationProfile | null {
   return registry.get(id) ?? null;
@@ -173,6 +195,13 @@ export function fogHostRuntimeForProfile(
     && typeof profile.fogEngine.compactCatalogVersion === 'string'
     && typeof profile.fogEngine.compactCatalogFingerprint === 'string') {
     return Object.freeze({ hostVersion: '0.6.0', schemaVersion: 3, annotationSource: 'compact-v1' });
+  }
+  if (profile.fogAnnotationSource === 'compact-v3'
+    && profile.fogItemTracking === 'compact-fog-item-tracking-v1'
+    && versions.includes('0.7.3')
+    && typeof profile.fogEngine.compactCatalogVersion === 'string'
+    && typeof profile.fogEngine.compactCatalogFingerprint === 'string') {
+    return Object.freeze({ hostVersion: '0.7.3', schemaVersion: 3, annotationSource: 'compact-v3' });
   }
   if (profile.fogAnnotationSource === 'compact-v2'
     && profile.fogItemTracking === 'compact-fog-item-tracking-v1'

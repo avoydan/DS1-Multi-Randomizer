@@ -4,7 +4,7 @@ import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
-import { buildSettings, seedCodeForProfile, v5ExtraCaseSets } from '../../scripts/goldenCompatibility.mjs';
+import { buildSettings, seedCodeForProfile, v5ExtraCaseSets, v6ExtraCaseSets } from '../../scripts/goldenCompatibility.mjs';
 import { canonicalSettingsJson } from '../../dist/core/canonicalSettings.js';
 import { currentGenerationProfile, resolveGenerationProfile } from '../../dist/core/generationProfiles.js';
 import { decodeSeedCode, encodeSeedCode } from '../../dist/core/seedCode.js';
@@ -99,6 +99,38 @@ test('the v5 golden fixtures pin the Compact Fog hard-lock reproduction and full
   assert.equal(v5.cases[1].settings.fog.enabled, true);
 });
 
+test('the v6 golden fixtures pin the start-reachability regressions: original hard-lock, V5 smoke start-trap, a Ceaseless-rejected world, full triple', async () => {
+  const v6 = (await fixtures()).find((fixture) => fixture.file === 'ds1tr-gen-v6.compact-fog.json');
+  assert.ok(v6, 'the ds1tr-gen-v6 Compact Fog fixture file exists');
+  assert.deepEqual(v6.cases.map((entry) => entry.name), [
+    'v6-original-hardlock-reproduction', 'v6-owner-smoke-start-trap', 'v6-v5-rejected-route-search-2', 'v6-compact-full-triple',
+  ]);
+  const [original, smoke, rejectedByV5, fullTriple] = v6.cases;
+  // A: the original confirmed hard-lock: same master seed and settings as the V4 support bundle, so the same Fog seed that paired the Asylum hallway with Ceaseless.
+  assert.equal(original.masterSeed, '332055808');
+  assert.equal(deriveSeeds(original.masterSeed).fog, 4009337993);
+  assert.deepEqual(original.expected.fogSeeds, [4009337993]);
+  assert.deepEqual(original.expected.attempts, ['success']);
+  assert.equal(original.settings.fog.language, 'POLISH');
+  // B: the owner V5 smoke code (master 13825956): its first Fog seed is accepted on v6 at once.
+  assert.equal(smoke.masterSeed, '13825956');
+  assert.deepEqual(smoke.expected.attempts, ['success']);
+  assert.equal(smoke.expected.fogSeeds.length, 1);
+  // C: v5 exhausted all five Fog attempts for this master seed (golden-v5-route-search-2: 2098234880, 3667276361, 1192827970, 1573785486, 1444496450); v6 accepts the first.
+  assert.equal(rejectedByV5.masterSeed, 'golden-v5-route-search-2');
+  assert.deepEqual(rejectedByV5.expected.fogSeeds, [2098234880]);
+  assert.deepEqual(rejectedByV5.expected.attempts, ['success']);
+  assert.equal(fullTriple.settings.items.enabled, true);
+  assert.equal(fullTriple.settings.enemies.enabled, true);
+  assert.equal(fullTriple.settings.fog.enabled, true);
+  for (const entry of v6.cases) {
+    assert.equal(entry.profile, 'ds1tr-gen-v6');
+    assert.ok(entry.expected.fileCount > 0 && Object.keys(entry.expected.files).length === entry.expected.fileCount);
+    assert.equal(entry.expected.attempts.at(-1), 'success');
+    assert.equal(entry.expected.attempts.length, 1, 'no Fog retry was needed: the retry budget and the acceptance rule do not hide anything');
+  }
+});
+
 test('the V5 recorder preserves its declared profile and new worlds use the promoted profile', () => {
   const [spec] = v5ExtraCaseSets['compact-fog'];
   const seedCode = seedCodeForProfile('ds1tr-gen-v5', spec.masterSeed, buildSettings(spec.patch));
@@ -106,7 +138,11 @@ test('the V5 recorder preserves its declared profile and new worlds use the prom
   assert.equal(decoded.ok, true, decoded.message ?? '');
   assert.equal(decoded.envelope.profile, 'ds1tr-gen-v5');
   assert.equal(resolveGenerationProfile('ds1tr-gen-v5')?.id, 'ds1tr-gen-v5');
-  assert.equal(currentGenerationProfile().id, 'ds1tr-gen-v5');
+  assert.equal(currentGenerationProfile().id, 'ds1tr-gen-v6');
+  const [v6Spec] = v6ExtraCaseSets['compact-fog'];
+  const v6Decoded = decodeSeedCode(seedCodeForProfile('ds1tr-gen-v6', v6Spec.masterSeed, buildSettings(v6Spec.patch)));
+  assert.equal(v6Decoded.ok, true, v6Decoded.message ?? '');
+  assert.equal(v6Decoded.envelope.profile, 'ds1tr-gen-v6');
 });
 
 test('every recorded Seed Code decodes to its recorded profile, master seed and canonical settings, and re-encodes identically', async () => {

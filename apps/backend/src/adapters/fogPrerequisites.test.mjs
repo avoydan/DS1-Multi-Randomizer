@@ -6,7 +6,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { defaultFogHostExecutable, resolveFogPrerequisites, worldDataOptionsForProfile } from '../../dist/adapters/fogPrerequisites.js';
-import { compactRuntimeWorldDataId, compactRuntimeWorldDataManifest, compactRuntimeWorldDataV2Id } from '../../dist/adapters/worldData.js';
+import { compactRuntimeWorldDataId, compactRuntimeWorldDataManifest, compactRuntimeWorldDataV2Id, compactRuntimeWorldDataV3Id } from '../../dist/adapters/worldData.js';
 import { resolveGenerationProfile } from '../../dist/core/generationProfiles.js';
 
 const tmp = () => mkdtemp(path.join(os.tmpdir(), 'ds1tr-fogprereq-'));
@@ -86,6 +86,15 @@ test('world-data preflight selects the Seed Code profile and defaults new runs t
   assert.equal(compactV2.id, v5.fogEngine.worldDataId);
   assert.equal(compactV2.manifest, compactRuntimeWorldDataManifest);
   assert.equal(typeof compactV2.reconstructFiles, 'function');
+  const v6 = resolveGenerationProfile('ds1tr-gen-v6');
+  assert.ok(v6);
+  const compactV3 = worldDataOptionsForProfile(v6, 'C:\\Pristine', nexusEnv, 'C:\\Cache');
+  assert.equal(compactV3.id, compactRuntimeWorldDataV3Id);
+  assert.equal(compactV3.id, v6.fogEngine.worldDataId, 'v6 reads its own prepared world data, never the v5 one');
+  assert.notEqual(compactV3.id, compactRuntimeWorldDataV2Id);
+  assert.equal(compactV3.manifest, compactRuntimeWorldDataManifest);
+  assert.equal(typeof compactV3.reconstructFiles, 'function');
+  assert.equal(compactV3.allowUpstreamDownloads, false, 'v6 needs no download: its data is reconstructed locally');
   const v1 = worldDataOptionsForProfile(legacy, 'C:\\Pristine', nexusEnv, 'C:\\Cache');
   assert.equal(v1.id, legacy.fogEngine.worldDataId);
   assert.equal(v1.manifest, undefined);

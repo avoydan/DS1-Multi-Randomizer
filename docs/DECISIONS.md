@@ -1489,3 +1489,12 @@ Full evidence: `docs/BOSSES_ONLY_AUDIT.md`.
 4. SBOM deferred (see RELEASE_TRUST.md): `npm sbom` covers only 18 npm components, is not deterministic and omits Electron, .NET and NuGet; a partial SBOM would overstate trust.
 5. Signing remains an owner decision; the brief is in CODE_SIGNING.md. The first Nexus release may be unsigned if the page says so. EV is not recommended for SmartScreen reasons.
 6. `SECURITY.md` uses GitHub private vulnerability reporting when enabled (it is currently disabled) and otherwise an issue that carries no details; no email address is invented.
+
+# Generation profile ds1tr-gen-v6: fix the start trap at its root, retire the Ceaseless route check (2026-11-01)
+
+1. The original Fog hard-lock was a start trap, not a Ceaseless post-boss problem: the Asylum starting hallway's only randomized exit (`o8952_0000`) paired with a dead-end pocket, and the project's own v1/v2 catalog gave the hallway two unconditional fixed exits (to the Asylum exterior and to Firelink) that upstream FogMod does not have, so the solver accepted it. Evidence and numbers: `docs/COMPACT_FULL_FOG_V3.md`.
+2. A new profile, not an edit: V6 adds annotation source `compact-v3`, catalog `ds1tr-compact-full-fog-v3` (the hallway exits are conditioned on the interior, the hallway-owned Firelink route is removed), and the `StartReachabilityValidator` postcondition (every Area reachable from the start; retryable `FOG_SEED_UNSOLVABLE`). V1-V5, their fingerprints, world data ids and goldens are untouched; V5 keeps its frozen Ceaseless validator.
+3. The rule lives in the graph. A runtime predicate stricter than the graph would be invisible to FogMod's connector (100 repair tries) and could only reject. The validator therefore only re-asserts reachability.
+4. The Ceaseless fixed-route proof is retired for V6 only. This relies on the topology argument (boss completion is a persistent flag; the pocket is a leaf; the lava route belongs to main Demon Ruins) and is not game-verified.
+5. `Program.HostVersion` stays `0.7.3` (no earlier allow-list changes; a v6 request is refused by an older host as an unknown annotation source); FogHost project version `0.8.0`. Fog retry bounds are unchanged.
+6. Residual risk, recorded and not fixed here: 11 other fixed Area routes are unconditional where upstream has a condition, and 157 project-only fixed routes were not cross-checked.

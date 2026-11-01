@@ -7,7 +7,7 @@ import type { FogCompatibility } from './fogCompatibility.js';
 
 export type FogHostMode = 'dryRun' | 'write';
 export type FogHostOptions = Omit<FogOptions, 'enabled' | 'language'>;
-export type FogAnnotationSource = 'legacy-fogmod' | 'compact-v1' | 'compact-v2';
+export type FogAnnotationSource = 'legacy-fogmod' | 'compact-v1' | 'compact-v2' | 'compact-v3';
 
 export const fogHostSchemaVersion = 3;
 
@@ -156,7 +156,7 @@ export class FogHostProcess {
       ? !('annotationSource' in execution.request)
         && !('pristineGameDirectory' in execution.request)
         && !('expectedAnnotationFingerprint' in execution.request)
-      : ['legacy-fogmod', 'compact-v1', 'compact-v2'].includes(execution.request.annotationSource)
+      : ['legacy-fogmod', 'compact-v1', 'compact-v2', 'compact-v3'].includes(execution.request.annotationSource)
         && typeof execution.request.pristineGameDirectory === 'string'
         && typeof execution.request.expectedAnnotationFingerprint === 'string';
     if (!uint32(execution.request.seed)

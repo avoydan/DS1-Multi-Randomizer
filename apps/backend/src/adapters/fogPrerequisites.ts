@@ -6,10 +6,10 @@ import { promisify } from 'node:util';
 import type { FogLanguage } from '@ds1tr/contracts';
 import { fogReadSet } from './fogCompatibility.js';
 import {
-  compactRuntimeWorldDataId, compactRuntimeWorldDataV2Id, compactRuntimeWorldDataManifest, prepareWorldData,
+  compactRuntimeWorldDataId, compactRuntimeWorldDataV2Id, compactRuntimeWorldDataV3Id, compactRuntimeWorldDataManifest, prepareWorldData,
   type WorldDataOptions, type WorldDataProgress, type WorldDataResult,
 } from './worldData.js';
-import { COMPACT_FOG_CATALOG_V1_VERSION, COMPACT_FOG_CATALOG_V2_VERSION, loadCompactFogProjection, type CompactFogProjection } from './compactFogProjection.js';
+import { COMPACT_FOG_CATALOG_V1_VERSION, COMPACT_FOG_CATALOG_V2_VERSION, COMPACT_FOG_CATALOG_V3_VERSION, loadCompactFogProjection, type CompactFogProjection } from './compactFogProjection.js';
 import { defaultStateRoot } from '../core/gameState.js';
 import { fogHostRuntimeForProfile, type FogHostRuntimeContract, type GenerationProfile } from '../core/generationProfiles.js';
 
@@ -35,7 +35,7 @@ export interface FogPrerequisites {
   executablePath: string;
   dataRoot: string;
   readSet: string[];
-  annotationSource: 'legacy-fogmod' | 'compact-v1' | 'compact-v2';
+  annotationSource: 'legacy-fogmod' | 'compact-v1' | 'compact-v2' | 'compact-v3';
   /** v0.6.0 exports progression graphs for legacy profiles; generation itself still uses executablePath (v0.5.0). */
   progressionModelExecutablePath: string;
   pristineGameDirectory?: string;
@@ -84,7 +84,8 @@ export function worldDataOptionsForProfile(
   cacheRoot = defaultWorldDataCacheRoot(),
 ): WorldDataOptions {
   const compact = profile.fogAnnotationSource !== 'legacy-fogmod';
-  const compactDataId = profile.fogAnnotationSource === 'compact-v2' ? compactRuntimeWorldDataV2Id : compactRuntimeWorldDataId;
+  const compactDataId = profile.fogAnnotationSource === 'compact-v3' ? compactRuntimeWorldDataV3Id
+    : profile.fogAnnotationSource === 'compact-v2' ? compactRuntimeWorldDataV2Id : compactRuntimeWorldDataId;
   const runtime = fogHostRuntimeForProfile(profile);
   if (!runtime) throw new Error('The selected generation profile has no supported FogHost runtime contract.');
   const executablePath = path.resolve(runtime.hostVersion === '0.5.0'
@@ -127,7 +128,7 @@ export async function resolveFogPrerequisites(
   const runtime = context?.fogRuntime;
   if (!runtime || !((runtime.hostVersion === '0.5.0' && runtime.schemaVersion === 2 && runtime.annotationSource === 'legacy-fogmod')
     || (runtime.hostVersion === '0.6.0' && runtime.schemaVersion === 3 && runtime.annotationSource === 'compact-v1')
-    || (runtime.hostVersion === '0.7.3' && runtime.schemaVersion === 3 && runtime.annotationSource === 'compact-v2'))) {
+    || (runtime.hostVersion === '0.7.3' && runtime.schemaVersion === 3 && (runtime.annotationSource === 'compact-v2' || runtime.annotationSource === 'compact-v3')))) {
     return { failure: {
       code: 'FOG_PROFILE_RUNTIME_INVALID',
       userMessage: 'The fog randomizer cannot run for this generation profile. Please update or reinstall DS1 Multi Randomizer.',
@@ -159,7 +160,8 @@ export async function resolveFogPrerequisites(
       ...(annotationSource !== 'legacy-fogmod'
         ? {
           manifest: compactRuntimeWorldDataManifest,
-          id: annotationSource === 'compact-v2' ? compactRuntimeWorldDataV2Id : compactRuntimeWorldDataId,
+          id: annotationSource === 'compact-v3' ? compactRuntimeWorldDataV3Id
+            : annotationSource === 'compact-v2' ? compactRuntimeWorldDataV2Id : compactRuntimeWorldDataId,
           reconstructFiles: context!.reconstructCompactData
             ?? ((pristineDirectory: string, outputRoot: string) => reconstructCompactData(executablePath, pristineDirectory, outputRoot)),
         }
@@ -170,6 +172,7 @@ export async function resolveFogPrerequisites(
     if (!prepared.ok) return { failure: { code: prepared.code, userMessage: prepared.userMessage, technical: prepared.technical } };
     dataRoot = prepared.root;
     worldDataId = annotationSource === 'compact-v1' ? 'compact-runtime-offline-v1'
+      : annotationSource === 'compact-v3' ? compactRuntimeWorldDataV3Id
       : annotationSource === 'compact-v2' ? compactRuntimeWorldDataV2Id : path.basename(prepared.root);
   }
   const events = await names(path.join(dataRoot, 'dist', 'DS1R', 'event'));
@@ -177,8 +180,8 @@ export async function resolveFogPrerequisites(
   if (annotationSource !== 'legacy-fogmod') {
     if (!context?.pristineDirectory) return null;
     try {
-      const catalogVersion = runtime.annotationSource === 'compact-v2'
-        ? COMPACT_FOG_CATALOG_V2_VERSION : COMPACT_FOG_CATALOG_V1_VERSION;
+      const catalogVersion = runtime.annotationSource === 'compact-v3' ? COMPACT_FOG_CATALOG_V3_VERSION
+        : runtime.annotationSource === 'compact-v2' ? COMPACT_FOG_CATALOG_V2_VERSION : COMPACT_FOG_CATALOG_V1_VERSION;
       const compactProjection = await loadCompactFogProjection(executablePath, dataRoot, context.pristineDirectory, catalogVersion);
       return {
         executablePath,

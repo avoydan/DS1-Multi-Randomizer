@@ -87,6 +87,15 @@ namespace FogHost.Tests
                     Console.WriteLine($"Compact V2 boss policy checks: {passed} passed, {failed} failed.");
                     return failed == 0 ? 0 : 1;
                 }
+                if (args.Contains("compact-v3-seed-sweep", StringComparer.Ordinal))
+                {
+                    try { return CompactRealGenerationTest.RunV3SeedSweepFromEnvironment(); }
+                    catch (Exception error)
+                    {
+                        Console.Error.WriteLine($"FAIL Compact Fog v3 seed sweep: {error}");
+                        return 1;
+                    }
+                }
                 if (args.Contains("compact-v2-post-boss-sweep", StringComparer.Ordinal))
                 {
                     try { return CompactRealGenerationTest.RunPostBossSeedSweepFromEnvironment(); }
@@ -120,6 +129,15 @@ namespace FogHost.Tests
                 Test("Compact V2 PvP solo initializers preserve map gate identities and avoid active gates", FogCompactV2PvpPolicyTest.VerifySoloInitializers);
                 Test("Compact V2 retains the Anor Londo writer lookup without adding a PvP-off graph edge", FogCompactV2PvpPolicyTest.VerifyWriterAnchorWhenPvpIsOff);
                 Test("v5 boss completion is a trigger-bound state, not an Area visit", BossProgressionTest.Verify);
+                Test("v6 start reachability rejects a start region whose only exit pairs with a dead-end pocket", StartReachabilityTest.VerifySyntheticStartTrapIsRejected);
+                Test("an unconditional fixed exit out of the start hides the same trap (the original defect)", StartReachabilityTest.VerifySyntheticFakeUnconditionalExitHidesTheTrap);
+                if (Environment.GetEnvironmentVariable("DS1TR_COMPACT_DATA_ROOT") != null && Environment.GetEnvironmentVariable("DS1TR_PRISTINE_DSR_ROOT") != null)
+                {
+                    Test("v3 catalog seals the Asylum start and retires the Ceaseless post-boss proof; v2 stays frozen", StartReachabilityTest.VerifyV3CatalogSealsTheAsylumStart);
+                    Test("regression A: the original confirmed hard-lock seed traps the sealed hallway on v1 and reaches the world on v3", StartReachabilityTest.VerifyOriginalHardLockSeed);
+                    Test("regression B: the V5 owner smoke Fog seed traps the sealed hallway on v2 and reaches the world on v3", StartReachabilityTest.VerifySmokeSeedStartTrap);
+                    Test("regression C: a valid world rejected by the Ceaseless rule is accepted by v6", StartReachabilityTest.VerifyWorldRejectedByCeaselessRuleIsAcceptedByV6);
+                }
                 if (dataRoot != null) Test("verified DSR fact index reads map, spawn-point, ItemLotParam, NpcParam drop and object-act references", FogDsrFactsTest.Verify);
                 Test("error classifier maps FogMod throw sites", Classifier);
                 Test("invariant: a model declared as a Player model (c0000) stays valid; losing it is a violation", ModelDeclarationInvariant);

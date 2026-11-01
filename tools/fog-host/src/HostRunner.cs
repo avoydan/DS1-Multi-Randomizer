@@ -133,11 +133,18 @@ namespace FogHost
             string annotationSha256;
             if (ann == null)
             {
-                if (request.AnnotationSource == HostRequest.CompactAnnotations || request.AnnotationSource == HostRequest.CompactV2Annotations)
+                if (request.AnnotationSource == HostRequest.CompactAnnotations || HostRequest.IsCompactV2Family(request.AnnotationSource))
                 {
                     FogDsrFacts facts = FogDsrFacts.Read(request.FogDataRoot, request.PristineGameDirectory, includeLegacyAnnotations: false);
                     string compactFingerprint;
-                    if (request.AnnotationSource == HostRequest.CompactV2Annotations)
+                    if (request.AnnotationSource == HostRequest.CompactV3Annotations)
+                    {
+                        FogCompactCatalogV3 compact = FogCompactCatalogBuilder.BuildV3(facts);
+                        if (!compact.IsComplete) throw Invalid("Compact annotation coverage is incomplete.");
+                        compactFingerprint = compact.Fingerprint;
+                        ann = compact.CreateFreshCandidateAnnotations();
+                    }
+                    else if (request.AnnotationSource == HostRequest.CompactV2Annotations)
                     {
                         FogCompactCatalogV2 compact = FogCompactCatalogBuilder.BuildV2(facts);
                         if (!compact.IsComplete) throw Invalid("Compact annotation coverage is incomplete.");
@@ -166,7 +173,7 @@ namespace FogHost
                 ? request.ExpectedAnnotationFingerprint
                 : DataRoot.AnnotationSha256(Directory.GetCurrentDirectory());
             Console.WriteLine($"Seed: {opt.DisplaySeed}. Options: {string.Join(" ", opt.GetEnabled())}");
-            if (request.AnnotationSource == HostRequest.CompactV2Annotations)
+            if (HostRequest.IsCompactV2Family(request.AnnotationSource))
                 FogCompactV2PvpPolicy.ApplyGraphOptions(ann, opt["major"], opt["minor"]);
             var graph = new Graph();
             graph.Construct(opt, ann);
@@ -177,8 +184,11 @@ namespace FogHost
 
             Enter("solve-graph", "Connecting fog gates.");
             new GraphConnector().Connect(opt, graph, ann);
+            // ds1tr-gen-v5 (compact-v2) keeps its frozen Ceaseless post-boss check; ds1tr-gen-v6 (compact-v3) replaces it with the general start-reachability postcondition.
             if (request.AnnotationSource == HostRequest.CompactV2Annotations)
                 BossProgressionValidator.ValidatePostBossRoutes(opt, graph, ann);
+            else if (request.AnnotationSource == HostRequest.CompactV3Annotations)
+                StartReachabilityValidator.Validate(opt, graph);
 
             Enter("write-game-data", request.DryRun ? "Computing game data (dry run)." : "Writing game data to staging.");
             var merge = new EmevdMerge(mergeInputs);
@@ -234,7 +244,7 @@ namespace FogHost
                             : EMEVD.Read(Resolve(staging, Path.Combine("event", fileName)));
                         FogVanillaEventBuilder.ReplaceBedOfChaosHelpers(pristine, output);
                     }
-                    if (request.AnnotationSource == HostRequest.CompactV2Annotations)
+                    if (HostRequest.IsCompactV2Family(request.AnnotationSource))
                         FogCompactV2PvpPolicy.AddUnprojectedSoloInitializers(fileName, output, ann);
                     merge.Merge(fileName, output);
                 },

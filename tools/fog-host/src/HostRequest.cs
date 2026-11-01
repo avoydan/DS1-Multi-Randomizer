@@ -18,6 +18,10 @@ namespace FogHost
         public const string LegacyFogModAnnotations = "legacy-fogmod";
         public const string CompactAnnotations = "compact-v1";
         public const string CompactV2Annotations = "compact-v2";
+        /// <summary>Generation profile ds1tr-gen-v6: Compact Fog v2 behavior on the v3 catalog (physically sound Asylum start) with start-reachability instead of the Ceaseless post-boss check.</summary>
+        public const string CompactV3Annotations = "compact-v3";
+        /// <summary>Annotation sources that share every Compact v2 graph option, event builder and boss-fog behavior.</summary>
+        public static bool IsCompactV2Family(string annotationSource) => annotationSource == CompactV2Annotations || annotationSource == CompactV3Annotations;
 
         /// <summary>Contract option key -> FogMod option flag (docs/FOGHOST_INTEGRATION.md).</summary>
         public static readonly IReadOnlyList<(string Key, string Flag)> OptionFlags = new[]
@@ -118,8 +122,8 @@ namespace FogHost
                     ExpectedAnnotationFingerprint = String(root, "expectedAnnotationFingerprint"),
                 };
 
-                if (request.AnnotationSource != LegacyFogModAnnotations && request.AnnotationSource != CompactAnnotations && request.AnnotationSource != CompactV2Annotations)
-                    throw Invalid($"request.annotationSource must be \"{LegacyFogModAnnotations}\", \"{CompactAnnotations}\" or \"{CompactV2Annotations}\".");
+                if (request.AnnotationSource != LegacyFogModAnnotations && request.AnnotationSource != CompactAnnotations && request.AnnotationSource != CompactV2Annotations && request.AnnotationSource != CompactV3Annotations)
+                    throw Invalid($"request.annotationSource must be \"{LegacyFogModAnnotations}\", \"{CompactAnnotations}\", \"{CompactV2Annotations}\" or \"{CompactV3Annotations}\".");
                 if (request.AnnotationSource != LegacyFogModAnnotations && !Sha256.IsMatch(request.ExpectedAnnotationFingerprint))
                     throw Invalid("request.expectedAnnotationFingerprint must be a lowercase SHA-256 for Compact annotations.");
                 if (request.AnnotationSource == LegacyFogModAnnotations && request.ExpectedAnnotationFingerprint.Length != 0)

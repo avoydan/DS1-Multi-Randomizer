@@ -37,7 +37,14 @@ namespace FogHost
                 FogDsrFacts facts = FogDsrFacts.Read(dataRoot, pristineRoot, includeLegacyAnnotations: false);
                 FogCompactBackendProjection projection;
                 string fingerprint;
-                if (catalogVersion == FogCompactCatalogV2.Version)
+                if (catalogVersion == FogCompactCatalogV3.Version)
+                {
+                    FogCompactCatalogV3 catalog = FogCompactCatalogBuilder.BuildV3(facts);
+                    if (!catalog.IsComplete) throw new InvalidDataException("Compact annotation coverage is incomplete.");
+                    projection = catalog.CreateBackendProjection();
+                    fingerprint = catalog.Fingerprint;
+                }
+                else if (catalogVersion == FogCompactCatalogV2.Version)
                 {
                     FogCompactCatalogV2 catalog = FogCompactCatalogBuilder.BuildV2(facts);
                     if (!catalog.IsComplete) throw new InvalidDataException("Compact annotation coverage is incomplete.");

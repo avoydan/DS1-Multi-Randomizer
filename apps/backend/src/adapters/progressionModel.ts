@@ -42,7 +42,7 @@ export const KEY_PLACEMENT_MODEL_MESSAGE = 'Key placement needs the world data o
 function isModel(value: unknown, variant: ProgressionModelVariant, expectedAnnotationSha256: string, annotationSource: string): value is ProgressionModel {
   if (!value || typeof value !== 'object') return false;
   const model = value as Partial<ProgressionModel>;
-  const expectedFormat = annotationSource === 'compact-v2' ? BOSS_PROGRESSION_MODEL_FORMAT : PROGRESSION_MODEL_FORMAT;
+  const expectedFormat = annotationSource === 'compact-v2' || annotationSource === 'compact-v3' ? BOSS_PROGRESSION_MODEL_FORMAT : PROGRESSION_MODEL_FORMAT;
   return model.format === expectedFormat && (model.variant ?? 'vanilla') === variant && model.fogModCommit === worldDataSourceCommit && model.annotationSha256 === expectedAnnotationSha256
     && Array.isArray(model.areas) && Array.isArray(model.edges) && Array.isArray(model.keys) && typeof model.lotAreas === 'object' && model.lotAreas !== null
     && typeof model.start === 'string' && typeof model.prison === 'object'

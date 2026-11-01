@@ -46,6 +46,10 @@ code, which still decodes and re-encodes byte-for-byte as V4. This local QA
 promotion and the later correction are not release-readiness or gameplay-success
 claims.
 
+## ds1tr-gen-v6 (Compact Fog v3; backend 0.47.0, 2026-11-01)
+
+`CURRENT_GENERATION_PROFILE` is now `ds1tr-gen-v6` for newly created worlds. V1 to V5 are frozen and unchanged: their registry entries, the V5 catalog fingerprint `73f3c842...`, the V5 world data id `ef625777d6aa5abf`, the host compatibility identifier `0.7.3` and every golden fixture file (61 cases) are as before, and a V5 Seed Code (for example the V5 smoke code) keeps selecting V5. V6 differs from V5 in exactly two things: the catalog (the Asylum starting hallway has no unconditional exit; fingerprint `df7aa8f9...`, world data id `93da37b479bec09a`) and the Fog postcondition (general start reachability instead of the Ceaseless post-boss route check). The retry budget (3 combined, 5 Fog attempts) is unchanged. Root cause, evidence, rule and residual risk: [COMPACT_FULL_FOG_V3.md](COMPACT_FULL_FOG_V3.md). New golden fixtures: `ds1tr-gen-v6.compact-fog.json` (the original confirmed hard-lock master seed and settings, the V5 owner smoke master seed and settings, a master seed whose five V5 Fog attempts were all rejected, and the Triple defaults).
+
 ## V3/V4 Fog host allow-list (backend 0.46.5; 2026-10-31)
 
 **Defect.** Since `7766d69` (V5 introduction, 2026-10-21) the only Compact-capable FogHost the application ships is the 0.7.x host

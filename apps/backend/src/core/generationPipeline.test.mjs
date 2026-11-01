@@ -134,6 +134,7 @@ test('generation profile selects its frozen roaming-boss destination and fit pol
     ['ds1tr-gen-v3', 'safe-handlers-v2', 'legacy-v1'],
     ['ds1tr-gen-v4', 'safe-handlers-v2', 'owner-approved-v1'],
     ['ds1tr-gen-v5', 'safe-handlers-v2', 'owner-approved-v1'],
+    ['ds1tr-gen-v6', 'safe-handlers-v2', 'owner-approved-v1'],
   ]) {
     const result = await generateRun({ config: config(game), workspacePath: path.join(root, id), profile: resolveGenerationProfile(id) }, () => {}, {
       getPristineSource: async () => ({ directory: pristine }),

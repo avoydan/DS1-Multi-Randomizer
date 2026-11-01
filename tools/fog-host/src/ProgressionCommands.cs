@@ -92,8 +92,8 @@ namespace FogHost
             {
                 root = Path.GetFullPath(root);
                 output = Path.GetFullPath(output);
-            if (annotationSource != HostRequest.LegacyFogModAnnotations && annotationSource != HostRequest.CompactAnnotations && annotationSource != HostRequest.CompactV2Annotations)
-                throw new FogHostException(HostErrors.RequestInvalid, "--annotation-source must be legacy-fogmod, compact-v1 or compact-v2.");
+            if (annotationSource != HostRequest.LegacyFogModAnnotations && annotationSource != HostRequest.CompactAnnotations && annotationSource != HostRequest.CompactV3Annotations && annotationSource != HostRequest.CompactV2Annotations)
+                throw new FogHostException(HostErrors.RequestInvalid, "--annotation-source must be legacy-fogmod, compact-v1, compact-v2 or compact-v3.");
             bool compact = annotationSource != HostRequest.LegacyFogModAnnotations;
             if (compact
                 && (string.IsNullOrWhiteSpace(pristineRoot) || !Regex.IsMatch(expectedFingerprint ?? string.Empty, "^[a-f0-9]{64}$", RegexOptions.CultureInvariant)))
@@ -136,7 +136,17 @@ namespace FogHost
             if (variant == "race-plus") opt["hard"] = true;
             Annotations ann;
             string annotationHash;
-            if (annotationSource == HostRequest.CompactV2Annotations)
+            if (annotationSource == HostRequest.CompactV3Annotations)
+            {
+                FogCompactCatalogV3 compact = FogCompactCatalogBuilder.BuildV3(
+                    FogDsrFacts.Read(root, Path.GetFullPath(pristineRoot), includeLegacyAnnotations: false));
+                if (!compact.IsComplete) throw new FogHostException(HostErrors.EngineFailed, "Compact annotation coverage is incomplete.");
+                if (!string.Equals(compact.Fingerprint, expectedFingerprint, StringComparison.Ordinal))
+                    throw new FogHostException(HostErrors.RequestInvalid, "The Compact annotation fingerprint does not match the generation profile.");
+                ann = compact.CreateFreshCandidateAnnotations();
+                annotationHash = compact.Fingerprint;
+            }
+            else if (annotationSource == HostRequest.CompactV2Annotations)
             {
                 FogCompactCatalogV2 compact = FogCompactCatalogBuilder.BuildV2(
                     FogDsrFacts.Read(root, Path.GetFullPath(pristineRoot), includeLegacyAnnotations: false));

@@ -41,3 +41,9 @@ DS1TR_FOG_DATA_ROOT=<fog data> tools/fog-host/tests/bin/Release/net8.0/FogHost.T
 - The self-tests never touch a game installation.
 - Without `DS1TR_FOG_DATA_ROOT`, the data tests are reported as skipped.
 - A proof on real-format data is at `apps/backend/scripts/fogHostE2e.mjs`.
+- The Compact Fog regression tests (catalog v3, start reachability, the original hard-lock, the V5 smoke seed, a Ceaseless-rejected world) and the V5/V6
+  generation tests need real data: set `DS1TR_COMPACT_DATA_ROOT` (a prepared Compact world-data folder), `DS1TR_PRISTINE_DSR_ROOT` and
+  `DS1TR_TEST_GAME_ROOT` (a clean Dark Souls Remastered copy) and `FOGHOST_EXE`. Without them those tests are not run.
+- Annotation sources a request may name: `legacy-fogmod` (profiles v1/v2), `compact-v1` (v3/v4), `compact-v2` (v5, with the frozen Ceaseless post-boss check)
+  and `compact-v3` (v6: physically sound Asylum start, `StartReachabilityValidator`). Acceptance sample for v6:
+  `DS1TR_COMPACT_V3_SEEDS=1,2,3 FogHost.Tests.exe compact-v3-seed-sweep`. Design: `docs/COMPACT_FULL_FOG_V3.md`.

@@ -3,6 +3,8 @@ import test from 'node:test';
 import {
   COMPACT_FOG_CATALOG_VERSION,
   COMPACT_FOG_CATALOG_V2_VERSION,
+  COMPACT_FOG_CATALOG_V3_VERSION,
+  COMPACT_FOG_CATALOG_V3_FINGERPRINT,
   COMPACT_FOG_PROJECTION_FORMAT,
   CompactFogProjectionError,
   parseCompactFogProjection,
@@ -29,6 +31,10 @@ test('parses a Compact projection without changing its tracked identities', () =
 test('projection parsing requires the profile-selected immutable catalog version', () => {
   const source = { ...valid(), catalogVersion: COMPACT_FOG_CATALOG_V2_VERSION };
   assert.equal(parseCompactFogProjection(source, COMPACT_FOG_CATALOG_V2_VERSION).catalogVersion, COMPACT_FOG_CATALOG_V2_VERSION);
+  assert.equal(parseCompactFogProjection({ ...valid(), catalogVersion: COMPACT_FOG_CATALOG_V3_VERSION }, COMPACT_FOG_CATALOG_V3_VERSION).catalogVersion, 'ds1tr-compact-full-fog-v3');
+  assert.match(COMPACT_FOG_CATALOG_V3_FINGERPRINT, /^[a-f0-9]{64}$/u);
+  assert.throws(() => parseCompactFogProjection({ ...valid(), catalogVersion: COMPACT_FOG_CATALOG_V3_VERSION }, COMPACT_FOG_CATALOG_V2_VERSION), CompactFogProjectionError,
+    'a v3 projection never satisfies a v2 profile');
   assert.throws(() => parseCompactFogProjection(source), CompactFogProjectionError,
     'a v2 projection cannot silently satisfy a v1 caller');
 });

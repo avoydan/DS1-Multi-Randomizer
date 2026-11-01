@@ -275,6 +275,95 @@ namespace FogHost.Tests
             }
         }
 
+        /// <summary>
+        /// Acceptance sample for ds1tr-gen-v6: raw Fog seeds (DS1TR_COMPACT_V3_SEEDS, comma separated) through the real v3 generation path. Prints how many
+        /// the start-reachability rule accepts and how many the connector or the rule rejects as retryable.
+        /// </summary>
+        public static int RunV3SeedSweepFromEnvironment()
+        {
+            string dataRoot = RequiredDirectory("DS1TR_FOG_DATA_ROOT");
+            string pristineRoot = RequiredDirectory("DS1TR_PRISTINE_DSR_ROOT");
+            string seedList = Environment.GetEnvironmentVariable("DS1TR_COMPACT_V3_SEEDS");
+            if (string.IsNullOrWhiteSpace(seedList)) throw new InvalidOperationException("DS1TR_COMPACT_V3_SEEDS must contain a comma-separated list of uint32 Fog seeds.");
+            uint[] seeds = seedList.Split(',').Select(value => uint.Parse(value.Trim(), System.Globalization.CultureInfo.InvariantCulture)).ToArray();
+            FogDsrFacts facts = FogDsrFacts.Read(dataRoot, pristineRoot, includeLegacyAnnotations: false);
+            FogCompactCatalogV3 catalog = FogCompactCatalogBuilder.BuildV3(facts);
+            string originalDirectory = Environment.CurrentDirectory;
+            string scratchRoot = Path.Combine(Path.GetTempPath(), "ds1tr-compact-v3-sweep-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(scratchRoot);
+            var successes = new List<uint>();
+            var retryable = new List<(uint Seed, string Message)>();
+            var unexpected = new List<(uint Seed, string Message)>();
+            string[] options = (Environment.GetEnvironmentVariable("DS1TR_AUDIT_OPTIONS") ?? "traversableFogs,bossFogs,areaWarps,scaling,requireLordSouls").Split(',');
+            try
+            {
+                Environment.CurrentDirectory = dataRoot;
+                foreach (uint seed in seeds)
+                {
+                    try
+                    {
+                        RunCaseV3(dataRoot, scratchRoot, catalog, "v3-" + seed.ToString(System.Globalization.CultureInfo.InvariantCulture), options, seed, "ENGLISH");
+                        successes.Add(seed);
+                    }
+                    catch (FogHostException error) when (error.Code == HostErrors.SeedUnsolvable && error.Retryable)
+                    {
+                        retryable.Add((seed, error.Message));
+                        Console.WriteLine($"RETRYABLE Compact Fog v3 seed {seed}: {error.Message}");
+                    }
+                    catch (Exception error)
+                    {
+                        unexpected.Add((seed, error.ToString()));
+                        Console.Error.WriteLine($"FAIL Compact Fog v3 seed {seed}: {error}");
+                    }
+                    try { Directory.Delete(scratchRoot, true); Directory.CreateDirectory(scratchRoot); } catch (IOException) { }
+                }
+                Console.WriteLine($"Compact Fog v3 seed sweep: {successes.Count}/{seeds.Length} generated; {retryable.Count} typed retryable rejections; {unexpected.Count} unexpected failures.");
+                return unexpected.Count == 0 && successes.Count > 0 ? 0 : 1;
+            }
+            finally
+            {
+                Environment.CurrentDirectory = originalDirectory;
+                try { Directory.Delete(scratchRoot, true); } catch (IOException) { }
+            }
+        }
+
+        private static string[] RunCaseV3(
+            string dataRoot,
+            string scratchRoot,
+            FogCompactCatalogV3 catalog,
+            string name,
+            IEnumerable<string> enabledOptions,
+            uint seed,
+            string language = "ENGLISH")
+        {
+            string runRoot = Path.Combine(scratchRoot, name + "-" + seed + "-" + Guid.NewGuid().ToString("N"));
+            string staging = Path.Combine(runRoot, "staging");
+            Directory.CreateDirectory(runRoot);
+            CopyGameData(Path.Combine(dataRoot, "dist", "DS1R"), staging, RequiredDirectory("DS1TR_PRISTINE_DSR_ROOT"), language);
+            var enabled = new HashSet<string>(enabledOptions, StringComparer.Ordinal);
+            var options = new JsonObject();
+            foreach ((string key, _) in HostRequest.OptionFlags) options[key] = enabled.Contains(key);
+            HostRequest request = HostRequest.Parse(Request(dataRoot, staging, Path.Combine(runRoot, "foghost.log"), options,
+                seed, RequiredDirectory("DS1TR_PRISTINE_DSR_ROOT"), catalog.Fingerprint, HostRequest.CompactV3Annotations, language).ToJsonString());
+            var runner = new HostRunner((_, _) => { });
+            TextWriter originalOutput = Console.Out;
+            HostResult result;
+            try
+            {
+                Console.SetOut(TextWriter.Null);
+                runner.ValidateLayout(request);
+                result = runner.Run(request);
+                DecodeEveryWrittenFile(staging, result);
+                VerifyCompactBossFogActionability(staging, result, catalog.Catalog);
+                VerifyCeaselessDefaultLanding(staging, RequiredDirectory("DS1TR_PRISTINE_DSR_ROOT"), catalog.Catalog);
+            }
+            finally
+            {
+                Console.SetOut(originalOutput);
+            }
+            return result.Files.OrderBy(file => file.Path, StringComparer.Ordinal).Select(file => $"{file.Path}:{file.Size}:{file.Sha256}").ToArray();
+        }
+
         public static int RunPostBossSeedSweepFromEnvironment()
         {
             string dataRoot = RequiredDirectory("DS1TR_FOG_DATA_ROOT");
@@ -681,6 +770,8 @@ namespace FogHost.Tests
                 ["preservedNpcParams"] = new JsonArray(),
             },
         };
+
+        internal static void CopyGameDataForAudit(string source, string target, string pristineRoot, string language) => CopyGameData(source, target, pristineRoot, language);
 
         private static void CopyGameData(string source, string target, string pristineRoot, string language)
         {

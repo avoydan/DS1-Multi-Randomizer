@@ -257,6 +257,40 @@ namespace FogHost
             Array.AsReadOnly(Catalog.LotLocations.Select(lot => lot.FirstLot.Value).ToArray()));
     }
 
+    /// <summary>
+    /// Frozen v3 catalog (generation profile ds1tr-gen-v6): v2 plus a physically correct Undead Asylum start. The starting hallway is separated
+    /// from Oscar's cell by a randomizable wall, so it has no unconditional exit of its own: leaving the Asylum interior needs the balcony and
+    /// Oscar's cell first (upstream FogMod's own conditions), and the crow departure is already the fixed or randomized warp of asylum_loop.
+    /// v1 and v2 gave the hallway two unconditional fixed exits, which let the solver accept layouts whose only hallway exit pairs with a
+    /// dead-end pocket. Ceaseless needs no separate post-boss route proof in v3: its lower route is an ordinary boss-completion edge.
+    /// </summary>
+    public sealed class FogCompactCatalogV3
+    {
+        public const string Version = "ds1tr-compact-full-fog-v3";
+        public FogAnnotationCatalog Catalog { get; }
+        public IReadOnlyList<FogCompactCategoryCoverage> Coverage { get; }
+        public IReadOnlyList<FogBossGatedRoute> BossGatedRoutes { get; }
+        public string Fingerprint => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(Version + "\n" + Catalog.Fingerprint))).ToLowerInvariant();
+        public bool IsComplete => Coverage.All(category => category.State == FogCompactCategoryState.Complete);
+
+        internal FogCompactCatalogV3(FogAnnotationCatalog catalog, IEnumerable<FogCompactCategoryCoverage> coverage,
+            IEnumerable<FogBossGatedRoute> bossGatedRoutes)
+        {
+            Catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
+            Coverage = Array.AsReadOnly((coverage ?? throw new ArgumentNullException(nameof(coverage))).ToArray());
+            BossGatedRoutes = Array.AsReadOnly((bossGatedRoutes ?? throw new ArgumentNullException(nameof(bossGatedRoutes))).ToArray());
+        }
+
+        public Annotations CreateFreshCandidateAnnotations() => Catalog.ToFogModAnnotations();
+
+        public FogCompactBackendProjection CreateBackendProjection() => new FogCompactBackendProjection(
+            Version, Fingerprint,
+            Array.AsReadOnly(Catalog.KeyItems
+                .Where(item => !item.Tags.HasFlag(FogKeyItemTags.RandomOnly) && !item.Tags.HasFlag(FogKeyItemTags.Hard))
+                .Select(item => new FogTrackedItemProjection(item.GameItemId.Category, item.GameItemId.ItemId, true)).ToArray()),
+            Array.AsReadOnly(Catalog.LotLocations.Select(lot => lot.FirstLot.Value).ToArray()));
+    }
+
     public sealed record FogTrackedItemProjection(int EquipType, int ItemId, bool Required);
     public sealed record FogCompactBackendProjection(
         string CatalogVersion,
@@ -558,6 +592,45 @@ namespace FogHost
                 source.CustomStarts, source.DefaultCosts, source.Enemies, source.LotLocations,
                 source.DefaultFlagCols, writerSupportEntrances, source.LotRows, bossCompletions);
             return new FogCompactCatalogV2(catalog, v1.Coverage, bossGatedRoutes);
+        }
+
+        /// <summary>
+        /// The v3 catalog: <see cref="BuildV2"/> with the Asylum start made physically sound. Only the starting hallway's two fixed exits change
+        /// (see <see cref="FogCompactCatalogV3"/>); v2 itself is untouched and keeps its frozen fingerprint.
+        /// </summary>
+        public static FogCompactCatalogV3 BuildV3(FogDsrFacts facts)
+        {
+            FogCompactCatalogV2 v2 = BuildV2(facts);
+            FogAnnotationCatalog source = v2.Catalog;
+            FogCondition leaveAsylum = new FogCondition(FogConditionKind.All, Array.AsReadOnly(new[]
+            {
+                FogConditionReference.Area(new FogAreaId("asylum_balcony")),
+                FogConditionReference.Area(new FogAreaId("asylum_oscar")),
+            }));
+            FogArea[] areas = source.Areas.Select(area =>
+            {
+                if (area.Id.Value != "asylum") return area;
+                // The tutorial departure to Firelink is the crow warp of asylum_loop (fixed edge, or the randomized warp); the hallway-owned
+                // fixed route to Firelink duplicated it and was available at the very start. The hallway's exit to the Asylum exterior needs
+                // the interior first.
+                FogAreaLink[] links = (area.To ?? Array.Empty<FogAreaLink>())
+                    .Where(link => link.Destination.Value != "firelink")
+                    .Select(link => link.Destination.Value == "asylum_outside" && link.Condition == null ? link with { Condition = leaveAsylum } : link)
+                    .ToArray();
+                return area with { To = Array.AsReadOnly(links) };
+            }).ToArray();
+
+            FogArea hallway = areas.Single(area => area.Id.Value == "asylum");
+            if (hallway.To.Any(link => link.Condition == null) || hallway.To.Any(link => link.Destination.Value == "firelink")
+                || !hallway.To.Any(link => link.Destination.Value == "asylum_outside"))
+                throw new InvalidDataException("Compact Fog v3 must not give the Asylum starting hallway an unconditional exit and must keep its conditioned exterior route.");
+
+            FogBossCompletionTransition[] bossCompletions = source.BossCompletions
+                .Select(transition => transition with { RequireFixedPostBossRoute = false }).ToArray();
+            var catalog = new FogAnnotationCatalog(areas, source.KeyItems, source.Warps, source.Entrances,
+                source.CustomStarts, source.DefaultCosts, source.Enemies, source.LotLocations,
+                source.DefaultFlagCols, source.WriterSupportEntrances, source.LotRows, bossCompletions);
+            return new FogCompactCatalogV3(catalog, v2.Coverage, v2.BossGatedRoutes);
         }
 
         private static bool IsV2HigherSide(string entranceName, bool isASide) =>

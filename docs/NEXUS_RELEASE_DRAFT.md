@@ -85,7 +85,7 @@ An **optional** convenience that gives a new character a strong starting loadout
 
 # Known limitations
 
-- **Some seeds need a reroll.** Fog randomization has a safety check that deliberately rejects layouts it cannot prove safe (for example, ones that could leave you with no way out after a boss). When it rejects five attempts in a row the app says so and asks you to try another seed or change Fog options. In a test of 1,000 seeds with default options, about one in four master seeds produced a world (after the app's five automatic Fog attempts). This is the safety check working as designed: the project prefers rejecting an uncertain world over giving you one you could get stuck in. It is not a crash.
+- **Occasionally a seed needs a reroll.** Fog randomization checks, before it gives you a world, that the whole map can be reached from the Asylum start. If it cannot find a layout that passes within its five automatic attempts, the app says so and asks you to try another seed or change Fog options. In the project's tests this is rare, but it is not impossible, and it is not a crash.
 - Fog layouts have been checked by automated generation tests; they have not been played through completely in every combination. Report anything that looks wrong.
 - Randomized worlds can be hard or unfair. That is part of randomizers.
 
@@ -156,7 +156,7 @@ Full notices: THIRD_PARTY_NOTICES.md in the repository and the licenses folder i
 
 **X.Y.Z [OWNER: final version]**
 
-- New worlds use the newest generation rules (`ds1tr-gen-v5`): corrected Fog topology and a safety rule for the Ceaseless Discharge area; the Fog safety check is intentionally conservative, so some seeds ask for a reroll.
+- New worlds use the newest generation rules (`ds1tr-gen-v6`). They fix a start trap: the first wall in the Asylum could lead to a dead-end area whose only way out led back, which left the whole run stuck. The Fog safety check is now a general "everything is reachable from the start" rule and the earlier Ceaseless-only check is retired. Earlier Seed Codes keep generating exactly as before.
 - Older (v3 and v4) Seed Codes with Fog work again.
 - The optional free-cursor helper (F10) now starts only while Dark Souls Remastered is running, and only if you turned it on.
 - Optional Skill Issue Mode.

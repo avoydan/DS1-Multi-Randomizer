@@ -17,6 +17,7 @@
 //   DS1TR_GOLDEN_GAME_SOURCE=<clean game dir> node apps/backend/scripts/goldenCompatibility.mjs record ds1tr-gen-v2 roaming-bosses
 //   DS1TR_GOLDEN_GAME_SOURCE=<clean game dir> node apps/backend/scripts/goldenCompatibility.mjs record ds1tr-gen-v3 compact-fog
 //   DS1TR_GOLDEN_GAME_SOURCE=<clean game dir> node apps/backend/scripts/goldenCompatibility.mjs record ds1tr-gen-v4 roaming-boss-fit
+//   DS1TR_GOLDEN_GAME_SOURCE=<clean game dir> node apps/backend/scripts/goldenCompatibility.mjs record ds1tr-gen-v6 compact-fog
 //   (set DS1TR_STATE_DIR to an empty folder to prepare the world data there; DS1TR_FOG_HOST / DS1TR_DATA_TOOL_EXE as usual)
 
 import { createHash } from 'node:crypto';
@@ -264,6 +265,35 @@ export const v5ExtraCaseSets = {
   ],
 };
 
+/**
+ * ds1tr-gen-v6 (Compact Fog v3): a physically sound Asylum start and the general start-reachability rule instead of the Ceaseless post-boss check.
+ * The cases pin the three worlds that motivated it, under the same master seeds and settings they had before:
+ *  - the original confirmed hard-lock (master 332055808, Fog seed 4009337993: the Asylum hallway wall paired with the Ceaseless pocket);
+ *  - the owner V5 smoke code (master 13825956), whose accepted V5 world traps the start in a four-area region;
+ *  - a master seed whose five Fog attempts were all rejected by the V5 Ceaseless rule (golden-v5-route-search-2) and now generates;
+ *  - the Triple defaults.
+ */
+export const v6ExtraCaseSets = {
+  'compact-fog': [
+    { name: 'v6-original-hardlock-reproduction', masterSeed: '332055808', patch: {
+      items: { enabled: false, randomizeStartingEquipment: true, randomizeGifts: true, randomizeEnemyDrops: true,
+        randomizeShops: true, fashionSouls: true, soulItems: 'shuffled', startingItems: 'mixed-pool', keyPlacement: 'vanilla', laundromat: true },
+      enemies: { enabled: false, randomizeBosses: true, scaling: 'area', replaceMimics: true, replaceRespawningMosquitoes: true,
+        gwynNerf: 'medium', secondGargoyle: 'replace', placement: { algorithm: 'sampling-v1', replacementChance: 100,
+          normalReplacement: 'both', fit: 'fits', difficultyMode: 'random', difficultyStrictness: 'loose', bossReplacement: 'bosses',
+          bossChanceInNormalSlots: 10, roamingBossSouls: 100, roamingBossesStayDead: true, bossChanceInBossSlots: 90 } },
+      fog: { traversableFogs: true, bossFogs: true, areaWarps: true, scaling: true, requireLordSouls: true, language: 'POLISH' },
+      output: { generateSpoilerLog: true },
+    } },
+    { name: 'v6-owner-smoke-start-trap', masterSeed: '13825956', patch: {
+      items: { keyPlacement: 'vanilla', randomizeLordvessel: false, randomizeLordSouls: false, itemDifficulty: 'fair', laundromat: false },
+      enemies: { placement: { bossChanceInNormalSlots: 10, roamingBossSouls: 50, roamingBossesStayDead: false, bossChanceInBossSlots: 90, hostileNpcs: false } },
+    } },
+    { name: 'v6-v5-rejected-route-search-2', masterSeed: 'golden-v5-route-search-2', patch: {} },
+    { name: 'v6-compact-full-triple', masterSeed: 'golden-v6-compact-full-triple', patch: {} },
+  ],
+};
+
 export function buildSettings(patch) {
   const merged = merge(defaults, patch);
   return JSON.parse(JSON.stringify(merged));
@@ -344,9 +374,9 @@ async function main() {
       const profileSets = profile === 'ds1tr-gen-v2' ? v2ExtraCaseSets
         : profile === 'ds1tr-gen-v3' ? v3ExtraCaseSets
           : profile === 'ds1tr-gen-v4' ? v4ExtraCaseSets
-            : profile === 'ds1tr-gen-v5' ? v5ExtraCaseSets : v1ExtraCaseSets;
+            : profile === 'ds1tr-gen-v5' ? v5ExtraCaseSets : profile === 'ds1tr-gen-v6' ? v6ExtraCaseSets : v1ExtraCaseSets;
       const caseList = setName ? profileSets[setName]
-        : (profile === 'ds1tr-gen-v2' || profile === 'ds1tr-gen-v3' || profile === 'ds1tr-gen-v4' || profile === 'ds1tr-gen-v5' ? [] : v1Cases);
+        : (profile === 'ds1tr-gen-v2' || profile === 'ds1tr-gen-v3' || profile === 'ds1tr-gen-v4' || profile === 'ds1tr-gen-v5' || profile === 'ds1tr-gen-v6' ? [] : v1Cases);
       if (!caseList) throw new Error(`Unknown extra case set ${setName}.`);
       const target = path.join(fixtureDirectory, setName ? `${profile}.${setName}.json` : `${profile}.json`);
       const exists = await access(target).then(() => true, () => false);
