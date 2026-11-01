@@ -2,11 +2,30 @@
 
 This page describes the network and local-file behavior of DS1 Multi Randomizer. See [Release trust](RELEASE_TRUST.md) and [Code signing](CODE_SIGNING.md) for distribution and signing status.
 
+## Trust at a glance
+
+| Question | Answer (what is technically established) |
+|---|---|
+| Is the source public? | Yes: https://github.com/avoydan/DS1-Multi-Randomizer, GPL-3.0-only, with a tag for each release. |
+| Which commit built a release? | Each release's `release-manifest-X.Y.Z.json` records the commit and whether the working tree was clean; the tag points at it. |
+| Checksums | `SHA256SUMS.txt` beside every GitHub release; a match shows the file is the published one, nothing more. |
+| Build provenance | Releases built after v0.40.0 carry a GitHub build provenance attestation (`gh attestation verify`, see README). v0.40.0 and earlier do not. The Nexus edition is built locally and is **not** covered yet. Provenance names the repository, workflow and commit; it is not a signature, a scan or a safety guarantee. |
+| Code signing | **None.** All releases are unsigned; Windows SmartScreen or antivirus may warn, and a signature would not by itself remove first-release warnings. |
+| Nexus scan | Nexus scans every uploaded file with VirusTotal and shows the result on the Files tab; a clean result is not a guarantee. |
+| Network | GitHub edition: update checks to GitHub (can be turned off), plus a legacy-only Fog data download. Nexus edition: none. Details below. |
+| Telemetry | None: no analytics, accounts, crash reporting or automatic uploads in the code. |
+| Administrator rights | Not needed: per-user installer (`perMachine: false`, `allowElevation: false`) and the app runs as `asInvoker`. |
+| Game files changed | Only the game data files managed by the app (maps, events, parameters and similar) inside the Dark Souls Remastered folder, and only after **Apply to game**. Saves are not touched. |
+| Backup and restore | A pristine snapshot is the single restore source; **Restore original game** returns the managed files. Steam's Verify integrity of game files is the manual fallback. |
+| Uninstall | Restore the game first, then uninstall in Windows. App data under `%APPDATA%\ds1-triple-randomizer-desktop` is kept until you delete it. |
+| Bundled game files | None: the packages contain no Dark Souls files; the helpers read your own installed copy. |
+| Reporting a vulnerability | See [SECURITY.md](../SECURITY.md). |
+
 ## Network behavior
 
 - **No telemetry, accounts, analytics, crash reporting, or automatic support uploads.** The project has no application server. The app does not send the user's game files, settings, seeds, run history, or support bundle to the project.
-- **Update checks contact GitHub Releases.** Automatic checks are enabled by default and can be disabled in the app's Updates settings; a manual check remains available. A check reads public release metadata. It does not download an update until the user chooses **Download update**. Installation requires a later **Restart and update** action. GitHub can see ordinary connection metadata such as the source IP address and request timing.
-- **Fog data is fetched only when needed.** When Fog/world randomization is used and its cache is missing, the backend downloads 40 data files over HTTPS from the pinned `thefifthmatt/FogMod` commit on `raw.githubusercontent.com`. Every file is checked against a built-in SHA-256 before use. The files are cached locally; subsequent runs can work offline. GitHub can see ordinary connection metadata for these requests.
+- **Update checks (GitHub edition only) contact GitHub Releases.** The **Nexus edition has no update or network code path at all**: it does not load the updater, has no `app-update.yml` and made no non-loopback connection in a live observation (see [NEXUS_MODS.md](NEXUS_MODS.md)). Automatic checks in the GitHub edition are enabled by default and can be disabled in the app's Updates settings; a manual check remains available. A check reads public release metadata. It does not download an update until the user chooses **Download update**. Installation requires a later **Restart and update** action. GitHub can see ordinary connection metadata such as the source IP address and request timing.
+- **Fog data is downloaded only for legacy Seed Codes in the GitHub edition.** New worlds (generation profile v5) and v3/v4 Seed Codes reconstruct their Fog data locally from the player's own game files and download nothing. Only profile v1/v2 Seed Codes need 40 upstream data files; the GitHub edition downloads them over HTTPS from the pinned `thefifthmatt/FogMod` commit on `raw.githubusercontent.com`, checks each against a built-in SHA-256 and caches them; the Nexus edition refuses such a Seed Code instead (`WORLD_DATA_LEGACY_UNAVAILABLE`). GitHub can see ordinary connection metadata for these requests.
 - **Support bundles are user initiated.** Export creates a local ZIP at a location chosen by the user. It is not uploaded by the application.
 - **Local state stays on this computer.** Settings, run history, presets, and game path are stored under `%APPDATA%\ds1-triple-randomizer-desktop`. Seed Codes contain settings and a master seed, not personal information.
 
@@ -29,5 +48,7 @@ Public releases are currently **unsigned**. A valid SHA-256 match proves that a 
 The source repository is public under GPL-3.0-only. The release workflow records the source commit and checks package contents, versions, update source, and hashes. See [Release trust](RELEASE_TRUST.md) for the current limits of those checks.
 
 ## Reporting an issue
+
+Security vulnerabilities: use the private route in [SECURITY.md](../SECURITY.md), not a public issue.
 
 For a suspected tampered release, preserve the file, calculate its SHA-256, and compare it with the checksum for the same version. For a detection that appears incorrect, record the security product, detection name, alert identifier, file version, release URL, and hash, then use that vendor's official submission process. Never share private game files or a support bundle unless you have reviewed it and chosen to do so.

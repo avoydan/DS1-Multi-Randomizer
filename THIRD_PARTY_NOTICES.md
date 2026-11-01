@@ -10,7 +10,10 @@ included under `engines/combined/vendor/` — see
 file list, and the blob-identity verification record. FogHost
 (`tools/fog-host/`) vendors selected FogMod and SoulsIds engine sources at
 pinned commits; see `tools/fog-host/vendor/UPSTREAM_PIN.md`. FogMod's
-game-derived `dist/` data is not included; the user supplies it.
+game-derived `dist/` data is not included: profile v3 and later reconstruct their
+Fog inputs locally from the user's own game files, and the GitHub edition
+downloads the legacy v1/v2 data from FogMod's repository at run time
+(`docs/FOG_DATA_PROVENANCE.md`); the Nexus edition downloads nothing.
 
 | Component | Upstream | License | Distribution policy |
 | --- | --- | --- | --- |

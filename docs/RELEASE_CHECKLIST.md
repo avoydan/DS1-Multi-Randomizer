@@ -1,6 +1,6 @@
 # Release checklist
 
-The short version. The reasons are in [AUTO_UPDATE.md](AUTO_UPDATE.md) (updates, workflow) and [RELEASE_TRUST.md](RELEASE_TRUST.md) (signing, trust).
+The short version. For the final public launch (GitHub and Nexus Mods) use [PUBLICATION_CHECKLIST.md](PUBLICATION_CHECKLIST.md) as well. The reasons are in [AUTO_UPDATE.md](AUTO_UPDATE.md) (updates, workflow) and [RELEASE_TRUST.md](RELEASE_TRUST.md) (signing, trust).
 The workflow stops at a draft and, from the release after v0.40.0, attests its files (build provenance; see [RELEASE_TRUST.md](RELEASE_TRUST.md)). v0.40.0 and earlier have no attestation. Publish as a **public prerelease** by default; publish stable only when explicitly requested.
 
 ## Once, before the first release

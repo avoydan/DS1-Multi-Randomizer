@@ -50,7 +50,7 @@ Replace `X.Y.Z` with the version you downloaded, and repeat the command for `DS1
 
 ## Privacy and network use
 
-There is no telemetry, analytics, account, crash reporting, or automatic support-bundle upload. Update checks contact GitHub Releases; automatic checks can be turned off, and update files are downloaded only after the user requests them. Fog/world randomization downloads 40 checksum-verified data files from a pinned FogMod commit when needed and caches them locally. Network requests expose ordinary connection metadata to GitHub. Read the full [privacy and security statement](docs/SECURITY_AND_PRIVACY.md).
+There is no telemetry, analytics, account, crash reporting, or automatic support-bundle upload, and no Dark Souls game files are bundled (the app works on your own installed copy). The **GitHub** edition checks GitHub Releases for updates (automatic checks can be turned off; files are downloaded only after you ask) and, only for legacy v1/v2 Fog Seed Codes, downloads 40 checksum-verified FogMod data files. New worlds need no download. The **Nexus** edition makes no network connections. Network requests expose ordinary connection metadata to GitHub. The app does not need administrator rights. Read the [trust summary and privacy statement](docs/SECURITY_AND_PRIVACY.md). To report a security problem privately, see [SECURITY.md](SECURITY.md).
 
 ## Source and license
 
@@ -62,4 +62,6 @@ Issues: [GitHub issue tracker](https://github.com/avoydan/DS1-Multi-Randomizer/i
 
 - [Installation, updates, and release process](docs/AUTO_UPDATE.md)
 - [Release trust and executable inventory](docs/RELEASE_TRUST.md)
-- [Nexus Mods publication draft and review status](docs/NEXUS_MODS.md)
+- [Nexus Mods readiness dossier](docs/NEXUS_MODS.md) and [draft page text](docs/NEXUS_RELEASE_DRAFT.md)
+- [Publication checklist](docs/PUBLICATION_CHECKLIST.md)
+- [Security policy](SECURITY.md)
