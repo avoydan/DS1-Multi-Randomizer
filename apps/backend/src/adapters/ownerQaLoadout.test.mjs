@@ -50,6 +50,45 @@ test('vendored Skill Issue overlay resolves the named +5 weapon identity and pre
   assert.match(source, /Havel's Ring was equipped/u);
 });
 
+test('Skill Issue final QA loadout: the nine consumables, the Skull Lantern, the exact goods allow-list and nothing that opens the world', async () => {
+  const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../../');
+  const source = await readFile(path.join(repositoryRoot, 'engines/combined/vendor/tools/DsrDataTool/Program.cs'), 'utf8');
+  const start = source.indexOf('static OwnerQaLoadoutReport ApplyOwnerQaLoadout');
+  const end = source.indexOf('static bool CellValuesEqual');
+  assert.ok(start > 0 && end > start);
+  const overlay = source.slice(start, end);
+
+  // Existing loadout is untouched.
+  for (const fragment of ['("equip_Wep_Right", blackKnightHalberd), ("equip_Wep_Left", grassCrestShield)', '("equip_Helm", havelsHelm), ("equip_Armer", havelsArmor)',
+    '("equip_Accessory01", ringOfFavorAndProtection)', '("equip_Accessory02", cloranthyRing)', '("soul", 10_000)', '("baseVit", 99)', '(twinklingTitanite, 10)'])
+    assert.ok(overlay.includes(fragment), `existing loadout fragment missing: ${fragment}`);
+
+  // Skull Lantern: a weapon in the second left-hand slot, resolved by name and checked left-hand equipable.
+  assert.match(overlay, /const int skullLantern = 1_396_000;/u);
+  assert.match(overlay, /RequireName\(names\.Weapons, skullLantern, "Skull Lantern"\)/u);
+  assert.match(overlay, /\("equip_Subwep_Left", skullLantern\)/u);
+  assert.match(overlay, /leftHandEquipable/u);
+
+  // The goods allow-list is exact: Humanity is goods 500 (the consumable), Prism Stone is the one requested item left out for slot capacity.
+  const requests = [...overlay.matchAll(/\((\d+), "([^"]+)", (\d+)\)/gu)].map((match) => [Number(match[1]), match[2], Number(match[3])]);
+  assert.deepEqual(requests, [
+    [500, 'Humanity', 99], [501, 'Twin Humanities', 99], [240, 'Divine Blessing', 99], [330, 'Homeward Bone', 99], [260, 'Green Blossom', 99],
+    [274, 'Purging Stone', 99], [272, 'Blooming Purple Moss Clump', 99], [312, 'Transient Curse', 99], [280, 'Repair Powder', 99],
+  ]);
+  assert.ok(requests.length + 1 <= 10, 'Titanite plus the consumables must fit the ten CharaInitParam goods slots');
+  assert.match(overlay, /Math\.Min\(requested, maxNum\)/u);
+  assert.match(overlay, /goodsLoadout\.Count > 10/u);
+  assert.match(overlay, /Prism Stone \(goods 370\)/u);
+
+  // Nothing that can unlock or bypass progression, and no progression flag or event is touched by the overlay.
+  for (const forbidden of ['Master Key', 'Orange Charred Ring', 'Covenant of Artorias', 'Lordvessel', 'Crest of Artorias', 'Cage Key', 'Residence Key', 'Key to the Seal',
+    'Archive Tower Giant Door Key', 'Peculiar Doll', 'Broken Pendant', 'Lord Soul', 'Bequeathed']) assert.ok(!requests.some(([, name]) => name.includes(forbidden)), forbidden);
+  assert.doesNotMatch(overlay, /EventFlag|SetEventFlag|emevd|EMEVD|ItemLotParam|MSB1|\.msb/u);
+  // The overlay may only change loadout fields on the class rows, and proves it against the original rows.
+  assert.match(overlay, /originalCharaCells/u);
+  assert.match(overlay, /which is outside the starting loadout/u);
+});
+
 test('Resistance uses DSR CHARACTER_INIT_PARAM.baseDurability, not the unrelated baseLuc field', async () => {
   const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../../');
   const source = await readFile(path.join(repositoryRoot, 'engines/combined/vendor/tools/DsrDataTool/Program.cs'), 'utf8');
@@ -88,7 +127,9 @@ test('real DSR PARAM data: serialized Skill Issue output sets all eight displaye
       assert.equal(result.error, undefined, `${layout.name}: ${result.error?.message}`);
       assert.equal(result.status, 0, `${layout.name}: ${result.stderr}`);
       assert.match(result.stdout, /applied to 10 classes/u, layout.name);
-      assert.match(result.stdout, /Validated DSR items: 9/u, layout.name);
+      assert.match(result.stdout, /Validated DSR items: 19/u, layout.name);
+      assert.match(result.stdout, /Starting inventory: Twinkling Titanite x10; Humanity x99; Twin Humanities x99; Divine Blessing x99; Homeward Bone x99; Green Blossom x99; Purging Stone x99; Blooming Purple Moss Clump x99; Transient Curse x99; Repair Powder x99\./u, layout.name);
+      assert.match(result.stdout, /Second left-hand slot: Skull Lantern\./u, layout.name);
       assert.match(result.stdout, /Black Knight Halberd \+5 item ID: 1105005; EquipParamWeapon base row: 1105000; ReinforceParamWeapon row: 1200 \(level 5\)/u, layout.name);
       assert.ok((await readFile(output)).byteLength > 0, `${layout.name} emitted GameParam`);
     }

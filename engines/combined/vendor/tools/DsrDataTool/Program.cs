@@ -3,7 +3,8 @@
 // Change: InsertEventInstruction/RemoveEventInstruction now keep DS1 "skip N lines" counts
 // consistent (EventSkipRanges.cs); insertions state their anchor. Also adds an
 // owner-only package overlay, apply-owner-qa-loadout, which validates resolved
-// DSR item names/IDs and patches only generated CharaInitParam rows. See
+// DSR item names/IDs and patches only generated CharaInitParam rows (2026-11-03: the
+// starting loadout also carries a Skull Lantern and nine stackable consumables). See
 // engines/combined/vendor/UPSTREAM_PIN.md ("Local modifications").
 
 using System.Security.Cryptography;
@@ -77,6 +78,8 @@ try
             RequireDirectory(options, "package"));
         Console.WriteLine($"Skill Issue Mode loadout applied to {report.Classes} classes.");
         Console.WriteLine($"Validated DSR items: {report.Items}.");
+        Console.WriteLine($"Starting inventory: {report.Inventory}.");
+        Console.WriteLine($"Second left-hand slot: {report.SecondLeftHand}.");
         Console.WriteLine($"Black Knight Halberd +5 item ID: {report.BlackKnightHalberdPlus5Id}; EquipParamWeapon base row: {report.BlackKnightHalberdBaseId}; ReinforceParamWeapon row: {report.BlackKnightHalberdReinforcementId} (level {report.BlackKnightHalberdReinforcementLevel}).");
     }
     else if (command == "install")
@@ -146,6 +149,19 @@ static OwnerQaLoadoutReport ApplyOwnerQaLoadout(string gameDirectory, string pac
     const int cloranthyRing = 104;
     const int havelsRing = 100;
     const int twinklingTitanite = 1_130;
+    // Skull Lantern is a lantern-class WEAPON (EquipParamWeapon), not a goods item; vanilla class rows already
+    // keep catalyst-class weapons (Pyromancy Flame) in the second hand slots, so it goes in the left second slot.
+    const int skullLantern = 1_396_000;
+    // The start kit (CharaInitParam) has exactly ten goods slots, slot 1 is Twinkling Titanite. Only these nine
+    // consumables fit beside it. Prism Stone (goods 370) was requested too and is the one left out for capacity.
+    // "Humanity" appears twice in the English FMG: goods 500 is the consumable referenced by item lots, goods 350
+    // (goodsType 4) is not. Quantities are clamped to the game's own EquipParamGoods.maxNum.
+    var consumableRequests = new (int Id, string Name, int Requested)[]
+    {
+        (500, "Humanity", 99), (501, "Twin Humanities", 99), (240, "Divine Blessing", 99),
+        (330, "Homeward Bone", 99), (260, "Green Blossom", 99), (274, "Purging Stone", 99),
+        (272, "Blooming Purple Moss Clump", 99), (312, "Transient Curse", 99), (280, "Repair Powder", 99),
+    };
 
     var itemMessagePath = Path.Combine(gameDirectory, "msg", "ENGLISH", "item.msgbnd.dcx");
     var sourceGameParamPath = Path.Combine(gameDirectory, "param", "GameParam", "GameParam.parambnd.dcx");
@@ -230,7 +246,28 @@ static OwnerQaLoadoutReport ApplyOwnerQaLoadout(string gameDirectory, string pac
     RequireRow(accessoryParam, ringOfFavorAndProtection, "Ring of Favor and Protection");
     RequireRow(accessoryParam, cloranthyRing, "Cloranthy Ring");
     RequireRow(accessoryParam, havelsRing, "Havel's Ring");
-    RequireRow(ReadSourceParam("EquipParamGoods.param"), twinklingTitanite, "Twinkling Titanite");
+    var goodsParam = ReadSourceParam("EquipParamGoods.param");
+    RequireRow(goodsParam, twinklingTitanite, "Twinkling Titanite");
+    RequireName(names.Weapons, skullLantern, "Skull Lantern");
+    RequireRow(weaponParam, skullLantern, "Skull Lantern");
+    ApplyCompatibleParamdef(goodsParam, paramdefs);
+    var lanternRow = weaponParam.Rows.Single(row => row.ID == skullLantern);
+    if (GetCellInt(lanternRow, "leftHandEquipable", 0) != 1)
+        throw new InvalidDataException("Skill Issue Mode Skull Lantern is not left-hand equipable in EquipParamWeapon.");
+    var goodsLoadout = new List<(int Id, int Quantity)> { (twinklingTitanite, 10) };
+    foreach (var (id, name, requested) in consumableRequests)
+    {
+        RequireName(names.Goods, id, name);
+        RequireRow(goodsParam, id, name);
+        var goodsRow = goodsParam.Rows.Single(row => row.ID == id);
+        var maxNum = GetCellInt(goodsRow, "maxNum", 0);
+        if (GetCellInt(goodsRow, "goodsType", -1) != 0 || GetCellInt(goodsRow, "isConsume", 0) != 1 || maxNum < 1)
+            throw new InvalidDataException($"Skill Issue Mode consumable {name} (goods {id}) is not a stackable consumable in EquipParamGoods.");
+        goodsLoadout.Add((id, Math.Min(requested, maxNum)));
+    }
+    if (goodsLoadout.Count > 10 || goodsLoadout.Select(entry => entry.Id).Distinct().Count() != goodsLoadout.Count)
+        throw new InvalidDataException("Skill Issue Mode goods loadout must fit the ten CharaInitParam goods slots without duplicates.");
+    var goodsLoadoutArray = goodsLoadout.ToArray();
 
     var sourceChara = ReadSourceParam("CharaInitParam.param");
     ApplyCompatibleParamdef(sourceChara, paramdefs);
@@ -280,6 +317,7 @@ static OwnerQaLoadoutReport ApplyOwnerQaLoadout(string gameDirectory, string pac
         .ToDictionary(file => file.Name, file => file.Bytes.ToArray(), StringComparer.OrdinalIgnoreCase);
     var charaParam = PARAM.Read(charaFile.Bytes);
     ApplyCompatibleParamdef(charaParam, paramdefs);
+    var originalCharaCells = charaParam.Rows.ToDictionary(row => row.ID, row => RowCells(row));
 
     var classRowIds = Enumerable.Range(0, 10)
         .Select(index => (Display: 3_000 + index, Start: 2_000 + index))
@@ -298,7 +336,7 @@ static OwnerQaLoadoutReport ApplyOwnerQaLoadout(string gameDirectory, string pac
                 ("baseDex", 99), ("baseDurability", 99), ("baseMag", 99), ("baseFai", 99),
                 ("soulLv", expectedSoulLevels[rowId]), ("soul", 10_000),
                 ("equip_Wep_Right", blackKnightHalberd), ("equip_Wep_Left", grassCrestShield),
-                ("equip_Subwep_Right", -1), ("equip_Subwep_Left", -1),
+                ("equip_Subwep_Right", -1), ("equip_Subwep_Left", skullLantern),
                 ("equip_Helm", havelsHelm), ("equip_Armer", havelsArmor),
                 ("equip_Gaunt", havelsGauntlets), ("equip_Leg", havelsLeggings),
                 ("equip_Accessory01", ringOfFavorAndProtection),
@@ -313,12 +351,13 @@ static OwnerQaLoadoutReport ApplyOwnerQaLoadout(string gameDirectory, string pac
             for (var slot = 1; slot <= 10; slot++)
             {
                 var suffix = slot.ToString("00", System.Globalization.CultureInfo.InvariantCulture);
-                SetCell(row, $"item_{suffix}", slot == 1 ? twinklingTitanite : -1);
-                SetCell(row, $"itemNum_{suffix}", slot == 1 ? 10 : 0);
+                var entry = slot <= goodsLoadoutArray.Length ? goodsLoadoutArray[slot - 1] : (Id: -1, Quantity: 0);
+                SetCell(row, $"item_{suffix}", entry.Id);
+                SetCell(row, $"itemNum_{suffix}", entry.Quantity);
             }
             AssertOwnerQaClass(row, blackKnightHalberd, grassCrestShield, havelsGreatshield, havelsHelm, havelsArmor,
                 havelsGauntlets, havelsLeggings, ringOfFavorAndProtection, cloranthyRing, havelsRing,
-                twinklingTitanite, expectedSoulLevels[rowId]);
+                skullLantern, goodsLoadoutArray, expectedSoulLevels[rowId]);
         }
     }
 
@@ -349,18 +388,44 @@ static OwnerQaLoadoutReport ApplyOwnerQaLoadout(string gameDirectory, string pac
                 AssertOwnerQaClass(verifiedRow, blackKnightHalberd,
                     grassCrestShield, havelsGreatshield,
                     havelsHelm, havelsArmor, havelsGauntlets, havelsLeggings,
-                    ringOfFavorAndProtection, cloranthyRing, havelsRing, twinklingTitanite, expectedSoulLevels[id]);
+                    ringOfFavorAndProtection, cloranthyRing, havelsRing, skullLantern, goodsLoadoutArray, expectedSoulLevels[id]);
                 if (GetCellInt(verifiedRow, "baseLuc") != originalBaseLuc[id])
                     throw new InvalidDataException($"Skill Issue Mode changed the separate baseLuc field on CharaInitParam row {id}.");
             }
+        // Only the starting loadout may differ: every other CharaInitParam row is byte-for-byte the cells it was, and on the ten
+        // class rows (and their display twins) only the stat, soul, equipment and starting-inventory fields changed.
+        var classRowSet = classRowIds.SelectMany(pair => new[] { pair.Display, pair.Start }).ToHashSet();
+        var loadoutFields = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "baseVit", "baseWil", "baseEnd", "baseStr", "baseDex", "baseDurability", "baseMag", "baseFai", "soulLv", "soul",
+        };
+        foreach (var cell in charaParam.Rows[0].Cells.Select(entry => entry.Def.InternalName))
+            if (cell.StartsWith("equip_", StringComparison.Ordinal) || cell.StartsWith("item_", StringComparison.Ordinal) || cell.StartsWith("itemNum_", StringComparison.Ordinal))
+                loadoutFields.Add(cell);
+        if (verifiedParam.Rows.Count != originalCharaCells.Count)
+            throw new InvalidDataException("Skill Issue Mode overlay changed the CharaInitParam row count.");
+        foreach (var verifiedRow in verifiedParam.Rows)
+        {
+            var before = originalCharaCells[verifiedRow.ID];
+            foreach (var (field, value) in RowCells(verifiedRow))
+            {
+                if (CellValuesEqual(before[field], value)) continue;
+                if (!classRowSet.Contains(verifiedRow.ID) || !loadoutFields.Contains(field))
+                    throw new InvalidDataException($"Skill Issue Mode changed {field} on CharaInitParam row {verifiedRow.ID}, which is outside the starting loadout.");
+            }
+        }
         File.Move(temporaryPath, packageParamPath, true);
     }
     finally
     {
         if (File.Exists(temporaryPath)) File.Delete(temporaryPath);
     }
-    return new OwnerQaLoadoutReport(classRowIds.Count, 9, blackKnightHalberd, blackKnightHalberdBaseId, reinforcementId, reinforcementLevel);
+    return new OwnerQaLoadoutReport(classRowIds.Count, 9 + 1 + consumableRequests.Length, blackKnightHalberd, blackKnightHalberdBaseId, reinforcementId, reinforcementLevel,
+        string.Join("; ", goodsLoadoutArray.Select(entry => $"{names.Goods[entry.Id]} x{entry.Quantity}")), names.Weapons[skullLantern]);
 }
+
+static bool CellValuesEqual(object left, object right) =>
+    left is byte[] leftBytes && right is byte[] rightBytes ? leftBytes.AsSpan().SequenceEqual(rightBytes) : Equals(left, right);
 
 static bool IsSameOrWithin(string parent, string child)
 {
@@ -370,7 +435,7 @@ static bool IsSameOrWithin(string parent, string child)
 
 static void AssertOwnerQaClass(
     PARAM.Row row, int weapon, int shield, int excludedShield, int helm, int armor, int gauntlets, int leggings,
-    int ring, int secondRing, int excludedRing, int twinkling, int soulLevel)
+    int ring, int secondRing, int excludedRing, int lantern, (int Id, int Quantity)[] goodsLoadout, int soulLevel)
 {
     foreach (var field in new[] { "baseVit", "baseWil", "baseEnd", "baseStr", "baseDex", "baseDurability", "baseMag", "baseFai" })
         if (GetCellInt(row, field) != 99) throw new InvalidDataException($"Skill Issue Mode invariant failed: {field} on row {row.ID}.");
@@ -380,12 +445,12 @@ static void AssertOwnerQaClass(
         GetCellInt(row, "equip_Armer") != armor || GetCellInt(row, "equip_Gaunt") != gauntlets ||
         GetCellInt(row, "equip_Leg") != leggings || GetCellInt(row, "equip_Accessory01") != ring ||
         GetCellInt(row, "equip_Accessory02") != secondRing ||
-        new[] { "equip_Subwep_Right", "equip_Subwep_Left",
+        GetCellInt(row, "equip_Subwep_Left") != lantern ||
+        new[] { "equip_Subwep_Right",
             "equip_Accessory03", "equip_Accessory04", "equip_Accessory05", "equip_Arrow", "equip_Bolt",
             "equip_SubArrow", "equip_SubBolt", "equip_Skill_01", "equip_Skill_02", "equip_Skill_03",
             "equip_Spell_01", "equip_Spell_02", "equip_Spell_03", "equip_Spell_04", "equip_Spell_05",
-            "equip_Spell_06", "equip_Spell_07" }.Any(field => GetCellInt(row, field) != -1) ||
-        GetCellInt(row, "item_01") != twinkling || GetCellInt(row, "itemNum_01") != 10)
+            "equip_Spell_06", "equip_Spell_07" }.Any(field => GetCellInt(row, field) != -1))
         throw new InvalidDataException($"Skill Issue Mode invariant failed for CharaInitParam row {row.ID}.");
     if (new[] { "equip_Wep_Right", "equip_Wep_Left", "equip_Subwep_Right", "equip_Subwep_Left" }
         .Any(field => GetCellInt(row, field) == excludedShield))
@@ -393,10 +458,13 @@ static void AssertOwnerQaClass(
     if (new[] { "equip_Accessory01", "equip_Accessory02", "equip_Accessory03", "equip_Accessory04", "equip_Accessory05" }
         .Any(field => GetCellInt(row, field) == excludedRing))
         throw new InvalidDataException($"Skill Issue Mode invariant failed: Havel's Ring was equipped on row {row.ID}.");
-    for (var slot = 2; slot <= 10; slot++)
+    // The starting inventory is exactly the allow-list: nothing else, in particular no key, ring-of-progression, Lord Soul or other item
+    // that could open the world (Skill Issue Mode must not be able to hide a real progression bug).
+    for (var slot = 1; slot <= 10; slot++)
     {
         var suffix = slot.ToString("00", System.Globalization.CultureInfo.InvariantCulture);
-        if (GetCellInt(row, $"item_{suffix}") != -1 || GetCellInt(row, $"itemNum_{suffix}") != 0)
+        var expected = slot <= goodsLoadout.Length ? goodsLoadout[slot - 1] : (Id: -1, Quantity: 0);
+        if (GetCellInt(row, $"item_{suffix}") != expected.Id || GetCellInt(row, $"itemNum_{suffix}") != expected.Quantity)
             throw new InvalidDataException($"Skill Issue Mode inventory invariant failed on row {row.ID}, slot {slot}.");
     }
 }
@@ -6218,4 +6286,4 @@ record ActivationReport(
     DateTimeOffset InstalledAt,
     DateTimeOffset? RestoredAt,
     List<ActivationFile> Files);
-record OwnerQaLoadoutReport(int Classes, int Items, int BlackKnightHalberdPlus5Id, int BlackKnightHalberdBaseId, int BlackKnightHalberdReinforcementId, int BlackKnightHalberdReinforcementLevel);
+record OwnerQaLoadoutReport(int Classes, int Items, int BlackKnightHalberdPlus5Id, int BlackKnightHalberdBaseId, int BlackKnightHalberdReinforcementId, int BlackKnightHalberdReinforcementLevel, string Inventory, string SecondLeftHand);
