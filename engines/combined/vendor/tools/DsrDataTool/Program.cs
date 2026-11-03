@@ -11,6 +11,7 @@ using System.Security.Cryptography;
 using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using SoulsFormats;
@@ -80,6 +81,7 @@ try
         Console.WriteLine($"Validated DSR items: {report.Items}.");
         Console.WriteLine($"Starting inventory: {report.Inventory}.");
         Console.WriteLine($"Second left-hand slot: {report.SecondLeftHand}.");
+        Console.WriteLine($"One-time grant: {report.Grant}.");
         Console.WriteLine($"Black Knight Halberd +5 item ID: {report.BlackKnightHalberdPlus5Id}; EquipParamWeapon base row: {report.BlackKnightHalberdBaseId}; ReinforceParamWeapon row: {report.BlackKnightHalberdReinforcementId} (level {report.BlackKnightHalberdReinforcementLevel}).");
     }
     else if (command == "install")
@@ -269,6 +271,52 @@ static OwnerQaLoadoutReport ApplyOwnerQaLoadout(string gameDirectory, string pac
         throw new InvalidDataException("Skill Issue Mode goods loadout must fit the ten CharaInitParam goods slots without duplicates.");
     var goodsLoadoutArray = goodsLoadout.ToArray();
 
+    // One-time grant for what the start kit cannot carry: head armor (the only head slot holds Havel's Helm), rings (the two usable ring slots hold
+    // the existing rings) and the eleventh goods item. A dedicated common event awards one dedicated item lot per item, once, behind a dedicated flag.
+    // The allow-list is exact; nothing here can open the world.
+    const int grantEventId = 8_990;
+    const int grantFlag = 6_931;
+    const int grantFirstLot = 90_010;
+    const int grantLotStep = 10;
+    var grantRequests = new (int Category, int Id, int Quantity, string Name)[]
+    {
+        (0x1000_0000, 190_000, 1, "Sunlight Maggot"), (0x1000_0000, 600_000, 1, "Mask of the Mother"),
+        (0x1000_0000, 590_000, 1, "Mask of the Father"), (0x1000_0000, 610_000, 1, "Mask of the Child"),
+        (0x2000_0000, 128, 1, "Dark Wood Grain Ring"), (0x2000_0000, 100, 1, "Havel's Ring"),
+        (0x2000_0000, 125, 1, "Rusted Iron Ring"), (0x2000_0000, 123, 1, "Slumbering Dragoncrest Ring"),
+        (0x4000_0000, 370, 99, "Prism Stone"),
+    };
+    var grants = new List<(int LotId, int Category, int Id, int Quantity, string Name)>();
+    for (var index = 0; index < grantRequests.Length; index++)
+    {
+        var (category, id, requested, name) = grantRequests[index];
+        var quantity = requested;
+        switch (category)
+        {
+            case 0x1000_0000: RequireName(names.Armor, id, name); RequireRow(protectorParam, id, name); break;
+            case 0x2000_0000: RequireName(names.Accessories, id, name); RequireRow(accessoryParam, id, name); break;
+            case 0x4000_0000:
+                RequireName(names.Goods, id, name); RequireRow(goodsParam, id, name);
+                var grantGoodsRow = goodsParam.Rows.Single(row => row.ID == id);
+                if (GetCellInt(grantGoodsRow, "goodsType", -1) != 0 || GetCellInt(grantGoodsRow, "isConsume", 0) != 1)
+                    throw new InvalidDataException($"Skill Issue Mode grant {name} (goods {id}) is not a stackable consumable.");
+                quantity = Math.Min(requested, GetCellInt(grantGoodsRow, "maxNum", 0));
+                break;
+            default: throw new InvalidDataException($"Unknown Skill Issue Mode grant category {category}.");
+        }
+        if (quantity < 1) throw new InvalidDataException($"Skill Issue Mode grant {name} has no valid carry quantity.");
+        grants.Add((grantFirstLot + index * grantLotStep, category, id, quantity, name));
+    }
+    var grantArray = grants.ToArray();
+    var sourceLotParam = ReadSourceParam("ItemLotParam.param");
+    ApplyCompatibleParamdef(sourceLotParam, paramdefs);
+    // The template is a vanilla, event-awarded, single-item, guaranteed lot with no pickup flag (Prism Stone x1, lot 100000).
+    var lotTemplate = sourceLotParam.Rows.SingleOrDefault(row => row.ID == 100_000)
+        ?? throw new InvalidDataException("Skill Issue Mode grant template item lot 100000 is missing.");
+    if (GetCellInt(lotTemplate, "lotItemId01") != 370 || GetCellInt(lotTemplate, "lotItemCategory01") != 0x4000_0000 || GetCellInt(lotTemplate, "lotItemBasePoint01") != 100
+        || GetCellInt(lotTemplate, "getItemFlagId") != -1 || Enumerable.Range(2, 7).Any(slot => GetCellInt(lotTemplate, $"lotItemId0{slot}") != 0))
+        throw new InvalidDataException("Skill Issue Mode grant template item lot 100000 is not the expected single guaranteed item without a pickup flag.");
+
     var sourceChara = ReadSourceParam("CharaInitParam.param");
     ApplyCompatibleParamdef(sourceChara, paramdefs);
     var charaDefinition = paramdefs.Single(definition => definition.ParamType == "CHARACTER_INIT_PARAM");
@@ -313,7 +361,8 @@ static OwnerQaLoadoutReport ApplyOwnerQaLoadout(string gameDirectory, string pac
     var charaFile = packageBinder.Files.Single(file =>
         file.Name.EndsWith("CharaInitParam.param", StringComparison.OrdinalIgnoreCase));
     var unchangedPackageFiles = packageBinder.Files
-        .Where(file => !file.Name.EndsWith("CharaInitParam.param", StringComparison.OrdinalIgnoreCase))
+        .Where(file => !file.Name.EndsWith("CharaInitParam.param", StringComparison.OrdinalIgnoreCase)
+            && !Path.GetFileName(file.Name).Equals("ItemLotParam.param", StringComparison.OrdinalIgnoreCase))
         .ToDictionary(file => file.Name, file => file.Bytes.ToArray(), StringComparer.OrdinalIgnoreCase);
     var charaParam = PARAM.Read(charaFile.Bytes);
     ApplyCompatibleParamdef(charaParam, paramdefs);
@@ -361,14 +410,47 @@ static OwnerQaLoadoutReport ApplyOwnerQaLoadout(string gameDirectory, string pac
         }
     }
 
+    var lotFile = packageBinder.Files.Single(file => Path.GetFileName(file.Name).Equals("ItemLotParam.param", StringComparison.OrdinalIgnoreCase));
+    var lotParam = PARAM.Read(lotFile.Bytes);
+    ApplyCompatibleParamdef(lotParam, paramdefs);
+    var originalLotCells = lotParam.Rows.ToDictionary(row => row.ID, row => RowCells(row));
+    var originalLotOrder = lotParam.Rows.Select(row => row.ID).ToList();
+    foreach (var grant in grantArray)
+        foreach (var id in new[] { grant.LotId - 1, grant.LotId, grant.LotId + 1 })
+            if (sourceLotParam.Rows.Any(row => row.ID == id) || lotParam.Rows.Any(row => row.ID == id))
+                throw new InvalidDataException($"Skill Issue Mode grant item lot {grant.LotId} (or a neighbour, {id}) is already used.");
+    foreach (var grant in grantArray)
+    {
+        var lotRow = new PARAM.Row(grant.LotId, "", lotParam.AppliedParamdef);
+        foreach (var cell in lotRow.Cells)
+        {
+            var templateValue = lotTemplate.Cells.Single(entry => entry.Def.InternalName.Equals(cell.Def.InternalName, StringComparison.Ordinal)).Value;
+            cell.Value = templateValue is byte[] bytes ? bytes.ToArray() : templateValue;
+        }
+        foreach (var (field, value) in new[]
+        {
+            ("lotItemId01", grant.Id), ("lotItemCategory01", grant.Category), ("lotItemBasePoint01", 100),
+            ("lotItemNum01", grant.Quantity), ("enableLuck01", 0), ("getItemFlagId", -1),
+        }) SetCell(lotRow, field, value);
+        var at = lotParam.Rows.FindIndex(row => row.ID > grant.LotId);
+        if (at < 0) lotParam.Rows.Add(lotRow); else lotParam.Rows.Insert(at, lotRow);
+        var position = lotParam.Rows.IndexOf(lotRow);
+        if ((position > 0 && lotParam.Rows[position - 1].ID >= grant.LotId) || (position + 1 < lotParam.Rows.Count && lotParam.Rows[position + 1].ID <= grant.LotId))
+            throw new InvalidDataException($"Skill Issue Mode grant item lot {grant.LotId} was not inserted in ascending order.");
+    }
+    lotFile.Bytes = lotParam.Write();
+    AssertSkillIssueGrantLots(lotParam, grantArray, lotTemplate);
+
     charaFile.Bytes = charaParam.Write();
     var temporaryPath = packageParamPath + ".owner-qa.tmp";
+    string? grantEventTemporary = null;
+    string grantEventPath = "";
     try
     {
         Directory.CreateDirectory(Path.GetDirectoryName(packageParamPath)!);
         packageBinder.Write(temporaryPath);
         var verificationBinder = BND3.Read(temporaryPath);
-        if (verificationBinder.Files.Count != unchangedPackageFiles.Count + 1)
+        if (verificationBinder.Files.Count != unchangedPackageFiles.Count + 2)
             throw new InvalidDataException("Skill Issue Mode overlay changed the GameParam binder file set.");
         foreach (var (name, bytes) in unchangedPackageFiles)
         {
@@ -414,14 +496,181 @@ static OwnerQaLoadoutReport ApplyOwnerQaLoadout(string gameDirectory, string pac
                     throw new InvalidDataException($"Skill Issue Mode changed {field} on CharaInitParam row {verifiedRow.ID}, which is outside the starting loadout.");
             }
         }
+        // ItemLotParam differs only by the nine added rows (every original row has the same cells, in the same order) and the added rows are the allow-list.
+        var verifiedLotFile = verificationBinder.Files.Single(file => Path.GetFileName(file.Name).Equals("ItemLotParam.param", StringComparison.OrdinalIgnoreCase));
+        var verifiedLots = PARAM.Read(verifiedLotFile.Bytes);
+        ApplyCompatibleParamdef(verifiedLots, paramdefs);
+        if (verifiedLots.Rows.Count != originalLotCells.Count + grantArray.Length)
+            throw new InvalidDataException("Skill Issue Mode overlay changed the ItemLotParam row count by more than the grant lots.");
+        var grantLotIds = grantArray.Select(grant => grant.LotId).ToHashSet();
+        if (!verifiedLots.Rows.Where(row => !grantLotIds.Contains(row.ID)).Select(row => row.ID).SequenceEqual(originalLotOrder))
+            throw new InvalidDataException("Skill Issue Mode overlay reordered or removed original ItemLotParam rows.");
+        foreach (var row in verifiedLots.Rows.Where(row => !grantLotIds.Contains(row.ID)))
+            foreach (var (field, value) in RowCells(row))
+                if (!CellValuesEqual(originalLotCells[row.ID][field], value))
+                    throw new InvalidDataException($"Skill Issue Mode changed {field} on original ItemLotParam row {row.ID}.");
+        AssertSkillIssueGrantLots(verifiedLots, grantArray, lotTemplate);
+
+        // The grant event, written to a temporary file and verified before anything is moved into place.
+        grantEventTemporary = AppendSkillIssueGrantEvent(gameDirectory, packageGameRoot, grantEventId, grantFlag, grantArray.Select(grant => grant.LotId).ToArray(),
+            sourceBinder, paramdefs, out grantEventPath);
         File.Move(temporaryPath, packageParamPath, true);
+        File.Move(grantEventTemporary, grantEventPath, true);
+        grantEventTemporary = null;
+        UpdateSkillIssuePatchManifest(packageDirectory, gameDirectory, packageGameRoot, packageParamPath, grantEventPath);
     }
     finally
     {
         if (File.Exists(temporaryPath)) File.Delete(temporaryPath);
+        if (grantEventTemporary != null && File.Exists(grantEventTemporary)) File.Delete(grantEventTemporary);
     }
-    return new OwnerQaLoadoutReport(classRowIds.Count, 9 + 1 + consumableRequests.Length, blackKnightHalberd, blackKnightHalberdBaseId, reinforcementId, reinforcementLevel,
-        string.Join("; ", goodsLoadoutArray.Select(entry => $"{names.Goods[entry.Id]} x{entry.Quantity}")), names.Weapons[skullLantern]);
+    return new OwnerQaLoadoutReport(classRowIds.Count, 9 + 1 + consumableRequests.Length + grantArray.Length, blackKnightHalberd, blackKnightHalberdBaseId, reinforcementId, reinforcementLevel,
+        string.Join("; ", goodsLoadoutArray.Select(entry => $"{names.Goods[entry.Id]} x{entry.Quantity}")), names.Weapons[skullLantern],
+        $"event {grantEventId}, flag {grantFlag}, lots {grantArray[0].LotId} to {grantArray[^1].LotId} step {grantLotStep}: " + string.Join("; ", grantArray.Select(grant => grant.Quantity == 1 ? grant.Name : $"{grant.Name} x{grant.Quantity}")));
+}
+
+static void AssertSkillIssueGrantLots(PARAM lots, (int LotId, int Category, int Id, int Quantity, string Name)[] grants, PARAM.Row template)
+{
+    foreach (var grant in grants)
+    {
+        var row = lots.Rows.Single(entry => entry.ID == grant.LotId);
+        if (GetCellInt(row, "lotItemId01") != grant.Id || GetCellInt(row, "lotItemCategory01") != grant.Category || GetCellInt(row, "lotItemNum01") != grant.Quantity
+            || GetCellInt(row, "lotItemBasePoint01") != 100 || GetCellInt(row, "getItemFlagId") != -1 || GetCellInt(row, "enableLuck01") != 0
+            || Enumerable.Range(2, 7).Any(slot => GetCellInt(row, $"lotItemId0{slot}") != 0 || GetCellInt(row, $"lotItemBasePoint0{slot}") != 0 || GetCellInt(row, $"lotItemNum0{slot}") != 0))
+            throw new InvalidDataException($"Skill Issue Mode grant item lot {grant.LotId} ({grant.Name}) is not exactly one guaranteed item.");
+        foreach (var (field, value) in RowCells(row))
+            if (!field.StartsWith("lotItem", StringComparison.Ordinal) && field != "getItemFlagId" && !field.StartsWith("enableLuck", StringComparison.Ordinal)
+                && !CellValuesEqual(template.Cells.Single(entry => entry.Def.InternalName == field).Value, value))
+                throw new InvalidDataException($"Skill Issue Mode grant item lot {grant.LotId} differs from the vanilla template in {field}.");
+    }
+}
+
+static string EventSignature(EMEVD.Event entry) =>
+    $"{entry.ID}|{entry.RestBehavior}|" + string.Join(";", entry.Instructions.Select(instruction => $"{instruction.Bank}:{instruction.ID}:{Convert.ToHexString(instruction.ArgData)}"))
+    + "|" + string.Join(";", entry.Parameters.Select(parameter => $"{parameter.InstructionIndex}:{parameter.TargetStartByte}:{parameter.SourceStartByte}:{parameter.ByteCount}"));
+
+// Appends the Skill Issue Mode grant to common.emevd (the package's, or the pristine one when the package has none) and returns the verified temporary file.
+// The event: wait, end if the dedicated flag is already on, award the nine dedicated lots, set the flag. It is initialized from the end of common event 0.
+static string AppendSkillIssueGrantEvent(
+    string gameDirectory, string packageGameRoot, int eventId, int flag, int[] lotIds, BND3 sourceBinder, List<PARAMDEF> paramdefs, out string outputPath)
+{
+    var packageEventDirectory = Path.Combine(packageGameRoot, "event");
+    outputPath = Path.Combine(packageEventDirectory, "common.emevd.dcx");
+    var sourceCommonPath = Path.Combine(gameDirectory, "event", "common.emevd.dcx");
+    var inputPath = File.Exists(outputPath) ? outputPath : sourceCommonPath;
+    var common = EMEVD.Read(inputPath);
+    var before = common.Events.ToDictionary(entry => entry.ID, EventSignature);
+    var constructor = common.Events.Single(entry => entry.ID == 0);
+    var constructorParameterCount = constructor.Parameters.Count;
+    var constructorBefore = constructor.Instructions.Select(instruction => $"{instruction.Bank}:{instruction.ID}:{Convert.ToHexString(instruction.ArgData)}").ToList();
+    if (before.ContainsKey(eventId))
+        throw new InvalidDataException($"Skill Issue Mode grant event ID {eventId} is already used in common.emevd.");
+    if (constructor.Instructions.Any(instruction => (instruction.Bank == 1000 && instruction.ID == 4) || (instruction.Bank == 1003 && instruction.ID == 2)))
+        throw new InvalidDataException("Common event 0 ends unconditionally somewhere; an appended initializer would never run.");
+
+    // Collision evidence: neither the flag nor the event ID appears anywhere in the pristine or the package event files, and the flag is not a value in any
+    // pristine or package GameParam table either.
+    var eventDirectories = new[] { Path.Combine(gameDirectory, "event"), packageEventDirectory }.Where(Directory.Exists).Distinct().ToArray();
+    foreach (var file in eventDirectories.SelectMany(directory => Directory.GetFiles(directory, "*.emevd.dcx")))
+        foreach (var entry in EMEVD.Read(file).Events)
+        {
+            if (entry.ID == flag || entry.ID == eventId)
+                throw new InvalidDataException($"Skill Issue Mode grant flag or event ID collides with event {entry.ID} in {Path.GetFileName(file)}.");
+            foreach (var instruction in entry.Instructions)
+                for (var offset = 0; offset + sizeof(int) <= instruction.ArgData.Length; offset++)
+                {
+                    var value = BitConverter.ToInt32(instruction.ArgData, offset);
+                    if (value == flag || value == eventId)
+                        throw new InvalidDataException($"Skill Issue Mode grant flag {flag} or event ID {eventId} is already referenced by {Path.GetFileName(file)} event {entry.ID}.");
+                }
+        }
+    foreach (var file in sourceBinder.Files)
+    {
+        var table = PARAM.Read(file.Bytes);
+        if (!table.ApplyParamdefCarefully(paramdefs)) continue;
+        foreach (var row in table.Rows)
+        {
+            if (row.ID == flag) throw new InvalidDataException($"Skill Issue Mode grant flag {flag} is a row ID of {Path.GetFileName(file.Name)}.");
+            foreach (var cell in row.Cells)
+                if ((cell.Value is int signed && signed == flag) || (cell.Value is uint unsigned && unsigned == (uint)flag))
+                    throw new InvalidDataException($"Skill Issue Mode grant flag {flag} is used by {Path.GetFileName(file.Name)} ({cell.Def.InternalName}).");
+        }
+    }
+
+    var grantEvent = new EMEVD.Event(eventId, EMEVD.Event.RestBehaviorType.Default);
+    grantEvent.Instructions.Add(new EMEVD.Instruction(1001, 0, new object[] { 1.0f }));
+    grantEvent.Instructions.Add(new EMEVD.Instruction(1003, 2, new object[] { (byte)0, (byte)1, (byte)0, flag }));
+    foreach (var lotId in lotIds) grantEvent.Instructions.Add(new EMEVD.Instruction(2003, 36, new object[] { lotId }));
+    grantEvent.Instructions.Add(new EMEVD.Instruction(2003, 2, new object[] { flag, (byte)1 }));
+    common.Events.Add(grantEvent);
+    constructor.Instructions.Add(new EMEVD.Instruction(2000, 0, new object[] { 0, eventId, 0 }));
+
+    Directory.CreateDirectory(packageEventDirectory);
+    var temporaryPath = outputPath + ".owner-qa.tmp";
+    common.Write(temporaryPath);
+    try
+    {
+        var verification = EMEVD.Read(temporaryPath);
+        if (verification.Events.Count != before.Count + 1)
+            throw new InvalidDataException("Skill Issue Mode grant changed the common event count by more than the grant event.");
+        foreach (var entry in verification.Events)
+        {
+            if (entry.ID == eventId)
+            {
+                var expected = new[]
+                {
+                    "1001:0:" + Convert.ToHexString(BitConverter.GetBytes(1.0f)),
+                    "1003:2:" + Convert.ToHexString(new byte[] { 0, 1, 0, 0 }.Concat(BitConverter.GetBytes(flag)).ToArray()),
+                }.Concat(lotIds.Select(lotId => "2003:36:" + Convert.ToHexString(BitConverter.GetBytes(lotId))))
+                 .Append("2003:2:" + Convert.ToHexString(BitConverter.GetBytes(flag).Concat(new byte[] { 1, 0, 0, 0 }).ToArray())).ToList();
+                var actual = entry.Instructions.Select(instruction => $"{instruction.Bank}:{instruction.ID}:{Convert.ToHexString(instruction.ArgData)}").ToList();
+                if (!actual.SequenceEqual(expected) || entry.Parameters.Count != 0 || entry.RestBehavior != EMEVD.Event.RestBehaviorType.Default)
+                    throw new InvalidDataException("The Skill Issue Mode grant event is not exactly the wait, end-if-done, nine awards and flag set.");
+            }
+            else if (entry.ID == 0)
+            {
+                var after = entry.Instructions.Select(instruction => $"{instruction.Bank}:{instruction.ID}:{Convert.ToHexString(instruction.ArgData)}").ToList();
+                if (after.Count != constructorBefore.Count + 1 || !after.Take(constructorBefore.Count).SequenceEqual(constructorBefore)
+                    || after[^1] != $"2000:0:{Convert.ToHexString(BitConverter.GetBytes(0).Concat(BitConverter.GetBytes(eventId)).Concat(BitConverter.GetBytes(0)).ToArray())}"
+                    || entry.Parameters.Count != constructorParameterCount)
+                    throw new InvalidDataException("Common event 0 changed by more than the appended grant initializer.");
+            }
+            else if (!before.TryGetValue(entry.ID, out var original) || original != EventSignature(entry))
+                throw new InvalidDataException($"Skill Issue Mode grant changed common event {entry.ID}.");
+        }
+        return temporaryPath;
+    }
+    catch
+    {
+        if (File.Exists(temporaryPath)) File.Delete(temporaryPath);
+        throw;
+    }
+}
+
+// Packages of the combined engine ("mod" tree) are activated only when patch-manifest.json lists every changed game file with its final hash. The overlay changes
+// GameParam and common.emevd after that manifest was written, so it records both.
+static void UpdateSkillIssuePatchManifest(string packageDirectory, string gameDirectory, string packageGameRoot, string packageParamPath, string packageCommonPath)
+{
+    var manifestPath = Path.Combine(packageDirectory, "patch-manifest.json");
+    if (!File.Exists(manifestPath) || !Directory.Exists(Path.Combine(packageDirectory, "mod"))) return;
+    var manifest = JsonNode.Parse(File.ReadAllText(manifestPath))?.AsObject() ?? throw new InvalidDataException("patch-manifest.json is not an object.");
+    JsonObject Entry(string source, string packagePath) => new()
+    {
+        ["source"] = source,
+        ["output"] = "mod/" + source,
+        ["sourceSha256"] = HashFile(Path.Combine(gameDirectory, source.Replace('/', Path.DirectorySeparatorChar))),
+        ["outputSha256"] = HashFile(packagePath),
+    };
+    const string paramSource = "param/GameParam/GameParam.parambnd.dcx";
+    const string commonSource = "event/common.emevd.dcx";
+    if (manifest["gameParam"] is JsonObject gameParam && gameParam["source"]?.GetValue<string>() == paramSource) gameParam["outputSha256"] = HashFile(packageParamPath);
+    else manifest["gameParam"] = Entry(paramSource, packageParamPath);
+    var events = manifest["events"] as JsonArray ?? new JsonArray();
+    var existing = events.OfType<JsonObject>().SingleOrDefault(entry => entry["source"]?.GetValue<string>() == commonSource);
+    if (existing != null) existing["outputSha256"] = HashFile(packageCommonPath);
+    else events.Add(Entry(commonSource, packageCommonPath));
+    manifest["events"] = events;
+    File.WriteAllText(manifestPath, manifest.ToJsonString(new JsonSerializerOptions { WriteIndented = true, PropertyNamingPolicy = JsonNamingPolicy.CamelCase }));
 }
 
 static bool CellValuesEqual(object left, object right) =>
@@ -6286,4 +6535,4 @@ record ActivationReport(
     DateTimeOffset InstalledAt,
     DateTimeOffset? RestoredAt,
     List<ActivationFile> Files);
-record OwnerQaLoadoutReport(int Classes, int Items, int BlackKnightHalberdPlus5Id, int BlackKnightHalberdBaseId, int BlackKnightHalberdReinforcementId, int BlackKnightHalberdReinforcementLevel, string Inventory, string SecondLeftHand);
+record OwnerQaLoadoutReport(int Classes, int Items, int BlackKnightHalberdPlus5Id, int BlackKnightHalberdBaseId, int BlackKnightHalberdReinforcementId, int BlackKnightHalberdReinforcementLevel, string Inventory, string SecondLeftHand, string Grant);

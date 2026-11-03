@@ -214,7 +214,7 @@
       "gameConveniencesNote": "Local launcher settings. They do not affect world generation or Seed Codes.",
       "skillIssueLabel": "Skill Issue Mode",
       "skillIssueDescription": "Need a little help with the whole \"git gud\" thing? New characters start absurdly overpowered so you can explore randomized worlds without worrying about combat progression. This does not affect the randomized world or Seed Code.",
-      "skillIssueOverrideNote": "Skill Issue Mode overrides the starting stats, equipment and items you receive (it adds a Skull Lantern and a stack of healing and utility consumables). Your Starting class stats, Starting equipment, and Starting weapon types options keep their saved values.",
+      "skillIssueOverrideNote": "Skill Issue Mode overrides the starting stats, equipment and items you receive (it adds a Skull Lantern, the Sunlight Maggot, the Pinwheel masks, extra rings and stacks of healing and utility consumables, granted once at the start). Your Starting class stats, Starting equipment, and Starting weapon types options keep their saved values.",
       "freeCursorLabel": "Free cursor",
       "freeCursorDescription": "Use the shortcut to release the cursor and switch focus away from the game. Dark Souls Remastered stays visible.",
       "freeCursorShortcutLabel": "Cursor release shortcut",

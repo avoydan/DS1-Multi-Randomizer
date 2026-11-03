@@ -54,7 +54,7 @@ test('Skill Issue final QA loadout: the nine consumables, the Skull Lantern, the
   const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../../');
   const source = await readFile(path.join(repositoryRoot, 'engines/combined/vendor/tools/DsrDataTool/Program.cs'), 'utf8');
   const start = source.indexOf('static OwnerQaLoadoutReport ApplyOwnerQaLoadout');
-  const end = source.indexOf('static bool CellValuesEqual');
+  const end = source.indexOf('static void AssertSkillIssueGrantLots');
   assert.ok(start > 0 && end > start);
   const overlay = source.slice(start, end);
 
@@ -83,7 +83,8 @@ test('Skill Issue final QA loadout: the nine consumables, the Skull Lantern, the
   // Nothing that can unlock or bypass progression, and no progression flag or event is touched by the overlay.
   for (const forbidden of ['Master Key', 'Orange Charred Ring', 'Covenant of Artorias', 'Lordvessel', 'Crest of Artorias', 'Cage Key', 'Residence Key', 'Key to the Seal',
     'Archive Tower Giant Door Key', 'Peculiar Doll', 'Broken Pendant', 'Lord Soul', 'Bequeathed']) assert.ok(!requests.some(([, name]) => name.includes(forbidden)), forbidden);
-  assert.doesNotMatch(overlay, /EventFlag|SetEventFlag|emevd|EMEVD|ItemLotParam|MSB1|\.msb/u);
+  // Events, item lots and flags are touched only by the one-time grant (see skillIssueGrant.test.mjs); no map and no existing flag or progression event.
+  assert.doesNotMatch(overlay, /SetEventFlag|BossFlag|MSB1|\.msb|11\d{6}/u);
   // The overlay may only change loadout fields on the class rows, and proves it against the original rows.
   assert.match(overlay, /originalCharaCells/u);
   assert.match(overlay, /which is outside the starting loadout/u);
@@ -127,9 +128,11 @@ test('real DSR PARAM data: serialized Skill Issue output sets all eight displaye
       assert.equal(result.error, undefined, `${layout.name}: ${result.error?.message}`);
       assert.equal(result.status, 0, `${layout.name}: ${result.stderr}`);
       assert.match(result.stdout, /applied to 10 classes/u, layout.name);
-      assert.match(result.stdout, /Validated DSR items: 19/u, layout.name);
+      assert.match(result.stdout, /Validated DSR items: 28/u, layout.name);
       assert.match(result.stdout, /Starting inventory: Twinkling Titanite x10; Humanity x99; Twin Humanities x99; Divine Blessing x99; Homeward Bone x99; Green Blossom x99; Purging Stone x99; Blooming Purple Moss Clump x99; Transient Curse x99; Repair Powder x99\./u, layout.name);
       assert.match(result.stdout, /Second left-hand slot: Skull Lantern\./u, layout.name);
+      assert.match(result.stdout, /One-time grant: event 8990, flag 6931, lots 90010 to 90090 step 10: Sunlight Maggot; Mask of the Mother; Mask of the Father; Mask of the Child; Dark Wood Grain Ring; Havel's Ring; Rusted Iron Ring; Slumbering Dragoncrest Ring; Prism Stone x99\./u, layout.name);
+      assert.ok((await readFile(path.join(layout.root, path.dirname(layout.relative).startsWith('mod') ? 'mod/event/common.emevd.dcx' : 'event/common.emevd.dcx'))).byteLength > 0, `${layout.name} emitted common.emevd`);
       assert.match(result.stdout, /Black Knight Halberd \+5 item ID: 1105005; EquipParamWeapon base row: 1105000; ReinforceParamWeapon row: 1200 \(level 5\)/u, layout.name);
       assert.ok((await readFile(output)).byteLength > 0, `${layout.name} emitted GameParam`);
     }
