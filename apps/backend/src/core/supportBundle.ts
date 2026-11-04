@@ -15,6 +15,8 @@ export const BUNDLE_ALLOWLIST = [
   'generation/run-manifest.json',
   'generation/generation-summary.json',
   'generation/validation-summary.json',
+  'generation/solver-route.md',
+  'generation/solver-witness.json',
   'logs/app.log',
   'logs/backend.log',
   'logs/relevant-generation.log',
@@ -26,6 +28,7 @@ export type BundleEntryName = (typeof BUNDLE_ALLOWLIST)[number];
 export const BUNDLE_LIMITS: Record<BundleEntryName, number> = {
   'README.txt': 32 * 1024, 'summary.txt': 64 * 1024, 'diagnostics.json': 256 * 1024,
   'generation/run-manifest.json': 256 * 1024, 'generation/generation-summary.json': 128 * 1024, 'generation/validation-summary.json': 128 * 1024,
+  'generation/solver-route.md': 160 * 1024, 'generation/solver-witness.json': 640 * 1024,
   'logs/app.log': 256 * 1024, 'logs/backend.log': 512 * 1024, 'logs/relevant-generation.log': 256 * 1024, 'release/release-manifest.json': 64 * 1024,
 };
 export const BUNDLE_TOTAL_LIMIT = 2 * 1024 * 1024;

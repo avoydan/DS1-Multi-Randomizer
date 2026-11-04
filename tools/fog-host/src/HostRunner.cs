@@ -188,7 +188,12 @@ namespace FogHost
             if (request.AnnotationSource == HostRequest.CompactV2Annotations)
                 BossProgressionValidator.ValidatePostBossRoutes(opt, graph, ann);
             else if (request.AnnotationSource == HostRequest.CompactV3Annotations)
-                StartReachabilityValidator.Validate(opt, graph);
+            {
+                // The witness observes the very search that accepts the world; it changes nothing about it (docs/SOLVER_WITNESS.md).
+                var witnessObserver = new WitnessObserver();
+                GraphChecker.CheckRecord accepted = StartReachabilityValidator.Validate(opt, graph, witnessObserver);
+                WriteSolverWitness(request, opt, graph, ann, accepted, witnessObserver, input.Params["ItemLotParam"]);
+            }
 
             Enter("write-game-data", request.DryRun ? "Computing game data (dry run)." : "Writing game data to staging.");
             var merge = new EmevdMerge(mergeInputs);
@@ -305,6 +310,28 @@ namespace FogHost
                 KeyItemsHash = result.KeyItemsHash,
                 Files = files,
             };
+        }
+
+        /// <summary>Sidecar next to the host log, outside the staging tree and outside the response: a failure here is logged and never fails generation.</summary>
+        public const string SolverWitnessFileName = "solver-witness.json";
+
+        private static void WriteSolverWitness(HostRequest request, RandomizerOptions opt, Graph graph, Annotations ann, GraphChecker.CheckRecord accepted, WitnessObserver observer, SoulsFormats.PARAM itemLots)
+        {
+            try
+            {
+                SolverWitness.KeyItemSources sources = null;
+                try { sources = SolverWitness.KeyItemSources.Find(ann, itemLots); }
+                catch (Exception e) { Console.WriteLine($"Key item lot sources were not read for the solver witness: {e.Message}"); }
+                byte[] witness = SolverWitness.Build(opt, graph, ann, accepted, observer, request.AnnotationSource, sources);
+                string target = Path.Combine(Path.GetDirectoryName(request.LogPath), SolverWitnessFileName);
+                string temporary = target + ".tmp";
+                File.WriteAllBytes(temporary, witness);
+                File.Move(temporary, target, true);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine($"The solver witness could not be written (generation is unaffected): {e.Message}");
+            }
         }
 
         private void Enter(string stage, string message)

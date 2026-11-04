@@ -11,6 +11,7 @@ import enPool from '../locales/en/pool.json';
 import enSeed from '../locales/en/seed.json';
 import enSettings from '../locales/en/settings.json';
 import enSmoke from '../locales/en/smoke.json';
+import enSolver from '../locales/en/solver.json';
 import enSupport from '../locales/en/support.json';
 import plApp from '../locales/pl/app.json';
 import plCommon from '../locales/pl/common.json';
@@ -25,6 +26,7 @@ import plPool from '../locales/pl/pool.json';
 import plSeed from '../locales/pl/seed.json';
 import plSettings from '../locales/pl/settings.json';
 import plSmoke from '../locales/pl/smoke.json';
+import plSolver from '../locales/pl/solver.json';
 import plSupport from '../locales/pl/support.json';
 
 /**
@@ -32,7 +34,7 @@ import plSupport from '../locales/pl/support.json';
  * the groups of one i18next namespace, so every key is `area.path.to.text` and the whole key set is type-checked from the English files.
  * Both languages must provide every area (checked by i18n/locales.test.mjs).
  */
-export const en = { common: enCommon, app: enApp, settings: enSettings, game: enGame, help: enHelp, hints: enHints, history: enHistory, seed: enSeed, smoke: enSmoke, pool: enPool, plan: enPlan, diagnostics: enDiagnostics, support: enSupport, errors: enErrors } as const;
-export const pl = { common: plCommon, app: plApp, settings: plSettings, game: plGame, help: plHelp, hints: plHints, history: plHistory, seed: plSeed, smoke: plSmoke, pool: plPool, plan: plPlan, diagnostics: plDiagnostics, support: plSupport, errors: plErrors } as const;
+export const en = { common: enCommon, app: enApp, settings: enSettings, game: enGame, help: enHelp, hints: enHints, history: enHistory, seed: enSeed, smoke: enSmoke, solver: enSolver, pool: enPool, plan: enPlan, diagnostics: enDiagnostics, support: enSupport, errors: enErrors } as const;
+export const pl = { common: plCommon, app: plApp, settings: plSettings, game: plGame, help: plHelp, hints: plHints, history: plHistory, seed: plSeed, smoke: plSmoke, solver: plSolver, pool: plPool, plan: plPlan, diagnostics: plDiagnostics, support: plSupport, errors: plErrors } as const;
 
 export const resources = { en: { translation: en }, pl: { translation: pl } } as const;

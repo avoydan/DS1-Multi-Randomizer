@@ -83,6 +83,10 @@ CRLF after patching.
    parameters, so the output is unchanged today; the patch keeps the same
    principle as patch 7.
 
+### Solver witness observer (FogHost 0.9.0)
+
+`GraphChecker.Check` gained one optional trailing parameter, `WitnessObserver observer = null` (the observer class is project-owned, `src/WitnessObserver.cs`, namespace `FogMod`), and five read-only calls: `OnStart` after `visit(start)`, `BeginPass` at the top of each pass, `OnBossCompletion` after the completion state is set, and `OnFirstReach` immediately before `visit(edge.To)` (the first edge that reaches an Area, with its linked condition and which of its variables are true). The observer is never read back and no value the search uses is changed: with a null observer every caller behaves exactly as before (`SolverWitnessTest.VerifyObserverDoesNotChangeTheSearch`). Used only by `StartReachabilityValidator` for the V6 witness (`docs/SOLVER_WITNESS.md`).
+
 ### Boss-completion progression modifications
 
 `AnnotationData.cs`, `Graph.cs`, `GraphChecker.cs`, and `GraphConnector.cs` each

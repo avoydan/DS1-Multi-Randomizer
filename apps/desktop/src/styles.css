@@ -326,6 +326,9 @@ input[type="checkbox"]:not(.switch) { width: 17px; height: 17px; padding: 0; acc
 .hint-list li span { color: #c7cdd6; }
 .hint-list li small { color: #8791a0; font-size: 12px; }
 .hint-export { margin-top: 18px; }
+.solver-route h3 { margin: 16px 0 6px; font-size: 15px; color: #d9a95f; }
+.solver-route-text { margin: 0; max-height: 52vh; overflow: auto; padding: 12px; border: 1px solid #242a33; border-radius: 10px; background: #0f1319; color: #c7cdd6; font: 12.5px/1.5 Consolas, 'Cascadia Mono', monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+.solver-tree-toggle { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
 @media (max-width: 1000px), (max-height: 820px) {
   .sidebar { gap: 12px; padding-top: 14px; }
   .brand img { max-width: 88px; }

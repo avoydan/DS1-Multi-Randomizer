@@ -4,11 +4,13 @@ import os from 'node:os';
 import path from 'node:path';
 import type { GameStateReport, RunHistoryEntry } from '@ds1tr/contracts';
 import type { Diagnostics, InstallMode } from '@ds1tr/contracts';
+import { SOLVER_ROUTE_FILE_NAME } from '@ds1tr/contracts';
 import { type BuildInfo, type ManifestLike, buildDiagnostics, pickWorld, signingStateOf } from './diagnostics.js';
 import { currentGenerationProfile } from './generationProfiles.js';
 import { readLogTail } from './appLog.js';
 import { type OperationStore, readOperationStore } from './operations.js';
 import { type RedactionContext, redactionContext } from './redaction.js';
+import { locateWitnessFile } from './solverWitnessStore.js';
 import { type BundleResult, type BundleSource, BUNDLE_LIMITS, buildSupportBundle, readBundleFile } from './supportBundle.js';
 
 /**
@@ -119,6 +121,10 @@ export async function assembleSupportBundle(deps: SupportDependencies, request: 
   const build = loadBuildInfo(deps.runtimeRoot);
   const generateWorkspace = operations.generate?.workspacePath;
   const generationLog = contained(deps.runRoot, generateWorkspace) ? readLogTail(path.join(generateWorkspace, 'generation.log'), BUNDLE_LIMITS['logs/relevant-generation.log']) : '';
+  const witnessFile = entry ? await locateWitnessFile(entry.packagePath, deps.runRoot).catch(() => null) : null;
+  const witnessFiles = witnessFile
+    ? { witness: readBundleFile(witnessFile, BUNDLE_LIMITS['generation/solver-witness.json']), route: readBundleFile(path.join(path.dirname(witnessFile), SOLVER_ROUTE_FILE_NAME), BUNDLE_LIMITS['generation/solver-route.md']) }
+    : null;
   const sources: BundleSource[] = [
     { name: 'README.txt', content: request.readmeText.slice(0, BUNDLE_LIMITS['README.txt']) },
     { name: 'summary.txt', content: request.summaryText.slice(0, BUNDLE_LIMITS['summary.txt']) },
@@ -144,6 +150,9 @@ export async function assembleSupportBundle(deps: SupportDependencies, request: 
         errors: operations.generate?.errors ?? [], warnings: operations.generate?.warnings ?? [],
       },
     },
+    // The solver witness of the chosen world (docs/SOLVER_WITNESS.md): the route the solver believed and the full proof tree. No paths, no timestamps.
+    { name: 'generation/solver-route.md', content: witnessFiles?.route ?? null },
+    { name: 'generation/solver-witness.json', content: witnessFiles?.witness ?? null },
     { name: 'logs/app.log', content: deps.appLogPath ? readLogTail(deps.appLogPath, BUNDLE_LIMITS['logs/app.log']) || null : null },
     { name: 'logs/backend.log', content: readLogTail(deps.backendLogPath, BUNDLE_LIMITS['logs/backend.log']) || null },
     { name: 'logs/relevant-generation.log', content: generationLog || null },

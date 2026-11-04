@@ -26,7 +26,7 @@ namespace FogMod
             public Dictionary<Edge, float> InEdge = new Dictionary<Edge, float>();
         }
         public CheckRecord Check(RandomizerOptions opt, Graph g, string start,
-            IEnumerable<string> initiallyCompletedBossCompletions = null, Func<Edge, bool> edgeAllowed = null)
+            IEnumerable<string> initiallyCompletedBossCompletions = null, Func<Edge, bool> edgeAllowed = null, WitnessObserver observer = null)
         {
             Dictionary<string, Node> graph = g.graph;
             foreach (Node node in graph.Values)
@@ -62,6 +62,7 @@ namespace FogMod
             HashSet<Edge> seenEdge = new HashSet<Edge>();
             Dictionary<string, NodeRecord> recs = new Dictionary<string, NodeRecord>();
             visit(start);
+            observer?.OnStart(start, graph[start].Items);
             recs[start] = new NodeRecord { Area = start, Dist = 0 };
             bool lastLoop = false;
             Dictionary<Edge, float> duplicatePaths = new Dictionary<Edge, float>();
@@ -126,6 +127,7 @@ namespace FogMod
             while (true)
             {
                 if (opt["explain"]) Console.WriteLine("---");
+                observer?.BeginPass();
                 int diff = visited.Count + bossCompletions.Count;
                 foreach (string loc in visited.OrderBy(l => recs[l].Dist).ToList())
                 {
@@ -160,6 +162,7 @@ namespace FogMod
                                 && bossCompletions.Add(completion.Key))
                             {
                                 config[completion.Key] = Expr.TRUE;
+                                observer?.OnBossCompletion(completion.Key, completion.Value, edge);
                                 if (opt["explain"]) Console.WriteLine($"Boss completion achievable: {completion.Value.EventId} via {completion.Value.TriggerEntrance}");
                             }
                         }
@@ -171,6 +174,7 @@ namespace FogMod
                         }
                         else
                         {
+                            observer?.OnFirstReach(loc, edge, config, graph[edge.To].Items);
                             visit(edge.To);
                             if (opt["explain"]) Console.WriteLine($"{loc} -> {edge.To} ({dist}) ({edge.Text} -> {(edge.Link == null ? "" : edge.Link.Text)}{(edge.LinkedExpr == null ? "" : $", if {edge.LinkedExpr}")})");
                         }

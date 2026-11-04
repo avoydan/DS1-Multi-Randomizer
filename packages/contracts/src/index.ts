@@ -394,6 +394,7 @@ export * from './generation.js';
 export * from './installation.js';
 export * from './smokeTests.js';
 export * from './hintSheet.js';
+export * from './solverRoute.js';
 export * from './diagnostics.js';
 export * from './problemText.js';
 export * from './settingsRegistry.js';

@@ -17,10 +17,13 @@ namespace FogHost
     /// </summary>
     public static class StartReachabilityValidator
     {
-        public static void Validate(RandomizerOptions options, Graph graph)
+        public static void Validate(RandomizerOptions options, Graph graph) => Validate(options, graph, null);
+
+        /// <summary>Same check; an optional <see cref="WitnessObserver"/> records, inside this very search, why each Area was first believed reachable. Returns the accepted record.</summary>
+        public static GraphChecker.CheckRecord Validate(RandomizerOptions options, Graph graph, WitnessObserver observer)
         {
             string start = graph.start?.Area ?? throw new InvalidOperationException("The graph has no start Area to check reachability from.");
-            GraphChecker.CheckRecord check = new GraphChecker().Check(options, graph, start);
+            GraphChecker.CheckRecord check = new GraphChecker().Check(options, graph, start, null, null, observer);
             string[] unvisited = (check.Unvisited ?? new System.Collections.Generic.List<string>()).OrderBy(area => area, StringComparer.Ordinal).ToArray();
             if (unvisited.Length > 0)
             {
@@ -31,6 +34,7 @@ namespace FogHost
                     retryScope: "fog")
                 { Stage = "solve-graph" };
             }
+            return check;
         }
     }
 }

@@ -1,0 +1,27 @@
+{
+  "action": {
+    "view": "Trasa solvera",
+    "unavailable": "Brak trasy solvera dla tego świata. Powstał, zanim trasa solvera istniała, albo nie ma grafu Fog. Użyj opcji Wygeneruj pliki ponownie, aby ją utworzyć."
+  },
+  "viewer": {
+    "title": "Trasa solvera",
+    "close": "Zamknij",
+    "loading": "Wczytywanie trasy solvera…",
+    "unavailable": "Trasa solvera nie jest dostępna dla tego świata. Powstał, zanim trasa solvera istniała, jego folder uruchomienia zniknął albo Fog był wyłączony. Użyj opcji Wygeneruj pliki ponownie, aby utworzyć świat jeszcze raz.",
+    "warning": "Ta trasa to spoiler: pokazuje, dokąd prowadzą bramy mgły i gdzie leżą przedmioty kluczowe.",
+    "intro": "To dokładnie ta trasa, na podstawie której solver uznał ten świat za możliwy do ukończenia. Przejdź ją w grze; pierwszy krok, którego nie da się wykonać, pokazuje, gdzie model solvera różni się od prawdziwej gry.",
+    "seedCode": "Kod ziarna",
+    "profile": "Profil generowania",
+    "fogSeed": "Ziarno Fog",
+    "attempt": "Próba",
+    "attemptValue": "Fog {{fog}}, połączona {{combined}}",
+    "claim": "Twierdzenie solvera",
+    "claimValue": "Osiągnięto {{reached}} z {{total}} obszarów; cel trasy: {{target}}",
+    "route": "Trasa",
+    "tree": "Pełne drzewo dowodu",
+    "showTree": "Pokaż pełne drzewo dowodu",
+    "copy": "Kopiuj trasę",
+    "copied": "Trasa skopiowana.",
+    "copyFailed": "Nie udało się skopiować trasy."
+  }
+}

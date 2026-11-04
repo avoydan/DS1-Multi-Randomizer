@@ -1,4 +1,4 @@
-import type { SmokeExpectation, Diagnostics, HintDocument, DecodedSeedPayload, EnemyPoolDescription, GenerationSettings, PersistedSettings, RunHistoryEntry, GameStateReport, GenerationEvent, GenerationResult, InstallationValidation, OperationResult, PipelinePlan, PresetDocument, PresetImportResult, RandomizerConfig } from '@ds1tr/contracts';
+import type { SmokeExpectation, Diagnostics, HintDocument, SolverWitnessDocument, DecodedSeedPayload, EnemyPoolDescription, GenerationSettings, PersistedSettings, RunHistoryEntry, GameStateReport, GenerationEvent, GenerationResult, InstallationValidation, OperationResult, PipelinePlan, PresetDocument, PresetImportResult, RandomizerConfig } from '@ds1tr/contracts';
 
 export interface DetectedInstallation { gamePath: string; label: string; valid: boolean; problems: string[] }
 export interface SmokeTestList {
@@ -78,6 +78,7 @@ export const api = {
   deleteHistoryEntry: (id: string) => post<{ ok: boolean }>('/history/delete', { id }),
   spoiler: (id: string) => post<{ ok: true; text: string } | { ok: false; code?: string; message: string }>('/history/spoiler', { id }),
   hints: (id: string) => post<{ ok: true; document: HintDocument } | { ok: false; code: string }>('/hints/get', { id }),
+  solverRoute: (id: string) => post<{ ok: true; document: SolverWitnessDocument; markdown: string } | { ok: false; code: string }>('/solver-route/get', { id }),
   diagnostics: (gamePath: string, language: string, worldId?: string) => post<{ ok: true; diagnostics: Diagnostics }>('/diagnostics', { gamePath, language, worldId }),
   supportBundle: (request: { gamePath: string; language: string; worldId?: string; summaryText: string; readmeText: string }) =>
     post<{ ok: true; fileName: string; contentBase64: string; report: { entries: Array<{ name: string; bytes: number; truncated: boolean }>; totalBytes: number; redactions: number } } | { ok: false; code: string }>('/support/bundle', request),

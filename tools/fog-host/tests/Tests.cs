@@ -132,8 +132,21 @@ namespace FogHost.Tests
                 Test("v6 start reachability rejects a start region whose only exit pairs with a dead-end pocket", StartReachabilityTest.VerifySyntheticStartTrapIsRejected);
                 Test("an unconditional fixed exit out of the start hides the same trap (the original defect)", StartReachabilityTest.VerifySyntheticFakeUnconditionalExitHidesTheTrap);
                 Test("v6 boss-arena entry: a boss arena reachable only through the link back from its bell room is rejected; entering through its own fog keeps the link usable", BossArenaEntryTest.VerifySyntheticBossArenaEntry);
+                Test("solver witness: the observer is read-only and never changes the search", SolverWitnessTest.VerifyObserverDoesNotChangeTheSearch);
+                Test("solver witness: each Area's predecessor is the edge that first reached it, in the solver's own order", SolverWitnessTest.VerifyPredecessorsAreFirstReachInSolverOrder);
+                Test("solver witness: both sides of every gate are kept (boss-encounter side, other side, vanilla vs shuffled pairing)", SolverWitnessTest.VerifyBothGateSidesAreKept);
+                Test("solver witness: conditions and key-item acquisition are shown and ordered before the step that needs them", SolverWitnessTest.VerifyConditionsAndItemAcquisitionAreShown);
+                Test("solver witness: the way back is read from the graph (an in-map link is not one-way just because it has no pair), with its condition", SolverWitnessTest.VerifyWayBackIsReadFromTheGraph);
+                Test("solver witness: the route is walked greedily and lists a return only when nothing else is ready", SolverWitnessTest.VerifyRouteDoesNotJumpBetweenBranchesNeedlessly);
+                Test("solver witness: the main route is self-consistent (every step leaves a reached Area; every requirement is met earlier)", SolverWitnessTest.VerifyMainRouteIsSelfConsistent);
+                Test("solver witness: a glitched-logic edge is marked, and none exists when glitched logic is off", SolverWitnessTest.VerifyGlitchedRouteIsMarkedAndAbsentWhenOff);
+                Test("solver witness: the JSON is deterministic, carries no paths or timestamps and exposes both gate sides", SolverWitnessTest.VerifyDeterministicJsonRoundTrip);
                 if (Environment.GetEnvironmentVariable("DS1TR_COMPACT_DATA_ROOT") != null && Environment.GetEnvironmentVariable("DS1TR_PRISTINE_DSR_ROOT") != null)
                 {
+                    Test("solver witness regression A: the original Asylum -> Ceaseless trap shows the fake unconditional hallway exit as its first step", SolverWitnessTest.VerifyWitnessExposesTheAsylumCeaselessTrap);
+                    Test("solver witness regression D: the owner's Quelaag layout shows the arena entered by the back link and left by her boss-side fog o4950_0000", SolverWitnessTest.VerifyWitnessExposesTheQuelaagReverseFog);
+                    Test("solver witness regression E: the Gaping layout shows the Depths wall o1420_0000 entering depths_gaping", SolverWitnessTest.VerifyWitnessExposesTheGapingWall);
+                    Test("solver witness: an accepted real v3 layout has a self-consistent route to the Gwyn arena and the same witness on every connection", SolverWitnessTest.VerifyRealV3WitnessIsConsistentAndDeterministic);
                     Test("v3 requires a boss arena to be reached before its post-encounter neighbour can walk back in; v2 stays frozen; forward-only routes untouched", BossArenaEntryTest.VerifyV3BossArenaEntryCatalog);
                     Test("regression D: the owner's Quelaag layout (Fog seed 4038375671) is accepted without the rule, rejected with it, and the corrected seed is valid", BossArenaEntryTest.VerifyOwnerQuelaagLayoutIsRejected);
                     Test("on real v3 layouts no Area depends on walking back into a boss arena", BossArenaEntryTest.VerifyNoBackEntryDependenceOnRealLayouts);

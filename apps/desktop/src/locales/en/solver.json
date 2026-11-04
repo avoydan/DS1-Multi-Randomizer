@@ -1,0 +1,27 @@
+{
+  "action": {
+    "view": "Solver route",
+    "unavailable": "No solver route for this world. It was made before the solver route existed, or it has no Fog graph. Use Regenerate files to create it."
+  },
+  "viewer": {
+    "title": "Solver route",
+    "close": "Close",
+    "loading": "Loading the solver route…",
+    "unavailable": "The solver route is not available for this world. It was made before the solver route existed, its run folder is gone, or Fog was off. Use Regenerate files to create the world again.",
+    "warning": "This route is a spoiler: it names where fog gates and key items lead.",
+    "intro": "This is the exact route the solver used to accept this world as completable. Follow it in the game; the first step that cannot be done shows where the solver's model differs from the real game.",
+    "seedCode": "Seed Code",
+    "profile": "Generation profile",
+    "fogSeed": "Fog seed",
+    "attempt": "Attempt",
+    "attemptValue": "Fog {{fog}}, combined {{combined}}",
+    "claim": "Solver claim",
+    "claimValue": "{{reached}} of {{total}} areas reached; route target: {{target}}",
+    "route": "Route",
+    "tree": "Full proof tree",
+    "showTree": "Show the full proof tree",
+    "copy": "Copy route",
+    "copied": "Route copied.",
+    "copyFailed": "Could not copy the route."
+  }
+}

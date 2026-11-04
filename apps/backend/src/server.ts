@@ -22,6 +22,7 @@ import { decodeSeedCode } from './core/seedCode.js';
 import { smokeTestWorlds } from './core/smokeTests.js';
 import { currentGenerationProfile, resolveGenerationProfile, supportedGenerationProfiles } from './core/generationProfiles.js';
 import { hintsAvailableFor, hintsForEntry, persistHints } from './core/hintStore.js';
+import { persistSolverWitness, solverRouteAvailableFor, solverRouteForEntry } from './core/solverWitnessStore.js';
 import { AppLogger, LOG_STAGES, type LogLevel, type LogStage } from './core/appLog.js';
 import { OperationTracker } from './core/operations.js';
 import { ACTIVITY_ROUTES, ActivityTracker } from './core/activity.js';
@@ -211,7 +212,7 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'POST' && url.pathname === '/api/history/list') {
       const entries = await history.list();
-      return send(res, 200, { entries: await Promise.all(entries.map(async (entry) => ({ ...entry, hintsAvailable: await hintsAvailableFor(entry, runRoot).catch(() => false) }))), supportedProfiles: supportedGenerationProfiles() });
+      return send(res, 200, { entries: await Promise.all(entries.map(async (entry) => ({ ...entry, hintsAvailable: await hintsAvailableFor(entry, runRoot).catch(() => false), solverRouteAvailable: await solverRouteAvailableFor(entry, runRoot).catch(() => false) }))), supportedProfiles: supportedGenerationProfiles() });
     }
 
     if (req.method === 'POST' && url.pathname === '/api/history/delete') {
@@ -235,6 +236,13 @@ const server = http.createServer(async (req, res) => {
       const entry = typeof body.id === 'string' ? await history.get(body.id) : null;
       const document = entry ? await hintsForEntry(entry, runRoot, APP_VERSION).catch(() => null) : null;
       return send(res, 200, document ? { ok: true, document } : { ok: false, code: 'HINTS_UNAVAILABLE' });
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/solver-route/get') {
+      const body = await readJson<{ id?: string }>(req);
+      const entry = typeof body.id === 'string' ? await history.get(body.id) : null;
+      const route = entry ? await solverRouteForEntry(entry, runRoot).catch(() => null) : null;
+      return send(res, 200, route ? { ok: true, document: route.document, markdown: route.markdown } : { ok: false, code: 'SOLVER_ROUTE_UNAVAILABLE' });
     }
 
     if (req.method === 'POST' && url.pathname === '/api/diagnostics') {
@@ -319,6 +327,10 @@ const server = http.createServer(async (req, res) => {
           // The hint data is built once, from the placements the generator just wrote, and kept next to the run (never in the package).
           const hintsPath = await persistHints(workspacePath, {
             seedCode: prepared.seedCode, profile: prepared.profile.id, createdAt: new Date().toISOString(), appVersion: APP_VERSION, settings: prepared.envelope.settings,
+          }).catch(() => null);
+          // The solver witness of the ACCEPTED Fog attempt is kept next to the run too (never in the package; docs/SOLVER_WITNESS.md).
+          await persistSolverWitness(workspacePath, {
+            seedCode: prepared.seedCode, profile: prepared.profile.id, appVersion: APP_VERSION, masterSeed: prepared.config.masterSeed, attempts: result.manifest.attempts,
           }).catch(() => null);
           // The same world generated again (Load seed, Regenerate files) refreshes its entry; it is not a new run.
           const entry = await history.addOrRefresh({

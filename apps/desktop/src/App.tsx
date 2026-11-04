@@ -4,6 +4,7 @@ import type { TFunction } from 'i18next';
 import { ErrorNotice, useProblemText, type ErrorInfo } from './ErrorNotice';
 import { behaviorLabel, behaviorValue } from './planText';
 import { HintSheetPanel } from './HintSheetPanel';
+import { SolverRoutePanel } from './SolverRoutePanel';
 import { DiagnosticsPanel } from './DiagnosticsPanel';
 import { exportSupportBundle } from './supportBundle';
 import { Readiness } from './Readiness';
@@ -111,6 +112,8 @@ export function App() {
   const [lastOperationId, setLastOperationId] = useState<string | undefined>(undefined);
   const [diagnosticsTarget, setDiagnosticsTarget] = useState<string | null>(null);
   const [hintTarget, setHintTarget] = useState<{ id: string; exportFirst: boolean } | null>(null);
+  /** The world whose solver route is open (history entry id). */
+  const [solverTarget, setSolverTarget] = useState<string | null>(null);
   const [view, setView] = useState<ViewId>('game');
   const [mode, setModeState] = useState<SettingsMode>(readMode);
   /** The sections the advanced view opens when it is reached from the basic notice about custom values. */
@@ -445,6 +448,7 @@ export function App() {
                   <button role="menuitem" onClick={() => void generateRun()} disabled={generationDisabled}>{t('app.run.randomizeAgain')}</button>
                   <button role="menuitem" onClick={() => { setRunMenuOpen(false); setView('seed'); }}>{t('common.loadSeed')}</button>
                   <button role="menuitem" disabled={!generation.historyId} onClick={() => { setRunMenuOpen(false); if (generation.historyId) setHintTarget({ id: generation.historyId, exportFirst: false }); }}>{t('hints.action.view')}</button>
+                  <button role="menuitem" disabled={!generation.historyId} onClick={() => { setRunMenuOpen(false); if (generation.historyId) setSolverTarget(generation.historyId); }}>{t('solver.action.view')}</button>
                 </div>
               )}
             </div>
@@ -467,6 +471,7 @@ export function App() {
                 <div className="menu" role="menu">
                   <button role="menuitem" onClick={() => { setRunMenuOpen(false); setView('seed'); }}>{t('common.loadSeed')}</button>
                   <button role="menuitem" disabled={!appliedEntry?.hintsAvailable} onClick={() => { setRunMenuOpen(false); if (appliedEntry) setHintTarget({ id: appliedEntry.id, exportFirst: false }); }}>{t('hints.action.view')}</button>
+                  <button role="menuitem" disabled={!appliedEntry?.solverRouteAvailable} title={appliedEntry?.solverRouteAvailable ? '' : t('solver.action.unavailable')} onClick={() => { setRunMenuOpen(false); if (appliedEntry) setSolverTarget(appliedEntry.id); }}>{t('solver.action.view')}</button>
                 </div>
               )}
             </div>
@@ -552,7 +557,7 @@ export function App() {
                   entries={history} gameState={gameState} busy={busy}
                   onApply={(entry) => void applyPackage(entry.packagePath)} onRegenerate={(entry) => void regenerate(entry)}
                   onCopy={(entry) => void copySeed(entry.seedCode)} onLaunch={() => void launch()}
-                  onDelete={(entry) => void deleteEntry(entry)} onSpoiler={spoilerOf} onHints={(entry, exportFirst) => setHintTarget({ id: entry.id, exportFirst })} onDiagnostics={(entry) => setDiagnosticsTarget(entry.id)} onSupportBundle={(entry) => void bundleOf(entry)}
+                  onDelete={(entry) => void deleteEntry(entry)} onSpoiler={spoilerOf} onHints={(entry, exportFirst) => setHintTarget({ id: entry.id, exportFirst })} onSolverRoute={(entry) => setSolverTarget(entry.id)} onDiagnostics={(entry) => setDiagnosticsTarget(entry.id)} onSupportBundle={(entry) => void bundleOf(entry)}
                 />
               </section>
             </>
@@ -571,6 +576,7 @@ export function App() {
 
           {diagnosticsTarget && <DiagnosticsPanel gamePath={config.gamePath} worldId={diagnosticsTarget} onClose={() => setDiagnosticsTarget(null)} />}
           {hintTarget && <HintSheetPanel entryId={hintTarget.id} exportFirst={hintTarget.exportFirst} onClose={() => setHintTarget(null)} />}
+          {solverTarget && <SolverRoutePanel entryId={solverTarget} onClose={() => setSolverTarget(null)} />}
         </main>
       </div>
     </HelpProvider>

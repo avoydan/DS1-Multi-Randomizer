@@ -195,6 +195,8 @@ export interface RunHistoryEntry {
   packageExists?: boolean;
   /** Computed when the history is read: the hint sheet can be shown (the hint data exists, or the run folder still holds the placements). */
   hintsAvailable?: boolean;
+  /** Computed when the history is read: the run folder holds the solver witness (docs/SOLVER_WITNESS.md), so the Solver route can be shown. */
+  solverRouteAvailable?: boolean;
 }
 
 /** Settings kept between sessions (not machine state: the game path is managed separately). */
