@@ -1548,3 +1548,10 @@ Full evidence: `docs/BOSSES_ONLY_AUDIT.md`.
 2. V6 is unreleased, so the correction is made in place in catalog v3 (both wall sides `depths`, new fingerprint, V6 goldens re-recorded), not in a V7. V1-V5 are untouched; retries and the frozen V5 Ceaseless validator are untouched. The visible-fog actionability of `o1400_0000` and its completion rule are unchanged.
 3. Chosen over a directional boss-exit rule in the checker: the wall labelling was the cause, the correction is one field in the catalog (so the connector repairs layouts during connection), and with the arena entered through its own fog the boss-side exit only leads back to the arrival partner. The hard-logic drop stays (off by default, deliberate glitched route). Gwyndolin and the Pinwheel PvP gate are upstream's own extra ways in and are not changed.
 4. The bug class is closed for this release: Quelaag (owner-confirmed), the twelve back-entries and the Gaping Dragon arena. No further arena search is planned.
+
+# V7 takes the physical Fog model from the original FogMod, not from map metadata (2026-11-05, proposed, awaiting the owner)
+
+1. **Upstream is the source of truth.** The pinned `dist/fog.txt` defines Areas, links, Entrances, sides, Warps, conditions and key items for generation profile `ds1tr-gen-v7`. No transition may count toward solvability because of `ConnectCollision`, `Area.To` alone, a matching map name or map adjacency.
+2. **Thin adapter.** FogHost source `upstream-v7` loads the file unchanged (hash-pinned), runs FogMod's own graph, connector and checker, skips the Compact event reconstructions, and adds only the start-reachability check and the solver witness with provenance. The combined Items randomizer changes where key items are, never the route.
+3. **Profiles.** V1-V6 stay frozen. V7 is not registered yet: the Nexus edition does not download or bundle the legacy Fog data, so offering V7 there needs the owner's decision (user-supplied cache, bundling `fog.txt` and reconstructing the rest, or GitHub edition only).
+4. **A rejected impossible world is better than an accepted fake one**: nothing is relaxed to raise acceptance.

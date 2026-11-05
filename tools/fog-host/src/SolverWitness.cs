@@ -27,6 +27,11 @@ namespace FogHost
     /// </summary>
     public static class SolverWitness
     {
+        /// <summary>Provenance of a transition or an item location (generation profile ds1tr-gen-v7 only; absent for the frozen Compact profiles, which cannot tell).</summary>
+        public const string SourceUpstream = "upstream-fogmod";
+        public const string SourceCombinedOverlay = "project-combined-overlay";
+        public const string SourceProjectVerified = "project-verified-route";
+
         public const string Format = "ds1tr-solver-witness";
         public const int SchemaVersion = 1;
         /// <summary>The Gwyn arena: the deepest progression Area of the graph, and the natural completion target when the solver reached it.</summary>
@@ -57,10 +62,11 @@ namespace FogHost
 
         public sealed record EdgeDto(
             string Kind, string Label, bool Randomized, string Pairing, bool Glitched, bool OneWay, string Reverse, string ReverseCondition, string ReverseVia,
-            string[] Qualifiers, GateDto Exit, GateDto Arrival, string Requires, RequirementDto[] Requirements, string[] SatisfiedBy);
+            string[] Qualifiers, GateDto Exit, GateDto Arrival, string Requires, RequirementDto[] Requirements, string[] SatisfiedBy,
+            string Source);
 
         /// <summary><c>Lots</c> are the staged ItemLotParam rows (inside the solver's own lot-to-Area table) that hold the item; the solver only uses their Area.</summary>
-        public sealed record ItemDto(string Name, string GameName, string GameItemId, string DefaultArea, string SolverArea, bool Moved, int[] Lots, string[] Tags);
+        public sealed record ItemDto(string Name, string GameName, string GameItemId, string DefaultArea, string SolverArea, bool Moved, int[] Lots, string[] Tags, string Source);
 
         public sealed record ReachDto(int Sequence, int Pass, string Area, string[] AreaTags, string FromArea, EdgeDto Edge, string[] KeyItemsGained);
 
@@ -134,8 +140,9 @@ namespace FogHost
             Dictionary<string, Area> areas = annotations.Areas.ToDictionary(a => a.Name, a => a, StringComparer.Ordinal);
             Dictionary<string, Item> keyItems = annotations.KeyItems.ToDictionary(i => i.Name, i => i, StringComparer.Ordinal);
 
-            ItemDto ItemOf(string name) => ItemInfo(name, keyItems, graph, sources);
-            EdgeDto Describe(AreaReachInfo reach) => DescribeEdge(reach.Edge, reach.Condition, reach.Satisfied, graph, annotations, warps, reachBy, grantBy, keyItems, areas);
+            bool upstream = HostRequest.IsUpstream(annotationSource);
+            ItemDto ItemOf(string name) => ItemInfo(name, keyItems, graph, sources, upstream);
+            EdgeDto Describe(AreaReachInfo reach) => DescribeEdge(reach.Edge, reach.Condition, reach.Satisfied, graph, annotations, warps, reachBy, grantBy, keyItems, areas, upstream ? SourceUpstream : null);
 
             ReachDto[] tree = observer.Reaches.Select(r => new ReachDto(
                 r.Sequence, r.Pass, r.Area, AreaTags(areas, r.Area), r.FromArea, r.Edge == null ? null : Describe(new AreaReachInfo(r)),
@@ -149,7 +156,9 @@ namespace FogHost
 
             string[] optional = areas.Values.Where(a => a.HasTag("optional")).Select(a => a.Name).OrderBy(n => n, StringComparer.Ordinal).ToArray();
             var claim = new ClaimDto(
-                "Every non-optional Area is reachable from the start Area through the connected Fog graph (generation profile ds1tr-gen-v6 start-reachability rule).",
+                upstream
+                    ? "Every non-optional Area is reachable from the start Area through the connected Fog graph built only from the original FogMod annotations (generation profile ds1tr-gen-v7); key items sit where the combined item placement put them."
+                    : "Every non-optional Area is reachable from the start Area through the connected Fog graph (generation profile ds1tr-gen-v6 start-reachability rule).",
                 observer.Reaches[0].Area, graph.start?.Name, graph.graph.Count, observer.Reaches.Count,
                 optional, (check.Unvisited ?? new List<string>()).OrderBy(n => n, StringComparer.Ordinal).ToArray(),
                 options.GetEnabled().ToArray(), options["hard"]);
@@ -186,14 +195,17 @@ namespace FogHost
         private static string[] AreaTags(Dictionary<string, Area> areas, string name)
             => areas.TryGetValue(name, out Area area) ? area.TagList.OrderBy(t => t, StringComparer.Ordinal).ToArray() : Array.Empty<string>();
 
-        private static ItemDto ItemInfo(string name, Dictionary<string, Item> keyItems, Graph graph, KeyItemSources sources)
+        private static ItemDto ItemInfo(string name, Dictionary<string, Item> keyItems, Graph graph, KeyItemSources sources, bool upstream)
         {
             keyItems.TryGetValue(name, out Item item);
             graph.itemAreas.TryGetValue(name, out string solverArea);
             sources.GameNames.TryGetValue(name, out string gameName);
             int[] lots = sources.Lots.TryGetValue(name, out List<int> found) ? found.OrderBy(l => l).ToArray() : Array.Empty<int>();
-            return new ItemDto(name, gameName, item?.ID, item?.Area, solverArea, item != null && solverArea != null && item.Area != solverArea, lots,
-                item?.TagList.OrderBy(t => t, StringComparer.Ordinal).ToArray() ?? Array.Empty<string>());
+            bool moved = item != null && solverArea != null && item.Area != solverArea;
+            // An item the Items randomizer moved out of its upstream Area is the one place where the project adds its own state; the physical route stays upstream.
+            return new ItemDto(name, gameName, item?.ID, item?.Area, solverArea, moved, lots,
+                item?.TagList.OrderBy(t => t, StringComparer.Ordinal).ToArray() ?? Array.Empty<string>(),
+                upstream ? (moved ? SourceCombinedOverlay : SourceUpstream) : null);
         }
 
         // ---- edge description (metadata only) --------------------------------------------------------------------------------------------------------
@@ -201,7 +213,7 @@ namespace FogHost
         private static EdgeDto DescribeEdge(
             Edge edge, Expr condition, IReadOnlyList<string> satisfied, Graph graph, Annotations annotations, HashSet<Entrance> warps,
             Dictionary<string, AreaReachInfo> reachBy, Dictionary<string, WitnessObserver.BossGrant> grantBy, Dictionary<string, Item> keyItems,
-            Dictionary<string, Area> areas)
+            Dictionary<string, Area> areas, string source)
         {
             Edge arrival = edge.Link;
             Entrance exitEntrance = Lookup(graph, edge.Name);
@@ -216,6 +228,7 @@ namespace FogHost
 
             string kind;
             if (glitched) kind = "glitched-route";
+            else if (inMap && HasTag(edge.Side, "door")) kind = "door";
             else if (inMap) kind = "fixed-route";
             else if (exitWarp || arrivalWarp) kind = "warp";
             else if (HasEntranceTag(exitEntrance, "door") || HasEntranceTag(arrivalEntrance, "door")) kind = "door";
@@ -229,6 +242,7 @@ namespace FogHost
                     if (entrance.HasTag(tag)) qualifiers.Add(tag);
             }
             if (shortcut) qualifiers.Add("shortcut");
+            if (HasTag(edge.Side, "drop") || HasTag(arrival?.Side, "drop")) qualifiers.Add("drop");
             if (inMap) qualifiers.Add("in-map link");
             bool randomized = !edge.IsFixed;
             // Way back: the graph builds an in-map link without a pair, and a walkable route back is a SEPARATE edge of the other Area. So "one-way" means no
@@ -248,7 +262,7 @@ string label = Label(kind, randomized, qualifiers);
                 kind, label, randomized, pairing, glitched, oneWay, reverseState, reverse?.LinkedExpr?.ToString(), reverse == null ? null : (reverse.Name ?? "in map"), qualifiers.ToArray(),
                 Gate(edge.From, edge, exitEntrance, edge.Side, areas),
                 Gate(edge.To, arrival, arrivalEntrance, arrival?.Side, areas),
-                condition?.ToString(), requirements, satisfied.ToArray());
+                condition?.ToString(), requirements, satisfied.ToArray(), source);
         }
 
         /// <summary>The edge that leaves the arrival Area for the exit Area again: the pair of a gate, else the best (unconditional first, then by condition text) edge back.</summary>

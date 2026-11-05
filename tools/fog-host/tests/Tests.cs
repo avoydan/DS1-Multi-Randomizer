@@ -132,6 +132,22 @@ namespace FogHost.Tests
                 Test("v6 start reachability rejects a start region whose only exit pairs with a dead-end pocket", StartReachabilityTest.VerifySyntheticStartTrapIsRejected);
                 Test("an unconditional fixed exit out of the start hides the same trap (the original defect)", StartReachabilityTest.VerifySyntheticFakeUnconditionalExitHidesTheTrap);
                 Test("v6 boss-arena entry: a boss arena reachable only through the link back from its bell room is rejected; entering through its own fog keeps the link usable", BossArenaEntryTest.VerifySyntheticBossArenaEntry);
+                Test("v7 source contract: upstream-v7 is its own annotation source and inherits no Compact behavior", UpstreamV7Test.VerifySourceContract);
+                if (dataRoot != null)
+                {
+                    Test("v7 annotation file is the verified upstream fog.txt, with no project-only data", UpstreamV7Test.VerifyAnnotationFileIsTheVerifiedUpstreamFile);
+                    Test("v7 graph is exactly the upstream annotations (links, entrances, sides, warps, unique warps unpaired)", UpstreamV7Test.VerifyGraphIsExactlyTheUpstreamAnnotations);
+                    Test("v7 historical A: the Asylum hallway has no fake unconditional exit and no ConnectCollision link to Firelink", UpstreamV7Test.VerifyAsylumHasNoFakeUnconditionalExit);
+                    Test("v7 historical D: Quelaag's arena has no in-map link and is entered by her own boss fog", UpstreamV7Test.VerifyQuelaagArenaHasNoBackLink);
+                    Test("v7 historical E: o1420_0000 is the Depths wall and the Gaping arena is entered by o1400_0000 only (or the hard drop)", UpstreamV7Test.VerifyGapingAreaIsNotMislabelled);
+                    Test("v7 historical F: the Priscilla arena is left by the upstream unique warp 1512500, never by a ConnectCollision link", UpstreamV7Test.VerifyPriscillaExitIsTheUpstreamWarp);
+                    Test("v7 transition inventory: everything is upstream; the overlay is the key-item-conditioned subset", UpstreamV7Test.VerifyTransitionInventory);
+                    if (Environment.GetEnvironmentVariable("DS1TR_PRISTINE_DSR_ROOT") != null)
+                    {
+                        Test("v7 witness: deterministic, every transition upstream, nothing project-verified, no fixed exit from the Priscilla arena", UpstreamV7Test.VerifyWitnessProvenanceAndDeterminism);
+                        Test("v7 raw-seed acceptance with FogMod's own connector (DS1TR_V7_ACCEPTANCE_SEEDS)", UpstreamV7Test.VerifyRawSeedAcceptance);
+                    }
+                }
                 Test("solver witness: the observer is read-only and never changes the search", SolverWitnessTest.VerifyObserverDoesNotChangeTheSearch);
                 Test("solver witness: each Area's predecessor is the edge that first reached it, in the solver's own order", SolverWitnessTest.VerifyPredecessorsAreFirstReachInSolverOrder);
                 Test("solver witness: both sides of every gate are kept (boss-encounter side, other side, vanilla vs shuffled pairing)", SolverWitnessTest.VerifyBothGateSidesAreKept);

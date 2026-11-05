@@ -67,7 +67,7 @@ namespace FogHost
             }
             if (Contains(staging, request.LogPath)) throw Invalid("logPath must be outside the staging directory.");
 
-            DataRoot.Verify(request.FogDataRoot, includeLegacyAnnotations: request.AnnotationSource == HostRequest.LegacyFogModAnnotations);
+            DataRoot.Verify(request.FogDataRoot, includeLegacyAnnotations: HostRequest.UsesFogModAnnotationFile(request.AnnotationSource));
 
             var missing = new List<string>();
             IEnumerable<string> readSet = new[] { GameParam, $"msg/{request.Language}/menu.msgbnd.dcx" }
@@ -167,9 +167,13 @@ namespace FogHost
                     using StreamReader reader = File.OpenText("dist/fog.txt");
                     ann = new DeserializerBuilder().Build().Deserialize<Annotations>(reader);
                     annotationSha256 = DataRoot.AnnotationSha256(Directory.GetCurrentDirectory());
+                    // V7 pins the exact upstream annotation file: any other fog.txt would be a different world under the same Seed Code.
+                    if (HostRequest.IsUpstream(request.AnnotationSource)
+                        && !string.Equals(annotationSha256, request.ExpectedAnnotationFingerprint, StringComparison.Ordinal))
+                        throw Invalid("The upstream fog.txt differs from the hash pinned by the generation profile.");
                 }
             }
-            else annotationSha256 = request.AnnotationSource != HostRequest.LegacyFogModAnnotations
+            else annotationSha256 = !HostRequest.UsesFogModAnnotationFile(request.AnnotationSource) || HostRequest.IsUpstream(request.AnnotationSource)
                 ? request.ExpectedAnnotationFingerprint
                 : DataRoot.AnnotationSha256(Directory.GetCurrentDirectory());
             Console.WriteLine($"Seed: {opt.DisplaySeed}. Options: {string.Join(" ", opt.GetEnabled())}");
@@ -187,7 +191,7 @@ namespace FogHost
             // ds1tr-gen-v5 (compact-v2) keeps its frozen Ceaseless post-boss check; ds1tr-gen-v6 (compact-v3) replaces it with the general start-reachability postcondition.
             if (request.AnnotationSource == HostRequest.CompactV2Annotations)
                 BossProgressionValidator.ValidatePostBossRoutes(opt, graph, ann);
-            else if (request.AnnotationSource == HostRequest.CompactV3Annotations)
+            else if (request.AnnotationSource == HostRequest.CompactV3Annotations || HostRequest.IsUpstream(request.AnnotationSource))
             {
                 // The witness observes the very search that accepts the world; it changes nothing about it (docs/SOLVER_WITNESS.md).
                 var witnessObserver = new WitnessObserver();
@@ -201,6 +205,8 @@ namespace FogHost
             {
                 EventMerger = (fileName, output) =>
                 {
+                    // ds1tr-gen-v7 writes the upstream events as FogMod produces them: none of the Compact reconstructions below apply to it.
+                    if (HostRequest.IsUpstream(request.AnnotationSource)) { merge.Merge(fileName, output); return; }
                     FogAddedEventBuilder.ReplaceReconstructedAddedEvents(fileName, output);
                     if (string.Equals(fileName, "common.emevd.dcx", StringComparison.Ordinal))
                     {

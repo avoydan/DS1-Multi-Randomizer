@@ -20,6 +20,15 @@ namespace FogHost
         public const string CompactV2Annotations = "compact-v2";
         /// <summary>Generation profile ds1tr-gen-v6: Compact Fog v2 behavior on the v3 catalog (physically sound Asylum start) with start-reachability instead of the Ceaseless post-boss check.</summary>
         public const string CompactV3Annotations = "compact-v3";
+        /// <summary>
+        /// Generation profile ds1tr-gen-v7: the ORIGINAL FogMod annotation file (<c>dist/fog.txt</c> at the pinned commit, verified byte-for-byte by its SHA-256) is the only source
+        /// of Areas, links, Entrances, sides, Warps, conditions and key items. Nothing is reconstructed from map metadata, and none of the Compact event reconstructions run:
+        /// the upstream writer works on the upstream data, exactly as in the legacy profiles.
+        /// </summary>
+        public const string UpstreamV7Annotations = "upstream-v7";
+        public static bool IsUpstream(string annotationSource) => annotationSource == UpstreamV7Annotations;
+        /// <summary>Sources whose annotations are read from the FogMod data root's <c>dist/fog.txt</c> (legacy profiles and V7) and therefore need the full verified data set.</summary>
+        public static bool UsesFogModAnnotationFile(string annotationSource) => annotationSource == LegacyFogModAnnotations || annotationSource == UpstreamV7Annotations;
         /// <summary>Annotation sources that share every Compact v2 graph option, event builder and boss-fog behavior.</summary>
         public static bool IsCompactV2Family(string annotationSource) => annotationSource == CompactV2Annotations || annotationSource == CompactV3Annotations;
 
@@ -122,10 +131,10 @@ namespace FogHost
                     ExpectedAnnotationFingerprint = String(root, "expectedAnnotationFingerprint"),
                 };
 
-                if (request.AnnotationSource != LegacyFogModAnnotations && request.AnnotationSource != CompactAnnotations && request.AnnotationSource != CompactV2Annotations && request.AnnotationSource != CompactV3Annotations)
-                    throw Invalid($"request.annotationSource must be \"{LegacyFogModAnnotations}\", \"{CompactAnnotations}\", \"{CompactV2Annotations}\" or \"{CompactV3Annotations}\".");
+                if (request.AnnotationSource != LegacyFogModAnnotations && request.AnnotationSource != CompactAnnotations && request.AnnotationSource != CompactV2Annotations && request.AnnotationSource != CompactV3Annotations && request.AnnotationSource != UpstreamV7Annotations)
+                    throw Invalid($"request.annotationSource must be \"{LegacyFogModAnnotations}\", \"{CompactAnnotations}\", \"{CompactV2Annotations}\", \"{CompactV3Annotations}\" or \"{UpstreamV7Annotations}\".");
                 if (request.AnnotationSource != LegacyFogModAnnotations && !Sha256.IsMatch(request.ExpectedAnnotationFingerprint))
-                    throw Invalid("request.expectedAnnotationFingerprint must be a lowercase SHA-256 for Compact annotations.");
+                    throw Invalid("request.expectedAnnotationFingerprint must be a lowercase SHA-256 (the Compact catalog fingerprint, or the fog.txt hash for upstream-v7).");
                 if (request.AnnotationSource == LegacyFogModAnnotations && request.ExpectedAnnotationFingerprint.Length != 0)
                     throw Invalid("request.expectedAnnotationFingerprint must be empty for legacy FogMod annotations.");
 

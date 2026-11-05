@@ -57,6 +57,20 @@ export interface SolverEdge {
   requires: string | null;
   requirements: SolverRequirement[];
   satisfiedBy: string[];
+  /** Provenance of the transition (generation profile ds1tr-gen-v7 only; null or absent for the frozen Compact profiles, which cannot tell). */
+  source?: SolverSource | null;
+}
+
+/** Where a transition or an item location comes from. The physical route is never anything but upstream FogMod in V7; the project only adds item state. */
+export type SolverSource = 'upstream-fogmod' | 'project-combined-overlay' | 'project-verified-route';
+
+export function sourceText(source: SolverSource | null | undefined): string | null {
+  switch (source) {
+    case 'upstream-fogmod': return 'UPSTREAM FOGMOD';
+    case 'project-combined-overlay': return 'PROJECT COMBINED-MODE OVERLAY';
+    case 'project-verified-route': return 'PROJECT-SPECIFIC VERIFIED ROUTE';
+    default: return null;
+  }
 }
 
 export interface SolverItem {
@@ -69,6 +83,7 @@ export interface SolverItem {
   moved: boolean;
   lots: number[];
   tags: string[];
+  source?: SolverSource | null;
 }
 
 export interface SolverReach {
@@ -223,6 +238,8 @@ export function renderSolverSteps(document: SolverWitnessDocument): string[] {
       lines.push(`   FROM SIDE: ${objectText(edge.exit)}${gateNotes(edge.exit)}`);
       lines.push(`   TO SIDE:   ${objectText(edge.arrival)}${gateNotes(edge.arrival)}`);
       lines.push(`   DIRECTION: ${directionText(edge)}`);
+      const provenance = sourceText(edge.source);
+      if (provenance) lines.push(`   SOURCE: ${provenance}`);
       if (edge.requirements.length === 0) lines.push('   SOLVER REQUIREMENTS: none');
       else {
         lines.push(`   SOLVER REQUIREMENTS: ${edge.requires}`);
@@ -233,6 +250,8 @@ export function renderSolverSteps(document: SolverWitnessDocument): string[] {
       if (step.item.lots.length) lines.push(`   SOURCE: item lot${step.item.lots.length === 1 ? '' : 's'} ${step.item.lots.join(', ')}, in Area ${step.area}`);
       else lines.push(`   SOURCE: no item lot was found for it; the solver uses its default Area ${step.area}`);
       if (step.item.moved) lines.push(`   NOTE: the catalog's default Area for this item is ${step.item.defaultArea ?? '?'}; the solver uses the Area of the lot it found`);
+      const itemProvenance = sourceText(step.item.source);
+      if (itemProvenance) lines.push(`   LOCATION SOURCE: ${itemProvenance}`);
       lines.push('   The solver considers it obtained once this Area has been reached.');
     } else if (step.type === 'boss-completion' && step.completion) {
       lines.push(`${step.number}. BOSS COMPLETION ASSUMED — ${step.completion.name}`);
