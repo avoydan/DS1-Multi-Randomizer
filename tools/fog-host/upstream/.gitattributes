@@ -1,0 +1,2 @@
+# Bundled upstream data stays byte-identical to the pinned blob.
+* -text

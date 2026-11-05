@@ -7,8 +7,10 @@ import type { FogLanguage } from '@ds1tr/contracts';
 import { fogReadSet } from './fogCompatibility.js';
 import {
   compactRuntimeWorldDataId, compactRuntimeWorldDataV2Id, compactRuntimeWorldDataV3Id, compactRuntimeWorldDataManifest, prepareWorldData,
+  upstreamV7AnnotationSha256, upstreamV7WorldDataId, upstreamV7WorldDataManifest,
   type WorldDataOptions, type WorldDataProgress, type WorldDataResult,
 } from './worldData.js';
+import { loadUpstreamFogProjection, type UpstreamFogProjection } from './upstreamFogProjection.js';
 import { COMPACT_FOG_CATALOG_V1_VERSION, COMPACT_FOG_CATALOG_V2_VERSION, COMPACT_FOG_CATALOG_V3_VERSION, loadCompactFogProjection, type CompactFogProjection } from './compactFogProjection.js';
 import { defaultStateRoot } from '../core/gameState.js';
 import { fogHostRuntimeForProfile, type FogHostRuntimeContract, type GenerationProfile } from '../core/generationProfiles.js';
@@ -35,11 +37,13 @@ export interface FogPrerequisites {
   executablePath: string;
   dataRoot: string;
   readSet: string[];
-  annotationSource: 'legacy-fogmod' | 'compact-v1' | 'compact-v2' | 'compact-v3';
+  annotationSource: 'legacy-fogmod' | 'compact-v1' | 'compact-v2' | 'compact-v3' | 'upstream-v7';
   /** v0.6.0 exports progression graphs for legacy profiles; generation itself still uses executablePath (v0.5.0). */
   progressionModelExecutablePath: string;
   pristineGameDirectory?: string;
   compactProjection?: CompactFogProjection;
+  /** ds1tr-gen-v7: the key items and item lots the upstream fog.txt declares (the item model the Items randomizer follows). */
+  upstreamProjection?: UpstreamFogProjection;
   /** Id of the application-prepared world data set (its folder name); absent when a developer override supplies the data. */
   worldDataId?: string;
 }
@@ -83,8 +87,10 @@ export function worldDataOptionsForProfile(
   env: NodeJS.ProcessEnv = process.env,
   cacheRoot = defaultWorldDataCacheRoot(),
 ): WorldDataOptions {
+  const upstream = profile.fogAnnotationSource === 'upstream-v7';
   const compact = profile.fogAnnotationSource !== 'legacy-fogmod';
-  const compactDataId = profile.fogAnnotationSource === 'compact-v3' ? compactRuntimeWorldDataV3Id
+  const compactDataId = upstream ? upstreamV7WorldDataId
+    : profile.fogAnnotationSource === 'compact-v3' ? compactRuntimeWorldDataV3Id
     : profile.fogAnnotationSource === 'compact-v2' ? compactRuntimeWorldDataV2Id : compactRuntimeWorldDataId;
   const runtime = fogHostRuntimeForProfile(profile);
   if (!runtime) throw new Error('The selected generation profile has no supported FogHost runtime contract.');
@@ -95,7 +101,7 @@ export function worldDataOptionsForProfile(
     cacheRoot,
     pristineDirectory,
     ...(compact ? {
-      manifest: compactRuntimeWorldDataManifest,
+      manifest: upstream ? upstreamV7WorldDataManifest : compactRuntimeWorldDataManifest,
       id: compactDataId,
       reconstructFiles: (source: string, output: string) => reconstructCompactData(executablePath, source, output),
     } : { id: profile.fogEngine.worldDataId }),
@@ -128,7 +134,7 @@ export async function resolveFogPrerequisites(
   const runtime = context?.fogRuntime;
   if (!runtime || !((runtime.hostVersion === '0.5.0' && runtime.schemaVersion === 2 && runtime.annotationSource === 'legacy-fogmod')
     || (runtime.hostVersion === '0.6.0' && runtime.schemaVersion === 3 && runtime.annotationSource === 'compact-v1')
-    || (runtime.hostVersion === '0.7.3' && runtime.schemaVersion === 3 && (runtime.annotationSource === 'compact-v2' || runtime.annotationSource === 'compact-v3')))) {
+    || (runtime.hostVersion === '0.7.3' && runtime.schemaVersion === 3 && (runtime.annotationSource === 'compact-v2' || runtime.annotationSource === 'compact-v3' || runtime.annotationSource === 'upstream-v7')))) {
     return { failure: {
       code: 'FOG_PROFILE_RUNTIME_INVALID',
       userMessage: 'The fog randomizer cannot run for this generation profile. Please update or reinstall DS1 Multi Randomizer.',
@@ -159,8 +165,9 @@ export async function resolveFogPrerequisites(
       pristineDirectory: context!.pristineDirectory,
       ...(annotationSource !== 'legacy-fogmod'
         ? {
-          manifest: compactRuntimeWorldDataManifest,
-          id: annotationSource === 'compact-v3' ? compactRuntimeWorldDataV3Id
+          manifest: annotationSource === 'upstream-v7' ? upstreamV7WorldDataManifest : compactRuntimeWorldDataManifest,
+          id: annotationSource === 'upstream-v7' ? upstreamV7WorldDataId
+            : annotationSource === 'compact-v3' ? compactRuntimeWorldDataV3Id
             : annotationSource === 'compact-v2' ? compactRuntimeWorldDataV2Id : compactRuntimeWorldDataId,
           reconstructFiles: context!.reconstructCompactData
             ?? ((pristineDirectory: string, outputRoot: string) => reconstructCompactData(executablePath, pristineDirectory, outputRoot)),
@@ -172,11 +179,34 @@ export async function resolveFogPrerequisites(
     if (!prepared.ok) return { failure: { code: prepared.code, userMessage: prepared.userMessage, technical: prepared.technical } };
     dataRoot = prepared.root;
     worldDataId = annotationSource === 'compact-v1' ? 'compact-runtime-offline-v1'
+      : annotationSource === 'upstream-v7' ? upstreamV7WorldDataId
       : annotationSource === 'compact-v3' ? compactRuntimeWorldDataV3Id
       : annotationSource === 'compact-v2' ? compactRuntimeWorldDataV2Id : path.basename(prepared.root);
   }
   const events = await names(path.join(dataRoot, 'dist', 'DS1R', 'event'));
   const maps = await names(path.join(dataRoot, 'dist', 'DS1R', 'map', 'MapStudio'));
+  if (annotationSource === 'upstream-v7') {
+    if (!context?.pristineDirectory) return null;
+    try {
+      const upstreamProjection = await loadUpstreamFogProjection(executablePath, dataRoot, upstreamV7AnnotationSha256);
+      return {
+        executablePath,
+        progressionModelExecutablePath,
+        dataRoot,
+        readSet: fogReadSet(events, maps, language),
+        annotationSource,
+        pristineGameDirectory: path.resolve(context.pristineDirectory),
+        upstreamProjection,
+        ...(worldDataId ? { worldDataId } : {}),
+      };
+    } catch (error) {
+      return { failure: {
+        code: 'FOG_UPSTREAM_PROJECTION_UNAVAILABLE',
+        userMessage: 'The fog randomizer data could not be read. Try again, or check the game files.',
+        technical: error instanceof Error ? error.message : String(error),
+      } };
+    }
+  }
   if (annotationSource !== 'legacy-fogmod') {
     if (!context?.pristineDirectory) return null;
     try {

@@ -14,7 +14,10 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { copyFile, mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { COMPACT_FOG_CATALOG_V1_FINGERPRINT, COMPACT_FOG_CATALOG_V1_VERSION, COMPACT_FOG_CATALOG_V2_FINGERPRINT, COMPACT_FOG_CATALOG_V2_VERSION, COMPACT_FOG_CATALOG_V3_FINGERPRINT, COMPACT_FOG_CATALOG_V3_VERSION } from './compactFogProjection.js';
+
+const defaultBundledRoot = process.env.DS1TR_RUNTIME_ROOT ?? path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../../');
 
 export const worldDataSourceCommit = '6e6dc7886d0f8bcc53c1800d95c9e859d1f2f87f';
 export const worldDataBaseUrl = `https://raw.githubusercontent.com/thefifthmatt/FogMod/${worldDataSourceCommit}/`;
@@ -30,9 +33,11 @@ export interface WorldDataEntry {
   /** Size of the file as the upstream repository serves it (used as a download bound). */
   size: number;
   kind: WorldDataKind;
-  origin: 'game' | 'upstream' | 'reconstructed';
+  origin: 'game' | 'upstream' | 'reconstructed' | 'bundled';
   /** For origin 'game': the path inside the clean installation. */
   gamePath?: string;
+  /** For origin 'bundled': the path of the shipped file relative to the application root (tools/fog-host/upstream/PROVENANCE.md records why it may be shipped). */
+  bundledPath?: string;
 }
 
 export const worldDataManifest: readonly WorldDataEntry[] = [
@@ -163,6 +168,25 @@ export const compactRuntimeWorldDataV3Id = createHash('sha256')
   .update(`${COMPACT_FOG_CATALOG_V3_VERSION}\n${COMPACT_FOG_CATALOG_V3_FINGERPRINT}\n${compactReconstructionVersion}\n${worldDataSourceCommit}\n${compactRuntimeWorldDataManifest.map((entry) => `${entry.path}:${entry.sha256}`).join('\n')}`)
   .digest('hex').slice(0, 16);
 
+/**
+ * Generation profile ds1tr-gen-v7 (docs/V7_UPSTREAM_PARITY.md): the ORIGINAL upstream fog.txt, bundled with the application (Apache-2.0, unmodified, byte-pinned), plus the 58
+ * inputs that are rebuilt on the player's machine from the installed game. Nothing is downloaded and no cache from an earlier version is needed, so V7 works offline in every
+ * distribution. The events, talk scripts and layouts are rebuilt by the same local reconstruction as the Compact profiles (it reproduces all 1281 upstream events instruction
+ * for instruction); none of Compact's physical-route model is part of it.
+ */
+export const upstreamV7ProfileId = 'ds1tr-gen-v7';
+export const upstreamV7DataVersion = 'ds1tr-upstream-fog-data-v1';
+export const upstreamV7BundledAnnotationPath = 'tools/fog-host/upstream/fog.txt';
+const upstreamAnnotationEntry = worldDataManifest.find((entry) => entry.path === 'dist/fog.txt')!;
+export const upstreamV7AnnotationSha256 = upstreamAnnotationEntry.sha256;
+export const upstreamV7WorldDataManifest: readonly WorldDataEntry[] = Object.freeze([
+  ...compactRuntimeWorldDataManifest,
+  { ...upstreamAnnotationEntry, origin: 'bundled' as const, bundledPath: upstreamV7BundledAnnotationPath },
+]);
+export const upstreamV7WorldDataId = createHash('sha256')
+  .update(`${upstreamV7ProfileId}\n${upstreamV7DataVersion}\n${compactReconstructionVersion}\n${worldDataSourceCommit}\n${upstreamV7WorldDataManifest.map((entry) => `${entry.path}:${entry.sha256}`).join('\n')}`)
+  .digest('hex').slice(0, 16);
+
 export function hashWorldDataContent(bytes: Uint8Array, text: boolean): string {
   const hash = createHash('sha256');
   if (!text) return hash.update(bytes).digest('hex');
@@ -205,6 +229,8 @@ export interface WorldDataOptions {
   fetchBytes?: (url: string, maxBytes: number) => Promise<Uint8Array>;
   /** Only an explicitly identified GitHub distribution may fetch legacy upstream data. */
   allowUpstreamDownloads?: boolean;
+  /** Application root that holds the bundled files (default: the runtime root, or the repository root in development). */
+  bundledRoot?: string;
   /** Builds Compact EMEVD, talk and layout inputs from the verified pristine game snapshot. */
   reconstructFiles?: (pristineDirectory: string, outputRoot: string) => Promise<void>;
   onProgress?: (progress: WorldDataProgress) => void;
@@ -323,6 +349,22 @@ async function assemble(options: WorldDataOptions): Promise<WorldDataResult> {
       const target = path.join(staging, ...entry.path.split('/'));
       await mkdir(path.dirname(target), { recursive: true });
       await copyFile(path.join(root, ...entry.path.split('/')), target);
+      done += 1;
+    }
+
+    for (const entry of manifest.filter((candidate) => candidate.origin === 'bundled' && !reusable.has(candidate.path))) {
+      let content: Buffer;
+      try { content = await readFile(path.join(options.bundledRoot ?? defaultBundledRoot, ...(entry.bundledPath ?? '').split('/'))); } catch (error) {
+        return failure('WORLD_DATA_RECONSTRUCTION_FAILED', 'A file that ships with DS1 Multi Randomizer is missing. Please download the application again.',
+          `Cannot read the bundled ${entry.bundledPath}: ${error instanceof Error ? error.message : String(error)}`);
+      }
+      const actual = hashWorldDataContent(content, entry.text);
+      if (actual !== entry.sha256) {
+        return failure('WORLD_DATA_RECONSTRUCTION_FAILED', 'A file that ships with DS1 Multi Randomizer is damaged. Please download the application again.',
+          `The bundled ${entry.bundledPath} does not match the pinned content (sha256 ${actual}, expected ${entry.sha256}).`);
+      }
+      await place(entry, content);
+      derived += 1;
       done += 1;
     }
 

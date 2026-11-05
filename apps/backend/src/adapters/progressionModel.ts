@@ -59,20 +59,24 @@ const runHost: HostRunner = (executable, args) => new Promise((resolve) => {
 
 /** The model for a prepared world data root: from the cache when it matches the pinned annotation, otherwise exported once (no shell, argument array). */
 export async function loadProgressionModel(
-  prerequisites: Pick<FogPrerequisites, 'executablePath' | 'progressionModelExecutablePath' | 'dataRoot' | 'annotationSource' | 'pristineGameDirectory' | 'compactProjection'>,
+  prerequisites: Pick<FogPrerequisites, 'executablePath' | 'progressionModelExecutablePath' | 'dataRoot' | 'annotationSource' | 'pristineGameDirectory' | 'compactProjection' | 'upstreamProjection'>,
   run: HostRunner = runHost,
   variant: ProgressionModelVariant = 'vanilla',
 ): Promise<ProgressionModelResult> {
   const annotationSource = prerequisites.annotationSource ?? 'legacy-fogmod';
-  const compact = annotationSource !== 'legacy-fogmod';
-  const expectedAnnotationSha256 = compact
-    ? prerequisites.compactProjection?.catalogFingerprint
-    : expectedLegacyAnnotationSha256;
+  // Legacy and upstream-v7 read the real fog.txt (the progression model is FogMod's own graph); only the Compact sources build a catalog from the installed game.
+  const upstream = annotationSource === 'upstream-v7';
+  const compact = annotationSource !== 'legacy-fogmod' && !upstream;
+  const expectedAnnotationSha256 = upstream
+    ? prerequisites.upstreamProjection?.annotationSha256
+    : compact
+      ? prerequisites.compactProjection?.catalogFingerprint
+      : expectedLegacyAnnotationSha256;
   if (!expectedAnnotationSha256) return failure('The selected fog annotation source has no verified identity.');
   if (compact && !prerequisites.pristineGameDirectory)
     return failure('The Compact progression model requires the verified pristine game directory.');
   // One cache file per variant: a vanilla model is never served for Race Mode + (or the reverse). The vanilla name is the one of every earlier version.
-  const suffix = `${compact ? `.${annotationSource}` : ''}${variant === 'vanilla' ? '' : `.${variant}`}`;
+  const suffix = `${compact || upstream ? `.${annotationSource}` : ''}${variant === 'vanilla' ? '' : `.${variant}`}`;
   const cacheFile = path.join(path.dirname(prerequisites.dataRoot), `${path.basename(prerequisites.dataRoot)}${suffix}.progression-model.json`);
   try {
     const cached = JSON.parse(await readFile(cacheFile, 'utf8')) as unknown;

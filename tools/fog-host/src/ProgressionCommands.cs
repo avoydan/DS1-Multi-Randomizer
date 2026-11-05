@@ -92,13 +92,13 @@ namespace FogHost
             {
                 root = Path.GetFullPath(root);
                 output = Path.GetFullPath(output);
-            if (annotationSource != HostRequest.LegacyFogModAnnotations && annotationSource != HostRequest.CompactAnnotations && annotationSource != HostRequest.CompactV3Annotations && annotationSource != HostRequest.CompactV2Annotations)
-                throw new FogHostException(HostErrors.RequestInvalid, "--annotation-source must be legacy-fogmod, compact-v1, compact-v2 or compact-v3.");
-            bool compact = annotationSource != HostRequest.LegacyFogModAnnotations;
+            if (annotationSource != HostRequest.LegacyFogModAnnotations && annotationSource != HostRequest.UpstreamV7Annotations && annotationSource != HostRequest.CompactAnnotations && annotationSource != HostRequest.CompactV3Annotations && annotationSource != HostRequest.CompactV2Annotations)
+                throw new FogHostException(HostErrors.RequestInvalid, "--annotation-source must be legacy-fogmod, upstream-v7, compact-v1, compact-v2 or compact-v3.");
+            bool compact = !HostRequest.UsesFogModAnnotationFile(annotationSource);
             if (compact
                 && (string.IsNullOrWhiteSpace(pristineRoot) || !Regex.IsMatch(expectedFingerprint ?? string.Empty, "^[a-f0-9]{64}$", RegexOptions.CultureInvariant)))
                 throw new FogHostException(HostErrors.RequestInvalid, "Compact progression models require --pristine-root and a lowercase --expected-annotation-fingerprint.");
-            DataRoot.Verify(root, includeLegacyAnnotations: annotationSource == HostRequest.LegacyFogModAnnotations);
+            DataRoot.VerifyForSource(root, annotationSource);
                 Environment.CurrentDirectory = root;
             (Annotations ann, Graph graph, RandomizerOptions opt, string annotationHash) = Build(
                 root, variant, annotationSource, pristineRoot, expectedFingerprint);

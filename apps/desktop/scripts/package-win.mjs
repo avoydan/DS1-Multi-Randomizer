@@ -147,6 +147,8 @@ await copy(path.join(root, 'apps/backend/dist'), path.join(runtime, 'apps/backen
 await copy(path.join(root, 'packages/contracts/dist'), path.join(runtime, 'node_modules/@ds1tr/contracts/dist'));
 await copy(path.join(root, 'packages/contracts/package.json'), path.join(runtime, 'node_modules/@ds1tr/contracts/package.json'));
 await copy(path.join(root, 'engines/combined/vendor/src'), path.join(runtime, 'engines/combined/vendor/src'));
+// Generation profile ds1tr-gen-v7 reads FogMod's own annotation file, shipped unmodified (Apache-2.0; tools/fog-host/upstream/PROVENANCE.md records why it may be) so that V7 works offline in every distribution.
+await copy(path.join(root, 'tools/fog-host/upstream'), path.join(fogHost, 'upstream'));
 await copy(path.join(root, 'engines/combined/vendor/package.json'), path.join(runtime, 'engines/combined/vendor/package.json'));
 const notices = path.join(runtime, 'licenses');
 await mkdir(notices, { recursive: true });
@@ -158,6 +160,7 @@ for (const [source, target] of [
   ['tools/fog-host/vendor/UPSTREAM_PIN.md', 'FogHost-upstream-pin.md'],
   ['docs/LICENSING.md', 'distribution-policy.md'],
   ['docs/FOG_DATA_PROVENANCE.md', 'world-randomizer-data-provenance.md'],
+  ['tools/fog-host/upstream/PROVENANCE.md', 'FogMod-fog.txt-provenance.md'],
   ['node_modules/react/LICENSE', 'React-MIT.txt'],
   ['node_modules/react-dom/LICENSE', 'React-DOM-MIT.txt'],
   ['node_modules/scheduler/LICENSE', 'Scheduler-MIT.txt'],
@@ -168,8 +171,8 @@ for (const [source, target] of [
 await writeFile(path.join(notices, 'FogHost-legacy-0.5.0-source.txt'), `Frozen legacy FogHost ${legacyFogHostPin.version} source\nGit commit: ${legacyFogHostPin.commit}\nSubtree: ${legacyFogHostPin.subtree}\nSubtree tree: ${legacyFogHostPin.tree}\nWire schema: ${legacyFogHostPin.schemaVersion}\nThe package builds this exact historical tree at packaging time; no legacy source copy is maintained in the current source tree.\n`);
 await copy(path.join(root, 'engines/combined/vendor/UPSTREAM_PIN.md'), path.join(notices, 'combined-engine-upstream-pin.md'));
 const fogDataNotice = distribution === 'nexus'
-  ? 'Nexus builds never download FogMod static data: v1/v2 require a complete hash-verified local cache, while v3 reconstructs its 58 inputs locally from the player’s own game files.'
-  : 'GitHub builds can download FogMod static data over HTTPS only for legacy v1/v2, verify every file against its pinned SHA-256, and keep it in the app cache; v3 reconstructs its 58 inputs locally from the player’s own game files.';
+  ? 'Nexus builds never download FogMod static data: v1/v2 require a complete hash-verified local cache, while v3 to v7 reconstruct their 58 inputs locally from the player’s own game files; v7 additionally reads FogMod’s unmodified fog.txt (Apache-2.0) that ships with the application.'
+  : 'GitHub builds can download FogMod static data over HTTPS only for legacy v1/v2, verify every file against its pinned SHA-256, and keep it in the app cache; v3 to v7 reconstruct their 58 inputs locally from the player’s own game files, and v7 additionally reads FogMod’s unmodified fog.txt (Apache-2.0) that ships with the application.';
 await writeFile(path.join(notices, 'README.txt'), `DS1 Multi Randomizer is GPL-3.0-only. Third-party notices and pinned source details are in this folder. Electron and Chromium licenses are in the application root. JuicerMV.SoulsFormats 0.1.3 declares GPL-3.0-only; ZstdSharp.Port 0.8.1, YamlDotNet 7.0.0, and Newtonsoft.Json 13.0.3 declare MIT. FogMod static data (annotations, layouts, and event and talk scripts edited by its author) is never bundled. ${fogDataNotice} The map and parameter files the world randomizer needs are copied from the player’s own Dark Souls Remastered installation (see world-randomizer-data-provenance.md). The .NET helper programs are published self-contained and include the .NET runtime (MIT, Microsoft). The public corresponding-source fork and release tag are required before publication.\n`);
 // Build information the running application can report in its diagnostics and support bundle (docs/DIAGNOSTICS.md). The signing state is NOT recorded as a
 // fact here: a public build (--release) is only accepted after tools/release/release-verify.mjs required a trusted signature, a development build is unsigned.

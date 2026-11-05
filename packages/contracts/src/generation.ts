@@ -22,8 +22,14 @@ export const GENERATION_PROFILE_V4 = 'ds1tr-gen-v4';
 export const GENERATION_PROFILE_V5 = 'ds1tr-gen-v5';
 /** Compact Fog v3: a physically sound Undead Asylum start and a general start-reachability rule instead of the Ceaseless post-boss check. */
 export const GENERATION_PROFILE_V6 = 'ds1tr-gen-v6';
+/**
+ * Upstream FogMod world model: the original `fog.txt` (Areas, links, Entrances, sides, Warps, conditions, key items, lot locations) is the only source of the
+ * physical Fog/world model. No route is inferred from map metadata. Works offline in every distribution (the annotation is bundled, the other inputs are rebuilt
+ * from the player's installed game).
+ */
+export const GENERATION_PROFILE_V7 = 'ds1tr-gen-v7';
 /** The profile new runs use. A later profile may replace it here; older profiles stay runnable. */
-export const CURRENT_GENERATION_PROFILE = GENERATION_PROFILE_V6;
+export const CURRENT_GENERATION_PROFILE = GENERATION_PROFILE_V7;
 
 export const SEED_CODE_PREFIX = 'DS1TR';
 /** Version of the Seed Code container itself (encoding, checksum, envelope layout). */

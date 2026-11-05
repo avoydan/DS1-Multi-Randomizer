@@ -9,6 +9,7 @@ import { buildFogCompatibility, decideFogRetry, defaultFogRetryBounds, planFogSt
 import { FogHostProcess, fogHostSchemaVersion, type FogHostRequest, type FogHostResponse } from '../adapters/fogHostProcess.js';
 import { userMessageFor } from './userMessages.js';
 import { trackedItemsFromCompactProjection, type FogTrackedItems } from '../adapters/fogItemRules.js';
+import { trackedItemsFromUpstreamProjection } from '../adapters/upstreamFogProjection.js';
 import { legacyFogTrackedItems } from '../adapters/legacyFogTrackedItems.js';
 import { loadProgressionModel, type ProgressionModel, type ProgressionModelResult, type ProgressionModelVariant } from '../adapters/progressionModel.js';
 import { resolveFogPrerequisites, type FogPreparationContext, type FogPrerequisiteFailure, type FogPrerequisites } from '../adapters/fogPrerequisites.js';
@@ -251,6 +252,7 @@ export async function generateRun(
       worldDataId: prerequisites.worldDataId,
       compactCatalogVersion: prerequisites.compactProjection?.catalogVersion,
       compactCatalogFingerprint: prerequisites.compactProjection?.catalogFingerprint,
+      upstreamAnnotationSha256: prerequisites.upstreamProjection?.annotationSha256,
     });
     if (dataDrift) return fail('fog', 'GENERATION_PROFILE_MISMATCH', dataDrift);
     try { await requireFile(fogReady.executablePath); await access(fogReady.dataRoot); }
@@ -261,7 +263,11 @@ export async function generateRun(
   // historical profiles use their frozen tracking snapshot.
   let fogTrackedItems: FogTrackedItems | null = null;
   if (fogReady) {
-    if (profile.fogAnnotationSource !== 'legacy-fogmod') {
+    if (profile.fogAnnotationSource === 'upstream-v7') {
+      // The semantic source is the upstream fog.txt (every KeyItem, every LotLocation); the Items randomizer then decides where the items go and FogMod's ItemReader reads that placement.
+      if (!fogReady.upstreamProjection) return fail('fog', 'FOG_UPSTREAM_PROJECTION_UNAVAILABLE', 'The upstream fog projection is missing.');
+      fogTrackedItems = trackedItemsFromUpstreamProjection(fogReady.upstreamProjection);
+    } else if (profile.fogAnnotationSource !== 'legacy-fogmod') {
       if (!fogReady.compactProjection) return fail('fog', 'FOG_COMPACT_PROJECTION_UNAVAILABLE', 'The Compact catalog projection is missing.');
       fogTrackedItems = trackedItemsFromCompactProjection(fogReady.compactProjection);
     } else fogTrackedItems = legacyFogTrackedItems();
@@ -399,7 +405,7 @@ export async function generateRun(
         : { schemaVersion: fogHostSchemaVersion, ...commonRequest,
           annotationSource: fogRuntime!.annotationSource,
           pristineGameDirectory: pristine.directory,
-          expectedAnnotationFingerprint: fogReady!.compactProjection?.catalogFingerprint ?? '' };
+          expectedAnnotationFingerprint: fogReady!.compactProjection?.catalogFingerprint ?? fogReady!.upstreamProjection?.annotationSha256 ?? '' };
       const response: FogHostResponse = await services.fog.execute({
         executablePath: fogReady!.executablePath,
         requestPath: staging.value.requestPath, responsePath: staging.value.responsePath,

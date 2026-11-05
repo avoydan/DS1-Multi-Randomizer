@@ -46,6 +46,23 @@ code, which still decodes and re-encodes byte-for-byte as V4. This local QA
 promotion and the later correction are not release-readiness or gameplay-success
 claims.
 
+## ds1tr-gen-v7 (upstream FogMod world model; desktop 0.42.0, 2026-11-05)
+
+`CURRENT_GENERATION_PROFILE` is now `ds1tr-gen-v7` for newly created worlds. V1 to V6 are frozen and unchanged: their registry entries, the V6 catalog fingerprint `f2775c4a...`, the V6 world data id `de58b0aaa51c8ce9`, the host compatibility identifier `0.7.3` and every golden fixture file (65 cases) are as before; the published V6 Seed Codes (the 0.41.0 smoke code and the owner's later world) still decode, re-encode byte-for-byte and select V6 (`generationProfiles.test.mjs`). No V6 fixture was re-recorded.
+
+V7 differs from V6 in the physical Fog model only (plus the item model that follows from it):
+
+| | V6 | V7 |
+|---|---|---|
+| Annotation source | `compact-v3` (project catalog; routes inferred from `ConnectCollision`, `Area.To` adjacency, map membership) | `upstream-v7`: FogMod's own `dist/fog.txt`, unmodified, pinned by SHA-256 `77a10b40...` (git blob `83beace0...`) |
+| Item model | `compact-fog-item-tracking-v1` (the Compact "required 9" projection) | `upstream-fog-item-tracking-v7`: every upstream KeyItem (27, 25 required) and LotLocations entry (440), read from the file by `FogHost upstream-projection` |
+| World data | `de58b0aaa51c8ce9`: 58 locally rebuilt inputs | `82f7a04c33a2e42c`: the bundled `fog.txt` + the same 58 locally rebuilt inputs (19 copied from the game, 39 rebuilt); nothing downloaded |
+| Event writing | Compact reconstructions applied to the output | none: the upstream writer works on the rebuilt upstream events, as `0.5.0` did |
+| Start check | start reachability (V6) | start reachability on the upstream graph, after FogMod's own connector |
+| Solver witness | no provenance | every transition `upstream-fogmod`; a key item moved by the Items randomizer `project-combined-overlay` |
+
+Host: `HostVersion` stays `0.7.3`; `upstream-v7` is its own annotation source, so no earlier profile's allow-list changed. Fixtures: `fixtures/golden/ds1tr-gen-v7.upstream-fog.json` (Triple defaults, Fog alone, shuffled progression items with Lord Souls). Design, measurements and open items: `docs/V7_UPSTREAM_PARITY.md`.
+
 ## ds1tr-gen-v6 (Compact Fog v3; backend 0.47.0, 2026-11-01)
 
 `CURRENT_GENERATION_PROFILE` is now `ds1tr-gen-v6` for newly created worlds. V1 to V5 are frozen and unchanged: their registry entries, the V5 catalog fingerprint `73f3c842...`, the V5 world data id `ef625777d6aa5abf`, the host compatibility identifier `0.7.3` and every golden fixture file (61 cases) are as before, and a V5 Seed Code (for example the V5 smoke code) keeps selecting V5. V6 differs from V5 in exactly two things: the catalog (the Asylum starting hallway has no unconditional exit, both Lost Izalith lava entries need the Orange Charred Ring, the Sen's cage door needs the Cage Key and no longer bypasses to the roof, and those two keys are found in `demonruins_centipede` and `sens_upper`, the twelve post-encounter links back into boss arenas need the arena to have been reached first, and the Depths wall `o1420_0000` joins `depths` to `depths` as upstream so the Gaping Dragon arena is entered only through its own fog; the lava, cage, boss-arena and Gaping corrections were made before V6's first release, in place; fingerprint `f2775c4a...`, world data id `de58b0aaa51c8ce9`) and the Fog postcondition (general start reachability instead of the Ceaseless post-boss route check). The retry budget (3 combined, 5 Fog attempts) is unchanged. Root cause, evidence, rule and residual risk: [COMPACT_FULL_FOG_V3.md](COMPACT_FULL_FOG_V3.md). New golden fixtures: `ds1tr-gen-v6.compact-fog.json` (the original confirmed hard-lock master seed and settings, the V5 owner smoke master seed and settings, a master seed whose five V5 Fog attempts were all rejected, and the Triple defaults).

@@ -19,6 +19,7 @@ namespace FogHost
         {
             if (CompactWorldDataCommands.Handles(args)) return CompactWorldDataCommands.Run(args);
             if (CompactProjectionCommands.Handles(args)) return CompactProjectionCommands.Run(args);
+            if (UpstreamProjectionCommands.Handles(args)) return UpstreamProjectionCommands.Run(args);
             // The progression commands (docs/ITEM_PROGRESSION_MODEL.md) are separate from `generate`: they write no game data and change nothing about it.
             if (ProgressionCommands.Handles(args)) return ProgressionCommands.Run(args);
             if (args.Length != 5 || args[0] != "generate" || args[1] != "--request" || args[3] != "--response")

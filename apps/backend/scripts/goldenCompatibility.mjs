@@ -18,6 +18,7 @@
 //   DS1TR_GOLDEN_GAME_SOURCE=<clean game dir> node apps/backend/scripts/goldenCompatibility.mjs record ds1tr-gen-v3 compact-fog
 //   DS1TR_GOLDEN_GAME_SOURCE=<clean game dir> node apps/backend/scripts/goldenCompatibility.mjs record ds1tr-gen-v4 roaming-boss-fit
 //   DS1TR_GOLDEN_GAME_SOURCE=<clean game dir> node apps/backend/scripts/goldenCompatibility.mjs record ds1tr-gen-v6 compact-fog
+//   DS1TR_GOLDEN_GAME_SOURCE=<clean game dir> node apps/backend/scripts/goldenCompatibility.mjs record ds1tr-gen-v7 upstream-fog
 //   (set DS1TR_STATE_DIR to an empty folder to prepare the world data there; DS1TR_FOG_HOST / DS1TR_DATA_TOOL_EXE as usual)
 
 import { createHash } from 'node:crypto';
@@ -294,6 +295,19 @@ export const v6ExtraCaseSets = {
   ],
 };
 
+/**
+ * ds1tr-gen-v7 (upstream FogMod world model): the original fog.txt is the whole physical Fog model, the item model is the upstream KeyItems/LotLocations, and the
+ * data set is built offline (bundled fog.txt + inputs rebuilt from the installed game). The cases pin: the Triple defaults, Fog alone (the physical model without any
+ * combined engine), and shuffled progression items with Lord Souls (the Items overlay moving upstream key items while the physical route stays upstream).
+ */
+export const v7ExtraCaseSets = {
+  'upstream-fog': [
+    { name: 'v7-upstream-triple', masterSeed: 'golden-v7-upstream-triple', patch: {} },
+    { name: 'v7-upstream-fog-only', masterSeed: 'golden-v7-upstream-fog-only', patch: { items: { enabled: false }, enemies: { enabled: false } } },
+    { name: 'v7-upstream-keys-shuffled-triple', masterSeed: 'golden-v7-keys-shuffled', patch: { items: { keyPlacement: 'shuffled', randomizeLordSouls: true } } },
+  ],
+};
+
 export function buildSettings(patch) {
   const merged = merge(defaults, patch);
   return JSON.parse(JSON.stringify(merged));
@@ -374,9 +388,9 @@ async function main() {
       const profileSets = profile === 'ds1tr-gen-v2' ? v2ExtraCaseSets
         : profile === 'ds1tr-gen-v3' ? v3ExtraCaseSets
           : profile === 'ds1tr-gen-v4' ? v4ExtraCaseSets
-            : profile === 'ds1tr-gen-v5' ? v5ExtraCaseSets : profile === 'ds1tr-gen-v6' ? v6ExtraCaseSets : v1ExtraCaseSets;
+            : profile === 'ds1tr-gen-v5' ? v5ExtraCaseSets : profile === 'ds1tr-gen-v6' ? v6ExtraCaseSets : profile === 'ds1tr-gen-v7' ? v7ExtraCaseSets : v1ExtraCaseSets;
       const caseList = setName ? profileSets[setName]
-        : (profile === 'ds1tr-gen-v2' || profile === 'ds1tr-gen-v3' || profile === 'ds1tr-gen-v4' || profile === 'ds1tr-gen-v5' || profile === 'ds1tr-gen-v6' ? [] : v1Cases);
+        : (profile === 'ds1tr-gen-v2' || profile === 'ds1tr-gen-v3' || profile === 'ds1tr-gen-v4' || profile === 'ds1tr-gen-v5' || profile === 'ds1tr-gen-v6' || profile === 'ds1tr-gen-v7' ? [] : v1Cases);
       if (!caseList) throw new Error(`Unknown extra case set ${setName}.`);
       const target = path.join(fixtureDirectory, setName ? `${profile}.${setName}.json` : `${profile}.json`);
       const exists = await access(target).then(() => true, () => false);

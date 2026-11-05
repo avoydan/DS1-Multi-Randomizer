@@ -13,7 +13,7 @@ import { fullConfig, fullSettings } from './seedTestSupport.mjs';
 
 const sha = (value) => createHash('sha256').update(value).digest('hex');
 
-test('v1 through v5 keep their frozen behavior while Compact v6 is current for new worlds', () => {
+test('v1 through v6 keep their frozen behavior while upstream v7 is current for new worlds', () => {
   const profile = resolveGenerationProfile('ds1tr-gen-v1');
   const corrected = resolveGenerationProfile('ds1tr-gen-v2');
   const compactLegacy = resolveGenerationProfile('ds1tr-gen-v3');
@@ -26,8 +26,13 @@ test('v1 through v5 keep their frozen behavior while Compact v6 is current for n
   assert.ok(compactLegacy);
   assert.ok(historicalCurrent);
   assert.ok(current);
-  assert.deepEqual(supportedGenerationProfiles(), ['ds1tr-gen-v1', 'ds1tr-gen-v2', 'ds1tr-gen-v3', 'ds1tr-gen-v4', 'ds1tr-gen-v5', 'ds1tr-gen-v6']);
-  assert.equal(currentGenerationProfile().id, 'ds1tr-gen-v6');
+  assert.deepEqual(supportedGenerationProfiles(), ['ds1tr-gen-v1', 'ds1tr-gen-v2', 'ds1tr-gen-v3', 'ds1tr-gen-v4', 'ds1tr-gen-v5', 'ds1tr-gen-v6', 'ds1tr-gen-v7']);
+  assert.equal(currentGenerationProfile().id, 'ds1tr-gen-v7');
+  // v6 is published and frozen: it keeps the Compact v3 catalog and the Compact tracking.
+  assert.equal(startReachability.fogAnnotationSource, 'compact-v3');
+  assert.equal(startReachability.fogItemTracking, 'compact-fog-item-tracking-v1');
+  assert.equal(startReachability.fogEngine.worldDataId, 'de58b0aaa51c8ce9');
+  assert.equal(startReachability.fogEngine.compactCatalogFingerprint, 'f2775c4a80f0ee41e4ccc0bf50fff4ea3714e11da73339c140cb3d6c6fe254a5');
   assert.doesNotMatch(profile.id, /\d+\.\d+/u, 'a profile id never contains an application version');
   assert.deepEqual(profile.combinedEngine.randomizerVersions, ['0.5.66']);
   assert.equal(profile.roamingBossDestinationPolicy, 'protected-v1');
@@ -126,14 +131,14 @@ test('components outside the profile lists are refused, those inside are accepte
   assert.match(checkProfileComponents(profile, { worldDataId: 'other' }), /world data other/u);
 });
 
-test('new worlds use v6 while the original V4 hard-lock Seed Code remains exact and pinned to v4 and V5 codes stay v5', () => {
+test('new worlds use v7 while the original V4 hard-lock Seed Code remains exact and pinned to v4 and V5 codes stay v5', () => {
   const run = prepareRun(fullConfig(), () => '123456');
   assert.equal(run.ok, true);
-  assert.equal(run.profile.id, 'ds1tr-gen-v6');
+  assert.equal(run.profile.id, 'ds1tr-gen-v7');
   // A later application only adds profiles; decoding reads the code's own profile, never the app version.
   const decoded = decodeSeedCode(run.seedCode);
-  assert.equal(decoded.envelope.profile, 'ds1tr-gen-v6');
-  assert.equal(decoded.seedCode, run.seedCode, 'the newly encoded V6 code round-trips exactly');
+  assert.equal(decoded.envelope.profile, 'ds1tr-gen-v7');
+  assert.equal(decoded.seedCode, run.seedCode, 'the newly encoded V7 code round-trips exactly');
 
   // A V5 code (the owner smoke code of the V5 QA) keeps selecting V5: it never silently switches to V6 semantics.
   const v5SmokeCode = 'DS1TR1-06NWCQQ3-K1HD8E66-2S3AD5N6-CTHZBKB8-FMSNNQWC-TRVW78NY-040F30XX-F0';
@@ -155,8 +160,22 @@ test('new worlds use v6 while the original V4 hard-lock Seed Code remains exact 
   assert.equal(oldRun.ok, true);
   assert.equal(oldRun.profile.id, 'ds1tr-gen-v4');
   assert.equal(oldRun.seedCode, originalHardLockCode);
+  // Published V6 Seed Codes (the 0.41.0 smoke code and the owner's later worlds) keep selecting V6: V7 never reinterprets them.
+  for (const v6Code of [
+    'DS1TR1-06NWCQQ3-K2GXEE39-K5WRJEDT-CNKBNHDS-Z7CTKEJ6-0S36D1M6-0S3A7NEF-D3TK6PQX-HHB3ZGX2-Z80G12X8-GYBG',
+    'DS1TR1-06NWCQQ3-K1GX8E56-2T3ECSK6-2TKAD8SN-SSM8TCWM-D8EE9F2F-B5TG6BHR-8TNSMRAH-TM001NQQ-0RP0',
+  ]) {
+    const v6Decoded = decodeSeedCode(v6Code);
+    assert.equal(v6Decoded.ok, true);
+    assert.equal(v6Decoded.envelope.profile, 'ds1tr-gen-v6');
+    assert.equal(encodeSeedCode(v6Decoded.envelope), v6Code, 'a published V6 code stays byte-for-byte identical');
+    const v6Run = prepareRun({ ...fullConfig(), seedCode: v6Code });
+    assert.equal(v6Run.ok, true);
+    assert.equal(v6Run.profile.id, 'ds1tr-gen-v6');
+    assert.equal(v6Run.seedCode, v6Code);
+  }
   // A code made by a profile this application does not know is an explicit, specific refusal, never a guess.
-  const future = encodeSeedCode({ profile: 'ds1tr-gen-v7', masterSeed: '1', settings: fullSettings() });
+  const future = encodeSeedCode({ profile: 'ds1tr-gen-v8', masterSeed: '1', settings: fullSettings() });
   const refused = prepareRun({ ...fullConfig(), seedCode: future });
   assert.equal(refused.ok, false);
   assert.equal(refused.code, 'UNSUPPORTED_PROFILE');
@@ -218,7 +237,7 @@ test('the application version never changes the world: the same Seed Code gives 
     assert.equal(today.result.manifest.appVersion, '0.30.0');
     assert.equal(later.result.manifest.appVersion, '12.4.7-future', 'the app version is recorded but only recorded');
     for (const field of ['generationProfile', 'seedCode', 'masterSeed']) assert.deepEqual(later.result.manifest[field], today.result.manifest[field], field);
-    assert.equal(today.result.manifest.generationProfile, 'ds1tr-gen-v6');
+    assert.equal(today.result.manifest.generationProfile, 'ds1tr-gen-v7');
     assert.equal(today.result.manifest.seedCode, code);
     assert.deepEqual(later.result.manifest.attempts, today.result.manifest.attempts);
     assert.deepEqual(await packageHashes(later.result.packagePath), await packageHashes(today.result.packagePath));

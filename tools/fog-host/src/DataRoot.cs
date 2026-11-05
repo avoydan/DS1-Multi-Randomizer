@@ -143,8 +143,10 @@ namespace FogHost
             Manifest.Where(e => e.Path.StartsWith(prefix, StringComparison.Ordinal)).Select(e => e.Path.Substring(prefix.Length));
 
         /// <summary>Throws FOG_DATA_MISSING listing every missing, altered, or unexpected file.</summary>
-        public static void Verify(string root, bool includeLegacyAnnotations = true)
+        public static void Verify(string root, bool includeLegacyAnnotations = true, bool locallyReconstructed = false)
         {
+            // locallyReconstructed: the 58 non-annotation files are the ones the player's own machine rebuilds from the installed game (events, talk scripts, layouts), not the upstream bytes.
+            bool reconstructedHashes = !includeLegacyAnnotations || locallyReconstructed;
             var problems = new List<string>();
             if (!Directory.Exists(root))
             {
@@ -159,7 +161,7 @@ namespace FogHost
                     problems.Add($"missing {entry.Path}");
                     continue;
                 }
-                string expectedHash = !includeLegacyAnnotations && CompactReconstructedHashes.TryGetValue(entry.Path, out string compactHash)
+                string expectedHash = reconstructedHashes && CompactReconstructedHashes.TryGetValue(entry.Path, out string compactHash)
                     ? compactHash : entry.Sha256;
                 if (!string.Equals(Hash(file, entry.Text), expectedHash, StringComparison.Ordinal))
                 {
@@ -178,6 +180,17 @@ namespace FogHost
                 }
             }
             if (problems.Count > 0) throw Missing(root, problems);
+        }
+
+        /// <summary>
+        /// The verification each annotation source needs: the legacy profiles read the 59 upstream files as published; Compact reads the 58 locally rebuilt files without fog.txt;
+        /// <c>upstream-v7</c> reads the bundled upstream fog.txt together with the 58 locally rebuilt files.
+        /// </summary>
+        public static void VerifyForSource(string root, string annotationSource)
+        {
+            if (annotationSource == HostRequest.LegacyFogModAnnotations) Verify(root, includeLegacyAnnotations: true);
+            else if (annotationSource == HostRequest.UpstreamV7Annotations) Verify(root, includeLegacyAnnotations: true, locallyReconstructed: true);
+            else Verify(root, includeLegacyAnnotations: false);
         }
 
         /// <summary>SHA-256 of fog.txt as it is pinned (LF-normalized).</summary>

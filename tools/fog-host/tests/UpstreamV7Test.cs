@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using FogHost;
 using FogMod;
 using YamlDotNet.Serialization;
@@ -136,6 +137,35 @@ namespace FogHost.Tests
             });
         }
 
+        // ---- the V7 data root: bundled annotation + locally rebuilt inputs ---------------------------------------------------------------------------
+
+        /// <summary>
+        /// The V7 data root is the bundled upstream fog.txt plus the 58 inputs rebuilt on the player's machine. It verifies in V7 mode and only in V7 mode; its fog.txt is byte-identical
+        /// to the bundled file and to the legacy cache's file; the projection of the upstream item model has every KeyItem (25 required, 2 random-only/hard) and every LotLocations entry.
+        /// </summary>
+        public static void VerifyV7DataRootAndItemProjection()
+        {
+            string v7Root = RequiredDirectory("DS1TR_V7_DATA_ROOT");
+            string legacyRoot = RequiredDirectory("DS1TR_FOG_DATA_ROOT");
+            DataRoot.VerifyForSource(v7Root, HostRequest.UpstreamV7Annotations);
+            bool legacyModeRejected = false;
+            try { DataRoot.VerifyForSource(v7Root, HostRequest.LegacyFogModAnnotations); } catch (FogHostException) { legacyModeRejected = true; }
+            Require(legacyModeRejected, "The locally rebuilt inputs must not pass as the legacy upstream files (the modes are separate).");
+            Require(File.ReadAllBytes(Path.Combine(v7Root, "dist", "fog.txt")).SequenceEqual(File.ReadAllBytes(Path.Combine(legacyRoot, "dist", "fog.txt"))), "The V7 fog.txt must be byte-identical to the upstream file of the legacy cache.");
+            string bundled = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "upstream", "fog.txt"));
+            if (File.Exists(bundled)) Require(File.ReadAllBytes(bundled).SequenceEqual(File.ReadAllBytes(Path.Combine(v7Root, "dist", "fog.txt"))), "The bundled fog.txt must be what the V7 data root holds.");
+
+            using JsonDocument projection = JsonDocument.Parse(UpstreamProjectionCommands.Build(v7Root));
+            JsonElement root = projection.RootElement;
+            Require(root.GetProperty("format").GetString() == UpstreamProjectionCommands.ProjectionFormat, "projection format");
+            Require(root.GetProperty("annotationSha256").GetString() == DataRoot.Manifest.Single(e => e.Path == "dist/fog.txt").Sha256, "The projection names the pinned fog.txt.");
+            JsonElement[] items = root.GetProperty("items").EnumerateArray().ToArray();
+            Require(items.Length == 27 && items.Count(i => i.GetProperty("required").GetBoolean()) == 25, $"Expected 27 upstream key items (25 required), found {items.Length}.");
+            Require(root.GetProperty("lotStarts").GetArrayLength() == 440, "Expected the 440 upstream LotLocations entries.");
+            Require(items.Any(i => i.GetProperty("name").GetString() == "lordvessel" && i.GetProperty("equipType").GetInt32() == 3 && i.GetProperty("itemId").GetInt32() == 2510), "The Lordvessel is an upstream key item.");
+            Require(items.Any(i => i.GetProperty("name").GetString() == "peculiar_doll" && i.GetProperty("required").GetBoolean()), "The Peculiar Doll is a required upstream key item (the Compact required-9 set left it out).");
+        }
+
         // ---- the four historical failures ------------------------------------------------------------------------------------------------------------
 
         private static Graph ConstructGraph(string dataRoot, bool glitched = false)
@@ -266,6 +296,36 @@ namespace FogHost.Tests
                     Require(document.Claim.AreasReached == document.Claim.AreasTotal - document.Claim.OptionalAreasNotRequired.Length || document.Claim.Unreached.Length == 0, "An accepted world reaches every required Area.");
                 }
                 Require(accepted >= 8, $"Expected most of the sample to be accepted, got {accepted}.");
+            });
+        }
+
+        /// <summary>
+        /// The V7 equivalent of the owner's hard-lock (V6: Asylum fog -> Priscilla boss side, then a fixed route out that killed the player): on real upstream layouts where the Asylum
+        /// start exits through the boss side of Priscilla's fog, every Area the solver reaches from the arena is reached through the upstream warp 1512500 (WarpFlag 5302) and
+        /// nothing else, the witness names it as upstream, and no in-map link leaves the arena.
+        /// </summary>
+        public static void VerifyPriscillaBossSideArrivalUsesTheUpstreamWarpOnly()
+        {
+            string dataRoot = RequiredDirectory("DS1TR_FOG_DATA_ROOT");
+            string gameRoot = RequiredDirectory("DS1TR_PRISTINE_DSR_ROOT");
+            InDirectory(dataRoot, () =>
+            {
+                int found = 0;
+                foreach (uint seed in new uint[] { 140, 243, 265 })
+                {
+                    Connected world = Connect(dataRoot, gameRoot, seed);
+                    bool fromAsylum = world.Graph.graph["paintedworld_priscilla"].From.Any(edge => edge.Name == "o1600_0000" && edge.From == "asylum");
+                    Require(fromAsylum, $"Fog seed {seed} is a known layout with the Asylum hallway paired to the boss side of Priscilla's fog.");
+                    found++;
+                    SolverWitness.WitnessDto document = SolverWitness.BuildDocument(world.Options, world.Graph, world.Annotations, world.Check, world.Observer, HostRequest.UpstreamV7Annotations);
+                    SolverWitness.ReachDto[] leaving = document.ReachTree.Where(reach => reach.FromArea == "paintedworld_priscilla").ToArray();
+                    Require(leaving.All(reach => reach.Edge.Exit.Object == "1512500" && reach.Edge.Kind == "warp" && reach.Edge.Source == SolverWitness.SourceUpstream && reach.Edge.Exit.Tags.Contains("unique")),
+                        $"Fog seed {seed}: the only way the solver leaves the Priscilla arena must be the upstream warp 1512500, found [{string.Join(",", leaving.Select(r => r.Edge.Exit.Object ?? "in-map"))}].");
+                    foreach (Graph.Edge edge in world.Graph.graph["paintedworld_priscilla"].To.Where(e => e.Name == "1512500"))
+                        Require(edge.Side.WarpFlag == 5302, "The warp keeps WarpFlag 5302.");
+                    Require(!document.ReachTree.Any(reach => reach.Edge != null && reach.Edge.Kind == "fixed-route" && reach.Edge.Exit.Area == "paintedworld_priscilla"), "No fixed route leaves the arena.");
+                }
+                Require(found == 3, "All three known layouts were checked.");
             });
         }
 

@@ -23,6 +23,13 @@ FogMod is Apache-2.0 and is compatible with a GPLv3 distribution. When it is
 vendored, preserve its license, copyright notices, NOTICE file if present, and
 clearly identify modified files.
 
+`dist/fog.txt` of the pinned FogMod commit is bundled unmodified for generation
+profile `ds1tr-gen-v7` (`tools/fog-host/upstream/`): it is directly authored
+annotation data covered by the repository's Apache-2.0 licence, and its
+provenance is recorded in `tools/fog-host/upstream/PROVENANCE.md`. No other file
+of FogMod's `dist` is bundled; events, talk scripts, layouts and game data are
+rebuilt or copied locally from the player's own installation.
+
 ## Legacy randomizers
 
 `HotPocketRemix/DarkSoulsItemRandomizer` and

@@ -35,6 +35,20 @@ game files: they are the FogMod author's own data (annotations, layouts) and Fro
 author edited. A different game build makes the derived hashes fail, which the application reports as an unsupported
 version.
 
+## Update 2026-11-05: `dist/fog.txt` is bundled for generation profile `ds1tr-gen-v7`
+
+On 2026-11-05 the owner decided that V7 must work offline in every distribution without any FogMod cache, and that only upstream files whose redistribution rights are clearly verified may be bundled. The classification of the 59 files under that rule:
+
+| Files | Class | Decision |
+|---|---|---|
+| `dist/fog.txt` | **A**: directly authored upstream metadata | **bundled**, unmodified (`tools/fog-host/upstream/fog.txt`, `PROVENANCE.md` next to it). Verified 2026-11-05: the git blob of the bundled bytes (`83beace06434ce98e33eaeecde86f17c810dd096`, 147516 bytes) is identical to the entry GitHub's tree API reports for `dist/fog.txt` at the pinned commit; the repository has one licence at its root (Apache-2.0, blob `e454a525...`, no NOTICE, no per-directory exception); all 9 commits that touched the file are by the repository owner; the author's own release package ships `dist`. This settles the open question recorded below. |
+| `dist/DS1R/Layouts/*.xml` (4) | **B**: scope not separately stated | **not bundled**; rebuilt locally from the installed game (`OfflineLayoutReconstructor`) |
+| `dist/DS1R/event/*.emevd.dcx` (18 + `common`) | **B**: FromSoftware events edited by the author | **not bundled**; rebuilt locally (`OfflineEventReconstructor`). Measured against the upstream originals, the rebuilt files agree instruction for instruction (id, instruction bank/id/arguments, parameters) in all 1281 events (the byte hashes differ only in serialization and parameter record order) |
+| `dist/DS1R/script/talk/*.talkesdbnd.dcx` (17) | **B**: FromSoftware talk scripts edited by the author | **not bundled**; rebuilt locally (`OfflineTalkReconstructor`, ESDLang round-trip normalization). 105 scripts are identical to upstream. The 73 scripts the author edited (by id the per-map bonfire and conversation scripts) differ from upstream in the state-machine dump (for example a literal `0x41` upstream against an int32 token in the rebuilt file), and **their equivalence is not proven**: they are the same rebuilt files the published V6 ships, they hold no Fog graph data, and the claim made here is only that they are not routes. Open item, listed in `docs/V7_UPSTREAM_PARITY.md` |
+| `dist/DS1R/map/MapStudio/*.msb` (18), `GameParam.parambnd.dcx` | **C**: game data, byte-identical to the installation | **not bundled**; copied from the verified pristine snapshot |
+
+The V7 data set is therefore: the bundled `fog.txt` + 19 files copied from the installed game + 39 files rebuilt from it. Nothing is downloaded, no cache from V1/V2 is needed, and the Nexus build is unchanged (offline, updater-free). The earlier statement that DS1TR bundles none of the 59 files is superseded for `dist/fog.txt` only.
+
 ## Redistribution decision
 
 On 2026-10-11, the user declined contacting the FogMod maintainer and directed

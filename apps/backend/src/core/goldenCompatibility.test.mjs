@@ -4,7 +4,7 @@ import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
-import { buildSettings, seedCodeForProfile, v5ExtraCaseSets, v6ExtraCaseSets } from '../../scripts/goldenCompatibility.mjs';
+import { buildSettings, seedCodeForProfile, v5ExtraCaseSets, v6ExtraCaseSets, v7ExtraCaseSets } from '../../scripts/goldenCompatibility.mjs';
 import { canonicalSettingsJson } from '../../dist/core/canonicalSettings.js';
 import { currentGenerationProfile, resolveGenerationProfile } from '../../dist/core/generationProfiles.js';
 import { decodeSeedCode, encodeSeedCode } from '../../dist/core/seedCode.js';
@@ -131,6 +131,23 @@ test('the v6 golden fixtures pin the start-reachability regressions: original ha
   }
 });
 
+test('the V7 fixtures pin the upstream FogMod world model: Triple defaults, Fog alone and shuffled progression items, each generated on the first Fog attempt', async () => {
+  const v7 = (await fixtures()).find((fixture) => fixture.file === 'ds1tr-gen-v7.upstream-fog.json');
+  assert.ok(v7, 'the ds1tr-gen-v7 upstream Fog fixture file exists');
+  assert.deepEqual(v7.cases.map((entry) => entry.name), v7ExtraCaseSets['upstream-fog'].map((spec) => spec.name));
+  for (const entry of v7.cases) {
+    assert.equal(entry.profile, 'ds1tr-gen-v7');
+    assert.ok(entry.expected.fileCount > 0 && Object.keys(entry.expected.files).length === entry.expected.fileCount);
+    assert.deepEqual(entry.expected.attempts, ['success'], 'no Fog retry was needed: nothing was relaxed to get these worlds accepted');
+  }
+  const triple = v7.cases.find((entry) => entry.name === 'v7-upstream-triple');
+  assert.equal(triple.settings.items.enabled, true);
+  assert.equal(triple.settings.enemies.enabled, true);
+  assert.equal(triple.settings.fog.enabled, true);
+  assert.equal(v7.cases.find((entry) => entry.name === 'v7-upstream-fog-only').settings.items.enabled, false);
+  assert.equal(v7.cases.find((entry) => entry.name === 'v7-upstream-keys-shuffled-triple').settings.items.keyPlacement, 'shuffled');
+});
+
 test('the V5 recorder preserves its declared profile and new worlds use the promoted profile', () => {
   const [spec] = v5ExtraCaseSets['compact-fog'];
   const seedCode = seedCodeForProfile('ds1tr-gen-v5', spec.masterSeed, buildSettings(spec.patch));
@@ -138,7 +155,7 @@ test('the V5 recorder preserves its declared profile and new worlds use the prom
   assert.equal(decoded.ok, true, decoded.message ?? '');
   assert.equal(decoded.envelope.profile, 'ds1tr-gen-v5');
   assert.equal(resolveGenerationProfile('ds1tr-gen-v5')?.id, 'ds1tr-gen-v5');
-  assert.equal(currentGenerationProfile().id, 'ds1tr-gen-v6');
+  assert.equal(currentGenerationProfile().id, 'ds1tr-gen-v7');
   const [v6Spec] = v6ExtraCaseSets['compact-fog'];
   const v6Decoded = decodeSeedCode(seedCodeForProfile('ds1tr-gen-v6', v6Spec.masterSeed, buildSettings(v6Spec.patch)));
   assert.equal(v6Decoded.ok, true, v6Decoded.message ?? '');

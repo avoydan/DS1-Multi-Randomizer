@@ -1,4 +1,4 @@
-import { CURRENT_GENERATION_PROFILE, GENERATION_PROFILE_V1, GENERATION_PROFILE_V2, GENERATION_PROFILE_V3, GENERATION_PROFILE_V4, GENERATION_PROFILE_V5, GENERATION_PROFILE_V6 } from '@ds1tr/contracts';
+import { CURRENT_GENERATION_PROFILE, GENERATION_PROFILE_V1, GENERATION_PROFILE_V2, GENERATION_PROFILE_V3, GENERATION_PROFILE_V4, GENERATION_PROFILE_V5, GENERATION_PROFILE_V6, GENERATION_PROFILE_V7 } from '@ds1tr/contracts';
 import { SEED_DERIVATION_V1, type SeedDerivation } from './seeds.js';
 
 /**
@@ -28,7 +28,7 @@ export interface GenerationProfile {
   /** Frozen roaming-boss candidate and fit-class rules; not a user setting. */
   readonly roamingBossFitPolicy: 'legacy-v1' | 'owner-approved-v1';
   /** Whether this profile selects the legacy pinned FogMod annotation source or the project Compact catalog. */
-  readonly fogAnnotationSource: 'legacy-fogmod' | 'compact-v1' | 'compact-v2' | 'compact-v3';
+  readonly fogAnnotationSource: 'legacy-fogmod' | 'compact-v1' | 'compact-v2' | 'compact-v3' | 'upstream-v7';
   /** Fog engine: FogHost versions with identical output, the pinned FogMod commit, and the world data set it reads. */
   readonly fogEngine: {
     readonly hostVersions: readonly string[];
@@ -36,9 +36,16 @@ export interface GenerationProfile {
     readonly worldDataId: string;
     readonly compactCatalogVersion?: string;
     readonly compactCatalogFingerprint?: string;
+    /** ds1tr-gen-v7 only: SHA-256 (LF-normalized) of the bundled upstream fog.txt that defines the whole physical Fog model. */
+    readonly upstreamAnnotationSha256?: string;
+    /** ds1tr-gen-v7 only: the version of the local rebuild of the events, talk scripts and layouts from the installed game. */
+    readonly localReconstructionVersion?: string;
   };
-  /** Item shuffle rules for the world randomizer (docs/FOG_ITEM_TRACKING.md) that this profile applies when Fog is on. */
-  readonly fogItemTracking: 'fog-item-tracking-v1' | 'compact-fog-item-tracking-v1';
+  /**
+   * Item shuffle rules for the world randomizer (docs/FOG_ITEM_TRACKING.md) that this profile applies when Fog is on. `upstream-fog-item-tracking-v7` is derived at run time from the
+   * upstream fog.txt itself (every KeyItem and every LotLocation), never from a catalog or a frozen snapshot.
+   */
+  readonly fogItemTracking: 'fog-item-tracking-v1' | 'compact-fog-item-tracking-v1' | 'upstream-fog-item-tracking-v7';
   /**
    * Completes the settings of a Seed Code created by this profile when the running application knows options that did not
    * exist then. Each such option must be given the value that reproduces the old behavior (never the current default).
@@ -53,7 +60,7 @@ export interface GenerationProfile {
 export interface FogHostRuntimeContract {
   readonly hostVersion: '0.5.0' | '0.6.0' | '0.7.3';
   readonly schemaVersion: 2 | 3;
-  readonly annotationSource: 'legacy-fogmod' | 'compact-v1' | 'compact-v2' | 'compact-v3';
+  readonly annotationSource: 'legacy-fogmod' | 'compact-v1' | 'compact-v2' | 'compact-v3' | 'upstream-v7';
 }
 
 const v1: GenerationProfile = Object.freeze({
@@ -169,7 +176,31 @@ const v6: GenerationProfile = Object.freeze({
   completeSettings: v5.completeSettings,
 });
 
-const registry: ReadonlyMap<string, GenerationProfile> = new Map([[v1.id, v1], [v2.id, v2], [v3.id, v3], [v4.id, v4], [v5.id, v5], [v6.id, v6]]);
+const UPSTREAM_V7_WORLD_DATA_ID = '82f7a04c33a2e42c';
+
+const v7: GenerationProfile = Object.freeze({
+  id: GENERATION_PROFILE_V7,
+  title: 'Upstream FogMod world model: original fog.txt semantics, no inferred routes, offline in every distribution',
+  seedDerivation: SEED_DERIVATION_V1,
+  retryBounds: Object.freeze({ maxCombinedAttempts: 3, maxFogAttempts: 5 }),
+  combinedEngine: Object.freeze({ randomizerVersions: Object.freeze(['0.5.66']) }),
+  roamingBossDestinationPolicy: 'safe-handlers-v2',
+  roamingBossFitPolicy: 'owner-approved-v1',
+  fogAnnotationSource: 'upstream-v7',
+  fogEngine: Object.freeze({
+    // HostVersion stays 0.7.3: v7 is selected by its own annotation source, so no earlier profile's allow-list changes (an older host refuses it as an unknown source).
+    hostVersions: Object.freeze(['0.7.3']),
+    fogModCommit: v6.fogEngine.fogModCommit,
+    // Identity of the prepared data set (profile, upstream fog.txt hash, local reconstruction version, every file hash); apps/backend/src/adapters/worldData.ts computes it and a test pins it.
+    worldDataId: UPSTREAM_V7_WORLD_DATA_ID,
+    upstreamAnnotationSha256: '77a10b4015c51bdfbe1499f38344c85540a63bfa1ef6370ad9c1ebdc9a2d2af6',
+    localReconstructionVersion: 'ds1tr-local-fog-data-v1',
+  }),
+  fogItemTracking: 'upstream-fog-item-tracking-v7',
+  completeSettings: v6.completeSettings,
+});
+
+const registry: ReadonlyMap<string, GenerationProfile> = new Map([[v1.id, v1], [v2.id, v2], [v3.id, v3], [v4.id, v4], [v5.id, v5], [v6.id, v6], [v7.id, v7]]);
 
 export function resolveGenerationProfile(id: string): GenerationProfile | null {
   return registry.get(id) ?? null;
@@ -203,6 +234,13 @@ export function fogHostRuntimeForProfile(
     && typeof profile.fogEngine.compactCatalogFingerprint === 'string') {
     return Object.freeze({ hostVersion: '0.7.3', schemaVersion: 3, annotationSource: 'compact-v3' });
   }
+  if (profile.fogAnnotationSource === 'upstream-v7'
+    && profile.fogItemTracking === 'upstream-fog-item-tracking-v7'
+    && versions.includes('0.7.3')
+    && typeof profile.fogEngine.upstreamAnnotationSha256 === 'string'
+    && typeof profile.fogEngine.localReconstructionVersion === 'string') {
+    return Object.freeze({ hostVersion: '0.7.3', schemaVersion: 3, annotationSource: 'upstream-v7' });
+  }
   if (profile.fogAnnotationSource === 'compact-v2'
     && profile.fogItemTracking === 'compact-fog-item-tracking-v1'
     && versions.includes('0.7.3')
@@ -228,6 +266,8 @@ export interface ObservedComponents {
   worldDataId?: string;
   compactCatalogVersion?: string;
   compactCatalogFingerprint?: string;
+  /** ds1tr-gen-v7: the hash of the upstream fog.txt that was actually read. */
+  upstreamAnnotationSha256?: string;
 }
 
 /**
@@ -254,6 +294,10 @@ export function checkProfileComponents(profile: GenerationProfile, observed: Obs
   if (observed.compactCatalogFingerprint !== undefined
     && observed.compactCatalogFingerprint !== profile.fogEngine.compactCatalogFingerprint) {
     return `Compact catalog fingerprint ${observed.compactCatalogFingerprint} differs from ${profile.id} (${profile.fogEngine.compactCatalogFingerprint ?? 'not used'}).`;
+  }
+  if (observed.upstreamAnnotationSha256 !== undefined
+    && observed.upstreamAnnotationSha256 !== profile.fogEngine.upstreamAnnotationSha256) {
+    return `upstream fog.txt ${observed.upstreamAnnotationSha256} differs from ${profile.id} (${profile.fogEngine.upstreamAnnotationSha256 ?? 'not used'}).`;
   }
   return null;
 }

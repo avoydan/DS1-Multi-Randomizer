@@ -47,3 +47,7 @@ DS1TR_FOG_DATA_ROOT=<fog data> tools/fog-host/tests/bin/Release/net8.0/FogHost.T
 - Annotation sources a request may name: `legacy-fogmod` (profiles v1/v2), `compact-v1` (v3/v4), `compact-v2` (v5, with the frozen Ceaseless post-boss check)
   and `compact-v3` (v6: physically sound Asylum start, `StartReachabilityValidator`). Acceptance sample for v6:
   `DS1TR_COMPACT_V3_SEEDS=1,2,3 FogHost.Tests.exe compact-v3-seed-sweep`. Design: `docs/COMPACT_FULL_FOG_V3.md`.
+- `upstream-v7` (v7): the original FogMod `dist/fog.txt` (bundled in `upstream/`, see `upstream/PROVENANCE.md`) read unchanged, with the 58 inputs rebuilt from the
+  installed game (`reconstruct-compact-data`); no Compact event reconstruction runs. `FogHost upstream-projection --data-root <dir> --out <json>` exports the upstream
+  key items and lots for the backend. The V7 tests (`tests/UpstreamV7Test.cs`) need `DS1TR_FOG_DATA_ROOT` (a data root holding the pinned fog.txt),
+  `DS1TR_PRISTINE_DSR_ROOT`, and `DS1TR_V7_DATA_ROOT` for the data-root check; `DS1TR_V7_ACCEPTANCE_SEEDS=300` runs the raw-seed acceptance. Design: `docs/V7_UPSTREAM_PARITY.md`.

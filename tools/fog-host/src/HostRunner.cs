@@ -67,7 +67,7 @@ namespace FogHost
             }
             if (Contains(staging, request.LogPath)) throw Invalid("logPath must be outside the staging directory.");
 
-            DataRoot.Verify(request.FogDataRoot, includeLegacyAnnotations: HostRequest.UsesFogModAnnotationFile(request.AnnotationSource));
+            DataRoot.VerifyForSource(request.FogDataRoot, request.AnnotationSource);
 
             var missing = new List<string>();
             IEnumerable<string> readSet = new[] { GameParam, $"msg/{request.Language}/menu.msgbnd.dcx" }

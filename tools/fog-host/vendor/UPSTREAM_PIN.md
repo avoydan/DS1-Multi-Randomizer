@@ -83,6 +83,10 @@ CRLF after patching.
    parameters, so the output is unchanged today; the patch keeps the same
    principle as patch 7.
 
+### Bundled annotation (generation profile ds1tr-gen-v7)
+
+No vendored FogMod source changed for V7. The annotation itself, `dist/fog.txt` at the pinned commit, is bundled **unmodified** in `tools/fog-host/upstream/fog.txt` (git blob `83beace06434ce98e33eaeecde86f17c810dd096`, verified against GitHub's tree API; SHA-256 of the LF-normalized text `77a10b4015c51bdfbe1499f38344c85540a63bfa1ef6370ad9c1ebdc9a2d2af6`); the reasons it may be redistributed are in `tools/fog-host/upstream/PROVENANCE.md`. Every other file of FogMod's `dist` stays unbundled and is rebuilt locally from the player's game.
+
 ### Solver witness observer (FogHost 0.9.0)
 
 `GraphChecker.Check` gained one optional trailing parameter, `WitnessObserver observer = null` (the observer class is project-owned, `src/WitnessObserver.cs`, namespace `FogMod`), and five read-only calls: `OnStart` after `visit(start)`, `BeginPass` at the top of each pass, `OnBossCompletion` after the completion state is set, and `OnFirstReach` immediately before `visit(edge.To)` (the first edge that reaches an Area, with its linked condition and which of its variables are true). The observer is never read back and no value the search uses is changed: with a null observer every caller behaves exactly as before (`SolverWitnessTest.VerifyObserverDoesNotChangeTheSearch`). Used only by `StartReachabilityValidator` for the V6 witness (`docs/SOLVER_WITNESS.md`).
