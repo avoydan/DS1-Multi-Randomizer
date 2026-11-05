@@ -19,7 +19,11 @@ namespace FogReconstruction
             [0x91] = "<=", [0x92] = ">=", [0x93] = "<", [0x94] = ">",
             [0x95] = "==", [0x96] = "!=", [0x98] = "&&", [0x99] = "||",
         };
-        internal static int Normalize(ESD esd)
+        /// <param name="keepCompactTrueCondition">
+        /// Generation profile ds1tr-gen-v7 only: a condition whose whole evaluator is the constant 1 (<c>41 A1</c>) keeps its compact encoding. FogMod's own Talk corpus has it that way in all 2336
+        /// such conditions of the 73 edited scripts (measured against the original files); the Compact profiles' frozen output rewrites it as an int32 token and must not change.
+        /// </param>
+        internal static int Normalize(ESD esd, bool keepCompactTrueCondition = false)
         {
             int rewritten = 0;
             foreach (KeyValuePair<long, Dictionary<long, ESD.State>> group in esd.StateGroups)
@@ -29,13 +33,45 @@ namespace FogReconstruction
                 var registers = new Dictionary<int, Expr>();
                 rewritten += NormalizeCommands(state.EntryCommands, registers, esd.Name, group.Key, stateEntry.Key);
                 foreach (ESD.Condition condition in state.Conditions ?? new List<ESD.Condition>())
-                    rewritten += NormalizeCondition(condition, registers, esd.Name, group.Key, stateEntry.Key);
+                    rewritten += NormalizeCondition(condition, registers, esd.Name, group.Key, stateEntry.Key, keepCompactTrueCondition);
                 rewritten += NormalizeCommands(state.WhileCommands, registers, esd.Name, group.Key, stateEntry.Key);
                 rewritten += NormalizeCommands(state.ExitCommands, registers, esd.Name, group.Key, stateEntry.Key);
             }
             rewritten += ApplyRepeatedNpcConversationPatch(esd);
             return rewritten;
         }
+
+        /// <summary>
+        /// Generation profile ds1tr-gen-v7 only. The game's own scripts share condition and command entries between states, and SoulsFormats' writer stores a shared entry once; FogMod's Talk
+        /// corpus (compiled by its author's tool) has every use written out. The content is unchanged: this gives each use its own copy, so the writer produces the same bytes as for FogMod's files.
+        /// </summary>
+        internal static void UnshareEntries(ESD esd)
+        {
+            foreach (Dictionary<long, ESD.State> group in esd.StateGroups.Values)
+            foreach (ESD.State state in group.Values)
+            {
+                state.EntryCommands = CloneCommands(state.EntryCommands);
+                state.WhileCommands = CloneCommands(state.WhileCommands);
+                state.ExitCommands = CloneCommands(state.ExitCommands);
+                state.Conditions = (state.Conditions ?? new List<ESD.Condition>()).Select(CloneCondition).ToList();
+            }
+        }
+
+        private static List<ESD.CommandCall> CloneCommands(List<ESD.CommandCall> commands) =>
+            (commands ?? new List<ESD.CommandCall>()).Select(command => new ESD.CommandCall
+            {
+                CommandBank = command.CommandBank,
+                CommandID = command.CommandID,
+                Arguments = (command.Arguments ?? new List<byte[]>()).Select(argument => (byte[])argument.Clone()).ToList(),
+            }).ToList();
+
+        private static ESD.Condition CloneCondition(ESD.Condition condition) =>
+            new ESD.Condition(condition.TargetState ?? -1, (byte[])condition.Evaluator.Clone())
+            {
+                TargetState = condition.TargetState,
+                PassCommands = CloneCommands(condition.PassCommands),
+                Subconditions = (condition.Subconditions ?? new List<ESD.Condition>()).Select(CloneCondition).ToList(),
+            };
 
         private static int ApplyRepeatedNpcConversationPatch(ESD esd)
         {
@@ -123,12 +159,13 @@ namespace FogReconstruction
 
         internal static string DescribeExpression(byte[] expression) => Describe(Parse(expression));
 
-        private static int NormalizeCondition(ESD.Condition condition, Dictionary<int, Expr> registers, string esdName, long groupId, long stateId)
+        private static int NormalizeCondition(ESD.Condition condition, Dictionary<int, Expr> registers, string esdName, long groupId, long stateId, bool keepCompactTrueCondition)
         {
-            int rewritten = Normalize(ref condition.Evaluator, registers, esdName, groupId, stateId);
+            bool constantTrue = keepCompactTrueCondition && condition.Evaluator != null && condition.Evaluator.Length == 2 && condition.Evaluator[0] == 0x41 && condition.Evaluator[1] == 0xA1;
+            int rewritten = constantTrue ? 0 : Normalize(ref condition.Evaluator, registers, esdName, groupId, stateId);
             rewritten += NormalizeCommands(condition.PassCommands, registers, esdName, groupId, stateId);
             foreach (ESD.Condition child in condition.Subconditions ?? new List<ESD.Condition>())
-                rewritten += NormalizeCondition(child, registers, esdName, groupId, stateId);
+                rewritten += NormalizeCondition(child, registers, esdName, groupId, stateId, keepCompactTrueCondition);
             return rewritten;
         }
 

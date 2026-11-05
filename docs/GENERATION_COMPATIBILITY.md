@@ -61,6 +61,8 @@ V7 differs from V6 in the physical Fog model only (plus the item model that foll
 | Start check | start reachability (V6) | start reachability on the upstream graph, after FogMod's own connector |
 | Solver witness | no provenance | every transition `upstream-fogmod`; a key item moved by the Items randomizer `project-combined-overlay` |
 
+**Pre-release correction (2026-11-05, before V7 was ever published).** Measured against the original generator on the same Fog seed, V7's locally rebuilt event archives (placement and parameter order) and talk archives (script name, constant-true condition encoding, unshared entries) differed from FogMod's own files in six event archives and all 17 talk archives. They were brought to FogMod's layout (`reconstruct-compact-data --upstream-layout`, V7 only), which changes V7's world data identity (`82f7a04c33a2e42c` to `bb35e3e0b8feeb75`, local reconstruction version `ds1tr-local-fog-data-v1+upstream-layout`) and the written event and talk files, so the three V7 fixtures were re-recorded once. V1 to V6 are untouched (their 65 cases pass unchanged) and no V7 Seed Code had been shared.
+
 Host: `HostVersion` stays `0.7.3`; `upstream-v7` is its own annotation source, so no earlier profile's allow-list changed. Fixtures: `fixtures/golden/ds1tr-gen-v7.upstream-fog.json` (Triple defaults, Fog alone, shuffled progression items with Lord Souls). Design, measurements and open items: `docs/V7_UPSTREAM_PARITY.md`.
 
 ## ds1tr-gen-v6 (Compact Fog v3; backend 0.47.0, 2026-11-01)

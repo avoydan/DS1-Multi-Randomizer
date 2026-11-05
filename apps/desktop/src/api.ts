@@ -1,4 +1,4 @@
-import type { SmokeExpectation, Diagnostics, HintDocument, SolverWitnessDocument, DecodedSeedPayload, EnemyPoolDescription, GenerationSettings, PersistedSettings, RunHistoryEntry, GameStateReport, GenerationEvent, GenerationResult, InstallationValidation, OperationResult, PipelinePlan, PresetDocument, PresetImportResult, RandomizerConfig } from '@ds1tr/contracts';
+import type { SmokeExpectation, Diagnostics, HintDocument, SolverWitnessDocument, DecodedSeedPayload, EnemyPoolDescription, GenerationSettings, PersistedSettings, RunHistoryEntry, HistoryCleanupPreview, HistoryCleanupResult, HistoryDeleteResult, GameStateReport, GenerationEvent, GenerationResult, InstallationValidation, OperationResult, PipelinePlan, PresetDocument, PresetImportResult, RandomizerConfig } from '@ds1tr/contracts';
 
 export interface DetectedInstallation { gamePath: string; label: string; valid: boolean; problems: string[] }
 export interface SmokeTestList {
@@ -75,7 +75,9 @@ export const api = {
   },
   decodeSeed: (seedCode: string) => post<DecodedSeedPayload>('/seed/decode', { seedCode }, true),
   history: () => post<{ entries: RunHistoryEntry[] }>('/history/list', {}),
-  deleteHistoryEntry: (id: string) => post<{ ok: boolean }>('/history/delete', { id }),
+  deleteHistoryEntry: (id: string) => post<HistoryDeleteResult>('/history/delete', { id }),
+  historyCleanupPreview: () => post<HistoryCleanupPreview>('/history/cleanup-preview', {}),
+  clearHistory: (onlyOldProfiles: boolean) => post<HistoryCleanupResult>('/history/clear', { onlyOldProfiles }),
   spoiler: (id: string) => post<{ ok: true; text: string } | { ok: false; code?: string; message: string }>('/history/spoiler', { id }),
   hints: (id: string) => post<{ ok: true; document: HintDocument } | { ok: false; code: string }>('/hints/get', { id }),
   solverRoute: (id: string) => post<{ ok: true; document: SolverWitnessDocument; markdown: string } | { ok: false; code: string }>('/solver-route/get', { id }),

@@ -127,6 +127,39 @@ namespace FogHost
                 ["dist/DS1R/script/talk/m18_01_00_00.talkesdbnd.dcx"] = "fa2e5c0a3b7d540b1b7cf73e9c6b33495159d6cb796d9aa6c22dcafa15db7477",
             };
 
+        /// <summary>
+        /// Generation profile ds1tr-gen-v7: the six event archives and the 17 talk archives as rebuilt with <c>--upstream-layout</c> (event placement and parameter order like FogMod's own archives;
+        /// scripts encoded exactly like FogMod's Talk corpus). Every other locally rebuilt file is the one of the Compact set above. The decompressed content of all 17 talk archives is
+        /// byte-identical to FogMod's; only the DCX compression layer differs (a different deflate encoder), which FogMod copies through unchanged.
+        /// </summary>
+        private static readonly IReadOnlyDictionary<string, string> UpstreamLayoutReconstructedHashes =
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["dist/DS1R/event/common.emevd.dcx"] = "c37009935e5ab417a08cdf9133bf6d8107ef43259027ccc3ac9e0659f1ae8226",
+                ["dist/DS1R/event/m10_02_00_00.emevd.dcx"] = "ea3192f10f6d9d6e5713a8998f06f4595dfdf81e0bb02d99f7a48b2923e4788d",
+                ["dist/DS1R/event/m12_01_00_00.emevd.dcx"] = "8fad5fb0d4227fc5f44b862bba32a7fa73d87ca365bbdb8c022388bb339fd4e1",
+                ["dist/DS1R/event/m14_01_00_00.emevd.dcx"] = "6feb216f0f21bd5aec416373c6499abd56685ee88156b9e0c71860ae2fc9634a",
+                ["dist/DS1R/event/m15_01_00_00.emevd.dcx"] = "f8a81b2ab94b415b079b903bf80950e1ba0e049444b2658bff6ab740bda17f42",
+                ["dist/DS1R/event/m17_00_00_00.emevd.dcx"] = "13b5cb69605df31b8bd9e37ee6edb27a4e441b5736167b89d19e1bb3f0277cc6",
+                ["dist/DS1R/script/talk/m10_00_00_00.talkesdbnd.dcx"] = "c1d13889b44c2d3a63d3b840d284e8a2e2b6a94a3ffad40d58dfcf6f667e26e0",
+                ["dist/DS1R/script/talk/m10_01_00_00.talkesdbnd.dcx"] = "1226410c498cf96dc92ce4bab630239004f3bd6119975b23fa76a3dfa4d8bf04",
+                ["dist/DS1R/script/talk/m10_02_00_00.talkesdbnd.dcx"] = "8aab1b62ac2feda8dd2d9404a5ed2302f2d61d3b7f8c3f601e05f98ab84063c1",
+                ["dist/DS1R/script/talk/m11_00_00_00.talkesdbnd.dcx"] = "e19d666729427444c3e1c131cf4a3e2dc331385d40d9fcb65520dee8962bbacd",
+                ["dist/DS1R/script/talk/m12_00_00_00.talkesdbnd.dcx"] = "3cd66a443ee353f6ef5c0ca6a4774de2bb9a0ae00bfca3656ac35d03b8965ba0",
+                ["dist/DS1R/script/talk/m12_01_00_00.talkesdbnd.dcx"] = "89052502b1f241e0b746837b0d4432e8808958386ecfd61fa76c7f6a180817d5",
+                ["dist/DS1R/script/talk/m13_00_00_00.talkesdbnd.dcx"] = "8662c7e1ff4fd9877eab05c38f808348d4409ed54a9452dfdf6c5917acdc96c4",
+                ["dist/DS1R/script/talk/m13_01_00_00.talkesdbnd.dcx"] = "6ccd8dfe9bd2c44413b5db6a952a60d9e8aaf1aaee60af1db284ce001d84a350",
+                ["dist/DS1R/script/talk/m13_02_00_00.talkesdbnd.dcx"] = "9e178a62f42baa89abfb41fef7a5e75a04822d1d19f84209ef725cf6d10e7298",
+                ["dist/DS1R/script/talk/m14_00_00_00.talkesdbnd.dcx"] = "7de00b21a974a40e030c1836f07a65b1571354bb25a171251fc71a186c9ee544",
+                ["dist/DS1R/script/talk/m14_01_00_00.talkesdbnd.dcx"] = "4fd47fb26bd8b482cc6c50d95c5f1609bec66f72988f65fa1f1d3ff9a3757c13",
+                ["dist/DS1R/script/talk/m15_00_00_00.talkesdbnd.dcx"] = "a1bebc66cf4e1efa7eb7b01dced97f9e3c57fcc6b8a8ea9fb27296498ceba887",
+                ["dist/DS1R/script/talk/m15_01_00_00.talkesdbnd.dcx"] = "7f54dce1fec1afc9106dfe16a0fe10f3b9d6044a6d796c2b1880c469a5ba110c",
+                ["dist/DS1R/script/talk/m16_00_00_00.talkesdbnd.dcx"] = "80dd1c9ae6215c4ad4d37f8b29d9d7c94b68cd0e8ee3b1914ecf98399b3b1f6c",
+                ["dist/DS1R/script/talk/m17_00_00_00.talkesdbnd.dcx"] = "223a9a80578ba8371aeefcf7bfd7fd5dff76923ad3028aa158964d907b3d3981",
+                ["dist/DS1R/script/talk/m18_00_00_00.talkesdbnd.dcx"] = "09229bb95a13f8e40336f14ab4b231ac6c1f321d8f5749cf04123fffbc3335c5",
+                ["dist/DS1R/script/talk/m18_01_00_00.talkesdbnd.dcx"] = "64cbc8fe750978c3d6354379359e6ab685883cb5b32d6fc1c5f0c1ade5ed5fef",
+            };
+
         /// <summary>Directories FogMod enumerates; any extra file there would change its behavior.</summary>
         private static readonly (string Directory, string Pattern)[] Enumerated =
         {
@@ -143,7 +176,7 @@ namespace FogHost
             Manifest.Where(e => e.Path.StartsWith(prefix, StringComparison.Ordinal)).Select(e => e.Path.Substring(prefix.Length));
 
         /// <summary>Throws FOG_DATA_MISSING listing every missing, altered, or unexpected file.</summary>
-        public static void Verify(string root, bool includeLegacyAnnotations = true, bool locallyReconstructed = false)
+        public static void Verify(string root, bool includeLegacyAnnotations = true, bool locallyReconstructed = false, bool upstreamLayout = false)
         {
             // locallyReconstructed: the 58 non-annotation files are the ones the player's own machine rebuilds from the installed game (events, talk scripts, layouts), not the upstream bytes.
             bool reconstructedHashes = !includeLegacyAnnotations || locallyReconstructed;
@@ -161,8 +194,8 @@ namespace FogHost
                     problems.Add($"missing {entry.Path}");
                     continue;
                 }
-                string expectedHash = reconstructedHashes && CompactReconstructedHashes.TryGetValue(entry.Path, out string compactHash)
-                    ? compactHash : entry.Sha256;
+                string expectedHash = upstreamLayout && UpstreamLayoutReconstructedHashes.TryGetValue(entry.Path, out string upstreamLayoutHash) ? upstreamLayoutHash
+                    : reconstructedHashes && CompactReconstructedHashes.TryGetValue(entry.Path, out string compactHash) ? compactHash : entry.Sha256;
                 if (!string.Equals(Hash(file, entry.Text), expectedHash, StringComparison.Ordinal))
                 {
                     problems.Add($"altered {entry.Path}");
@@ -189,7 +222,7 @@ namespace FogHost
         public static void VerifyForSource(string root, string annotationSource)
         {
             if (annotationSource == HostRequest.LegacyFogModAnnotations) Verify(root, includeLegacyAnnotations: true);
-            else if (annotationSource == HostRequest.UpstreamV7Annotations) Verify(root, includeLegacyAnnotations: true, locallyReconstructed: true);
+            else if (annotationSource == HostRequest.UpstreamV7Annotations) Verify(root, includeLegacyAnnotations: true, locallyReconstructed: true, upstreamLayout: true);
             else Verify(root, includeLegacyAnnotations: false);
         }
 

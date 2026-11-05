@@ -24,7 +24,7 @@ Only profile `ds1tr-gen-v6` (`compact-v3`) has the accepting search with a witne
 - **Full proof tree** (`reachTree`): every Area with the edge that first reached it, its search pass, its condition, which variables satisfied it, and the key items it provides. This is for debugging and support, not the main UI.
 - **Both sides of every gate**: a fog gate is shown as the gate you leave (object, description, Area, other-side Area) and the gate you arrive at (a different object when the pairing is shuffled). `bossTriggerSide` marks the side that starts the boss encounter; `areaIsBossArena` marks an Area tagged `boss`. `pairing` is `vanilla` (an object whose exit side leads to its own other side) or `shuffled`.
 - **Direction**: read from the graph, not from a missing pair. An in-map link is built without a pair, and a walkable way back is a **separate edge of the other Area**, so `oneWay` means "no edge from the arrival Area back to the exit Area exists in the graph". `reverse` is `none`, `unconditional` or `conditional`, with `reverseCondition` and `reverseVia` (the gate object, or "in map"). For a gate the reverse is its pair on the same object; otherwise the best edge back (unconditional first). The route prints `TWO-WAY (the graph also has B -> A via ..., always / only when X)` or `ONE-WAY (no edge back in the graph)`.
-- **Order**: the route is the dependency closure walked greedily: among the steps whose prerequisites are already met, one that leaves the Area the player stands in comes first, then the lowest solver sequence. It stays deterministic and valid, and a "First be in X" line is then a return the solver really assumes.
+- **Order**: the route is the dependency closure walked greedily: among the steps whose prerequisites are already met, one that leaves the Area the player stands in comes first, then the lowest solver sequence. It stays deterministic and valid, and a "RETURN FIRST TO X" line is then a return the solver really assumes.
 - **Conditions**: the condition as the solver evaluated it (`requires`), each term with its kind (`area`, `key-item`, `boss-completion`), where it comes from and the step that provided it.
 - **Key items**: where the solver believes each is obtained (the Area, the staged `ItemLotParam` rows in the solver's lot table, whether it was moved from its default Area) and its English name by game item id.
 - **Glitched logic**: only edges whose side carries the `hard` tag, which `Graph.Construct` drops when glitched logic is off; they are marked `glitched-route` with a visible warning.
@@ -39,7 +39,7 @@ Gate descriptions are the catalog's own `Text` (project transition ids such as `
 
 ## What the solver assumes (printed in every route)
 
-1. Every Area the solver has already reached can be entered again at any time (it expands every visited Area; it does not check the way back). A step whose exit Area is not where the previous step ended says "First be in: ...".
+1. Every Area the solver has already reached can be entered again at any time (it expands every visited Area; it does not check the way back). A step whose exit Area is not where the previous step ended says "RETURN FIRST TO: ...".
 2. A key item is obtained as soon as its Area is reached.
 3. A boss completion is derived only from a directed arrival through the boss encounter entrance; the game sets the real flag only when the boss dies.
 4. Two-way / one-way is what the graph has.

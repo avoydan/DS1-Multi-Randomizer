@@ -36,15 +36,16 @@ namespace FogReconstruction
 
         internal static void Build(string pristineRoot, string referenceRoot, string outputRoot)
         {
-            BuildCore(pristineRoot, referenceRoot, outputRoot);
+            BuildCore(pristineRoot, referenceRoot, outputRoot, false);
         }
 
-        internal static void BuildFromPristine(string pristineRoot, string outputRoot)
+        /// <param name="upstreamLayout">Generation profile ds1tr-gen-v7: encode the scripts exactly as FogMod's own Talk corpus does (see <see cref="TalkBytecodeNormalizer"/>).</param>
+        internal static void BuildFromPristine(string pristineRoot, string outputRoot, bool upstreamLayout = false)
         {
-            BuildCore(pristineRoot, null, outputRoot);
+            BuildCore(pristineRoot, null, outputRoot, upstreamLayout);
         }
 
-        private static void BuildCore(string pristineRoot, string referenceRoot, string outputRoot)
+        private static void BuildCore(string pristineRoot, string referenceRoot, string outputRoot, bool upstreamLayout)
         {
             string sourceRoot = Path.GetFullPath(pristineRoot);
             string oracleRoot = referenceRoot == null ? null : Path.GetFullPath(referenceRoot);
@@ -116,7 +117,7 @@ namespace FogReconstruction
                     {
                         normalizedScripts++;
                         appliedPlan.Add(name + "|" + Path.GetFileName(binderFile.Name.Replace('\\', '/')));
-                        normalizedExpressions += TalkBytecodeNormalizer.Normalize(script);
+                        normalizedExpressions += TalkBytecodeNormalizer.Normalize(script, upstreamLayout);
                     }
 #if FOG_RECONSTRUCTION_DEV
                     if (oracleScripts != null)
@@ -128,6 +129,8 @@ namespace FogReconstruction
 #endif
                     if (TalkNormalizationPlan.ShouldNormalize(name, binderFile.Name))
                     {
+                        // Generation profile ds1tr-gen-v7: FogMod's own Talk corpus carries no script name (the author's tool does not write it); the rest of the model is already identical.
+                        if (upstreamLayout) { script.Name = null; TalkBytecodeNormalizer.UnshareEntries(script); }
                         byte[] serialized = script.Write();
                         binderFile.Bytes = innerCompression == DCX.Type.None ? serialized : DCX.Compress(serialized, innerCompression);
                     }

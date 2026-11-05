@@ -19,6 +19,8 @@ export interface NewRun {
   manifestPath: string;
   spoilerPath: string | null;
   hintsPath?: string | null;
+  /** The application version that generated the run. */
+  appVersion?: string;
   now?: Date;
 }
 
@@ -62,7 +64,7 @@ export class RunHistory {
       const entry: RunHistoryEntry = {
         id: randomUUID(), createdAt: (run.now ?? new Date()).toISOString(), seedCode: run.seedCode, profile: run.profile,
         masterSeed: run.masterSeed, settings: run.settings, status: 'generated', packagePath: run.packagePath,
-        manifestPath: run.manifestPath, spoilerPath: run.spoilerPath, hintsPath: run.hintsPath ?? null,
+        manifestPath: run.manifestPath, spoilerPath: run.spoilerPath, hintsPath: run.hintsPath ?? null, ...(run.appVersion ? { appVersion: run.appVersion } : {}),
       };
       await this.#write([entry, ...(await this.#read())]);
       return entry;
@@ -81,13 +83,14 @@ export class RunHistory {
         const entry: RunHistoryEntry = {
           id: randomUUID(), createdAt: (run.now ?? new Date()).toISOString(), seedCode: run.seedCode, profile: run.profile,
           masterSeed: run.masterSeed, settings: run.settings, status: 'generated', packagePath: run.packagePath,
-          manifestPath: run.manifestPath, spoilerPath: run.spoilerPath, hintsPath: run.hintsPath ?? null,
+          manifestPath: run.manifestPath, spoilerPath: run.spoilerPath, hintsPath: run.hintsPath ?? null, ...(run.appVersion ? { appVersion: run.appVersion } : {}),
         };
         await this.#write([entry, ...entries]);
         return entry;
       }
       const refreshed: RunHistoryEntry = {
         ...entries[index], packagePath: run.packagePath, manifestPath: run.manifestPath, spoilerPath: run.spoilerPath, hintsPath: run.hintsPath ?? null, status: 'generated',
+        ...(run.appVersion ? { appVersion: run.appVersion } : {}),
       };
       await this.#write(entries.map((entry, position) => (position === index ? refreshed : entry)));
       return refreshed;
@@ -101,6 +104,18 @@ export class RunHistory {
       if (kept.length === entries.length) return false;
       await this.#write(kept);
       return true;
+    });
+  }
+
+  /** Removes several records in one write; returns how many existed. */
+  removeMany(ids: readonly string[]): Promise<number> {
+    return this.#exclusive(async () => {
+      const doomed = new Set(ids);
+      const entries = await this.#read();
+      const kept = entries.filter((entry) => !doomed.has(entry.id));
+      if (kept.length === entries.length) return 0;
+      await this.#write(kept);
+      return entries.length - kept.length;
     });
   }
 

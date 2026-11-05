@@ -11,7 +11,7 @@ import { worldDataOptionsForProfile } from '../../dist/adapters/fogPrerequisites
 import { parseUpstreamFogProjection, trackedItemsFromUpstreamProjection, UPSTREAM_FOG_PROJECTION_FORMAT } from '../../dist/adapters/upstreamFogProjection.js';
 import {
   compactRuntimeWorldDataManifest, hashWorldDataContent, prepareWorldData, upstreamV7AnnotationSha256, upstreamV7BundledAnnotationPath,
-  upstreamV7WorldDataId, upstreamV7WorldDataManifest, verifyWorldDataRoot,
+  upstreamV7LayoutFiles, upstreamV7LocalReconstructionVersion, upstreamV7WorldDataId, upstreamV7WorldDataManifest, verifyWorldDataRoot,
 } from '../../dist/adapters/worldData.js';
 
 const sha = (bytes) => createHash('sha256').update(bytes).digest('hex');
@@ -29,7 +29,8 @@ test('ds1tr-gen-v7 is registered, current, and pins the upstream annotation, the
   assert.equal(v7.fogEngine.upstreamAnnotationSha256, upstreamV7AnnotationSha256);
   assert.equal(v7.fogEngine.upstreamAnnotationSha256, '77a10b4015c51bdfbe1499f38344c85540a63bfa1ef6370ad9c1ebdc9a2d2af6');
   assert.equal(v7.fogEngine.worldDataId, upstreamV7WorldDataId, 'the profile pins the computed world data identity');
-  assert.equal(v7.fogEngine.localReconstructionVersion, 'ds1tr-local-fog-data-v1');
+  assert.equal(v7.fogEngine.localReconstructionVersion, upstreamV7LocalReconstructionVersion);
+  assert.equal(v7.fogEngine.localReconstructionVersion, 'ds1tr-local-fog-data-v1+upstream-layout');
   assert.deepEqual(fogHostRuntimeForProfile(v7), { hostVersion: '0.7.3', schemaVersion: 3, annotationSource: 'upstream-v7' });
   assert.equal(fogHostRuntimeForProfile({ ...v7, fogEngine: { ...v7.fogEngine, upstreamAnnotationSha256: undefined } }), null, 'without the pinned annotation there is no runtime contract');
   assert.equal(fogHostRuntimeForProfile({ ...v7, fogItemTracking: 'compact-fog-item-tracking-v1' }), null, 'upstream annotations are never paired with the Compact tracking');
@@ -52,7 +53,15 @@ test('the V7 data set is the bundled upstream fog.txt plus the 58 locally rebuil
   assert.equal(bundled.path, 'dist/fog.txt');
   assert.equal(bundled.bundledPath, upstreamV7BundledAnnotationPath);
   assert.equal(bundled.sha256, upstreamV7AnnotationSha256);
-  assert.deepEqual(upstreamV7WorldDataManifest.filter((entry) => entry.path !== 'dist/fog.txt'), compactRuntimeWorldDataManifest, 'the 58 other inputs are exactly the locally rebuilt set of the offline profiles');
+  // The 58 other inputs are the locally rebuilt set of the offline profiles, except the six event archives and 17 talk archives rebuilt with the upstream layout (decompressed talk content is FogMod's, byte for byte).
+  assert.equal(Object.keys(upstreamV7LayoutFiles).length, 23);
+  assert.deepEqual(upstreamV7WorldDataManifest.filter((entry) => entry.path !== 'dist/fog.txt' && !(entry.path in upstreamV7LayoutFiles)),
+    compactRuntimeWorldDataManifest.filter((entry) => !(entry.path in upstreamV7LayoutFiles)));
+  for (const path of Object.keys(upstreamV7LayoutFiles)) {
+    assert.match(path, /(event\/[^/]+\.emevd|script\/talk\/[^/]+\.talkesdbnd)\.dcx$/u);
+    const compact = compactRuntimeWorldDataManifest.find((entry) => entry.path === path);
+    assert.notEqual(upstreamV7LayoutFiles[path].sha256, compact.sha256, `${path} differs from the Compact rebuild`);
+  }
   assert.notEqual(upstreamV7WorldDataId, 'de58b0aaa51c8ce9');
   assert.match(upstreamV7WorldDataId, /^[0-9a-f]{16}$/u);
 });

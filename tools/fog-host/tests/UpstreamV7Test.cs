@@ -166,6 +166,45 @@ namespace FogHost.Tests
             Require(items.Any(i => i.GetProperty("name").GetString() == "peculiar_doll" && i.GetProperty("required").GetBoolean()), "The Peculiar Doll is a required upstream key item (the Compact required-9 set left it out).");
         }
 
+        /// <summary>
+        /// The locally rebuilt inputs of V7 (<c>reconstruct-compact-data --upstream-layout</c>) against FogMod's own dist files, measured on the real data: every event archive has the same
+        /// events in the same order with the same instructions and the same parameter order, and every talk archive is byte-identical after the DCX layer (the compression encoder is the one
+        /// thing that differs; FogMod copies the archive through unchanged). FogMod writes whatever it reads, so this is the input side of the runtime parity.
+        /// </summary>
+        public static void VerifyUpstreamLayoutRebuildMatchesFogMod()
+        {
+            string upstreamRoot = RequiredDirectory("DS1TR_FOG_DATA_ROOT");
+            string pristineRoot = RequiredDirectory("DS1TR_PRISTINE_DSR_ROOT");
+            string output = Path.Combine(Path.GetTempPath(), "ds1tr-v7-layout-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(output);
+            try
+            {
+                Require(CompactWorldDataCommands.Run(new[] { "reconstruct-compact-data", "--pristine-root", pristineRoot, "--output-root", output, "--upstream-layout" }) == 0, "The upstream-layout rebuild must succeed.");
+                string up = Path.Combine(upstreamRoot, "dist", "DS1R"); string re = Path.Combine(output, "dist", "DS1R");
+                SoulsFormats.EMEVD Load(string path) { byte[] bytes = File.ReadAllBytes(path); if (SoulsFormats.DCX.Is(bytes)) bytes = SoulsFormats.DCX.Decompress(bytes); return SoulsFormats.EMEVD.Read(bytes); }
+                string Body(SoulsFormats.EMEVD.Event evt) => evt.RestBehavior + "|" + string.Join(";", evt.Instructions.Select(i => i.Bank + ":" + i.ID + ":" + Convert.ToHexString(i.ArgData)))
+                    + "|" + string.Join(";", evt.Parameters.Select(p => p.InstructionIndex + ":" + p.TargetStartByte + ":" + p.SourceStartByte + ":" + p.ByteCount));
+                int archives = 0;
+                foreach (string file in Directory.GetFiles(Path.Combine(up, "event"), "*.emevd.dcx").OrderBy(f => f, StringComparer.Ordinal))
+                {
+                    var expected = Load(file); var actual = Load(Path.Combine(re, "event", Path.GetFileName(file)));
+                    Require(expected.Events.Select(e => e.ID).SequenceEqual(actual.Events.Select(e => e.ID)), $"{Path.GetFileName(file)}: the events must be in FogMod's order.");
+                    Require(expected.Events.Select(Body).SequenceEqual(actual.Events.Select(Body)), $"{Path.GetFileName(file)}: every event must have FogMod's instructions and parameter order.");
+                    archives++;
+                }
+                Require(archives == 18, $"Expected 18 event archives, compared {archives}.");
+                int scripts = 0;
+                foreach (string file in Directory.GetFiles(Path.Combine(up, "script", "talk"), "*.talkesdbnd.dcx").OrderBy(f => f, StringComparer.Ordinal))
+                {
+                    byte[] expected = SoulsFormats.DCX.Decompress(File.ReadAllBytes(file)); byte[] actual = SoulsFormats.DCX.Decompress(File.ReadAllBytes(Path.Combine(re, "script", "talk", Path.GetFileName(file))));
+                    Require(expected.SequenceEqual(actual), $"{Path.GetFileName(file)}: the decompressed talk archive must be byte-identical to FogMod's.");
+                    scripts++;
+                }
+                Require(scripts == 17, $"Expected 17 talk archives, compared {scripts}.");
+            }
+            finally { try { Directory.Delete(output, true); } catch { /* best effort */ } }
+        }
+
         // ---- the four historical failures ------------------------------------------------------------------------------------------------------------
 
         private static Graph ConstructGraph(string dataRoot, bool glitched = false)

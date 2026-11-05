@@ -234,7 +234,7 @@ export function renderSolverSteps(document: SolverWitnessDocument): string[] {
       const edge = step.edge;
       lines.push(`${step.number}. ${edge.label.toUpperCase()}`);
       if (edge.glitched) lines.push('   ⚠ GLITCHED LOGIC REQUIRED');
-      if (step.returnTo) lines.push(`   First be in: ${step.returnTo} (the solver assumes any Area it already reached can be entered again)`);
+      if (step.returnTo) lines.push(`   RETURN FIRST TO: ${step.returnTo} (an Area reached earlier; the solver assumes it can be entered again). Then take this step.`);
       lines.push(`   FROM SIDE: ${objectText(edge.exit)}${gateNotes(edge.exit)}`);
       lines.push(`   TO SIDE:   ${objectText(edge.arrival)}${gateNotes(edge.arrival)}`);
       lines.push(`   DIRECTION: ${directionText(edge)}`);

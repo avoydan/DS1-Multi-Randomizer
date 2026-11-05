@@ -17,5 +17,32 @@
     "settings": "Settings of this world",
     "spoiler": "Spoiler file"
   },
-  "diagnostics": "Diagnostics"
+  "diagnostics": "Diagnostics",
+  "clear": "Clear history",
+  "removeOld": "Remove old runs",
+  "removeOldHint": "Removes worlds made by older generation profiles (except the one that is applied).",
+  "appVersion": "version {{version}}",
+  "appVersionUnknown": "version unknown",
+  "buildHint": "The application version and the generation profile this world was made with.",
+  "legacy": "Older profile",
+  "legacyHint": "This world was made by an older generation profile. Its Seed Code is still valid and recreates the same world.",
+  "deleteApplied": "This world is applied to the game. Restore the original files first, then delete it.",
+  "dialog": {
+    "cancel": "Cancel",
+    "safety": "This does not uninstall the application, does not change your Dark Souls saves and does not change the installed game files. Shared data (the copy of the original files, world data, settings) stays.",
+    "clearTitle": "Clear history?",
+    "clearBody": "History entries to remove: {{count}}. Their diagnostic files go with them (generated packages, spoiler, hints, Solver route and manifest).",
+    "clearConfirm": "Remove entries: {{count}}",
+    "oldTitle": "Remove old runs?",
+    "oldBody": "Entries from older generation profiles to remove: {{count}}, with their diagnostic files. Worlds of the current profile stay.",
+    "oldConfirm": "Remove entries: {{count}}",
+    "protected": "The applied world is kept (entries: {{count}}), because the game uses it now and Restore may need it.",
+    "orphans": "Folders left by failed or interrupted generations will be removed too: {{count}}.",
+    "deleteTitle": "Delete this world from the history?",
+    "deleteBody": "This entry and the diagnostic files of this one world (package, spoiler, hints, Solver route) will be removed. Other worlds are not touched.",
+    "deleteConfirm": "Delete from history",
+    "cleared": "Entries removed: {{removed}}. Remaining: {{kept}}.",
+    "deleted": "World deleted from the history.",
+    "failed": "Could not delete. Nothing was changed."
+  }
 }

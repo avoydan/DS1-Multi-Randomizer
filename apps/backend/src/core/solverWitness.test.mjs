@@ -86,7 +86,7 @@ test('rendering: conditions, where each is satisfied, item acquisition with its 
   assert.match(text, /SOLVER REQUIREMENTS: cage_key_goods_2003\n\s+- key item cage_key_goods_2003 \(held by Area sens_upper\) — step 3/u);
   assert.match(text, /3\. ACQUIRE — Cage Key \(cage_key_goods_2003\)\n\s+SOURCE: item lot 1500150, in Area sens_upper/u);
   assert.match(text, /The solver considers it obtained once this Area has been reached\./u);
-  assert.match(text, /First be in: blighttown_quelaag \(the solver assumes any Area it already reached can be entered again\)/u);
+  assert.match(text, /RETURN FIRST TO: blighttown_quelaag \(an Area reached earlier; the solver assumes it can be entered again\)\. Then take this step\./u);
   // An item the solver could not place by lot says so instead of inventing a source.
   const noLot = fixtureDocument();
   noLot.mainRoute[2].item = { ...item, lots: [] };

@@ -16,6 +16,7 @@ import { userMessageFor } from './core/userMessages.js';
 import { worldDataOptionsForProfile } from './adapters/fogPrerequisites.js';
 import { prepareWorldData } from './adapters/worldData.js';
 import { RunHistory } from './core/runHistory.js';
+import { clearHistory, deleteRun, previewCleanup } from './core/historyCleanup.js';
 import { loadPersistedSettings, savePersistedSettings } from './core/settingsStore.js';
 import { prepareRun, type RunRequestBody } from './core/seededRun.js';
 import { decodeSeedCode } from './core/seedCode.js';
@@ -67,6 +68,8 @@ async function findSpoiler(workspacePath: string, packagePath: string): Promise<
 }
 
 const APP_VERSION = '0.46.2';
+/** The version the person sees (set by the desktop shell); recorded with every run in the history so an old QA build is recognizable. */
+const DESKTOP_VERSION = process.env.DS1TR_DESKTOP_VERSION ?? APP_VERSION;
 const runDependencies = { ...generationDependencies, appVersion: APP_VERSION };
 const supportDependencies: SupportDependencies = {
   stateRoot: defaultStateRoot(), runRoot, userDataDir: process.env.DS1TR_USER_DATA ?? null, appLogPath: process.env.DS1TR_APP_LOG ?? null,
@@ -215,9 +218,26 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { entries: await Promise.all(entries.map(async (entry) => ({ ...entry, hintsAvailable: await hintsAvailableFor(entry, runRoot).catch(() => false), solverRouteAvailable: await solverRouteAvailableFor(entry, runRoot).catch(() => false) }))), supportedProfiles: supportedGenerationProfiles() });
     }
 
+    // Delete one run: its record and the run folder it owns (docs/RUN_HISTORY_CLEANUP.md). The applied run is refused.
     if (req.method === 'POST' && url.pathname === '/api/history/delete') {
       const body = await readJson<{ id?: string }>(req);
-      return send(res, 200, { ok: typeof body.id === 'string' && await history.remove(body.id) });
+      if (typeof body.id !== 'string') return send(res, 200, { ok: false, code: 'RUN_NOT_FOUND', message: 'This run is no longer in the history.' });
+      return send(res, 200, await deleteRun(history, body.id, runRoot, defaultStateRoot()));
+    }
+
+    // What a cleanup would remove; asking changes nothing.
+    if (req.method === 'POST' && url.pathname === '/api/history/cleanup-preview') {
+      return send(res, 200, await previewCleanup(await history.list(), runRoot, defaultStateRoot(), currentGenerationProfile().id));
+    }
+
+    // "Clear history": every run except the applied one, plus the run folders nothing points at (failed or interrupted runs). "Remove old runs": only runs of an older profile.
+    if (req.method === 'POST' && url.pathname === '/api/history/clear') {
+      const body = await readJson<{ onlyOldProfiles?: boolean }>(req);
+      const current = currentGenerationProfile().id;
+      return send(res, 200, await clearHistory(history, runRoot, defaultStateRoot(), {
+        includeOrphans: body.onlyOldProfiles !== true, currentProfile: current,
+        ...(body.onlyOldProfiles === true ? { select: (entry) => entry.profile !== current } : {}),
+      }));
     }
 
     if (req.method === 'POST' && url.pathname === '/api/history/spoiler') {
@@ -335,7 +355,7 @@ const server = http.createServer(async (req, res) => {
           // The same world generated again (Load seed, Regenerate files) refreshes its entry; it is not a new run.
           const entry = await history.addOrRefresh({
             seedCode: prepared.seedCode, profile: prepared.profile.id, masterSeed: prepared.config.masterSeed, settings: prepared.envelope.settings,
-            packagePath: result.packagePath, manifestPath: result.manifestPath, spoilerPath, hintsPath,
+            packagePath: result.packagePath, manifestPath: result.manifestPath, spoilerPath, hintsPath, appVersion: DESKTOP_VERSION,
           }).catch(() => null);
           operation.set({ historyId: entry?.id ?? null, packagePath: result.packagePath });
           operation.finish({ ok: true });

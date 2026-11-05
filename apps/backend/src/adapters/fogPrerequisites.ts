@@ -66,10 +66,11 @@ export interface FogPreparationContext {
 
 const execFileAsync = promisify(execFile);
 
-async function reconstructCompactData(executablePath: string, pristineDirectory: string, outputRoot: string): Promise<void> {
+async function reconstructCompactData(executablePath: string, pristineDirectory: string, outputRoot: string, upstreamLayout = false): Promise<void> {
   try {
     await execFileAsync(executablePath, [
       'reconstruct-compact-data', '--pristine-root', pristineDirectory, '--output-root', outputRoot,
+      ...(upstreamLayout ? ['--upstream-layout'] : []),
     ], { windowsHide: true, timeout: 600_000, maxBuffer: 2 * 1024 * 1024 });
   } catch (error) {
     const detail = error !== null && typeof error === 'object' && 'stderr' in error && typeof error.stderr === 'string'
@@ -103,7 +104,7 @@ export function worldDataOptionsForProfile(
     ...(compact ? {
       manifest: upstream ? upstreamV7WorldDataManifest : compactRuntimeWorldDataManifest,
       id: compactDataId,
-      reconstructFiles: (source: string, output: string) => reconstructCompactData(executablePath, source, output),
+      reconstructFiles: (source: string, output: string) => reconstructCompactData(executablePath, source, output, upstream),
     } : { id: profile.fogEngine.worldDataId }),
     allowUpstreamDownloads: env.DS1TR_DISTRIBUTION === 'github',
   };
@@ -170,7 +171,7 @@ export async function resolveFogPrerequisites(
             : annotationSource === 'compact-v3' ? compactRuntimeWorldDataV3Id
             : annotationSource === 'compact-v2' ? compactRuntimeWorldDataV2Id : compactRuntimeWorldDataId,
           reconstructFiles: context!.reconstructCompactData
-            ?? ((pristineDirectory: string, outputRoot: string) => reconstructCompactData(executablePath, pristineDirectory, outputRoot)),
+            ?? ((pristineDirectory: string, outputRoot: string) => reconstructCompactData(executablePath, pristineDirectory, outputRoot, annotationSource === 'upstream-v7')),
         }
         : { id: worldDataId }),
       allowUpstreamDownloads: env.DS1TR_DISTRIBUTION === 'github',

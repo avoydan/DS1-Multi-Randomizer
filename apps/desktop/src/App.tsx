@@ -10,9 +10,10 @@ import { exportSupportBundle } from './supportBundle';
 import { Readiness } from './Readiness';
 import { SummaryChips, shortSeedCode, type LoadedSeed } from './SeedPanel';
 import { RunHistoryPanel } from './RunHistoryPanel';
+import { ConfirmDialog } from './ConfirmDialog';
 import { SmokeTestPanel } from './SmokeTestPanel';
 import { DEFAULT_GENERATION_SETTINGS, applySetting, deriveRunPhase, isLoadedSeedModified, joinConfig, sectionsWithCustomSettings, splitConfig } from '@ds1tr/contracts';
-import type { RunPhase, RunHistoryEntry, GameStateReport, GenerationResult, PipelinePlan, RandomizerConfig, SectionId } from '@ds1tr/contracts';
+import type { HistoryCleanupPreview, RunPhase, RunHistoryEntry, GameStateReport, GenerationResult, PipelinePlan, RandomizerConfig, SectionId } from '@ds1tr/contracts';
 import { api } from './api';
 import logo from './assets/branding/app-mark.png';
 import { HelpPanel, HelpProvider } from './ui/HelpPanel';
@@ -346,8 +347,34 @@ export function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingSeed, phase]);
 
-  const deleteEntry = async (entry: RunHistoryEntry) => {
-    try { await api.deleteHistoryEntry(entry.id); } catch { /* the entry stays */ }
+  /** Nothing in the history is deleted without this dialog: the action waits here until the person confirms, and cancelling changes nothing. */
+  const [historyAction, setHistoryAction] = useState<
+    | { kind: 'delete'; entry: RunHistoryEntry }
+    | { kind: 'clear' | 'old'; preview: HistoryCleanupPreview }
+    | null
+  >(null);
+  const [historyBusy, setHistoryBusy] = useState(false);
+  const [historyNote, setHistoryNote] = useState<string | null>(null);
+
+  const requestDelete = (entry: RunHistoryEntry) => { setHistoryNote(null); setHistoryAction({ kind: 'delete', entry }); };
+  const requestClear = async (kind: 'clear' | 'old') => {
+    setHistoryNote(null);
+    try { setHistoryAction({ kind, preview: await api.historyCleanupPreview() }); } catch { setHistoryNote(t('history.dialog.failed')); }
+  };
+  const confirmHistoryAction = async () => {
+    if (!historyAction) return;
+    setHistoryBusy(true);
+    try {
+      if (historyAction.kind === 'delete') {
+        const result = await api.deleteHistoryEntry(historyAction.entry.id);
+        setHistoryNote(result.ok ? t('history.dialog.deleted') : result.code === 'RUN_PROTECTED' ? t('history.deleteApplied') : t('history.dialog.failed'));
+      } else {
+        const result = await api.clearHistory(historyAction.kind === 'old');
+        setHistoryNote(t('history.dialog.cleared', { removed: result.removedEntries, kept: result.keptEntries }));
+      }
+    } catch { setHistoryNote(t('history.dialog.failed')); }
+    setHistoryBusy(false);
+    setHistoryAction(null);
     await refreshHistory();
   };
 
@@ -557,7 +584,7 @@ export function App() {
                   entries={history} gameState={gameState} busy={busy}
                   onApply={(entry) => void applyPackage(entry.packagePath)} onRegenerate={(entry) => void regenerate(entry)}
                   onCopy={(entry) => void copySeed(entry.seedCode)} onLaunch={() => void launch()}
-                  onDelete={(entry) => void deleteEntry(entry)} onSpoiler={spoilerOf} onHints={(entry, exportFirst) => setHintTarget({ id: entry.id, exportFirst })} onSolverRoute={(entry) => setSolverTarget(entry.id)} onDiagnostics={(entry) => setDiagnosticsTarget(entry.id)} onSupportBundle={(entry) => void bundleOf(entry)}
+                  onDelete={requestDelete} onClear={() => void requestClear('clear')} onRemoveOld={() => void requestClear('old')} onSpoiler={spoilerOf} onHints={(entry, exportFirst) => setHintTarget({ id: entry.id, exportFirst })} onSolverRoute={(entry) => setSolverTarget(entry.id)} onDiagnostics={(entry) => setDiagnosticsTarget(entry.id)} onSupportBundle={(entry) => void bundleOf(entry)}
                 />
               </section>
             </>
@@ -577,6 +604,25 @@ export function App() {
           {diagnosticsTarget && <DiagnosticsPanel gamePath={config.gamePath} worldId={diagnosticsTarget} onClose={() => setDiagnosticsTarget(null)} />}
           {hintTarget && <HintSheetPanel entryId={hintTarget.id} exportFirst={hintTarget.exportFirst} onClose={() => setHintTarget(null)} />}
           {solverTarget && <SolverRoutePanel entryId={solverTarget} onClose={() => setSolverTarget(null)} />}
+          {historyNote && <div className="notice" role="status">{historyNote}</div>}
+          {historyAction?.kind === 'delete' && (
+            <ConfirmDialog title={t('history.dialog.deleteTitle')} confirmLabel={t('history.dialog.deleteConfirm')} cancelLabel={t('history.dialog.cancel')} danger busy={historyBusy}
+              onConfirm={() => void confirmHistoryAction()} onCancel={() => setHistoryAction(null)}>
+              <p>{t('history.dialog.deleteBody')}</p>
+              <p className="field-note">{t('history.dialog.safety')}</p>
+            </ConfirmDialog>
+          )}
+          {historyAction && historyAction.kind !== 'delete' && (
+            <ConfirmDialog title={t(historyAction.kind === 'clear' ? 'history.dialog.clearTitle' : 'history.dialog.oldTitle')}
+              confirmLabel={t(historyAction.kind === 'clear' ? 'history.dialog.clearConfirm' : 'history.dialog.oldConfirm', { count: historyAction.kind === 'clear' ? historyAction.preview.removable : historyAction.preview.removableOld })}
+              cancelLabel={t('history.dialog.cancel')} danger busy={historyBusy}
+              onConfirm={() => void confirmHistoryAction()} onCancel={() => setHistoryAction(null)}>
+              <p>{t(historyAction.kind === 'clear' ? 'history.dialog.clearBody' : 'history.dialog.oldBody', { count: historyAction.kind === 'clear' ? historyAction.preview.removable : historyAction.preview.removableOld })}</p>
+              {historyAction.preview.protected > 0 && <p className="notice">{t('history.dialog.protected', { count: historyAction.preview.protected })}</p>}
+              {historyAction.kind === 'clear' && historyAction.preview.orphanFolders > 0 && <p className="field-note">{t('history.dialog.orphans', { count: historyAction.preview.orphanFolders })}</p>}
+              <p className="field-note">{t('history.dialog.safety')}</p>
+            </ConfirmDialog>
+          )}
         </main>
       </div>
     </HelpProvider>

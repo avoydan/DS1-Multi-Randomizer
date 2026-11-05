@@ -176,7 +176,7 @@ const v6: GenerationProfile = Object.freeze({
   completeSettings: v5.completeSettings,
 });
 
-const UPSTREAM_V7_WORLD_DATA_ID = '82f7a04c33a2e42c';
+const UPSTREAM_V7_WORLD_DATA_ID = 'bb35e3e0b8feeb75';
 
 const v7: GenerationProfile = Object.freeze({
   id: GENERATION_PROFILE_V7,
@@ -194,7 +194,7 @@ const v7: GenerationProfile = Object.freeze({
     // Identity of the prepared data set (profile, upstream fog.txt hash, local reconstruction version, every file hash); apps/backend/src/adapters/worldData.ts computes it and a test pins it.
     worldDataId: UPSTREAM_V7_WORLD_DATA_ID,
     upstreamAnnotationSha256: '77a10b4015c51bdfbe1499f38344c85540a63bfa1ef6370ad9c1ebdc9a2d2af6',
-    localReconstructionVersion: 'ds1tr-local-fog-data-v1',
+    localReconstructionVersion: 'ds1tr-local-fog-data-v1+upstream-layout',
   }),
   fogItemTracking: 'upstream-fog-item-tracking-v7',
   completeSettings: v6.completeSettings,

@@ -17,5 +17,32 @@
     "settings": "Ustawienia tego świata",
     "spoiler": "Plik ze spoilerami"
   },
-  "diagnostics": "Diagnostyka"
+  "diagnostics": "Diagnostyka",
+  "clear": "Wyczyść historię",
+  "removeOld": "Usuń stare runy",
+  "removeOldHint": "Usuwa losowania ze starszych profili generowania (poza aktualnie zastosowanym).",
+  "appVersion": "wersja {{version}}",
+  "appVersionUnknown": "wersja nieznana",
+  "buildHint": "Wersja aplikacji i profil generowania, w którym powstał ten świat.",
+  "legacy": "Starszy profil",
+  "legacyHint": "Ten świat powstał w starszym profilu generowania. Jego Seed Code nadal jest poprawny i odtworzy ten sam świat.",
+  "deleteApplied": "To losowanie jest zastosowane w grze. Najpierw przywróć oryginalne pliki gry, potem je usuń.",
+  "dialog": {
+    "cancel": "Anuluj",
+    "safety": "To nie odinstalowuje aplikacji, nie zmienia zapisów gry Dark Souls i nie zmienia zainstalowanych plików gry. Współdzielone dane (kopia oryginalnych plików, dane świata, ustawienia) zostają.",
+    "clearTitle": "Wyczyścić historię?",
+    "clearBody": "Zostanie usuniętych wpisów historii: {{count}}. Razem z nimi znikną pliki diagnostyczne tych losowań (wygenerowane pakiety, spoiler, wskazówki, Solver route i manifest).",
+    "clearConfirm": "Usuń wpisy: {{count}}",
+    "oldTitle": "Usunąć stare runy?",
+    "oldBody": "Zostanie usuniętych wpisów ze starszych profili generowania: {{count}}, razem z plikami diagnostycznymi tych losowań. Losowania z aktualnego profilu zostają.",
+    "oldConfirm": "Usuń wpisy: {{count}}",
+    "protected": "Zastosowane losowanie zostaje zachowane (wpisów: {{count}}), bo jest w tej chwili użyte w grze i jest potrzebne do przywrócenia.",
+    "orphans": "Usunięte zostaną też foldery po nieudanych lub przerwanych losowaniach: {{count}}.",
+    "deleteTitle": "Usunąć to losowanie z historii?",
+    "deleteBody": "Zostanie usunięty ten wpis oraz pliki diagnostyczne tego jednego losowania (pakiet, spoiler, wskazówki, Solver route). Inne losowania nie są ruszane.",
+    "deleteConfirm": "Usuń z historii",
+    "cleared": "Usunięto wpisów: {{removed}}. Zostało: {{kept}}.",
+    "deleted": "Losowanie usunięte z historii.",
+    "failed": "Nie udało się usunąć. Nic nie zostało zmienione."
+  }
 }

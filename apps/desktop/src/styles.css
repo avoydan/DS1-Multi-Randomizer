@@ -353,3 +353,16 @@ input[type="checkbox"]:not(.switch) { width: 17px; height: 17px; padding: 0; acc
 .cursor-shortcut-input:disabled { opacity: .55; }
 .update-notice { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
 .update-notice .update-actions { margin: 0; }
+
+/* Run history cleanup (docs/RUN_HISTORY_CLEANUP.md) */
+.history-tools { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 4px; }
+.danger-text { color: #e8998d; }
+.history-build { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; font-size: 11px; color: #8d96a3; }
+.history-profile { font-size: 11px; color: #8d96a3; }
+.history-legacy { padding: 1px 7px; border-radius: 100px; background: #2a2620; color: #bfa77a; font-size: 11px; }
+.confirm-dialog { max-width: 520px; }
+.confirm-dialog h2 { margin: 0 0 10px; font-size: 18px; }
+.confirm-dialog-body p { margin: 0 0 10px; line-height: 1.5; }
+.confirm-dialog-actions { justify-content: flex-end; margin-top: 14px; }
+.danger-action { background: #8a2f27; color: #fff; border: 0; border-radius: 8px; padding: 9px 16px; font-weight: 600; cursor: pointer; }
+.danger-action:disabled { opacity: .55; cursor: default; }

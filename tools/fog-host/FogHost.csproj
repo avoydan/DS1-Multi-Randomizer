@@ -36,6 +36,7 @@
     <Compile Include="..\fog-reconstruction\OfflineTalkReconstructor.cs" Link="src\OfflineTalkReconstructor.cs" />
     <Compile Include="..\fog-reconstruction\OfflineLayoutReconstructor.cs" Link="src\OfflineLayoutReconstructor.cs" />
     <Compile Include="..\fog-reconstruction\EventRemovalPlan.cs" Link="src\EventRemovalPlan.cs" />
+    <Compile Include="..\fog-reconstruction\UpstreamEventLayout.cs" Link="src\UpstreamEventLayout.cs" />
     <Compile Include="..\fog-reconstruction\TalkNormalizationPlan.cs" Link="src\TalkNormalizationPlan.cs" />
     <Compile Include="..\fog-reconstruction\TalkBytecodeNormalizer.cs" Link="src\TalkBytecodeNormalizer.cs" />
   </ItemGroup>

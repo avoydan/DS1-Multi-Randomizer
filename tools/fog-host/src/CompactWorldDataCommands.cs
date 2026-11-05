@@ -16,9 +16,11 @@ namespace FogHost
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
             CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
             CultureInfo.CurrentUICulture = CultureInfo.InvariantCulture;
-            if (args.Length != 5 || args[1] != "--pristine-root" || args[3] != "--output-root")
+            // --upstream-layout (generation profile ds1tr-gen-v7 only): encode and lay out the rebuilt events and talk scripts exactly like FogMod's own dist files.
+            bool upstreamLayout = args.Length == 6 && args[5] == "--upstream-layout";
+            if ((args.Length != 5 && !upstreamLayout) || args[1] != "--pristine-root" || args[3] != "--output-root")
             {
-                Console.Error.WriteLine("Usage: FogHost reconstruct-compact-data --pristine-root <dir> --output-root <dir>");
+                Console.Error.WriteLine("Usage: FogHost reconstruct-compact-data --pristine-root <dir> --output-root <dir> [--upstream-layout]");
                 return 2;
             }
 
@@ -33,10 +35,10 @@ namespace FogHost
                 string eventWrapper = Path.Combine(outputRoot, ".fog-event-output");
                 string talkWrapper = Path.Combine(outputRoot, ".fog-talk-output");
                 string layoutWrapper = Path.Combine(outputRoot, ".fog-layout-output");
-                OfflineEventReconstructor.BuildFromPristine(pristineRoot, eventWrapper);
+                OfflineEventReconstructor.BuildFromPristine(pristineRoot, eventWrapper, upstreamLayout);
                 Directory.Move(Path.Combine(eventWrapper, "event"), Path.Combine(ds1r, "event"));
                 Directory.Delete(eventWrapper);
-                OfflineTalkReconstructor.BuildFromPristine(pristineRoot, talkWrapper);
+                OfflineTalkReconstructor.BuildFromPristine(pristineRoot, talkWrapper, upstreamLayout);
                 Directory.CreateDirectory(Path.Combine(ds1r, "script"));
                 Directory.Move(Path.Combine(talkWrapper, "script", "talk"), Path.Combine(ds1r, "script", "talk"));
                 Directory.Delete(talkWrapper, recursive: true);

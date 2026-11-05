@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { GameStateReport, RunHistoryEntry } from '@ds1tr/contracts';
+import { CURRENT_GENERATION_PROFILE, type GameStateReport, type RunHistoryEntry } from '@ds1tr/contracts';
 import { SummaryChips, shortSeedCode } from './SeedPanel';
 import { currentLanguage } from './i18n';
 import { formatDateTime } from './i18n/format';
@@ -17,6 +17,10 @@ interface Props {
   onCopy: (entry: RunHistoryEntry) => void;
   onLaunch: () => void;
   onDelete: (entry: RunHistoryEntry) => void;
+  /** Ask to clear the whole history (the application confirms first, then asks the backend). */
+  onClear: () => void;
+  /** Ask to remove the runs of older generation profiles. */
+  onRemoveOld: () => void;
   onSpoiler: (entry: RunHistoryEntry) => Promise<string>;
   onHints: (entry: RunHistoryEntry, exportFirst: boolean) => void;
   onSolverRoute: (entry: RunHistoryEntry) => void;
@@ -25,7 +29,7 @@ interface Props {
 }
 
 /** Persistent run history: collapsed to one row until opened; each world shows only its quick actions, the rest is in the menu. */
-export function RunHistoryPanel({ entries, gameState, busy, onApply, onRegenerate, onCopy, onLaunch, onDelete, onSpoiler, onHints, onSolverRoute, onDiagnostics, onSupportBundle }: Props) {
+export function RunHistoryPanel({ entries, gameState, busy, onApply, onRegenerate, onCopy, onLaunch, onDelete, onClear, onRemoveOld, onSpoiler, onHints, onSolverRoute, onDiagnostics, onSupportBundle }: Props) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [menuFor, setMenuFor] = useState<string | null>(null);
@@ -43,6 +47,14 @@ export function RunHistoryPanel({ entries, gameState, busy, onApply, onRegenerat
       <button className="history-toggle" aria-expanded={open} aria-controls="run-history-list" onClick={() => setOpen((value) => !value)}>
         <span>{t('history.title')}</span><span className="history-count">{entries.length}</span><span className="history-caret" aria-hidden="true">{open ? '▲' : '▼'}</span>
       </button>
+      {open && entries.length > 0 && (
+        <div className="history-tools">
+          <button className="secondary danger-text" disabled={busy} onClick={onClear}>{t('history.clear')}</button>
+          {entries.some((entry) => entry.profile !== CURRENT_GENERATION_PROFILE && entry.status !== 'applied') && (
+            <button className="secondary" disabled={busy} title={t('history.removeOldHint')} onClick={onRemoveOld}>{t('history.removeOld')}</button>
+          )}
+        </div>
+      )}
       {open && (entries.length === 0
         ? <p className="field-note" id="run-history-list">{t('history.empty')}</p>
         : <div className="history-list" id="run-history-list">
@@ -55,6 +67,11 @@ export function RunHistoryPanel({ entries, gameState, busy, onApply, onRegenerat
                   <span className={`history-status ${entry.status}`}>{t(`history.status.${entry.status}`)}</span>
                   <code className="history-seed" title={entry.seedCode}>{shortSeedCode(entry.seedCode)}</code>
                   <SummaryChips settings={entry.settings} />
+                  <span className="history-build" title={t('history.buildHint')}>
+                    <span className="history-version">{entry.appVersion ? t('history.appVersion', { version: entry.appVersion }) : t('history.appVersionUnknown')}</span>
+                    <code className="history-profile">{entry.profile}</code>
+                    {entry.profile !== CURRENT_GENERATION_PROFILE && <span className="history-legacy" title={t('history.legacyHint')}>{t('history.legacy')}</span>}
+                  </span>
                 </div>
                 <div className="history-actions">
                   {!files
@@ -74,7 +91,7 @@ export function RunHistoryPanel({ entries, gameState, busy, onApply, onRegenerat
                         <button role="menuitem" onClick={() => { setMenuFor(null); onDiagnostics(entry); }}>{t('history.diagnostics')}</button>
                         <button role="menuitem" onClick={() => { setMenuFor(null); onSupportBundle(entry); }}>{t('support.ui.export')}</button>
                         {entry.spoilerPath && <button role="menuitem" onClick={() => void showSpoiler(entry)}>{t('history.viewSpoiler')}</button>}
-                        <button role="menuitem" className="danger" onClick={() => { setMenuFor(null); onDelete(entry); }}>{t('history.delete')}</button>
+                        <button role="menuitem" className="danger" disabled={entry.status === 'applied'} title={entry.status === 'applied' ? t('history.deleteApplied') : ''} onClick={() => { setMenuFor(null); onDelete(entry); }}>{t('history.delete')}</button>
                       </div>
                     )}
                   </div>

@@ -114,9 +114,44 @@ V7 uses the full upstream item model: `KeyItems` (27, of which 25 constrain plac
 - **Gate** (`gate-v7`): typecheck clean; backend 646 tests (645 passed, 0 failed, 1 skipped); desktop 150 (148 passed, 0 failed, 2 skipped, apart from the release-verifier test that checks the previously built package and passes on a fresh build); FogHost 194/194; golden verify PASS.
 - **Priscilla** (V7 equivalent of the owner's hard-lock): raw Fog seeds 140, 243, 265 have the Asylum hallway paired with the boss side of Priscilla's fog. In all three the only way the solver leaves the arena is the upstream unique warp `1512500` (`WarpFlag 5302` preserved, source `upstream-fogmod`), and no in-map link leaves the arena. No gameplay proof is claimed: the owner has to play it.
 
+## Fog runtime parity (2026-11-05, overnight)
+
+**Why.** Gameplay showed a Fog gate that the V7 witness called traversable but that did not let the player through. The suspicion was that the runtime files V7 writes are not what original FogMod writes.
+
+**The original pipeline (traced).** FogMod's `GameDataWriter.Write(options, annotations, graph, gameDirectory, DS1R)` is the only thing that produces the Fog runtime: from `fog.txt`, the connected graph and its `dist` it writes
+- the common event (`common.emevd`): one `InitializeEvent(5700, mode, ...)` per Entrance (mode 0 action-driven warp, 1 vanilla door or PvP gate, 2 flag-driven warp, 3 fixed world gate; the warp dispatcher event `5700` itself, and `5690/8900/8901/8950/8960` are inputs from `dist`), the boss-fog and boss-trigger rewrites in the map events, the player and region parts of the map MSBs, the scaled `GameParam`, and the Fog texts (`15000280-283`) into `msg/<language>/menu.msgbnd`;
+- the talk archives: **copied unchanged** from `dist/DS1R/script/talk`.
+Everything the writer reads from `dist/DS1R` (event archives, talk archives, layouts) is the FogMod author's edited game data. No FogMod code derives those files from a pristine game: they are inputs, not products. V7 runs the vendored writer unchanged and rebuilds those inputs on the player's machine, as before (39 files: 18 event archives, 17 talk archives, 4 layouts).
+
+**What was different, and the fix (V7 only; Compact profiles untouched).** Measured against the original files, the previous V7 rebuild had every event instruction right (1281 of 1281) and 73 talk scripts whose state machines matched but whose bytes did not. The remaining differences were all packaging of the author's tool:
+1. event placement and parameter order: the rebuild appended the author's added events to the end of six archives, upstream puts them next to a neighbour (21 anchors, event identifiers only), and the author's tool writes parameter records by (source byte, instruction) where the project builders wrote them by instruction;
+2. talk scripts: the author's compiler writes no script name, writes the constant-true condition as `41 A1` (2336 conditions; the rebuild wrote an int32 token), and writes every use of a condition or command out (the game's own scripts share entries and SoulsFormats' writer stores a shared entry once).
+`reconstruct-compact-data --upstream-layout` (V7 only) now applies exactly these four rules. Result against FogMod's own `dist`: all 18 event archives have the same events in the same order with the same instructions and parameter order; all 178 talk scripts are byte-identical; the 17 talk archives are byte-identical after the DCX layer. The only remaining difference of the rebuilt inputs is the DCX compression of the talk archives (a different deflate encoder than the author's 2019 environment); FogMod copies the archive through, and the decompressed bytes are equal.
+
+**Parity harness** (`apps/backend/scripts/fogRuntimeParity.mjs`). Same master seed, Fog-only settings, so the same Fog seed and options: A is profile `ds1tr-gen-v2` (the frozen original generator, FogHost 0.5.0 on FogMod's real `dist`), B is `ds1tr-gen-v7`. Every written file is compared.
+
+| Fog-owned output | files compared | byte-identical | identical after DCX | different |
+|---|---|---|---|---|
+| events | 90 | 90 | 90 | 0 |
+| talk / ESD | 85 | 0 | 85 | 0 |
+| maps | 90 | 90 | 90 | 0 |
+| params (`GameParam`) | 5 | 5 | 5 | 0 |
+| messages (`menu.msgbnd`) | 5 | 5 | 5 | 0 |
+| **total** | **275** | **190** | **275** | **0** |
+
+(5 seeds: 3 with the default Triple Fog options, 2 with the PvP, Lordvessel gates on; the same Fog seed and the same attempts in A and B every time.) A direct run of both generators on the Fog seed of the owner's QA world (`2842915877`, explicit seed and options): events 18/18 and maps 17/17 byte-identical, messages 1/1 and params 1/1 byte-identical, talk 17/17 identical after DCX, **0 differences**. Before the fix the same comparison showed 6 event archives and 17 talk archives different.
+
+**The gate `o2920_0000` ("Between Gough's stairway and Artorias").** In the QA world it is a fixed PvP fog (`dlc_hallway` to `dlc_postartorias`). Its runtime is the event-5700 mode-1 initializer in the common event 0 (`InitializeEvent(5700, mode 1, m12_01, 1211986, 1211987)`), which FogMod's writer emits for every non-randomized PvP gate; in the original generator's output and in V7's output this instruction is **byte-identical**, and so is every other file (above). So the gate's runtime is original FogMod's. What the player saw is what that runtime does:
+- the text id `15000281` is FogMod's own message "Sealed in New Londo Ruins" (`GameDataWriter`), shown by event 5700 mode 2 when the destination side of a flag-driven warp has an `EntryFlag` that is not set (in `fog.txt` only the lower New Londo sides `o6605_0000` and `o6606_0000`, flag `11600100`); it is written into `msg/<fog.language>/menu.msgbnd` only, so with a game language other than the Seed Code's `fog.language` the game prints `?ActionEventInfo? ID: 15000281` instead of the text;
+- mode 1 (this gate) contains no prompt at all: it only maintains the gate object according to the multiplayer state.
+So a prompt with that id comes from an entry-blocked warp (a randomized gate whose far side is a sealed New Londo side), not from the mode-1 PvP wiring of `o2920_0000`; it could not be reproduced here because the broken run was not available. **This is a structural statement: no gameplay result is claimed.** The remaining owner action is to check the in-game language against the Seed Code's Fog language and to note which side the gate leads to.
+
+**Overlays.** The combined engine's item and enemy output is merged into the Fog staging before the writer runs (FogHost's `EmevdMerge`, the same merge the original-generator profile uses); Skill Issue Mode and the manifests are added after Fog. The harness above has no combined files; the Triple goldens (V7 fixtures) exercise the merge, and V1/V2 (original generator with the same merge) are unchanged.
+
+**Distribution.** Bundled: only `tools/fog-host/upstream/fog.txt` (+ provenance note). Never bundled: any event, talk, layout, map or `GameParam` file, original or modified; the rebuilt inputs are generated locally into the application cache and nothing is downloaded (Nexus included).
+
 ## Open items
 
-1. **Talk scripts.** 73 of 178 rebuilt scripts (the author's bonfire and conversation edits) differ from upstream in the state-machine dump (literal encoding); equivalence is not proven. They are the same rebuilt files the published V6 ships and hold no Fog graph data.
+1. **Talk archive compression.** The 17 rebuilt talk archives are identical to FogMod's after DCX decompression, not as compressed bytes (a different deflate encoder). FogMod copies them unchanged and the game reads the decompressed content.
 2. **Item lots in the witness.** For V7 the route says "no lot (default area)" for an item because the witness's lot lookup reads the Compact lot table; the Area is correct, the lot id is not shown.
-3. **Parity with the `0.5.0` executable** on the same request (file-level equality of what is written) is not run.
-4. **Gameplay.** Nothing was played in the game.
+3. **The broken gate run.** The run in which the owner saw `?ActionEventInfo? ID: 15000281` was not available; the statements above were made from the QA world and the harness. Nothing was played in the game.

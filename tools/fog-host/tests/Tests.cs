@@ -143,6 +143,8 @@ namespace FogHost.Tests
                     Test("v7 historical F: the Priscilla arena is left by the upstream unique warp 1512500, never by a ConnectCollision link", UpstreamV7Test.VerifyPriscillaExitIsTheUpstreamWarp);
                     Test("v7 transition inventory: everything is upstream; the overlay is the key-item-conditioned subset", UpstreamV7Test.VerifyTransitionInventory);
                     if (Environment.GetEnvironmentVariable("DS1TR_PRISTINE_DSR_ROOT") != null)
+                        Test("v7 locally rebuilt events and talk archives equal FogMod's own dist (event order, instructions, parameter order; talk after the DCX layer)", UpstreamV7Test.VerifyUpstreamLayoutRebuildMatchesFogMod);
+                    if (Environment.GetEnvironmentVariable("DS1TR_PRISTINE_DSR_ROOT") != null)
                         Test("v7 Priscilla (owner hard-lock equivalent): Asylum -> Priscilla boss side is left only through the upstream warp 1512500 with WarpFlag 5302", UpstreamV7Test.VerifyPriscillaBossSideArrivalUsesTheUpstreamWarpOnly);
                     if (Environment.GetEnvironmentVariable("DS1TR_V7_DATA_ROOT") != null)
                         Test("v7 data root (bundled fog.txt + locally rebuilt inputs) verifies in V7 mode only; the upstream item model has all 27 key items and 440 lots", UpstreamV7Test.VerifyV7DataRootAndItemProjection);

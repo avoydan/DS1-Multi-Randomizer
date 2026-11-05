@@ -175,12 +175,40 @@ export const compactRuntimeWorldDataV3Id = createHash('sha256')
  * for instruction); none of Compact's physical-route model is part of it.
  */
 export const upstreamV7ProfileId = 'ds1tr-gen-v7';
-export const upstreamV7DataVersion = 'ds1tr-upstream-fog-data-v1';
+export const upstreamV7DataVersion = 'ds1tr-upstream-fog-data-v2';
+/** The version of the local rebuild V7 pins: the Compact file rebuild plus the upstream layout (`reconstruct-compact-data --upstream-layout`). */
+export const upstreamV7LocalReconstructionVersion = 'ds1tr-local-fog-data-v1+upstream-layout';
 export const upstreamV7BundledAnnotationPath = 'tools/fog-host/upstream/fog.txt';
 const upstreamAnnotationEntry = worldDataManifest.find((entry) => entry.path === 'dist/fog.txt')!;
 export const upstreamV7AnnotationSha256 = upstreamAnnotationEntry.sha256;
+/** The 6 event archives and 17 talk archives as `--upstream-layout` rebuilds them (hash and size of the rebuilt file); the other rebuilt files are the Compact ones. */
+export const upstreamV7LayoutFiles: Readonly<Record<string, { sha256: string; size: number }>> = Object.freeze({
+  'dist/DS1R/event/common.emevd.dcx': { sha256: 'c37009935e5ab417a08cdf9133bf6d8107ef43259027ccc3ac9e0659f1ae8226', size: 8668 },
+  'dist/DS1R/event/m10_02_00_00.emevd.dcx': { sha256: 'ea3192f10f6d9d6e5713a8998f06f4595dfdf81e0bb02d99f7a48b2923e4788d', size: 8829 },
+  'dist/DS1R/event/m12_01_00_00.emevd.dcx': { sha256: '8fad5fb0d4227fc5f44b862bba32a7fa73d87ca365bbdb8c022388bb339fd4e1', size: 24671 },
+  'dist/DS1R/event/m14_01_00_00.emevd.dcx': { sha256: '6feb216f0f21bd5aec416373c6499abd56685ee88156b9e0c71860ae2fc9634a', size: 12398 },
+  'dist/DS1R/event/m15_01_00_00.emevd.dcx': { sha256: 'f8a81b2ab94b415b079b903bf80950e1ba0e049444b2658bff6ab740bda17f42', size: 12765 },
+  'dist/DS1R/event/m17_00_00_00.emevd.dcx': { sha256: '13b5cb69605df31b8bd9e37ee6edb27a4e441b5736167b89d19e1bb3f0277cc6', size: 9343 },
+  'dist/DS1R/script/talk/m10_00_00_00.talkesdbnd.dcx': { sha256: 'c1d13889b44c2d3a63d3b840d284e8a2e2b6a94a3ffad40d58dfcf6f667e26e0', size: 13305 },
+  'dist/DS1R/script/talk/m10_01_00_00.talkesdbnd.dcx': { sha256: '1226410c498cf96dc92ce4bab630239004f3bd6119975b23fa76a3dfa4d8bf04', size: 37595 },
+  'dist/DS1R/script/talk/m10_02_00_00.talkesdbnd.dcx': { sha256: '8aab1b62ac2feda8dd2d9404a5ed2302f2d61d3b7f8c3f601e05f98ab84063c1', size: 65297 },
+  'dist/DS1R/script/talk/m11_00_00_00.talkesdbnd.dcx': { sha256: 'e19d666729427444c3e1c131cf4a3e2dc331385d40d9fcb65520dee8962bbacd', size: 8914 },
+  'dist/DS1R/script/talk/m12_00_00_00.talkesdbnd.dcx': { sha256: '3cd66a443ee353f6ef5c0ca6a4774de2bb9a0ae00bfca3656ac35d03b8965ba0', size: 17695 },
+  'dist/DS1R/script/talk/m12_01_00_00.talkesdbnd.dcx': { sha256: '89052502b1f241e0b746837b0d4432e8808958386ecfd61fa76c7f6a180817d5', size: 25509 },
+  'dist/DS1R/script/talk/m13_00_00_00.talkesdbnd.dcx': { sha256: '8662c7e1ff4fd9877eab05c38f808348d4409ed54a9452dfdf6c5917acdc96c4', size: 16192 },
+  'dist/DS1R/script/talk/m13_01_00_00.talkesdbnd.dcx': { sha256: '6ccd8dfe9bd2c44413b5db6a952a60d9e8aaf1aaee60af1db284ce001d84a350', size: 15016 },
+  'dist/DS1R/script/talk/m13_02_00_00.talkesdbnd.dcx': { sha256: '9e178a62f42baa89abfb41fef7a5e75a04822d1d19f84209ef725cf6d10e7298', size: 11337 },
+  'dist/DS1R/script/talk/m14_00_00_00.talkesdbnd.dcx': { sha256: '7de00b21a974a40e030c1836f07a65b1571354bb25a171251fc71a186c9ee544', size: 30200 },
+  'dist/DS1R/script/talk/m14_01_00_00.talkesdbnd.dcx': { sha256: '4fd47fb26bd8b482cc6c50d95c5f1609bec66f72988f65fa1f1d3ff9a3757c13', size: 13689 },
+  'dist/DS1R/script/talk/m15_00_00_00.talkesdbnd.dcx': { sha256: 'a1bebc66cf4e1efa7eb7b01dced97f9e3c57fcc6b8a8ea9fb27296498ceba887', size: 12968 },
+  'dist/DS1R/script/talk/m15_01_00_00.talkesdbnd.dcx': { sha256: '7f54dce1fec1afc9106dfe16a0fe10f3b9d6044a6d796c2b1880c469a5ba110c', size: 27753 },
+  'dist/DS1R/script/talk/m16_00_00_00.talkesdbnd.dcx': { sha256: '80dd1c9ae6215c4ad4d37f8b29d9d7c94b68cd0e8ee3b1914ecf98399b3b1f6c', size: 22628 },
+  'dist/DS1R/script/talk/m17_00_00_00.talkesdbnd.dcx': { sha256: '223a9a80578ba8371aeefcf7bfd7fd5dff76923ad3028aa158964d907b3d3981', size: 13967 },
+  'dist/DS1R/script/talk/m18_00_00_00.talkesdbnd.dcx': { sha256: '09229bb95a13f8e40336f14ab4b231ac6c1f321d8f5749cf04123fffbc3335c5', size: 24131 },
+  'dist/DS1R/script/talk/m18_01_00_00.talkesdbnd.dcx': { sha256: '64cbc8fe750978c3d6354379359e6ab685883cb5b32d6fc1c5f0c1ade5ed5fef', size: 8053 },
+});
 export const upstreamV7WorldDataManifest: readonly WorldDataEntry[] = Object.freeze([
-  ...compactRuntimeWorldDataManifest,
+  ...compactRuntimeWorldDataManifest.map((entry) => (upstreamV7LayoutFiles[entry.path] ? { ...entry, ...upstreamV7LayoutFiles[entry.path] } : entry)),
   { ...upstreamAnnotationEntry, origin: 'bundled' as const, bundledPath: upstreamV7BundledAnnotationPath },
 ]);
 export const upstreamV7WorldDataId = createHash('sha256')

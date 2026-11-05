@@ -17,6 +17,7 @@ export const ACTIVITY_ROUTES: ReadonlyMap<string, ActivityKind> = new Map<string
   ['/api/world-data/prepare', 'prepare'],
   ['/api/support/bundle', 'support'],
   ['/api/history/delete', 'history'],
+  ['/api/history/clear', 'history'],
 ]);
 
 export interface ActivitySnapshot {
