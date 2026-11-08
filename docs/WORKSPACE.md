@@ -24,7 +24,7 @@ Consequences, as policy:
 | `.workspace/archive` | evidence extracted from retired folders (see its `README.md`); not needed to build, test or release |
 | `.workspace/worktrees` | linked worktrees, only if ever needed |
 
-`.workspace/` is in `.gitignore`. To use it in a shell: `. .\tools\workspace\dev-env.ps1`. `apps/desktop/scripts/package-win.mjs` and `tools/release/helper-format-experiment.mjs` look for `.workspace/sdk/dotnet.exe` first (override with `DS1TR_DOTNET_SDK`, else `dotnet` from PATH).
+`.workspace/` is in `.gitignore`. To use it in a shell: `. .\tools\devenv\dev-env.ps1`. `apps/desktop/scripts/package-win.mjs` and `tools/release/helper-format-experiment.mjs` look for `.workspace/sdk/dotnet.exe` first (override with `DS1TR_DOTNET_SDK`, else `dotnet` from PATH).
 
 A new machine: clone the repository, install the SDK into `.workspace/sdk` (`dotnet-install` with `-InstallDir`), copy or create `.workspace/qa/game-inst/DARK SOULS REMASTERED` from a clean game install (`DarkSoulsRemastered.exe`, `event`, `map`, `msg`, `param`, `paramdef`, `script`, `sfx`).
 

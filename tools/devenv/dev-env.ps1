@@ -1,5 +1,5 @@
 # Sets the environment of a developer shell to the project-owned workspace (docs/WORKSPACE.md).
-#   . .\tools\workspace\dev-env.ps1
+#   . .\tools\devenv\dev-env.ps1
 # Everything it points at lives inside this repository under the git-ignored `.workspace` folder.
 $root = Resolve-Path (Join-Path $PSScriptRoot '..\..')
 $ws = Join-Path $root '.workspace'
