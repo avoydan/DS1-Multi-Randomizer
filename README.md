@@ -4,9 +4,9 @@ DS1 Multi Randomizer is a Windows desktop app for creating one deterministic Dar
 
 ## Download
 
-[Download latest release — v0.40.0](https://github.com/avoydan/DS1-Multi-Randomizer/releases/tag/v0.40.0) · [All releases](https://github.com/avoydan/DS1-Multi-Randomizer/releases)
+[Download latest release — v0.42.0](https://github.com/avoydan/DS1-Multi-Randomizer/releases/tag/v0.42.0)
 
-The release is a **public prerelease**. The recommended file is `DS1-Multi-Randomizer-0.40.0-Setup-x64.exe`. A portable executable is also provided; it extracts to a temporary folder each time it starts, which can trigger more antivirus warnings.
+Only the current release is offered; earlier builds were withdrawn. The recommended file is `DS1-Multi-Randomizer-0.42.0-Setup-x64.exe` (SHA-256 `c41171bcef1eceac283096ce82d4f42e354f9d1524ff007286b99b102092b411`); the portable file's SHA-256 is `289633707ed4a2af1092c4df2210fbbab98b3030e01f302b11eccc9c5de34f7d`. A portable executable is also provided; it extracts to a temporary folder each time it starts, which can trigger more antivirus warnings.
 
 ## What it does
 
@@ -29,14 +29,14 @@ The **Your game** screen also has an optional, local **Skill Issue Mode** conven
 Each release includes `SHA256SUMS.txt` and a versioned release manifest. In PowerShell, calculate a file's hash with:
 
 ```powershell
-Get-FileHash .\DS1-Multi-Randomizer-0.40.0-Setup-x64.exe -Algorithm SHA256
+Get-FileHash .\DS1-Multi-Randomizer-0.42.0-Setup-x64.exe -Algorithm SHA256
 ```
 
 Compare the `Hash` value with the line for that exact filename in `SHA256SUMS.txt`. A matching hash shows that the file matches the published checksum; it is not a code signature or a safety certification.
 
-### Verify where a release came from (releases after 0.40.0)
+### Verify where a release came from
 
-Releases built after v0.40.0 carry a GitHub **build provenance attestation** for the Setup, the Portable build and the other release files. With the [GitHub CLI](https://cli.github.com/) (`gh`; run `gh auth login` first if it asks you to sign in), run this in the folder with the download:
+The release carries a GitHub **build provenance attestation** for the Setup, the Portable build and the other release files. With the [GitHub CLI](https://cli.github.com/) (`gh`; run `gh auth login` first if it asks you to sign in), run this in the folder with the download:
 
 ```powershell
 gh attestation verify .\DS1-Multi-Randomizer-X.Y.Z-Setup-x64.exe --repo avoydan/DS1-Multi-Randomizer --signer-workflow avoydan/DS1-Multi-Randomizer/.github/workflows/release.yml
