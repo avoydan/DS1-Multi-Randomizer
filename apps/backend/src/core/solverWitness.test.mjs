@@ -16,6 +16,7 @@ import { fogAttemptDirectory, locateWitnessFile, persistSolverWitness, readWitne
 // The route exists only in internal QA (docs/INTERNAL_QA.md); the real-generation test below runs FogHost as internal QA does.
 process.env.DS1TR_INTERNAL_QA = '1';
 const smokeCode = 'DS1TR1-06NWCQQ3-K2GXEE39-K5WRJEDT-CNKBNHDS-Z7CTKEJ6-0S36D1M6-0S3A7NEF-D3TK6PQX-HHB3ZGX2-Z80G12X8-GYBG';
+const v7Code = 'DS1TR1-06NWCQQ3-K2HXEE79-Z4WJJR09-VQ985RMJ-MBAC8Q6X-JAHCS0MW-TK8GMT5M-08DAV026-5EG62M81-040CE0GZ-GC';
 const gameSource = process.env.DS1TR_GOLDEN_GAME_SOURCE;
 
 const gate = (area, object, text, extra = {}) => ({ area, object, text, tags: [], sideCondition: null, otherSideArea: null, areaIsBossArena: false, bossTriggerSide: false, ...extra });
@@ -275,6 +276,56 @@ test('real generation: the same Seed Code twice gives the same witness, route an
       assert.ok(step.edge.exit.area && step.edge.arrival.area, `step ${step.number} has both sides`);
     }
   } finally {
+    await rm(temp, { recursive: true, force: true });
+  }
+});
+
+test('public vs internal QA: the same V7 Seed Code gives the same world, and a public run leaves no route in any file it writes', { skip: !gameSource }, async () => {
+  const temp = await mkdtemp(path.join(os.tmpdir(), 'ds1tr-public-vs-qa-'));
+  const previous = process.env.DS1TR_INTERNAL_QA;
+  try {
+    const game = path.join(temp, 'game');
+    await cp(path.join(gameSource, executableName), path.join(game, executableName));
+    for (const managed of managedRoots) await cp(path.join(gameSource, ...managed.split('/')), path.join(game, ...managed.split('/')), { recursive: true });
+    const authority = new GameStateAuthority({ stateRoot: path.join(temp, 'state'), isGameRunning: async () => false });
+    assert.equal((await authority.importPristine(game)).ok, true);
+    const run = async (label, internal) => {
+      if (internal) process.env.DS1TR_INTERNAL_QA = '1'; else delete process.env.DS1TR_INTERNAL_QA;
+      const prepared = prepareRun({ gamePath: game, seedCode: v7Code });
+      assert.equal(prepared.ok, true);
+      assert.equal(prepared.profile.id, 'ds1tr-gen-v7');
+      const workspacePath = path.join(temp, label);
+      await mkdir(workspacePath, { recursive: true });
+      const result = await generateRun({ config: prepared.config, workspacePath, profile: prepared.profile, seedCode: prepared.seedCode }, () => {},
+        { getPristineSource: (gamePath) => authority.getPristineSource(gamePath) });
+      assert.equal(result.ok, true, result.ok ? '' : `${result.code}: ${result.message}`);
+      // What the server does: the route is persisted only in internal QA.
+      const witnessPath = internal ? await persistSolverWitness(workspacePath, { seedCode: prepared.seedCode, profile: prepared.profile.id, appVersion: 'test', masterSeed: prepared.config.masterSeed, attempts: result.manifest.attempts }) : null;
+      return { result, workspacePath, witnessPath, tree: await hashTree(workspacePath), package: await hashTree(result.packagePath) };
+    };
+    const publicRun = await run('public', false);
+    const internalRun = await run('internal', true);
+
+    // The same world: same Fog attempts and seeds, byte-identical package, same combined output.
+    assert.deepEqual(publicRun.result.manifest.attempts.map((a) => [a.combinedAttempt, a.fogAttempt, a.fogSeed, a.result]), internalRun.result.manifest.attempts.map((a) => [a.combinedAttempt, a.fogAttempt, a.fogSeed, a.result]));
+    for (const name of ['config.json', 'randomizer.json', 'run-manifest.json']) { publicRun.package.delete(name); internalRun.package.delete(name); }
+    assert.deepEqual([...publicRun.package], [...internalRun.package], 'the package is identical with and without internal QA');
+
+    // A public run: no route file anywhere in the run folder, and no route listing in the host log.
+    const routeFiles = [...publicRun.tree.keys()].filter((name) => /solver-(route|witness)/u.test(name));
+    assert.deepEqual(routeFiles, [], 'no solver route or witness file in a public run folder');
+    assert.equal(publicRun.witnessPath, null);
+    const publicLog = await readFile(path.join(publicRun.workspacePath, fogAttemptDirectory(publicRun.result.manifest.attempts.at(-1)), 'foghost.log'), 'utf8');
+    assert.ok(!/^ {2}From .+ to \S+/mu.test(publicLog) && !publicLog.includes(' <----') && !publicLog.includes('>>>>>>>>>>>>>>>'), 'no predecessor listing in the public host log');
+
+    // The internal run has all of it, and the same host log is otherwise unchanged.
+    assert.ok(internalRun.witnessPath, 'internal QA keeps the witness');
+    const internalLog = await readFile(path.join(internalRun.workspacePath, fogAttemptDirectory(internalRun.result.manifest.attempts.at(-1)), 'foghost.log'), 'utf8');
+    assert.match(internalLog, /^ {2}From .+ to \S+/mu);
+    const withoutListing = (log) => log.split(/\r?\n/u).filter((line) => !/^ {2}From /u.test(line) && !/^\S+( \d+%)?( \(scaling: \d+%\))?( \[.*\])?( <----)?$/u.test(line) && !line.startsWith('>>>>')).join('\n');
+    assert.ok(withoutListing(internalLog).length > 0 && publicLog.length < internalLog.length, 'the public log is the internal one without the route listing');
+  } finally {
+    if (previous === undefined) delete process.env.DS1TR_INTERNAL_QA; else process.env.DS1TR_INTERNAL_QA = previous;
     await rm(temp, { recursive: true, force: true });
   }
 });

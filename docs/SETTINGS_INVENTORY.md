@@ -79,7 +79,7 @@ The view (Basic or Advanced), the language and the help are interface state: the
 * **Limits:** It only has an effect together with at least one of the options below it. Key placement also needs "Items lying in the world".
 * **Seed Code and presets:** part of the world (Seed Code, preset, history); exported and imported.
 * **Evidence:** read from the code that does it.
-* **Implemented in (found by search, validated in apps/backend/src/core/configValidation.ts):** `apps/backend/src/adapters/combinedRandomizerBridge.ts`, `apps/backend/src/core/generationProfiles.ts`, `apps/backend/src/server.ts`.
+* **Implemented in (found by search, validated in apps/backend/src/core/configValidation.ts):** `apps/backend/src/adapters/combinedRandomizerBridge.ts`, `apps/backend/src/core/generationProfiles.ts`, `apps/backend/src/core/internalQa.ts`.
 
 ### Items lying in the world (`items.worldItems`)
 
@@ -297,7 +297,7 @@ The view (Basic or Advanced), the language and the help are interface state: the
 * **Limits:** Boss randomization is a separate switch below it.
 * **Seed Code and presets:** part of the world (Seed Code, preset, history); exported and imported.
 * **Evidence:** read from the code that does it.
-* **Implemented in (found by search, validated in apps/backend/src/core/configValidation.ts):** `apps/backend/src/adapters/combinedRandomizerBridge.ts`, `apps/backend/src/core/generationProfiles.ts`, `apps/backend/src/server.ts`.
+* **Implemented in (found by search, validated in apps/backend/src/core/configValidation.ts):** `apps/backend/src/adapters/combinedRandomizerBridge.ts`, `apps/backend/src/core/generationProfiles.ts`, `apps/backend/src/core/internalQa.ts`.
 
 ### Regular enemies (`enemies.regular`)
 
@@ -671,7 +671,7 @@ The view (Basic or Advanced), the language and the help are interface state: the
 * **Limits:** Always includes the DLC areas, so DLC content cannot be turned off while it is on.
 * **Seed Code and presets:** part of the world (Seed Code, preset, history); exported and imported.
 * **Evidence:** read from the code that does it.
-* **Implemented in (found by search, validated in apps/backend/src/core/configValidation.ts):** `apps/backend/src/adapters/combinedRandomizerBridge.ts`, `apps/backend/src/core/generationProfiles.ts`, `apps/backend/src/server.ts`.
+* **Implemented in (found by search, validated in apps/backend/src/core/configValidation.ts):** `apps/backend/src/adapters/combinedRandomizerBridge.ts`, `apps/backend/src/core/generationProfiles.ts`, `apps/backend/src/core/internalQa.ts`.
 
 ### Ordinary fog gates (`fog.traversable`)
 

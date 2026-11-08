@@ -12,6 +12,8 @@ import { prepareRun } from '../../dist/core/seededRun.js';
 // (DS1TR_GOLDEN_GAME_SOURCE plus the helper variables of the golden recorder) the same Seed Code must make the same randomized decisions
 // with the mode off and on. The package differs only by the overlay: the GameParam binder (CharaInitParam rows and the grant's item lots),
 // common.emevd (the one-time grant event and its initializer) and the manifest that records the overlay.
+// FogMod's route listing in the host log exists only in internal QA (docs/INTERNAL_QA.md); the test compares it as the record of Fog's decisions.
+process.env.DS1TR_INTERNAL_QA = '1';
 const source = process.env.DS1TR_GOLDEN_GAME_SOURCE;
 const smokeCode = 'DS1TR1-06NWCQQ3-K2GXEE39-K5WRJEDT-CNKBNHDS-Z7CTKEJ6-0S36D1M6-0S3A7NEF-D3TK6PQX-HHB3ZGX2-Z80G12X8-GYBG';
 

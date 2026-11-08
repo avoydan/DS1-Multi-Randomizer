@@ -61,7 +61,7 @@
         "effect": [
           "apps/backend/src/adapters/combinedRandomizerBridge.ts",
           "apps/backend/src/core/generationProfiles.ts",
-          "apps/backend/src/server.ts"
+          "apps/backend/src/core/internalQa.ts"
         ]
       }
     },
@@ -1056,7 +1056,7 @@
         "effect": [
           "apps/backend/src/adapters/combinedRandomizerBridge.ts",
           "apps/backend/src/core/generationProfiles.ts",
-          "apps/backend/src/server.ts"
+          "apps/backend/src/core/internalQa.ts"
         ]
       }
     },
@@ -2576,7 +2576,7 @@
         "effect": [
           "apps/backend/src/adapters/combinedRandomizerBridge.ts",
           "apps/backend/src/core/generationProfiles.ts",
-          "apps/backend/src/server.ts"
+          "apps/backend/src/core/internalQa.ts"
         ]
       }
     },
