@@ -6,11 +6,11 @@ QaTelemetry is a standalone .NET 8 owner-QA tool, version 0.5.0. It has no refer
 
 The helper uses two deliberately separate identities:
 
-**Executable telemetry profile:** calibration is performed only against the manifest-verified clean runtime at `C:\Users\Adam\ds1tr-qa\runtime\DARK SOULS REMASTERED`. The EXE SHA-256 is `a45aaa36dd2f6cc151670a639ea5547043cf38ea79ff4178b963c6ed71f98d7b`; the clean manifest SHA-256 is `89a9dc2a0fa7dbf990521e7adb9f27586c140334676639a88edeb1bd4b2d3729`. The profile binds that exact executable, a stable executable-profile ID, the tool version, and a canonical hash covering signature patterns, candidate pointer/field structures, and flag layout. Its evidence records vanilla Asylum/Firelink confirmations, movement/position checks, the Asylum-to-Firelink transition, and independently known true/false flags. It contains no Ceaseless package, run-manifest, runtime digest, or Seed Code identity.
+**Executable telemetry profile:** calibration is performed only against the manifest-verified clean runtime at `C:\Users\Adam\VisualStudioProjects\ds1-triple-randomizer-v5-isolation\.workspace\qa\runtime\DARK SOULS REMASTERED`. The EXE SHA-256 is `a45aaa36dd2f6cc151670a639ea5547043cf38ea79ff4178b963c6ed71f98d7b`; the clean manifest SHA-256 is `89a9dc2a0fa7dbf990521e7adb9f27586c140334676639a88edeb1bd4b2d3729`. The profile binds that exact executable, a stable executable-profile ID, the tool version, and a canonical hash covering signature patterns, candidate pointer/field structures, and flag layout. Its evidence records vanilla Asylum/Firelink confirmations, movement/position checks, the Asylum-to-Firelink transition, and independently known true/false flags. It contains no Ceaseless package, run-manifest, runtime digest, or Seed Code identity.
 
 **Ceaseless gameplay session:** recording and import remain bound to the exact package-applied QA runtime, package, selected case, Seed Code, process path, and executable profile identity:
 
-- Executable: C:\Users\Adam\ds1tr-qa\runtime\DARK SOULS REMASTERED - CEASELESS QA\DarkSoulsRemastered.exe
+- Executable: C:\Users\Adam\VisualStudioProjects\ds1-triple-randomizer-v5-isolation\.workspace\qa\runtime\DARK SOULS REMASTERED - CEASELESS QA\DarkSoulsRemastered.exe
 - Executable SHA-256: a45aaa36dd2f6cc151670a639ea5547043cf38ea79ff4178b963c6ed71f98d7b
 - Runtime digest: 5f182859f78f285a89a31a608ea28dc5b1cb069b082aa906637da11aea2873ef
 - Selected package tree SHA-256: 32f0c2afeff25c9341405989b80ba7dc6a72da1f3e90ecdf90cf37ca2b5f79a9

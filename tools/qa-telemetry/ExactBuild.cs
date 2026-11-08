@@ -10,8 +10,8 @@ public sealed record ExactBuildAuditResult(string Status, string ExecutablePath,
 
 public static class ExactBuildProfile
 {
-    public const string CalibrationExecutablePath = @"C:\Users\Adam\ds1tr-qa\runtime\DARK SOULS REMASTERED\DarkSoulsRemastered.exe";
-    public const string ExpectedExecutablePath = @"C:\Users\Adam\ds1tr-qa\runtime\DARK SOULS REMASTERED - CEASELESS QA\DarkSoulsRemastered.exe";
+    public const string CalibrationExecutablePath = @"C:\Users\Adam\VisualStudioProjects\ds1-triple-randomizer-v5-isolation\.workspace\qa\runtime\DARK SOULS REMASTERED\DarkSoulsRemastered.exe";
+    public const string ExpectedExecutablePath = @"C:\Users\Adam\VisualStudioProjects\ds1-triple-randomizer-v5-isolation\.workspace\qa\runtime\DARK SOULS REMASTERED - CEASELESS QA\DarkSoulsRemastered.exe";
     public const string ExpectedExecutableSha256 = "a45aaa36dd2f6cc151670a639ea5547043cf38ea79ff4178b963c6ed71f98d7b";
     public const string ExpectedRuntimeDigest = "5f182859f78f285a89a31a608ea28dc5b1cb069b082aa906637da11aea2873ef";
     public const string ExpectedCleanManifestSha256 = "89a9dc2a0fa7dbf990521e7adb9f27586c140334676639a88edeb1bd4b2d3729";

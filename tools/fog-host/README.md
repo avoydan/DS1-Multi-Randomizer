@@ -29,8 +29,8 @@ the check ignores line endings.
 
 ## Build and test
 
-Use the .NET 8 SDK (`docs/DECISIONS.md`; on the reference machine it is
-`~/dn8sdk/dotnet`):
+Use the .NET 8 SDK (`docs/DECISIONS.md`; the project-owned copy is
+`.workspace/sdk/dotnet.exe`, see `docs/WORKSPACE.md`):
 
 ```sh
 dotnet build tools/fog-host/FogHost.csproj -c Release          # -> bin/Release/net8.0/FogHost.exe

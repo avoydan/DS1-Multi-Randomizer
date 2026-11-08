@@ -36,3 +36,4 @@ engines/combined/tests/**/obj/
 *.key
 .env
 .env.*
+.workspace/

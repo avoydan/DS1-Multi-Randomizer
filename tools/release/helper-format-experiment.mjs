@@ -18,7 +18,7 @@ import { listFiles, parseArguments, repositoryRoot } from './release-lib.mjs';
 const { flags, positional } = parseArguments(process.argv.slice(2));
 if (positional.length !== 1) { console.error('Usage: node tools/release/helper-format-experiment.mjs <output folder> [--scan]'); process.exit(2); }
 const output = path.resolve(positional[0]);
-const localSdk = path.join(process.env.USERPROFILE ?? '', 'dn8sdk', 'dotnet.exe');
+const localSdk = path.join(repositoryRoot, '.workspace', 'sdk', 'dotnet.exe'); // docs/WORKSPACE.md
 const dotnet = process.env.DS1TR_DOTNET_SDK ?? (await access(localSdk).then(() => localSdk, () => 'dotnet'));
 const run = (command, args, env = process.env) => new Promise((resolve, reject) => {
   const child = spawn(command, args, { cwd: repositoryRoot, env, stdio: 'ignore', shell: false, windowsHide: true });

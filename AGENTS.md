@@ -118,6 +118,10 @@ DS1 Triple Randomizer is a Windows desktop application for Dark Souls Remastered
 
 Goal: one reliable application combining item randomization, enemy/boss randomization, and fog/world randomization without manually chaining three tools.
 
+## Workspace policy (one location)
+
+The only project location is `C:\Users\Adam\VisualStudioProjects\ds1-triple-randomizer-v5-isolation`, a standalone Git repository. Do not create sibling backups, extra clones or project folders under `C:\Users\Adam\`; use branches (and, if unavoidable, worktrees under `.workspace/worktrees/`). Project-owned temp, QA data, SDK and archives live in the git-ignored `.workspace/` inside the repository. Details: `docs/WORKSPACE.md`.
+
 ## Product rules
 - Dark Souls Remastered first. PTDE is out of scope for the first release.
 - One master seed.

@@ -54,12 +54,12 @@ public static class QaRuntimePolicy
     public const string SteamSourceRoot = @"C:\Program Files (x86)\Steam\steamapps\common\DARK SOULS REMASTERED";
     public const string SteamExecutablePath = @"C:\Program Files (x86)\Steam\steam.exe";
     public const string SteamAppManifestPath = @"C:\Program Files (x86)\Steam\steamapps\appmanifest_570940.acf";
-    public const string QaDataSnapshotRoot = @"C:\Users\Adam\ds1tr-qa\game-inst\DARK SOULS REMASTERED";
-    public const string CleanRuntimeRoot = @"C:\Users\Adam\ds1tr-qa\runtime\DARK SOULS REMASTERED";
-    public const string ModifiedRuntimeRoot = @"C:\Users\Adam\ds1tr-qa\runtime\DARK SOULS REMASTERED - CEASELESS QA";
-    public const string AttestationDirectory = @"C:\Users\Adam\ds1tr-qa\runtime\attestations";
-    public const string CleanManifestPath = @"C:\Users\Adam\ds1tr-qa\runtime\attestations\ceaseless-clean-runtime.v1.json";
-    public const string ModifiedManifestPath = @"C:\Users\Adam\ds1tr-qa\runtime\attestations\ceaseless-package-runtime.v1.json";
+    public const string QaDataSnapshotRoot = @"C:\Users\Adam\VisualStudioProjects\ds1-triple-randomizer-v5-isolation\.workspace\qa\game-inst\DARK SOULS REMASTERED";
+    public const string CleanRuntimeRoot = @"C:\Users\Adam\VisualStudioProjects\ds1-triple-randomizer-v5-isolation\.workspace\qa\runtime\DARK SOULS REMASTERED";
+    public const string ModifiedRuntimeRoot = @"C:\Users\Adam\VisualStudioProjects\ds1-triple-randomizer-v5-isolation\.workspace\qa\runtime\DARK SOULS REMASTERED - CEASELESS QA";
+    public const string AttestationDirectory = @"C:\Users\Adam\VisualStudioProjects\ds1-triple-randomizer-v5-isolation\.workspace\qa\ceaseless-attestations";
+    public const string CleanManifestPath = @"C:\Users\Adam\VisualStudioProjects\ds1-triple-randomizer-v5-isolation\.workspace\qa\ceaseless-attestations\ceaseless-clean-runtime.v1.json";
+    public const string ModifiedManifestPath = @"C:\Users\Adam\VisualStudioProjects\ds1-triple-randomizer-v5-isolation\.workspace\qa\ceaseless-attestations\ceaseless-package-runtime.v1.json";
 
     public static RuntimePolicy Default { get; } = new(
         SteamSourceRoot,

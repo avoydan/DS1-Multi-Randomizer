@@ -44,7 +44,8 @@ const desktop = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const root = path.resolve(desktop, '../..');
 const runtime = path.join(desktop, 'release', 'runtime');
 const npmCli = process.env.npm_execpath ?? path.join(path.dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js');
-const localSdk = path.join(process.env.USERPROFILE ?? '', 'dn8sdk', 'dotnet.exe');
+// The project-owned .NET SDK (docs/WORKSPACE.md): `.workspace/sdk` inside the repository, git-ignored. DS1TR_DOTNET_SDK overrides; otherwise `dotnet` from PATH.
+const localSdk = path.join(root, '.workspace', 'sdk', 'dotnet.exe');
 const dotnet = process.env.DS1TR_DOTNET_SDK ?? (await access(localSdk).then(() => localSdk, () => 'dotnet'));
 const run = (command, args, cwd = root, env = process.env) => new Promise((resolve, reject) => {
   const child = spawn(command, args, { cwd, env, stdio: 'inherit', shell: false, windowsHide: true });
@@ -73,7 +74,8 @@ await rm(runtime, { recursive: true, force: true });
 await mkdir(runtime, { recursive: true });
 const buildAppData = path.join(desktop, 'release', 'build-appdata');
 await mkdir(buildAppData, { recursive: true });
-const dotnetEnv = { ...process.env, APPDATA: buildAppData };
+const workspaceNuget = path.join(root, '.workspace', 'nuget');
+const dotnetEnv = { ...process.env, APPDATA: buildAppData, ...(dotnet === localSdk ? { NUGET_PACKAGES: process.env.NUGET_PACKAGES ?? workspaceNuget, DOTNET_CLI_HOME: process.env.DOTNET_CLI_HOME ?? path.join(root, '.workspace', 'tooling', 'dotnet-cli-home') } : {}) };
 const nugetConfig = path.join(desktop, 'release', 'NuGet.Config');
 await writeFile(nugetConfig, '<configuration><packageSources><clear /><add key="nuget.org" value="https://api.nuget.org/v3/index.json" /></packageSources></configuration>');
 await run(process.execPath, [npmCli, 'run', 'build', '-w', '@ds1tr/contracts']);
