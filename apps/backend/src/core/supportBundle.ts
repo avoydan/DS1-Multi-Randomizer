@@ -15,14 +15,14 @@ export const BUNDLE_ALLOWLIST = [
   'generation/run-manifest.json',
   'generation/generation-summary.json',
   'generation/validation-summary.json',
-  'generation/solver-route.md',
-  'generation/solver-witness.json',
   'logs/app.log',
   'logs/backend.log',
   'logs/relevant-generation.log',
   'release/release-manifest.json',
 ] as const;
-export type BundleEntryName = (typeof BUNDLE_ALLOWLIST)[number];
+/** Internal QA only (docs/INTERNAL_QA.md): a bundle of a public build can never carry these, even if a caller offers them. */
+export const INTERNAL_QA_BUNDLE_ENTRIES = ['generation/solver-route.md', 'generation/solver-witness.json'] as const;
+export type BundleEntryName = (typeof BUNDLE_ALLOWLIST)[number] | (typeof INTERNAL_QA_BUNDLE_ENTRIES)[number];
 
 /** Per-entry and total limits (uncompressed bytes). A log longer than its limit is cut to its END (the newest lines) and says so. */
 export const BUNDLE_LIMITS: Record<BundleEntryName, number> = {
@@ -49,7 +49,8 @@ export interface BundleReport {
   redactions: number;
 }
 
-const isAllowed = (name: string): name is BundleEntryName => (BUNDLE_ALLOWLIST as readonly string[]).includes(name);
+const isAllowed = (name: string, internalQa: boolean): name is BundleEntryName =>
+  (BUNDLE_ALLOWLIST as readonly string[]).includes(name) || (internalQa && (INTERNAL_QA_BUNDLE_ENTRIES as readonly string[]).includes(name));
 
 /** The end of a text within a byte limit, cut at a line start, with a note on top. */
 function limitText(text: string, limit: number): { text: string; truncated: boolean } {
@@ -68,13 +69,13 @@ export function bundleFileName(seedCode: string | null, now: Date): string {
 const MAX_LINE = 8000;
 const capLines = (text: string): string => (/[^\n]{8001}/u.test(text) ? text.split('\n').map((line) => (line.length > MAX_LINE ? `${line.slice(0, MAX_LINE)} [line cut]` : line)).join('\n') : text);
 
-export function buildSupportBundle(sources: readonly BundleSource[], context: RedactionContext, options: { seedCode: string | null; now?: Date }): BundleResult {
+export function buildSupportBundle(sources: readonly BundleSource[], context: RedactionContext, options: { seedCode: string | null; now?: Date; internalQa?: boolean }): BundleResult {
   const now = options.now ?? new Date();
   const redact = createRedactor(context);
   const entries: Array<{ name: BundleEntryName; data: Buffer; truncated: boolean }> = [];
   for (const source of sources) {
     if (source.content === null || source.content === undefined) continue;
-    if (!isAllowed(source.name)) return { ok: false, code: 'BUNDLE_INVALID_ENTRY', detail: source.name };
+    if (!isAllowed(source.name, options.internalQa === true)) return { ok: false, code: 'BUNDLE_INVALID_ENTRY', detail: source.name };
     let text: string;
     if (typeof source.content === 'object') text = `${JSON.stringify(redactJson(source.content, redact), null, 2)}\n`;
     else if (source.name.endsWith('.json')) {
@@ -94,7 +95,7 @@ export function buildSupportBundle(sources: readonly BundleSource[], context: Re
   const archive = createZip(entries.map((entry) => ({ name: entry.name, data: entry.data, modified: now })), now);
   // Read it back: the names are exactly the allowlisted ones and every checksum holds.
   const readBack = readZip(archive);
-  if (readBack.length !== entries.length || readBack.some((entry) => !isAllowed(entry.name))) return { ok: false, code: 'BUNDLE_INVALID_ENTRY', detail: 'the archive does not match its contents' };
+  if (readBack.length !== entries.length || readBack.some((entry) => !isAllowed(entry.name, options.internalQa === true))) return { ok: false, code: 'BUNDLE_INVALID_ENTRY', detail: 'the archive does not match its contents' };
   return {
     ok: true, archive, fileName: bundleFileName(options.seedCode, now),
     report: { entries: entries.map((entry) => ({ name: entry.name, bytes: entry.data.length, truncated: entry.truncated })), totalBytes, redactions: redact.count() },

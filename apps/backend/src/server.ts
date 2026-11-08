@@ -23,6 +23,7 @@ import { decodeSeedCode } from './core/seedCode.js';
 import { smokeTestWorlds } from './core/smokeTests.js';
 import { currentGenerationProfile, resolveGenerationProfile, supportedGenerationProfiles } from './core/generationProfiles.js';
 import { hintsAvailableFor, hintsForEntry, persistHints } from './core/hintStore.js';
+import { internalQaEnabled } from './core/internalQa.js';
 import { persistSolverWitness, solverRouteAvailableFor, solverRouteForEntry } from './core/solverWitnessStore.js';
 import { AppLogger, LOG_STAGES, type LogLevel, type LogStage } from './core/appLog.js';
 import { OperationTracker } from './core/operations.js';
@@ -70,6 +71,8 @@ async function findSpoiler(workspacePath: string, packagePath: string): Promise<
 const APP_VERSION = '0.46.2';
 /** The version the person sees (set by the desktop shell); recorded with every run in the history so an old QA build is recognizable. */
 const DESKTOP_VERSION = process.env.DS1TR_DESKTOP_VERSION ?? APP_VERSION;
+/** Internal QA (docs/INTERNAL_QA.md): the solver route is written, served and bundled only when this is on. Decided once, from the environment and the build, never by the renderer. */
+const INTERNAL_QA = internalQaEnabled(process.env, process.env.DS1TR_RUNTIME_ROOT);
 const runDependencies = { ...generationDependencies, appVersion: APP_VERSION };
 const supportDependencies: SupportDependencies = {
   stateRoot: defaultStateRoot(), runRoot, userDataDir: process.env.DS1TR_USER_DATA ?? null, appLogPath: process.env.DS1TR_APP_LOG ?? null,
@@ -111,6 +114,11 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'GET' && url.pathname === '/api/health') {
       return send(res, 200, { ok: true, service: 'ds1-triple-randomizer-backend', version: APP_VERSION });
+    }
+
+    // What this build offers beyond the product. The renderer has no setting for it: it only asks (docs/INTERNAL_QA.md).
+    if (req.method === 'GET' && url.pathname === '/api/capabilities') {
+      return send(res, 200, { ok: true, internalQa: INTERNAL_QA });
     }
 
     if (req.method === 'GET' && url.pathname === '/api/activity') {
@@ -215,7 +223,7 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'POST' && url.pathname === '/api/history/list') {
       const entries = await history.list();
-      return send(res, 200, { entries: await Promise.all(entries.map(async (entry) => ({ ...entry, hintsAvailable: await hintsAvailableFor(entry, runRoot).catch(() => false), solverRouteAvailable: await solverRouteAvailableFor(entry, runRoot).catch(() => false) }))), supportedProfiles: supportedGenerationProfiles() });
+      return send(res, 200, { entries: await Promise.all(entries.map(async (entry) => ({ ...entry, hintsAvailable: await hintsAvailableFor(entry, runRoot).catch(() => false), ...(INTERNAL_QA ? { solverRouteAvailable: await solverRouteAvailableFor(entry, runRoot).catch(() => false) } : {}) }))), supportedProfiles: supportedGenerationProfiles() });
     }
 
     // Delete one run: its record and the run folder it owns (docs/RUN_HISTORY_CLEANUP.md). The applied run is refused.
@@ -258,7 +266,7 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, document ? { ok: true, document } : { ok: false, code: 'HINTS_UNAVAILABLE' });
     }
 
-    if (req.method === 'POST' && url.pathname === '/api/solver-route/get') {
+    if (INTERNAL_QA && req.method === 'POST' && url.pathname === '/api/solver-route/get') {
       const body = await readJson<{ id?: string }>(req);
       const entry = typeof body.id === 'string' ? await history.get(body.id) : null;
       const route = entry ? await solverRouteForEntry(entry, runRoot).catch(() => null) : null;
@@ -348,10 +356,12 @@ const server = http.createServer(async (req, res) => {
           const hintsPath = await persistHints(workspacePath, {
             seedCode: prepared.seedCode, profile: prepared.profile.id, createdAt: new Date().toISOString(), appVersion: APP_VERSION, settings: prepared.envelope.settings,
           }).catch(() => null);
-          // The solver witness of the ACCEPTED Fog attempt is kept next to the run too (never in the package; docs/SOLVER_WITNESS.md).
-          await persistSolverWitness(workspacePath, {
-            seedCode: prepared.seedCode, profile: prepared.profile.id, appVersion: APP_VERSION, masterSeed: prepared.config.masterSeed, attempts: result.manifest.attempts,
-          }).catch(() => null);
+          // Internal QA only: the solver witness of the ACCEPTED Fog attempt is kept next to the run (never in the package; docs/SOLVER_WITNESS.md, docs/INTERNAL_QA.md).
+          if (INTERNAL_QA) {
+            await persistSolverWitness(workspacePath, {
+              seedCode: prepared.seedCode, profile: prepared.profile.id, appVersion: APP_VERSION, masterSeed: prepared.config.masterSeed, attempts: result.manifest.attempts,
+            }).catch(() => null);
+          }
           // The same world generated again (Load seed, Regenerate files) refreshes its entry; it is not a new run.
           const entry = await history.addOrRefresh({
             seedCode: prepared.seedCode, profile: prepared.profile.id, masterSeed: prepared.config.masterSeed, settings: prepared.envelope.settings,

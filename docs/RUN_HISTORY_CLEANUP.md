@@ -7,7 +7,7 @@ The history grows with every generation. This describes exactly what a run owns,
 | Where | What | Owned by the run |
 |---|---|---|
 | `<state>/history/runs.json` | one record: id, time, Seed Code, profile, master seed, settings, status (`generated`/`applied`/`restored`), `appVersion` (since 0.42.0), paths | yes |
-| `<state>/runs/<uuid>/` | the **run folder** the generation wrote into: the package (`fog-N-M/game`, `run-manifest.json`), the attempt folders (`combined-N`), the spoiler, `hints.json`, `solver-witness.json`, `solver-route.md`, `failed-manifest.json` of a failed attempt | yes |
+| `<state>/runs/<uuid>/` | the **run folder** the generation wrote into: the package (`fog-N-M/game`, `run-manifest.json`), the attempt folders (`combined-N`), the spoiler, `hints.json`, `failed-manifest.json` (and, in internal QA builds only, `solver-witness.json`, `solver-route.md`; `docs/INTERNAL_QA.md`) of a failed attempt | yes |
 
 ## What the application stores that a cleanup never touches
 

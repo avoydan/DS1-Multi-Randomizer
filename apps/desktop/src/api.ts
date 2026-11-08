@@ -73,6 +73,12 @@ export const api = {
       return false;
     }
   },
+  /** What this build offers beyond the product: `internalQa` is true only in an internal QA build (docs/INTERNAL_QA.md). */
+  capabilities: async (): Promise<{ internalQa: boolean }> => {
+    const { apiBase, token } = await connection();
+    const response = await fetch(`${apiBase}/capabilities`, { headers: { 'X-DS1TR-Token': token } });
+    return response.ok ? (await response.json()) as { internalQa: boolean } : { internalQa: false };
+  },
   decodeSeed: (seedCode: string) => post<DecodedSeedPayload>('/seed/decode', { seedCode }, true),
   history: () => post<{ entries: RunHistoryEntry[] }>('/history/list', {}),
   deleteHistoryEntry: (id: string) => post<HistoryDeleteResult>('/history/delete', { id }),

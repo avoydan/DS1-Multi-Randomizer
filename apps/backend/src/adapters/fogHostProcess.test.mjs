@@ -64,11 +64,11 @@ test('writes request, forwards exact command, parses progress and authoritative 
       child.emit('close', 0);
     });
     return child;
-  });
+  }, { PATH: 'p' });
   assert.deepEqual(await process.execute(execution, (event) => events.push(event)), success);
   assert.deepEqual(calls, [{ command: 'FogHost.exe', args: [
     'generate', '--request', execution.requestPath, '--response', execution.responsePath,
-  ], spawnOptions: { stdio: ['ignore', 'pipe', 'pipe'] } }]);
+  ], spawnOptions: { stdio: ['ignore', 'pipe', 'pipe'], env: { PATH: 'p' } } }]);
   assert.deepEqual(events, [
     { type: 'progress', stage: 'solve-graph', message: 'Solving' },
     { type: 'log', stream: 'stdout', message: 'other output\n' },

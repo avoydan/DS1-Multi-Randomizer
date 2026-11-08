@@ -335,16 +335,20 @@ namespace FogMod
                 }
                 g.areaRatios[rec.Area] = (ratio, dmgRatio);
                 
-                // Print out the connectivity info for spoiler logs
-                if (rec.Area == "anorlondo_os") Console.WriteLine(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
-                string areas = opt["debugareas"] ? $" [{string.Join(",", new SortedSet<string>(rec.Visited))}]" : "";
-                string scaling = opt["scale"] ? $" (scaling: {ratio * 100:0.}%)" : "";
-                Console.WriteLine($"{rec.Area}{(opt["explain"] ? $" {desiredCost * 100:0.}%" : "")}" + scaling + areas + (isBoss ? " <----" : ""));
-                foreach (KeyValuePair<Edge, float> entry in rec.InEdge.OrderBy(e => e.Value))
+                // Print out the connectivity info for spoiler logs.
+                // DS1 Multi Randomizer change: this listing is a complete route to Gwyn, so it is written only for internal QA (docs/INTERNAL_QA.md). Nothing else depends on it.
+                if (FogHost.InternalQa.Enabled)
                 {
-                    Edge e = entry.Key;
-                    // Don't print entry.Value directly (distance of edge) - hard to visualize
-                    Console.WriteLine($"  From {e.From} ({e.Text}) to {rec.Area}" + (e.Text == e.Link.Text ? "" : $" ({e.Link.Text})"));
+                    if (rec.Area == "anorlondo_os") Console.WriteLine(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
+                    string areas = opt["debugareas"] ? $" [{string.Join(",", new SortedSet<string>(rec.Visited))}]" : "";
+                    string scaling = opt["scale"] ? $" (scaling: {ratio * 100:0.}%)" : "";
+                    Console.WriteLine($"{rec.Area}{(opt["explain"] ? $" {desiredCost * 100:0.}%" : "")}" + scaling + areas + (isBoss ? " <----" : ""));
+                    foreach (KeyValuePair<Edge, float> entry in rec.InEdge.OrderBy(e => e.Value))
+                    {
+                        Edge e = entry.Key;
+                        // Don't print entry.Value directly (distance of edge) - hard to visualize
+                        Console.WriteLine($"  From {e.From} ({e.Text}) to {rec.Area}" + (e.Text == e.Link.Text ? "" : $" ({e.Link.Text})"));
+                    }
                 }
             }
             if (opt["dumpdist"])

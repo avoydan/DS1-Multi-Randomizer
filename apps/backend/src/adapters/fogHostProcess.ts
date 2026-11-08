@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import type { ChildProcess, SpawnOptions } from 'node:child_process';
 import { readFile, stat, writeFile } from 'node:fs/promises';
 import type { FogLanguage, FogOptions } from '@ds1tr/contracts';
+import { hostEnvironment, internalQaEnabled } from '../core/internalQa.js';
 import { validateFogCompatibility } from './fogCompatibility.js';
 import type { FogCompatibility } from './fogCompatibility.js';
 
@@ -145,7 +146,8 @@ function failure(code: FogHostErrorCode, message: string, schemaVersion: 2 | 3):
 }
 
 export class FogHostProcess {
-  constructor(private readonly spawnProcess: FogHostSpawn = spawn) {}
+  /** `environment` is the backend's own (the test seam); the host is told whether internal QA is on by the backend's decision, never by a variable of the player's. */
+  constructor(private readonly spawnProcess: FogHostSpawn = spawn, private readonly environment: NodeJS.ProcessEnv = process.env) {}
 
   async execute(
     execution: FogHostExecutionRequest,
@@ -195,7 +197,7 @@ export class FogHostProcess {
       try {
         child = this.spawnProcess(execution.executablePath,
           ['generate', '--request', execution.requestPath, '--response', execution.responsePath],
-          { stdio: ['ignore', 'pipe', 'pipe'] });
+          { stdio: ['ignore', 'pipe', 'pipe'], env: hostEnvironment(this.environment, internalQaEnabled(this.environment, this.environment.DS1TR_RUNTIME_ROOT)) });
       } catch (error) {
         resolve(failure('FOG_HOST_CRASHED', `Cannot start FogHost: ${String(error)}`, schemaVersion));
         return;

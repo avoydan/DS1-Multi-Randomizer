@@ -115,6 +115,8 @@ export function App() {
   const [hintTarget, setHintTarget] = useState<{ id: string; exportFirst: boolean } | null>(null);
   /** The world whose solver route is open (history entry id). */
   const [solverTarget, setSolverTarget] = useState<string | null>(null);
+  /** Internal QA builds only (docs/INTERNAL_QA.md): the backend says so; there is no setting for it and a normal build never shows the solver route. */
+  const [internalQa, setInternalQa] = useState(false);
   const [view, setView] = useState<ViewId>('game');
   const [mode, setModeState] = useState<SettingsMode>(readMode);
   /** The sections the advanced view opens when it is reached from the basic notice about custom values. */
@@ -124,6 +126,7 @@ export function App() {
 
   useEffect(() => {
     api.health().then(setBackendOnline);
+    api.capabilities().then((capabilities) => setInternalQa(capabilities.internalQa === true)).catch(() => setInternalQa(false));
     window.desktop?.connection().then((state) => setStartupError(state.error));
   }, []);
 
@@ -475,7 +478,7 @@ export function App() {
                   <button role="menuitem" onClick={() => void generateRun()} disabled={generationDisabled}>{t('app.run.randomizeAgain')}</button>
                   <button role="menuitem" onClick={() => { setRunMenuOpen(false); setView('seed'); }}>{t('common.loadSeed')}</button>
                   <button role="menuitem" disabled={!generation.historyId} onClick={() => { setRunMenuOpen(false); if (generation.historyId) setHintTarget({ id: generation.historyId, exportFirst: false }); }}>{t('hints.action.view')}</button>
-                  <button role="menuitem" disabled={!generation.historyId} onClick={() => { setRunMenuOpen(false); if (generation.historyId) setSolverTarget(generation.historyId); }}>{t('solver.action.view')}</button>
+                  {internalQa && <button role="menuitem" disabled={!generation.historyId} onClick={() => { setRunMenuOpen(false); if (generation.historyId) setSolverTarget(generation.historyId); }}>{t('solver.action.view')}</button>}
                 </div>
               )}
             </div>
@@ -498,7 +501,8 @@ export function App() {
                 <div className="menu" role="menu">
                   <button role="menuitem" onClick={() => { setRunMenuOpen(false); setView('seed'); }}>{t('common.loadSeed')}</button>
                   <button role="menuitem" disabled={!appliedEntry?.hintsAvailable} onClick={() => { setRunMenuOpen(false); if (appliedEntry) setHintTarget({ id: appliedEntry.id, exportFirst: false }); }}>{t('hints.action.view')}</button>
-                  <button role="menuitem" disabled={!appliedEntry?.solverRouteAvailable} title={appliedEntry?.solverRouteAvailable ? '' : t('solver.action.unavailable')} onClick={() => { setRunMenuOpen(false); if (appliedEntry) setSolverTarget(appliedEntry.id); }}>{t('solver.action.view')}</button>
+                  {/* Internal QA builds only: the backend reports the field at all only then (docs/INTERNAL_QA.md); a normal build renders nothing here. */}
+                  {appliedEntry?.solverRouteAvailable !== undefined && <button role="menuitem" disabled={!appliedEntry.solverRouteAvailable} title={appliedEntry.solverRouteAvailable ? '' : t('solver.action.unavailable')} onClick={() => { setRunMenuOpen(false); setSolverTarget(appliedEntry.id); }}>{t('solver.action.view')}</button>}
                 </div>
               )}
             </div>
@@ -603,7 +607,7 @@ export function App() {
 
           {diagnosticsTarget && <DiagnosticsPanel gamePath={config.gamePath} worldId={diagnosticsTarget} onClose={() => setDiagnosticsTarget(null)} />}
           {hintTarget && <HintSheetPanel entryId={hintTarget.id} exportFirst={hintTarget.exportFirst} onClose={() => setHintTarget(null)} />}
-          {solverTarget && <SolverRoutePanel entryId={solverTarget} onClose={() => setSolverTarget(null)} />}
+          {internalQa && solverTarget && <SolverRoutePanel entryId={solverTarget} onClose={() => setSolverTarget(null)} />}
           {historyNote && <div className="notice" role="status">{historyNote}</div>}
           {historyAction?.kind === 'delete' && (
             <ConfirmDialog title={t('history.dialog.deleteTitle')} confirmLabel={t('history.dialog.deleteConfirm')} cancelLabel={t('history.dialog.cancel')} danger busy={historyBusy}

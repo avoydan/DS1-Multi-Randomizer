@@ -9,18 +9,34 @@ import { fileURLToPath } from 'node:url';
 const desktop = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const read = (relative) => readFileSync(path.join(desktop, relative), 'utf8');
 
-test('after a successful generation the "Solver route" action is offered and opens the panel for the generated world', () => {
+test('internal QA only: every entry point is rendered only when the backend says this is an internal QA build (docs/INTERNAL_QA.md)', () => {
+  const app = read('src/App.tsx');
+  assert.match(app, /api\.capabilities\(\)\.then\(\(capabilities\) => setInternalQa\(capabilities\.internalQa === true\)\)\.catch\(\(\) => setInternalQa\(false\)\)/u);
+  assert.match(app, /const \[internalQa, setInternalQa\] = useState\(false\)/u, 'off until the backend says otherwise');
+  assert.match(app, /\{internalQa && <button role="menuitem"[^\n]*solver\.action\.view/u);
+  assert.match(app, /\{appliedEntry\?\.solverRouteAvailable !== undefined && <button role="menuitem"/u);
+  assert.match(app, /\{internalQa && solverTarget && <SolverRoutePanel/u);
+  assert.match(read('src/RunHistoryPanel.tsx'), /\{entry\.solverRouteAvailable !== undefined && <button role="menuitem"/u);
+  // Nothing hides the action by styling alone, and no setting turns it on.
+  for (const file of ['src/App.tsx', 'src/RunHistoryPanel.tsx', 'src/styles.css']) assert.doesNotMatch(read(file), /display:\s*none[^}]*solver|solver[^{]*\{[^}]*display:\s*none/u);
+  for (const file of ['src/App.tsx', 'src/RunHistoryPanel.tsx']) assert.doesNotMatch(read(file), /internalQa[^\n]*(checkbox|localStorage|setSetting)/u);
+  const backend = readFileSync(path.join(desktop, '..', 'backend', 'src', 'server.ts'), 'utf8');
+  assert.match(backend, /url\.pathname === '\/api\/capabilities'/u);
+});
+
+test('in an internal QA build the "Solver route" action is offered after generation and opens the panel for the generated world', () => {
   const app = read('src/App.tsx');
   assert.match(app, /import \{ SolverRoutePanel \} from '\.\/SolverRoutePanel';/u);
   // In the generated state: enabled as soon as the run has a history entry (the hint sheet's rule).
   assert.match(app, /disabled=\{!generation\.historyId\} onClick=\{\(\) => \{ setRunMenuOpen\(false\); if \(generation\.historyId\) setSolverTarget\(generation\.historyId\); \}\}>\{t\('solver\.action\.view'\)\}/u);
-  // In the applied state and in the history it follows the backend's availability flag.
-  assert.match(app, /disabled=\{!appliedEntry\?\.solverRouteAvailable\}[^\n]*setSolverTarget\(appliedEntry\.id\)[^\n]*solver\.action\.view/u);
+  // In the applied state and in the history it follows the backend's availability flag, which exists only in internal QA.
+  assert.match(app, /disabled=\{!appliedEntry\.solverRouteAvailable\}[^\n]*setSolverTarget\(appliedEntry\.id\)[^\n]*solver\.action\.view/u);
   assert.match(app, /onSolverRoute=\{\(entry\) => setSolverTarget\(entry\.id\)\}/u);
-  assert.match(app, /\{solverTarget && <SolverRoutePanel entryId=\{solverTarget\} onClose=\{\(\) => setSolverTarget\(null\)\} \/>\}/u);
+  assert.match(app, /\{internalQa && solverTarget && <SolverRoutePanel entryId=\{solverTarget\} onClose=\{\(\) => setSolverTarget\(null\)\} \/>\}/u);
   const history = read('src/RunHistoryPanel.tsx');
   assert.match(history, /disabled=\{!entry\.solverRouteAvailable\}[^\n]*onSolverRoute\(entry\)[^\n]*solver\.action\.view/u);
 });
+
 
 test('the panel shows the context, the route text, the optional proof tree, and can copy the route', () => {
   const panel = read('src/SolverRoutePanel.tsx');

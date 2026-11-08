@@ -1,5 +1,7 @@
 # Solver witness (the "Solver route")
 
+> **Internal QA only (0.42.0).** The route is not part of the product: a normal build writes, serves, shows and bundles none of it. See `docs/INTERNAL_QA.md` for what is internal and how it is switched on (`DS1TR_INTERNAL_QA=1` on a non-public build). Everything below describes an internal QA build.
+
 Status: implemented in desktop 0.42.0 / backend 0.48.0 / contracts 0.35.0 / FogHost project 0.9.0 (HostVersion stays `0.7.3`). Diagnostic only: it changes no generation semantics, no Seed Code and no generated file.
 
 ## Why

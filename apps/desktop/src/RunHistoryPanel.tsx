@@ -86,7 +86,8 @@ export function RunHistoryPanel({ entries, gameState, busy, onApply, onRegenerat
                       <div className="menu" role="menu">
                         <button role="menuitem" disabled={!entry.hintsAvailable} title={entry.hintsAvailable ? '' : t('hints.action.unavailable')} onClick={() => { setMenuFor(null); onHints(entry, false); }}>{t('hints.action.view')}</button>
                         <button role="menuitem" disabled={!entry.hintsAvailable} title={entry.hintsAvailable ? '' : t('hints.action.unavailable')} onClick={() => { setMenuFor(null); onHints(entry, true); }}>{t('hints.action.export')}</button>
-                        <button role="menuitem" disabled={!entry.solverRouteAvailable} title={entry.solverRouteAvailable ? '' : t('solver.action.unavailable')} onClick={() => { setMenuFor(null); onSolverRoute(entry); }}>{t('solver.action.view')}</button>
+                        {/* Internal QA builds only: the backend reports the field at all only then (docs/INTERNAL_QA.md). */}
+                        {entry.solverRouteAvailable !== undefined && <button role="menuitem" disabled={!entry.solverRouteAvailable} title={entry.solverRouteAvailable ? '' : t('solver.action.unavailable')} onClick={() => { setMenuFor(null); onSolverRoute(entry); }}>{t('solver.action.view')}</button>}
                         <button role="menuitem" onClick={() => showSettings(entry)}>{t('history.viewSettings')}</button>
                         <button role="menuitem" onClick={() => { setMenuFor(null); onDiagnostics(entry); }}>{t('history.diagnostics')}</button>
                         <button role="menuitem" onClick={() => { setMenuFor(null); onSupportBundle(entry); }}>{t('support.ui.export')}</button>

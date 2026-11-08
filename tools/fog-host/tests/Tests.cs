@@ -30,6 +30,8 @@ namespace FogHost.Tests
                 return ProcessHarness.RunProcessTreeChild(args[1]);
 
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+            // The suite checks the route diagnostics themselves (witness, FogMod's listing), which exist only for internal QA; tests of the public behavior set it explicitly.
+            Environment.SetEnvironmentVariable(InternalQa.Variable, "1");
             try
             {
                 hostExe = ProcessHarness.Configure(
@@ -133,6 +135,9 @@ namespace FogHost.Tests
                 Test("an unconditional fixed exit out of the start hides the same trap (the original defect)", StartReachabilityTest.VerifySyntheticFakeUnconditionalExitHidesTheTrap);
                 Test("v6 boss-arena entry: a boss arena reachable only through the link back from its bell room is rejected; entering through its own fog keeps the link usable", BossArenaEntryTest.VerifySyntheticBossArenaEntry);
                 Test("v7 source contract: upstream-v7 is its own annotation source and inherits no Compact behavior", UpstreamV7Test.VerifySourceContract);
+                Test("internal QA switch: only exactly \"1\" enables it", InternalQaTest.VerifySwitchSemantics);
+                Test("internal QA: the witness sidecar and FogMod's route listing are behind the switch, the accepting search is not", () => InternalQaTest.VerifyRouteOutputIsBehindTheSwitch(RepoRoot()));
+                DataTest("internal QA: a host run writes no route listing unless enabled, and the same files either way", RouteListingFollowsTheSwitch);
                 if (dataRoot != null)
                 {
                     Test("v7 annotation file is the verified upstream fog.txt, with no project-only data", UpstreamV7Test.VerifyAnnotationFileIsTheVerifiedUpstreamFile);
@@ -6645,6 +6650,30 @@ namespace FogHost.Tests
             string dir = MakeStaging("unsafe");
             File.WriteAllText(Path.Combine(dir, "game", "DarkSoulsRemastered.exe"), "not a game");
             ExpectError(Run(dir, Request(dir, dataRoot)), "FOG_STAGING_UNSAFE");
+        }
+
+        /// <summary>The same Fog seed with the switch off and on: identical staging tree (the switch only decides diagnostics), a route listing only with it on.</summary>
+        private static void RouteListingFollowsTheSwitch()
+        {
+            string previous = Environment.GetEnvironmentVariable(InternalQa.Variable);
+            try
+            {
+                var trees = new List<string>();
+                var logs = new List<string>();
+                foreach (string setting in new[] { null, "1" })
+                {
+                    Environment.SetEnvironmentVariable(InternalQa.Variable, setting);
+                    string dir = MakeStaging(setting == null ? "qa-off" : "qa-on");
+                    ExpectOk(Run(dir, Request(dir, dataRoot)));
+                    trees.Add(TreeHash(Path.Combine(dir, "game")));
+                    logs.Add(File.ReadAllText(Path.Combine(dir, "foghost.log")));
+                    Check(!File.Exists(Path.Combine(dir, "solver-witness.json")) || setting == "1", "no witness sidecar without internal QA");
+                }
+                Check(trees[0] == trees[1], "the switch must not change a single generated file");
+                Check(!logs[0].Contains("  From ", StringComparison.Ordinal) && !logs[0].Contains("<----", StringComparison.Ordinal), "the log must carry no route listing without internal QA");
+                Check(logs[1].Contains("  From ", StringComparison.Ordinal), "internal QA keeps FogMod's route listing in the log");
+            }
+            finally { Environment.SetEnvironmentVariable(InternalQa.Variable, previous); }
         }
 
         private static void DryRunUnchanged()

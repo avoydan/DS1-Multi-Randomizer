@@ -196,7 +196,8 @@ namespace FogHost
                 // The witness observes the very search that accepts the world; it changes nothing about it (docs/SOLVER_WITNESS.md).
                 var witnessObserver = new WitnessObserver();
                 GraphChecker.CheckRecord accepted = StartReachabilityValidator.Validate(opt, graph, witnessObserver);
-                WriteSolverWitness(request, opt, graph, ann, accepted, witnessObserver, input.Params["ItemLotParam"]);
+                // The route is internal QA material (docs/INTERNAL_QA.md): the search above always runs; the sidecar exists only when the backend enabled it.
+                if (InternalQa.Enabled) WriteSolverWitness(request, opt, graph, ann, accepted, witnessObserver, input.Params["ItemLotParam"]);
             }
 
             Enter("write-game-data", request.DryRun ? "Computing game data (dry run)." : "Writing game data to staging.");

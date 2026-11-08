@@ -16,7 +16,7 @@ The bundle is assembled from **named entries only** (`BUNDLE_ALLOWLIST` in `apps
 | `generation/run-manifest.json` | the manifest of the described world, or of the **last failed generation** when it is newer; attempts, validation notes, **package file hashes** |
 | `generation/generation-summary.json` | the last generate / apply / restore / failure (codes, stages, timings, counts) |
 | `generation/validation-summary.json` | validation reason codes, attempts, enemy / key placement validation, warnings and errors |
-| `generation/solver-route.md`, `generation/solver-witness.json` | the solver route of the described world and its full proof tree (`docs/SOLVER_WITNESS.md`); no paths, no timestamps; absent for a world made before the feature or without Fog |
+| *(internal QA builds only)* `generation/solver-route.md`, `generation/solver-witness.json` | the solver route and proof tree (`docs/SOLVER_WITNESS.md`). **Not on the allowlist of a normal build**: a public bundle never contains them and refuses them if offered (`docs/INTERNAL_QA.md`) |
 | `logs/app.log`, `logs/backend.log`, `logs/relevant-generation.log` | the newest lines (size-limited) |
 | `release/release-manifest.json` | the build information and signing state |
 

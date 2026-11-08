@@ -8,11 +8,13 @@ import { isSolverWitnessDocument, renderSolverRoute, renderSolverSteps, renderSo
 import { GameStateAuthority, executableName, managedRoots } from '../../dist/core/gameState.js';
 import { generateRun } from '../../dist/core/generationPipeline.js';
 import { prepareRun } from '../../dist/core/seededRun.js';
-import { BUNDLE_ALLOWLIST, buildSupportBundle } from '../../dist/core/supportBundle.js';
+import { BUNDLE_ALLOWLIST, INTERNAL_QA_BUNDLE_ENTRIES, buildSupportBundle } from '../../dist/core/supportBundle.js';
 import { fogAttemptDirectory, locateWitnessFile, persistSolverWitness, readWitnessDocument, solverRouteAvailableFor, solverRouteForEntry, witnessContext } from '../../dist/core/solverWitnessStore.js';
 
 // The solver witness (docs/SOLVER_WITNESS.md): what FogHost records inside the accepting search, how the backend keeps it next to the run (never in the
 // package) and how it is rendered for a person. The graph itself is tested in tools/fog-host/tests/SolverWitnessTest.cs; these tests cover everything after it.
+// The route exists only in internal QA (docs/INTERNAL_QA.md); the real-generation test below runs FogHost as internal QA does.
+process.env.DS1TR_INTERNAL_QA = '1';
 const smokeCode = 'DS1TR1-06NWCQQ3-K2GXEE39-K5WRJEDT-CNKBNHDS-Z7CTKEJ6-0S36D1M6-0S3A7NEF-D3TK6PQX-HHB3ZGX2-Z80G12X8-GYBG';
 const gameSource = process.env.DS1TR_GOLDEN_GAME_SOURCE;
 
@@ -202,16 +204,21 @@ test('store: a run without a witness (Fog off, an older run, a host that could n
   }
 });
 
-test('support bundle: the route and the witness are allowlisted entries and are carried unchanged', () => {
-  assert.ok(BUNDLE_ALLOWLIST.includes('generation/solver-route.md') && BUNDLE_ALLOWLIST.includes('generation/solver-witness.json'));
+test('support bundle: the route and the witness are internal QA entries, carried unchanged there and refused everywhere else', () => {
+  assert.ok(!BUNDLE_ALLOWLIST.includes('generation/solver-route.md') && !BUNDLE_ALLOWLIST.includes('generation/solver-witness.json'), 'not on the public allowlist');
+  assert.deepEqual([...INTERNAL_QA_BUNDLE_ENTRIES], ['generation/solver-route.md', 'generation/solver-witness.json']);
   const document = fixtureDocument();
-  const bundle = buildSupportBundle([
+  const sources = [
     { name: 'summary.txt', content: 'x' },
     { name: 'generation/solver-route.md', content: renderSolverRoute(document) },
     { name: 'generation/solver-witness.json', content: JSON.stringify(document) },
-  ], { directories: [], secrets: [] }, { seedCode: document.context.seedCode });
+  ];
+  const bundle = buildSupportBundle(sources, { directories: [], secrets: [] }, { seedCode: document.context.seedCode, internalQa: true });
   assert.equal(bundle.ok, true, bundle.ok ? '' : `${bundle.code}: ${bundle.detail}`);
   assert.deepEqual(bundle.report.entries.map((entry) => entry.name).sort(), ['generation/solver-route.md', 'generation/solver-witness.json', 'summary.txt']);
+  const publicBundle = buildSupportBundle(sources, { directories: [], secrets: [] }, { seedCode: document.context.seedCode });
+  assert.equal(publicBundle.ok, false, 'a public bundle cannot carry a route even when a caller offers one');
+  assert.equal(publicBundle.code, 'BUNDLE_INVALID_ENTRY');
 });
 
 async function hashTree(root) {
